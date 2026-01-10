@@ -47,6 +47,8 @@ abc/
 │   ├── tsconfig.json
 │   ├── tailwind.config.js
 │   └── index.html
+├── docs/
+├── ml-service/
 └── database/
     └── seeders/
         └── seed.sql        # Initial user data (3 users)
