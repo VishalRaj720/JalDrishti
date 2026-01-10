@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 1st Month Project - User Authentication System
 
 This is a scoped version of the groundwater-platform project, containing only the deliverables for the **1st month report**. The project demonstrates a complete user authentication system with database setup, backend API, and frontend UI.
