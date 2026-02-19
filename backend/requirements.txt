@@ -1,0 +1,51 @@
+# FastAPI core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+geoalchemy2==0.17.0
+psycopg2-binary==2.9.10
+
+# Pydantic & settings
+pydantic==2.10.4
+pydantic-settings==2.6.1
+email-validator==2.2.0
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[argon2]==1.7.4
+argon2-cffi==23.1.0
+
+# Async HTTP (for ML service calls)
+httpx==0.28.1
+
+# Celery + Redis
+celery==5.4.0
+redis==5.2.1
+flower==2.0.1
+
+# Rate limiting
+slowapi==0.1.9
+
+# Logging
+loguru==0.7.3
+
+# Data ingestion
+pandas==2.2.3
+geopandas==1.0.1
+shapely==2.0.6
+openpyxl==3.1.5
+
+# Monitoring (stubs)
+sentry-sdk[fastapi]==2.19.2
+prometheus-fastapi-instrumentator==7.0.0
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1
+anyio==4.7.0
