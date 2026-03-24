@@ -10,7 +10,7 @@ class SignupRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str   # plain str to accept .local and other non-standard TLDs
     password: str
 
 

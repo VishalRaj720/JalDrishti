@@ -1,0 +1,15 @@
+﻿src/components/common/ProtectedRoute.tsx(14,36): error TS2339: Property 'loading' does not exist on type '{ user: User | null; accessToken: string | null; role: UserRole | null; isAuthenticated: boolean; login: (username: string, password: string) => Promise<User>; logoutUser: () => Promise<...>; }'.
+src/pages/AquifersPage.tsx(71,17): error TS2322: Type '(vals: AquiferCreate) => Promise<Aquifer>' is not assignable to type '(values: AquiferCreate) => Promise<void>'.
+  Type 'Promise<Aquifer>' is not assignable to type 'Promise<void>'.
+    Type 'Aquifer' is not assignable to type 'void'.
+src/pages/IsrPointsPage.tsx(84,17): error TS2322: Type '(vals: IsrPointCreate) => Promise<IsrPoint>' is not assignable to type '(values: IsrPointCreate) => Promise<void>'.
+  Type 'Promise<IsrPoint>' is not assignable to type 'Promise<void>'.
+    Type 'IsrPoint' is not assignable to type 'void'.
+src/pages/SimulationDetailPage.tsx(36,19): error TS2339: Property 'status' does not exist on type 'Query<Simulation, Error, Simulation, (string | undefined)[]>'.
+src/pages/SimulationDetailPage.tsx(36,49): error TS2339: Property 'status' does not exist on type 'Query<Simulation, Error, Simulation, (string | undefined)[]>'.
+src/utils/geoUtils.ts(1,22): error TS7016: Could not find a declaration file for module '@turf/simplify'. 'C:/Users/letsm/OneDrive/Desktop/JalDrishti/frontend/node_modules/@turf/simplify/dist/es/index.js' implicitly has an 'any' type.
+  There are types at 'C:/Users/letsm/OneDrive/Desktop/JalDrishti/frontend/node_modules/@turf/simplify/index.d.ts', but this result could not be resolved when respecting package.json "exports". The '@turf/simplify' library may need to update its package.json or typings.
+src/utils/geoUtils.ts(2,20): error TS7016: Could not find a declaration file for module '@turf/buffer'. 'C:/Users/letsm/OneDrive/Desktop/JalDrishti/frontend/node_modules/@turf/buffer/dist/es/index.js' implicitly has an 'any' type.
+  There are types at 'C:/Users/letsm/OneDrive/Desktop/JalDrishti/frontend/node_modules/@turf/buffer/index.d.ts', but this result could not be resolved when respecting package.json "exports". The '@turf/buffer' library may need to update its package.json or typings.
+src/utils/geoUtils.ts(3,31): error TS7016: Could not find a declaration file for module '@turf/boolean-intersects'. 'C:/Users/letsm/OneDrive/Desktop/JalDrishti/frontend/node_modules/@turf/boolean-intersects/dist/es/index.js' implicitly has an 'any' type.
+  There are types at 'C:/Users/letsm/OneDrive/Desktop/JalDrishti/frontend/node_modules/@turf/boolean-intersects/dist/js/index.d.ts', but this result could not be resolved when respecting package.json "exports". The '@turf/boolean-intersects' library may need to update its package.json or typings.

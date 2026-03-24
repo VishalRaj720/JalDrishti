@@ -1,96 +1,94 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useState } from 'react';
+import {
+    Box, Paper, Typography, TextField, Button, Alert,
+    CircularProgress, InputAdornment, IconButton,
+} from '@mui/material';
+import { VisibilityOutlined, VisibilityOffOutlined } from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { classifyError, getUserFriendlyMessage } from '@/utils/errorClassifier';
 
-export const LoginPage: React.FC = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+const LoginPage: React.FC = () => {
     const { login } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+    const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
+
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPwd, setShowPwd] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
         setLoading(true);
-
+        setError(null);
         try {
-            await login({ email, password });
-            navigate('/dashboard');
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Login failed. Please try again.');
+            await login(email, password);
+            navigate(from, { replace: true });
+        } catch (err) {
+            const category = classifyError(err);
+            setError(getUserFriendlyMessage(category));
         } finally {
             setLoading(false);
         }
     };
 
-
     return (
-        <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
-            <div className="card max-w-md w-full">
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                        1st Month Project
-                    </h1>
-                    <p className="text-gray-600">
-                        User Authentication System
-                    </p>
-                </div>
+        <Box
+            sx={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'background.default',
+                background: 'radial-gradient(ellipse at 20% 60%, rgba(56,189,248,0.08) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(45,212,191,0.06) 0%, transparent 60%)',
+                p: 2,
+            }}
+        >
+            <Paper sx={{ p: 4, width: '100%', maxWidth: 420 }}>
+                <Box textAlign="center" mb={3}>
+                    <Typography variant="h4" fontWeight={700} color="primary.main">💧 JalDrishti</Typography>
+                    <Typography variant="body2" color="text.secondary" mt={0.5}>
+                        Groundwater Intelligence Platform
+                    </Typography>
+                </Box>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                            {error}
-                        </div>
-                    )}
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-                    <div>
-                        <label htmlFor="email" className="label">
-                            Email
-                        </label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="input"
-                            required
-                            autoComplete="email"
-                        />
-                    </div>
-
-                    <div>
-                        <label htmlFor="password" className="label">
-                            Password
-                        </label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="input"
-                            required
-                            autoComplete="current-password"
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                <form onSubmit={handleSubmit}>
+                    <TextField
+                        id="email" fullWidth label="Email" type="email"
+                        value={email} onChange={(e) => setEmail(e.target.value)}
+                        required autoFocus sx={{ mb: 2 }}
+                    />
+                    <TextField
+                        id="password" fullWidth label="Password"
+                        type={showPwd ? 'text' : 'password'}
+                        value={password} onChange={(e) => setPassword(e.target.value)}
+                        required sx={{ mb: 3 }}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton onClick={() => setShowPwd(!showPwd)} edge="end" aria-label="Toggle password visibility">
+                                        {showPwd ? <VisibilityOffOutlined /> : <VisibilityOutlined />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                    <Button
+                        id="login-btn" type="submit" fullWidth variant="contained"
+                        size="large" disabled={loading}
+                        startIcon={loading ? <CircularProgress size={18} /> : undefined}
                     >
-                        {loading ? 'Logging in...' : 'Login'}
-                    </button>
+                        {loading ? 'Signing in…' : 'Sign In'}
+                    </Button>
                 </form>
-
-                <div className="mt-6 text-center text-sm text-gray-600">
-                    <p>Demo credentials:</p>
-                    <p className="font-mono mt-1">admin@example.com / admin123</p>
-                    <p className="font-mono">analyst@example.com / analyst123</p>
-                    <p className="font-mono">viewer@example.com / viewer123</p>
-                </div>
-            </div>
-        </div>
+            </Paper>
+        </Box>
     );
 };
+
+export default LoginPage;

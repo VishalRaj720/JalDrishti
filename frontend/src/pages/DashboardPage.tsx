@@ -1,81 +1,116 @@
-import React from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import React, { lazy } from 'react';
+import {
+    Box, Grid, Typography, Card, CardContent, Chip,
+    LinearProgress,
+} from '@mui/material';
+import {
+    WaterOutlined, MapOutlined, ScienceOutlined, AssessmentOutlined,
+} from '@mui/icons-material';
+import {
+    ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts';
+import { useFetchDistricts } from '@/hooks/useFetchDistricts';
+import { useFetchAquifers } from '@/hooks/useFetchAquifers';
+import { useFetchIsrPoints } from '@/hooks/useFetchIsrPoints';
+import { useAuth } from '@/hooks/useAuth';
+import { vulnerabilityColor } from '@/utils/geoUtils';
 
-export const DashboardPage: React.FC = () => {
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
+const DashboardPage: React.FC = () => {
+    const { user } = useAuth();
+    const { data: districts = [] } = useFetchDistricts();
+    const { data: aquifers = [] } = useFetchAquifers();
+    const { data: isrPoints = [] } = useFetchIsrPoints();
 
-    const handleLogout = async () => {
-        await logout();
-        navigate('/login');
-    };
+    // Vulnerability distribution for chart
+    const vulnData = districts.map((d) => ({
+        name: d.name.substring(0, 10),
+        index: d.vulnerability_index ?? 0,
+    }));
+
+    const stats = [
+        { label: 'Districts', value: districts.length, icon: <MapOutlined />, color: 'primary.main' },
+        { label: 'Aquifers', value: aquifers.length, icon: <WaterOutlined />, color: 'secondary.main' },
+        { label: 'ISR Points', value: isrPoints.length, icon: <ScienceOutlined />, color: 'warning.main' },
+        {
+            label: 'Avg Vulnerability',
+            value: districts.length
+                ? (districts.reduce((a, d) => a + (d.vulnerability_index ?? 0), 0) / districts.length).toFixed(2)
+                : '—',
+            icon: <AssessmentOutlined />,
+            color: 'error.main',
+        },
+    ];
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16 items-center">
-                        <h1 className="text-xl font-bold text-gray-900">
-                            1st Month Project - Dashboard
-                        </h1>
-                        <button
-                            onClick={handleLogout}
-                            className="btn-secondary"
-                        >
-                            Logout
-                        </button>
-                    </div>
-                </div>
-            </nav>
+        <Box>
+            <Typography variant="h5" fontWeight={700} mb={0.5}>
+                Dashboard
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+                Welcome back, <strong>{user?.username}</strong>
+            </Typography>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="card">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                        Welcome, {user?.name}!
-                    </h2>
+            {/* KPI Cards */}
+            <Grid container spacing={2} mb={3}>
+                {stats.map((stat) => (
+                    <Grid item xs={12} sm={6} md={3} key={stat.label}>
+                        <Card sx={{ height: '100%' }}>
+                            <CardContent>
+                                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                                    <Box>
+                                        <Typography variant="h4" fontWeight={700}>
+                                            {stat.value}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" mt={0.5}>
+                                            {stat.label}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ color: stat.color, opacity: 0.9 }}>{stat.icon}</Box>
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
 
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-blue-50 p-4 rounded-lg">
-                                <h3 className="font-semibold text-gray-700 mb-2">Email</h3>
-                                <p className="text-gray-900">{user?.email}</p>
-                            </div>
-
-                            <div className="bg-green-50 p-4 rounded-lg">
-                                <h3 className="font-semibold text-gray-700 mb-2">Role</h3>
-                                <p className="text-gray-900 capitalize">{user?.role}</p>
-                            </div>
-
-                            <div className="bg-purple-50 p-4 rounded-lg">
-                                <h3 className="font-semibold text-gray-700 mb-2">User ID</h3>
-                                <p className="text-gray-900 font-mono text-sm">{user?.id}</p>
-                            </div>
-
-                            <div className="bg-yellow-50 p-4 rounded-lg">
-                                <h3 className="font-semibold text-gray-700 mb-2">Status</h3>
-                                <p className="text-green-600 font-semibold">✓ Authenticated</p>
-                            </div>
-                        </div>
-
-                        <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                                🎉 1st Month Scope Completed
-                            </h3>
-                            <p className="text-gray-700 mb-2">
-                                This project demonstrates the following features:
-                            </p>
-                            <ul className="list-disc list-inside space-y-1 text-gray-700">
-                                <li>User database entity with 3 roles (Admin, Analyst, Viewer)</li>
-                                <li>JWT-based authentication system</li>
-                                <li>Login UI with role-based access</li>
-                                <li>Protected dashboard route</li>
-                                <li>Token refresh mechanism</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </main>
-        </div>
+            {/* Vulnerability Chart */}
+            <Card>
+                <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} mb={2}>
+                        District Vulnerability Index
+                    </Typography>
+                    {vulnData.length === 0 ? (
+                        <Typography color="text.secondary" variant="body2">
+                            No district data available.
+                        </Typography>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                            <AreaChart data={vulnData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                                <defs>
+                                    <linearGradient id="vIdx" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f87171" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#f87171" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                <YAxis domain={[0, 1]} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                <Tooltip
+                                    contentStyle={{ background: '#111e35', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
+                                    labelStyle={{ color: '#e2e8f0' }}
+                                />
+                                <Area
+                                    type="monotone" dataKey="index"
+                                    stroke="#f87171" strokeWidth={2}
+                                    fill="url(#vIdx)"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    )}
+                </CardContent>
+            </Card>
+        </Box>
     );
 };
+
+export default DashboardPage;

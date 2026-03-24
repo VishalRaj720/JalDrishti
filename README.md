@@ -1,216 +1,133 @@
-# 1st Month Project - User Authentication System
+# JalDrishti – Groundwater Contamination Assessment Platform
 
-This is a scoped version of the groundwater-platform project, containing only the deliverables for the **1st month report**. The project demonstrates a complete user authentication system with database setup, backend API, and frontend UI.
+JalDrishti is a modern **Groundwater Contamination ISR (In-Situ Recovery) Impact Assessment Platform**. It models how uranium and other contaminant plumes propagate through aquifer systems from ISR mining injection points. It supports spatial queries, async physics simulations, machine learning-based predictions, and comprehensive role-based access control (RBAC).
 
-## 📋 Project Scope (1st Month)
+## 🌟 Key Features
+- **Spatial Data:** Built-in support for MultiPolygon boundaries for districts, administrative blocks, and aquifers using PostGIS.
+- **Asynchronous Physics Simulations:** Advection-Dispersion Equation (ADE) plume geometry and Monte Carlo uncertainty estimation powered by Celery worker tasks.
+- **ML Integration:** Supports falling back to realistic prediction stubs or real ML microservice integrations for concentration and vulnerability assessments.
+- **RBAC (Role-Based Access Control):** Granular access levels (Admin, Analyst, Viewer).
+- **Interactive UI:** React + TypeScript single-page application built on Material UI (MUI), featuring data grids and map-ready abstractions.
 
-This project includes:
-
-- ✅ **Users Entity Database**: PostgreSQL database with users table supporting 3 roles
-- ✅ **Authentication System**: JWT-based authentication with token refresh
-- ✅ **Login UI**: React-based login interface with role-based access
-- ✅ **3 User Roles**: Admin, Analyst, and Viewer with different permissions
-- ✅ **Protected Routes**: Dashboard accessible only to authenticated users
-
-## 🏗️ Project Structure
-
-```
-abc/
-├── backend/                 # Node.js/Express/TypeScript backend
-│   ├── src/
-│   │   ├── config/         # Database and environment configuration
-│   │   ├── controllers/    # Authentication controller
-│   │   ├── middleware/     # Auth, role, and error handling middleware
-│   │   ├── models/         # User model (Sequelize ORM)
-│   │   ├── routes/         # Authentication routes
-│   │   ├── services/       # Authentication service
-│   │   ├── utils/          # JWT and logger utilities
-│   │   ├── app.ts          # Express app setup
-│   │   └── server.ts       # Server entry point
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── .env
-├── frontend/               # React/TypeScript frontend
-│   ├── src/
-│   │   ├── components/     # ProtectedRoute component
-│   │   ├── context/        # Authentication context
-│   │   ├── hooks/          # useAuth hook
-│   │   ├── pages/          # Login and Dashboard pages
-│   │   ├── routes/         # App routing
-│   │   ├── services/       # API client and auth service
-│   │   ├── types/          # TypeScript types
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   └── index.css
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
-│   ├── tailwind.config.js
-│   └── index.html
-├── docs/
-├── ml-service/
-└── database/
-    └── seeders/
-        └── seed.sql        # Initial user data (3 users)
-```
-
-## 🚀 Setup Instructions
-
-### Prerequisites
-
-- Node.js (v18 or higher)
-- PostgreSQL (v14 or higher)
-- npm or yarn
-
-### 1. Database Setup
-
-1. Create a PostgreSQL database:
-```sql
-CREATE DATABASE groundwater_db;
-```
-
-2. Run the seed file to create users:
-```bash
-psql -U postgres -d groundwater_db -f database/seeders/seed.sql
-```
-
-### 2. Backend Setup
-
-1. Navigate to backend directory:
-```bash
-cd backend
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Configure environment variables:
-   - Update `.env` file with your database credentials
-   - Default configuration uses:
-     - Database: `groundwater_db`
-     - User: `postgres`
-     - Password: `040812` (change this!)
-     - Port: `5432`
-
-4. Start the backend server:
-```bash
-npm run dev
-```
-
-The backend will run on `http://localhost:5000`
-
-### 3. Frontend Setup
-
-1. Navigate to frontend directory:
-```bash
-cd frontend
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the development server:
-```bash
-npm run dev
-```
-
-The frontend will run on `http://localhost:5173`
-
-## 🔐 Test Credentials
-
-The system comes with 3 pre-configured users:
-
-| Role | Email | Password |
-|------|-------|----------|
-| **Admin** | admin@example.com | admin123 |
-| **Analyst** | analyst@example.com | analyst123 |
-| **Viewer** | viewer@example.com | viewer123 |
-
-## 🎯 Features Demonstrated
-
-### Backend Features
-- User model with password hashing (bcrypt)
-- JWT token generation and verification
-- Token refresh mechanism
-- Role-based authorization middleware
-- RESTful API endpoints for authentication
-- Error handling and validation (Joi)
-- Database connection with Sequelize ORM
-
-### Frontend Features
-- Login page with form validation
-- Authentication context and hooks
-- Protected routes with role checking
-- Token storage and automatic refresh
-- Dashboard displaying user information
-- Responsive UI with Tailwind CSS
-
-## 📡 API Endpoints
-
-### Authentication Routes (`/api/v1/auth`)
-
-- `POST /register` - Register a new user
-- `POST /login` - Login with email and password
-- `POST /refresh` - Refresh access token
-- `GET /me` - Get current user (protected)
-- `POST /logout` - Logout (protected)
-
-## 🔧 Technology Stack
-
+## 🏗️ Technology Stack
 ### Backend
-- **Runtime**: Node.js with TypeScript
-- **Framework**: Express.js
-- **Database**: PostgreSQL with Sequelize ORM
-- **Authentication**: JWT (jsonwebtoken)
-- **Password Hashing**: bcrypt
-- **Validation**: Joi
-- **Security**: Helmet, CORS, Rate Limiting
+- **Framework:** FastAPI (Python 3.10+) ⚡
+- **ORM & Database:** SQLAlchemy 2.0 (Async), PostgreSQL 14+, PostGIS 3.4
+- **Task Queue & Caching:** Celery, Redis
+- **Authentication:** JWT (Access & Refresh tokens)
+- **Migrations:** Alembic
 
 ### Frontend
-- **Framework**: React 18 with TypeScript
-- **Routing**: React Router v6
-- **Styling**: Tailwind CSS
-- **HTTP Client**: Axios
-- **Build Tool**: Vite
+- **Framework:** React 18 + TypeScript + Vite
+- **Global Data State:** Redux Toolkit
+- **Server State & Caching:** TanStack React Query
+- **Styling:** Material UI (MUI v5) + Tailwind CSS
 
-## 📝 What's NOT Included (Future Months)
+---
 
-This 1st month scope does NOT include:
-- Wells, water samples, or parameters entities
-- ML service integration for predictions
-- Map visualizations
-- CSV import functionality
-- Activity logs and alerts
-- Admin panel features
-- Data analytics and charts
+## 🚀 Setup & Installation (Local Development)
 
-These features are part of the full 10-month groundwater-platform project.
+### 📋 Prerequisites
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 14+ (with `PostGIS` extension installed)
+- Redis server (for caching and backend tasks)
 
-## 🐛 Troubleshooting
+### 🗄️ 1. Database Setup
+Ensure PostgreSQL is running, then create the database and enable PostGIS:
+```sql
+CREATE DATABASE groundwater_db;
+\c groundwater_db
+CREATE EXTENSION IF NOT EXISTS postgis;
+```
 
-### Backend won't start
-- Ensure PostgreSQL is running
-- Check database credentials in `.env`
-- Verify port 5000 is not in use
+### 🐍 2. Backend Setup
+1. Open a terminal and navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .\.venv\Scripts\activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Configure environment variables. The default `.env` will connect to `groundwater_db` on localhost with the user `postgres` and password `040812` (update `backend/.env` if your DB credentials are different).
+5. Run Alembic migrations to build the schema:
+   ```bash
+   alembic upgrade head
+   ```
+6. Seed the database with default users:
+   ```bash
+   python -m scripts.seed
+   ```
+7. Start the FastAPI development server:
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+   *The API will be running at `http://localhost:8000`. Swagger API documentation is available at `/docs`.*
 
-### Frontend won't connect to backend
-- Ensure backend is running on port 5000
-- Check CORS settings in backend `.env`
-- Verify API_URL in frontend (defaults to `http://localhost:5000/api/v1`)
+### ⚛️ 3. Frontend Setup
+1. Open a new terminal and navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the Vite development server:
+   ```bash
+   npm run dev
+   ```
+   *The application will be accessible at `http://localhost:5173`.*
 
-### Login fails
-- Ensure database has been seeded with users
-- Check browser console for error messages
-- Verify JWT secrets are set in backend `.env`
+---
 
-## 📄 License
+## 🔑 Test Credentials
+The `seed.py` script automatically creates three default users corresponding to the available system roles:
 
-MIT
+| Role | Email | Password | Allowed Actions |
+|------|-------|----------|-----------------|
+| **Admin** | `admin@jaldrishti.local` | `admin123` | Full access, manage users, run simulations, edit ISR points |
+| **Analyst** | `analyst@jaldrishti.local` | `analyst123` | Create & view simulations, edit ISR points, view models |
+| **Viewer** | `viewer@jaldrishti.local` | `viewer123` | Read-only access to districts, aquifers, and simulations |
 
-## 👨‍💻 Author
+---
 
-1st Month Project - Groundwater Platform Authentication System
+## 📂 Project Structure
+```text
+JalDrishti/
+├── backend/                  # FastAPI Application
+│   ├── app/
+│   │   ├── api/              # API v1 Routers (Auth, Districts, Simms, etc.)
+│   │   ├── models/           # SQLAlchemy ORM Models (Spatial, Users)
+│   │   ├── repositories/     # Data Access layer
+│   │   ├── services/         # Core business logic (Simulations, Auth)
+│   │   ├── tasks/            # Celery async tasks
+│   │   └── main.py           # Application Factory
+│   ├── scripts/              # DB Seeding and debugging scripts
+│   └── alembic/              # Database schema migrations
+├── frontend/                 # React Application
+│   ├── src/
+│   │   ├── api/              # Axios instances & interceptors
+│   │   ├── components/       # Shared UI components
+│   │   ├── pages/            # React Router page views
+│   │   ├── redux/            # Store and slices (Auth, UI)
+│   │   └── routes/           # RBAC-protected Router definitions
+└── docker-compose.yml        # (Experimental) Stack orchestration
+```
+
+## 🐳 Docker Deployment (Experimental)
+The repository includes a `docker-compose.yml` for containerized setups. However, as the `ml-service` microservice component is a WIP, running via Docker currently requires configuring or commenting out the `ml-service` dependency within the compose manifest.
+
+```bash
+docker-compose up --build
+```
+This spawns the PostgreSQL/PostGIS db, Redis cache, FastAPI backend, and Celery worker synchronously.
+
+---
+*Developed for the JalDrishti Groundwater Impact Assessment Platform.*

@@ -11,8 +11,11 @@ from app.services.auth import (
     create_access_token, create_refresh_token, decode_refresh_token
 )
 from app.exceptions import AppException
+from app.dependencies import get_current_user
+from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
 
 
 @router.post("/token", response_model=TokenResponse)
@@ -76,3 +79,10 @@ async def refresh_token(payload: RefreshRequest):
 async def logout():
     """Client-side token invalidation (stateless JWT: just drop the token)."""
     return MessageResponse(message="Logged out successfully. Please discard your tokens.")
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    """Return the profile of the currently authenticated user."""
+    return current_user
+

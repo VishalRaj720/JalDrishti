@@ -20,7 +20,7 @@ from app.exceptions import AppException
 logger.remove()
 logger.add(
     sys.stdout,
-    format='{"time":"{time:YYYY-MM-DD HH:mm:ss}", "level":"{level}", "message":"{message}"}',
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
     level="DEBUG" if settings.APP_ENV == "development" else "INFO",
     serialize=False,
 )
