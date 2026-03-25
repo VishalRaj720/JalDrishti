@@ -1,9 +1,14 @@
 import { lazy, Suspense } from 'react';
 import { Box, Paper } from '@mui/material';
-import { MapContainer, TileLayer, GeoJSON as LeafletGeoJSON, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import type { Map as LeafletMap } from 'leaflet';
 import { useMapContext } from '@/contexts/MapContext';
-import LoadingSpinner from '@/components/common/LoadingSpinner';
+import { DistrictLayer } from './layers/DistrictLayer';
+import { BlockLayer } from './layers/BlockLayer';
+import { AquiferLayer } from './layers/AquiferLayer';
+import { IsrPointLayer } from './layers/IsrPointLayer';
+import { PlumeLayer } from './layers/PlumeLayer';
+import { IsrPointDetailDrawer } from '../isr/IsrPointDetailDrawer';
 
 interface MapRefCapture {
     mapRef: React.MutableRefObject<LeafletMap | null>;
@@ -20,15 +25,7 @@ interface Props {
 }
 
 const MapView: React.FC<Props> = ({ height = '500px' }) => {
-    const { layers, mapRef } = useMapContext();
-
-    const layerColors: Record<string, string> = {
-        districts: '#38bdf8',
-        blocks: '#2dd4bf',
-        aquifers: '#a78bfa',
-        isr_points: '#fb923c',
-        plumes: '#f87171',
-    };
+    const { mapRef } = useMapContext();
 
     return (
         <Paper
@@ -55,22 +52,13 @@ const MapView: React.FC<Props> = ({ height = '500px' }) => {
                     maxZoom={19}
                 />
 
-                {Object.entries(layers).map(([key, layerState]) => {
-                    if (!layerState.visible || !layerState.data) return null;
-                    return (
-                        <LeafletGeoJSON
-                            key={key}
-                            data={layerState.data}
-                            style={{
-                                color: layerColors[key] ?? '#38bdf8',
-                                weight: 2,
-                                opacity: 0.9,
-                                fillOpacity: 0.15,
-                            }}
-                        />
-                    );
-                })}
+                <DistrictLayer />
+                <BlockLayer />
+                <AquiferLayer />
+                <IsrPointLayer />
+                <PlumeLayer />
             </MapContainer>
+            <IsrPointDetailDrawer />
         </Paper>
     );
 };

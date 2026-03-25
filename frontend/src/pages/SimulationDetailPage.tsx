@@ -6,11 +6,8 @@ import {
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { simulationsApi } from '@/api/simulationsApi';
-import {
-    ResponsiveContainer, LineChart, Line, XAxis, YAxis,
-    Tooltip as ReTooltip, CartesianGrid, ReferenceLine, Area, AreaChart,
-} from 'recharts';
 import { useSelector } from 'react-redux';
+import { SimulationResultCard } from '@/components/simulations/SimulationResultCard';
 import { selectPlumeGeometryBySimulationId, selectUncertaintyById } from '@/redux/slices/simulationsSlice';
 import { SIMULATION_STATUS_LABELS } from '@/utils/constants';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
@@ -32,10 +29,10 @@ const SimulationDetailPage: React.FC = () => {
         queryKey: ['simulations', id],
         queryFn: () => simulationsApi.getById(id!),
         enabled: !!id,
-        refetchInterval: (query) =>
-            query.state.data?.status === 'running' || query.state.data?.status === 'pending'
-                ? 3000
-                : false,
+        refetchInterval: (queryOrData: any) => {
+            const data = queryOrData?.state?.data ?? queryOrData;
+            return data?.status === 'running' || data?.status === 'pending' ? 3000 : false;
+        },
     });
 
     // Subscribe to real-time updates from WebSocket via Redux
@@ -45,12 +42,7 @@ const SimulationDetailPage: React.FC = () => {
     const effectiveUncertainty = uncertainty ?? sim?.uncertainty_estimate;
     const highUncertainty = effectiveUncertainty != null && effectiveUncertainty > 0.2;
 
-    // Build concentration chart data
-    const chartData =
-        sim?.estimated_concentration_spread?.time_steps?.map((t, i) => ({
-            time: t,
-            concentration: sim.estimated_concentration_spread?.concentrations?.[i] ?? 0,
-        })) ?? [];
+    // (Concentration chart data handled inside SimulationResultCard)
 
     if (isLoading) return <LoadingSpinner />;
     if (isError || !sim) {
@@ -131,35 +123,9 @@ const SimulationDetailPage: React.FC = () => {
                 </Grid>
 
                 {/* Concentration spread chart */}
-                {chartData.length > 0 && (
-                    <Grid item xs={12}>
-                        <Card>
-                            <CardContent>
-                                <Typography variant="subtitle1" fontWeight={600} mb={2}>
-                                    Concentration Spread Over Time
-                                </Typography>
-                                <ResponsiveContainer width="100%" height={220}>
-                                    <AreaChart data={chartData}>
-                                        <defs>
-                                            <linearGradient id="concGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#f87171" stopOpacity={0.35} />
-                                                <stop offset="95%" stopColor="#f87171" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                                        <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#94a3b8' }} label={{ value: 'Time (days)', position: 'insideBottom', fill: '#94a3b8', dy: 10 }} />
-                                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                                        <ReTooltip contentStyle={{ background: '#111e35', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }} />
-                                        {highUncertainty && (
-                                            <ReferenceLine y={0} stroke="#fbbf24" strokeDasharray="5 2" label={{ value: 'High uncertainty zone', fill: '#fbbf24', fontSize: 10 }} />
-                                        )}
-                                        <Area type="monotone" dataKey="concentration" stroke="#f87171" strokeWidth={2} fill="url(#concGrad)" />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                )}
+                <Grid item xs={12}>
+                    <SimulationResultCard simulation={sim as any} />
+                </Grid>
 
                 {/* Audit */}
                 <Grid item xs={12}>

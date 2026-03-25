@@ -16,15 +16,13 @@ export const MainLayout: React.FC = () => {
     return (
         <MapProvider>
             <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-                <Sidebar width={SIDEBAR_WIDTH} />
+                <Sidebar open={sidebarOpen} />
                 <Box
                     component="main"
                     sx={{
                         flexGrow: 1,
                         display: 'flex',
                         flexDirection: 'column',
-                        ml: sidebarOpen ? `${SIDEBAR_WIDTH}px` : 0,
-                        transition: 'margin 0.3s ease',
                         overflow: 'hidden',
                     }}
                 >

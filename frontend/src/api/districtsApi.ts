@@ -3,8 +3,8 @@ import type { District, DistrictCreate, DistrictUpdate, Block, BlockCreate, Bloc
 
 // ── Districts ─────────────────────────────────────────────────────
 export const districtsApi = {
-    getAll: async (): Promise<District[]> => {
-        const { data } = await axiosInstance.get<District[]>('/districts/');
+    getAll: async (skip: number = 0, limit: number = 100): Promise<District[]> => {
+        const { data } = await axiosInstance.get<District[]>('/districts', { params: { skip, limit } });
         return data;
     },
 
@@ -14,7 +14,7 @@ export const districtsApi = {
     },
 
     create: async (payload: DistrictCreate): Promise<District> => {
-        const { data } = await axiosInstance.post<District>('/districts/', payload);
+        const { data } = await axiosInstance.post<District>('/districts', payload);
         return data;
     },
 
@@ -31,7 +31,7 @@ export const districtsApi = {
 // ── Blocks ────────────────────────────────────────────────────────
 export const blocksApi = {
     getByDistrict: async (districtId: string): Promise<Block[]> => {
-        const { data } = await axiosInstance.get<Block[]>(`/districts/${districtId}/blocks/`);
+        const { data } = await axiosInstance.get<Block[]>(`/districts/${districtId}/blocks`);
         return data;
     },
 
@@ -44,7 +44,7 @@ export const blocksApi = {
 
     create: async (districtId: string, payload: BlockCreate): Promise<Block> => {
         const { data } = await axiosInstance.post<Block>(
-            `/districts/${districtId}/blocks/`,
+            `/districts/${districtId}/blocks`,
             payload
         );
         return data;

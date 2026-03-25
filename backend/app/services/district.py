@@ -81,6 +81,9 @@ class BlockService:
             monitoring_stations=station_overviews,
         )
 
+    async def list_all(self, skip: int = 0, limit: int = 100) -> List[Block]:
+        return await self.repo.get_all(skip=skip, limit=limit)
+
     async def list_by_district(self, district_id: uuid.UUID) -> List[Block]:
         return await self.repo.get_by_district(district_id)
 

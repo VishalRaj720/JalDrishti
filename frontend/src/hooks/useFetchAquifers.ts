@@ -4,10 +4,10 @@ import type { AquiferCreate, AquiferUpdate } from '@/types/aquifer';
 
 export const AQUIFERS_QUERY_KEY = ['aquifers'] as const;
 
-export const useFetchAquifers = (blockId?: string) => {
+export const useFetchAquifers = (blockId?: string, skip: number = 0, limit: number = 100) => {
     return useQuery({
-        queryKey: blockId ? [...AQUIFERS_QUERY_KEY, blockId] : AQUIFERS_QUERY_KEY,
-        queryFn: () => aquifersApi.getAll(blockId ? { block_id: blockId } : undefined),
+        queryKey: blockId ? [...AQUIFERS_QUERY_KEY, blockId, skip, limit] : [...AQUIFERS_QUERY_KEY, skip, limit],
+        queryFn: () => aquifersApi.getAll({ block_id: blockId, skip, limit }),
         staleTime: 5 * 60 * 1000,
     });
 };

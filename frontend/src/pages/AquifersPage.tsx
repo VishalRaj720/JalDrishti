@@ -7,15 +7,24 @@ import { useRBAC } from '@/hooks/useRBAC';
 import { AquiferForm } from '@/components/forms/AquiferForm';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import type { AquiferCreate } from '@/types/aquifer';
+import { AquiferDetailDrawer } from '@/components/aquifers/AquiferDetailDrawer';
 
 const AquifersPage: React.FC = () => {
-    const { data: aquifers = [], isLoading } = useFetchAquifers();
+    const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
+    const { data: aquifers = [], isLoading } = useFetchAquifers(
+        undefined,
+        paginationModel.page * paginationModel.pageSize,
+        paginationModel.pageSize
+    );
     const createMutation = useCreateAquifer();
     const deleteMutation = useDeleteAquifer();
     const { canCreateEdit, canDelete } = useRBAC();
 
     const [formOpen, setFormOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [viewId, setViewId] = useState<string | null>(null);
+
+    const rowCount = aquifers.length === paginationModel.pageSize ? -1 : paginationModel.page * paginationModel.pageSize + aquifers.length;
 
     const columns: GridColDef[] = [
         { field: 'name', headerName: 'Name', flex: 1 },
@@ -40,6 +49,12 @@ const AquifersPage: React.FC = () => {
             field: 'updated_at', headerName: 'Last Updated', width: 140,
             valueFormatter: ({ value }) => value ? new Date(value as string).toLocaleDateString() : '—',
         },
+        {
+            field: 'view', headerName: '', width: 80,
+            renderCell: ({ row }) => (
+                <Button size="small" onClick={() => setViewId(row.id)}>View</Button>
+            ),
+        },
         ...(canDelete ? [{
             field: 'actions', headerName: '', width: 90,
             renderCell: ({ row }: { row: { id: string } }) => (
@@ -62,6 +77,11 @@ const AquifersPage: React.FC = () => {
             <DataGrid
                 rows={aquifers} columns={columns} loading={isLoading}
                 autoHeight disableRowSelectionOnClick
+                paginationMode="server"
+                paginationModel={paginationModel}
+                onPaginationModelChange={setPaginationModel}
+                rowCount={rowCount}
+                pageSizeOptions={[25, 50, 100]}
                 sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
             />
 
@@ -82,6 +102,8 @@ const AquifersPage: React.FC = () => {
                 onCancel={() => setDeleteId(null)}
                 loading={deleteMutation.isPending}
             />
+            
+            <AquiferDetailDrawer aquiferId={viewId} onClose={() => setViewId(null)} />
         </Box>
     );
 };

@@ -6,8 +6,9 @@ import { useFetchDistricts, useDeleteDistrict } from '@/hooks/useFetchDistricts'
 import { useRBAC } from '@/hooks/useRBAC';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { vulnerabilityColor } from '@/utils/geoUtils';
+import { DistrictDetailDrawer } from '@/components/districts/DistrictDetailDrawer';
 
-const columns = (onDelete: (id: string) => void, canDelete: boolean): GridColDef[] => [
+const columns = (onDelete: (id: string) => void, canDelete: boolean, onView: (id: string) => void): GridColDef[] => [
     { field: 'name', headerName: 'District', flex: 1 },
     {
         field: 'vulnerability_index',
@@ -38,8 +39,14 @@ const columns = (onDelete: (id: string) => void, canDelete: boolean): GridColDef
         width: 150,
         valueFormatter: ({ value }) => value ? new Date(value as string).toLocaleDateString() : '—',
     },
+    {
+        field: 'view', headerName: '', width: 80,
+        renderCell: ({ row }) => (
+            <Button size="small" onClick={() => onView(row.id)}>View</Button>
+        ),
+    },
     ...(canDelete ? [{
-        field: 'actions', headerName: '', width: 100,
+        field: 'actions', headerName: '', width: 80,
         renderCell: ({ row }: { row: { id: string } }) => (
             <Button size="small" color="error" onClick={() => onDelete(row.id)}>Delete</Button>
         ),
@@ -47,10 +54,18 @@ const columns = (onDelete: (id: string) => void, canDelete: boolean): GridColDef
 ];
 
 const DistrictsPage: React.FC = () => {
-    const { data: districts = [], isLoading } = useFetchDistricts();
+    const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
+    const { data: districts = [], isLoading } = useFetchDistricts(
+        paginationModel.page * paginationModel.pageSize,
+        paginationModel.pageSize
+    );
     const deleteMutation = useDeleteDistrict();
     const { canDelete } = useRBAC();
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [viewId, setViewId] = useState<string | null>(null);
+
+    // Approximate rowCount based on length
+    const rowCount = districts.length === paginationModel.pageSize ? -1 : paginationModel.page * paginationModel.pageSize + districts.length;
 
     return (
         <Box>
@@ -60,10 +75,15 @@ const DistrictsPage: React.FC = () => {
 
             <DataGrid
                 rows={districts}
-                columns={columns((id) => setDeleteId(id), canDelete)}
+                columns={columns((id) => setDeleteId(id), canDelete, (id) => setViewId(id))}
                 loading={isLoading}
                 autoHeight
                 disableRowSelectionOnClick
+                paginationMode="server"
+                paginationModel={paginationModel}
+                onPaginationModelChange={setPaginationModel}
+                rowCount={rowCount}
+                pageSizeOptions={[25, 50, 100]}
                 sx={{
                     border: '1px solid',
                     borderColor: 'divider',
@@ -82,6 +102,7 @@ const DistrictsPage: React.FC = () => {
                 onCancel={() => setDeleteId(null)}
                 loading={deleteMutation.isPending}
             />
+            <DistrictDetailDrawer districtId={viewId} onClose={() => setViewId(null)} />
         </Box>
     );
 };

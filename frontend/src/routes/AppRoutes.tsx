@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner';
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const DistrictsPage = lazy(() => import('@/pages/DistrictsPage'));
+const BlocksPage = lazy(() => import('@/pages/BlocksPage'));
 const AquifersPage = lazy(() => import('@/pages/AquifersPage'));
 const IsrPointsPage = lazy(() => import('@/pages/IsrPointsPage'));
 const SimulationDetailPage = lazy(() => import('@/pages/SimulationDetailPage'));
@@ -29,6 +30,7 @@ export const AppRoutes: React.FC = () => {
                 >
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/districts" element={<DistrictsPage />} />
+                    <Route path="/blocks" element={<BlocksPage />} />
                     <Route path="/aquifers" element={<AquifersPage />} />
                     <Route
                         path="/simulations/:id"

@@ -9,6 +9,8 @@ from app.services.district import DistrictService
 from app.dependencies import require_analyst_or_admin, require_admin, require_any_role
 from app.exceptions import AppException
 
+from fastapi.responses import JSONResponse
+
 router = APIRouter(prefix="/districts", tags=["Districts"])
 
 
@@ -19,6 +21,31 @@ async def list_districts(
     _=Depends(require_any_role),
 ):
     return await DistrictService(db).list(skip=skip, limit=limit)
+
+
+@router.get("/geojson", response_class=JSONResponse)
+async def districts_geojson(
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_any_role)
+):
+    """Return all districts as a single GeoJSON FeatureCollection."""
+    from shapely.geometry import mapping
+    from geoalchemy2.shape import to_shape
+    districts = await DistrictService(db).list(limit=500)
+    features = []
+    for d in districts:
+        if d.geometry:
+            features.append({
+                "type": "Feature",
+                "geometry": mapping(to_shape(d.geometry)),
+                "properties": {
+                    "id": str(d.id),
+                    "name": d.name,
+                    "vulnerability_index": float(d.vulnerability_index) if d.vulnerability_index else None,
+                    "avg_porosity": float(d.avg_porosity) if d.avg_porosity else None,
+                }
+            })
+    return {"type": "FeatureCollection", "features": features}
 
 
 @router.get("/{district_id}", response_model=DistrictResponse)

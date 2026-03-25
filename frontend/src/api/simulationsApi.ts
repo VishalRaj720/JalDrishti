@@ -18,4 +18,9 @@ export const simulationsApi = {
         );
         return data;
     },
+
+    run: async (isrId: string): Promise<Simulation> => {
+        const { data } = await axiosInstance.post<Simulation>('/simulations/', { isr_point_id: isrId });
+        return data;
+    },
 };

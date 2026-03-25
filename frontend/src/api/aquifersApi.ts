@@ -2,8 +2,8 @@ import axiosInstance from './axiosInstance';
 import type { Aquifer, AquiferCreate, AquiferUpdate } from '@/types/aquifer';
 
 export const aquifersApi = {
-    getAll: async (params?: { block_id?: string }): Promise<Aquifer[]> => {
-        const { data } = await axiosInstance.get<Aquifer[]>('/aquifers/', { params });
+    getAll: async (params?: { block_id?: string; skip?: number; limit?: number }): Promise<Aquifer[]> => {
+        const { data } = await axiosInstance.get<Aquifer[]>('/aquifers', { params });
         return data;
     },
 
@@ -13,7 +13,7 @@ export const aquifersApi = {
     },
 
     create: async (payload: AquiferCreate): Promise<Aquifer> => {
-        const { data } = await axiosInstance.post<Aquifer>('/aquifers/', payload);
+        const { data } = await axiosInstance.post<Aquifer>('/aquifers', payload);
         return data;
     },
 

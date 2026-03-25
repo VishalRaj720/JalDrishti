@@ -200,10 +200,22 @@ class SimulationService:
             suggestion = _recovery_suggestion(avg_por if avg_por > 0 else None)
 
             # ── 9. Persist results ────────────────────────────────
+            import shapely.wkt
+            from shapely.geometry import mapping
+            plume_geom = mapping(shapely.wkt.loads(plume_wkt))
+
             updates = {
                 "status": "completed",
                 "affected_area": affected_area_km2,
-                "estimated_concentration_spread": ml_result["concentration"],
+                "estimated_concentration_spread": {
+                    **ml_result["concentration"],
+                    "geometry": plume_geom,
+                    "time_steps": [0, 90, 180, 270, 365],
+                    "concentrations": [
+                        ml_result["concentration"]["uranium"]["max"] * decay
+                        for decay in [1.0, 0.8, 0.6, 0.4, 0.2]
+                    ]
+                },
                 "vulnerability_assessment": ml_result["vulnerability"],
                 "uncertainty_estimate": uncertainty,
                 "suggested_recovery": suggestion,

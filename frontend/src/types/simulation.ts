@@ -43,6 +43,13 @@ export interface ConcentrationSpread {
     time_steps: number[];
     concentrations: number[];
     hydraulic_gradient?: number[];
+    uranium?: {
+        max: number;
+        exceeds_limit: boolean;
+        who_limit: number;
+        unit: string;
+    };
+    [key: string]: any;
 }
 
 export interface Simulation {

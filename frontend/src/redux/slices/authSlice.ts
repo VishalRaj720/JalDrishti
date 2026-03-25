@@ -8,6 +8,7 @@ interface AuthState {
     refreshToken: string | null;   // in-memory only – never persisted
     role: UserRole | null;
     isAuthenticated: boolean;
+    isInitialized: boolean;
 }
 
 const initialState: AuthState = {
@@ -16,6 +17,7 @@ const initialState: AuthState = {
     refreshToken: null,
     role: null,
     isAuthenticated: false,
+    isInitialized: false,
 };
 
 const authSlice = createSlice({
@@ -33,6 +35,7 @@ const authSlice = createSlice({
             }
             state.role = action.payload.user.role;
             state.isAuthenticated = true;
+            state.isInitialized = true;
         },
         updateToken: (state, action: PayloadAction<string>) => {
             state.accessToken = action.payload;
@@ -43,11 +46,15 @@ const authSlice = createSlice({
             state.refreshToken = null;
             state.role = null;
             state.isAuthenticated = false;
+            state.isInitialized = true;
+        },
+        setInitialized: (state) => {
+            state.isInitialized = true;
         },
     },
 });
 
-export const { setCredentials, updateToken, logout } = authSlice.actions;
+export const { setCredentials, updateToken, logout, setInitialized } = authSlice.actions;
 
 // Selectors
 export const selectCurrentUser = (state: RootState) => state.auth.user;
@@ -55,5 +62,6 @@ export const selectAccessToken = (state: RootState) => state.auth.accessToken;
 export const selectRefreshToken = (state: RootState) => state.auth.refreshToken;
 export const selectUserRole = (state: RootState) => state.auth.role;
 export const selectIsAuthenticated = (state: RootState) => state.auth.isAuthenticated;
+export const selectIsInitialized = (state: RootState) => state.auth.isInitialized;
 
 export default authSlice.reducer;
