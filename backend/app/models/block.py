@@ -26,6 +26,9 @@ class Block(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Relationships
     district: Mapped[object] = relationship("District", back_populates="blocks")
     aquifers: Mapped[list] = relationship("Aquifer", back_populates="block", lazy="select")
+    monitoring_stations: Mapped[list] = relationship(
+        "MonitoringStation", back_populates="block", lazy="select", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("name", "district_id", name="uq_block_name_district"),

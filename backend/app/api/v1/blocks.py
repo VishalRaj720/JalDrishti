@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.schemas.district import BlockCreate, BlockUpdate, BlockResponse
+from app.schemas.district import BlockCreate, BlockUpdate, BlockResponse, BlockDetailResponse
 from app.services.district import BlockService
 from app.dependencies import require_analyst_or_admin, require_admin, require_any_role
 from app.exceptions import AppException
@@ -21,17 +21,19 @@ async def list_blocks(
     return await BlockService(db).list_by_district(district_id)
 
 
-@router.get("/{block_id}", response_model=BlockResponse)
+@router.get("/{block_id}", response_model=BlockDetailResponse)
 async def get_block(
     district_id: uuid.UUID,
     block_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_any_role),
 ):
+    """Get a single block with an overview of all linked monitoring stations."""
     try:
-        return await BlockService(db).get(block_id)
+        return await BlockService(db).get_detail(block_id)
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
 
 
 @router.post("", response_model=BlockResponse, status_code=201)

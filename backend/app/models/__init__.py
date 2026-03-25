@@ -6,9 +6,10 @@ from app.models.block import Block  # noqa: F401
 from app.models.aquifer import Aquifer, AquiferType  # noqa: F401
 from app.models.isr_point import IsrPoint  # noqa: F401
 from app.models.simulation import Simulation, SimulationAquifer, PlumeParameter  # noqa: F401
-from app.models.monitoring_data import MonitoringData  # noqa: F401
+
 from app.models.hydraulic_head import HydraulicHead  # noqa: F401
 from app.models.ml_model import MLModel, MLModelType  # noqa: F401
+from app.models.monitoring_station import MonitoringStation, GroundwaterLevelReading  # noqa: F401
 
 __all__ = [
     "User", "UserRole",
@@ -17,7 +18,8 @@ __all__ = [
     "Aquifer", "AquiferType",
     "IsrPoint",
     "Simulation", "SimulationAquifer", "PlumeParameter",
-    "MonitoringData",
+
     "HydraulicHead",
     "MLModel", "MLModelType",
+    "MonitoringStation", "GroundwaterLevelReading",
 ]

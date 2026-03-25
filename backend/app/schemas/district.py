@@ -1,8 +1,11 @@
 """District and Block Pydantic schemas."""
 import uuid
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, List, TYPE_CHECKING
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from app.schemas.monitoring_station import MonitoringStationOverview
 
 
 class DistrictBase(BaseModel):
@@ -60,3 +63,11 @@ class BlockResponse(BlockBase):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class BlockDetailResponse(BlockResponse):
+    """Extended block response that includes a summary of linked monitoring stations."""
+    monitoring_stations: List[Any] = []  # List[MonitoringStationOverview] – avoid circular import
+
+    model_config = {"from_attributes": True}
+

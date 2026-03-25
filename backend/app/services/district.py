@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.district import DistrictRepository, BlockRepository
 from app.models.district import District
 from app.models.block import Block
-from app.schemas.district import DistrictCreate, DistrictUpdate, BlockCreate, BlockUpdate
+from app.schemas.district import DistrictCreate, DistrictUpdate, BlockCreate, BlockUpdate, BlockDetailResponse
 from app.exceptions import DuplicateResourceError, ResourceNotFoundError
 
 
@@ -63,6 +63,24 @@ class BlockService:
             raise ResourceNotFoundError("Block", str(block_id))
         return obj
 
+    async def get_detail(self, block_id: uuid.UUID) -> BlockDetailResponse:
+        """Return block with embedded overview of its monitoring stations."""
+        from app.services.monitoring_station import MonitoringStationService
+        block = await self.get(block_id)
+        station_service = MonitoringStationService(self.repo.db)
+        station_overviews = await station_service.get_station_overviews(block_id)
+        return BlockDetailResponse(
+            id=block.id,
+            name=block.name,
+            district_id=block.district_id,
+            aquifer_distribution=block.aquifer_distribution,
+            avg_porosity=block.avg_porosity,
+            avg_permeability=block.avg_permeability,
+            created_at=block.created_at,
+            updated_at=block.updated_at,
+            monitoring_stations=station_overviews,
+        )
+
     async def list_by_district(self, district_id: uuid.UUID) -> List[Block]:
         return await self.repo.get_by_district(district_id)
 
@@ -76,3 +94,4 @@ class BlockService:
     async def delete(self, block_id: uuid.UUID) -> None:
         obj = await self.get(block_id)
         await self.repo.delete(obj)
+

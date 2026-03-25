@@ -66,7 +66,6 @@ class Aquifer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Relationships
     block: Mapped[Optional[object]] = relationship("Block", back_populates="aquifers")
     hydraulic_heads: Mapped[list] = relationship("HydraulicHead", back_populates="aquifer")
-    monitoring_data: Mapped[list] = relationship("MonitoringData", back_populates="aquifer")
 
     __table_args__ = (
         Index("ix_aquifers_geometry", "geometry", postgresql_using="gist"),
