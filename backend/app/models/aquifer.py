@@ -53,6 +53,11 @@ class Aquifer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     storage_coefficient: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     specific_yield: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="%")
 
+    # Provenance: "original" | "derived" | "literature"
+    porosity_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    hydraulic_conductivity_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    transmissivity_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     # Water quality
     quality_ec: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="micromhos/cm")
     dtw_decadal_avg: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="Depth to water, m bgl")
