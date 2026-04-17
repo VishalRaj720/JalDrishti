@@ -276,4 +276,3 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ---
 
-*Generated at end of Month 3. Awaiting user confirmation before Step 6 (handover / next-month kickoff).*
