@@ -1,7 +1,7 @@
 import json
 import os
 
-INPUT = os.path.join(os.path.dirname(__file__), "..", "Datasets", "Sub district boundary.geojson")
+INPUT = os.path.join(os.path.dirname(__file__), "..", "Datasets", "Sub District Boundary.geojson")
 OUTPUT = os.path.join(os.path.dirname(__file__), "..", "Datasets", "Sub_District_Boundary_JH.geojson")
 
 STATE_CODE = "JH"
