@@ -1,0 +1,73 @@
+{
+  "station": {
+    "Station Code": "233830086313001",
+    "Station Name": "Sindri",
+    "Station Type": "Ground water",
+    "Agency Name": "Cgwb",
+    "State": "Jharkhand",
+    "District": "Dhanbad",
+    "Tehsil": "Baliapur",
+    "Data Acquisition": "Manual",
+    "Block": "Baliapur",
+    "Village": "Sindri",
+    "Latitude": "23.6417",
+    "Longitude": "86.525",
+    "Data Available From": "1991-08-01",
+    "Latest  Data Available": "2024-01-10",
+    "Type of Well": "Dug well",
+    "Aquifer Type": "-",
+    "Well Depth": "11.5",
+    "Unit": "m"
+  },
+  "readings": [
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2016-05-15T06:00:00",
+      "water_level_m": 7.71,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2017-05-15T06:00:00",
+      "water_level_m": 6.81,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2018-01-10T06:00:00",
+      "water_level_m": 2.31,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2020-11-30T00:00:00",
+      "water_level_m": -0.6,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-05-30T11:00:00",
+      "water_level_m": 5.24,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-11-10T11:00:00",
+      "water_level_m": 4.25,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-01-10T11:00:00",
+      "water_level_m": 2.93,
+      "unit": "m"
+    }
+  ]
+}

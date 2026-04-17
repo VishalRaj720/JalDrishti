@@ -1,0 +1,31 @@
+{
+  "station": {
+    "Station Code": "234750086275601",
+    "Station Name": "Panderpalli",
+    "Station Type": "Ground water",
+    "Agency Name": "Cgwb",
+    "State": "Jharkhand",
+    "District": "Dhanbad",
+    "Tehsil": "-",
+    "Data Acquisition": "Manual",
+    "Block": "-",
+    "Village": "-",
+    "Latitude": "23.7975",
+    "Longitude": "86.4658",
+    "Data Available From": "2023-11-10",
+    "Latest  Data Available": "2023-11-10",
+    "Type of Well": "-",
+    "Aquifer Type": "-",
+    "Well Depth": "-",
+    "Unit": "m"
+  },
+  "readings": [
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-11-10T11:00:00",
+      "water_level_m": 6.59,
+      "unit": "m"
+    }
+  ]
+}

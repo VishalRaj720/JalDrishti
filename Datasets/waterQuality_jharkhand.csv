@@ -1,0 +1,398 @@
+﻿S. No.,State,District,Location,Longitude,Latitude,Year,pH,EC (µS/cm at,CO3 (mg/L),HCO3,Cl (mg/L),F (mg/L),SO4,NO3,PO4,Total Hardness,Ca (mg/L),Mg (mg/L),Na (mg/L),K (mg/L),Fe (ppm),As (ppb),U (ppb),source_table
+1,Jharkhand,Bokaro,Phusro_Bermo,86.0011,23.7634,2023,7.75,1545,0,506,217,0.57,41,5,0.00,560,100,75,95,6,-,-,3.35,waterQuality_table36
+2,Jharkhand,Bokaro,Baramasia,86.3084,23.4805,2023,8.11,190,0,67,21,0.59,8,2,0.00,70,14,9,11,0,-,-,2.88,waterQuality_table36
+3,Jharkhand,Bokaro,Chandankiyari,86.3553,23.5758,2023,7.97,785,0,329,85,0.61,83,23,0.09,285,78,22,89,9,-,-,20.46,waterQuality_table36
+4,Jharkhand,Bokaro,Nutandih,86.3287,23.5256,2023,7.79,2235,0,622,291,0.47,161,26,0.28,1030,312,61,38,7,-,-,7.53,waterQuality_table36
+5,Jharkhand,Bokaro,Bokaro Railway Station,86.0835,23.6588,2023,7.96,771,0,348,28,0.82,47,13,0.11,215,60,16,75,11,-,-,3.63,waterQuality_table36
+6,Jharkhand,Bokaro,Chas,86.1774,23.626,2023,7.98,785,0,250,67,0.91,80,5,0.00,305,96,16,40,1,-,-,12.09,waterQuality_table36
+7,Jharkhand,Bokaro,Jaina More,86.0262,23.6699,2023,8.18,1148,0,262,167,0.52,94,33,0.00,450,118,38,55,1,-,-,15.81,waterQuality_table36
+8,Jharkhand,Bokaro,Pindarjora New,86.2023,23.5139,2023,8.24,1780,0,482,270,0.43,96,12,0.00,535,166,29,139,44,-,-,5.21,waterQuality_table36
+9,Jharkhand,Bokaro,Radhagaon Rly Station,86.0888,23.5967,2023,7.63,2127,0,555,320,0.34,116,41,0.00,810,238,52,109,16,-,-,2.51,waterQuality_table36
+10,Jharkhand,Bokaro,Gomia,85.8219,23.8001,2023,7.88,1405,0,580,124,1.36,47,3,0.00,405,88,45,131,9,-,-,2.14,waterQuality_table36
+11,Jharkhand,Bokaro,Tenughat,85.8445,23.7228,2023,7.79,549,0,183,50,0.74,37,14,0.21,230,62,18,21,1,-,-,7.35,waterQuality_table36
+12,Jharkhand,Bokaro,Banchas,85.9715,23.6229,2023,7.17,230,0,98,21,0.74,4,2,0.00,95,28,6,5,7,-,-,4.74,waterQuality_table36
+13,Jharkhand,Bokaro,Harmu,85.9365,23.6246,2023,7.62,492,0,226,32,0.39,11,6,0.00,200,42,23,18,4,-,-,2.88,waterQuality_table36
+14,Jharkhand,Bokaro,Nawadih,86.0422,23.8494,2023,7.89,920,0,268,97,0.71,80,24,0.09,385,104,30,34,0,-,-,5.49,waterQuality_table36
+15,Jharkhand,Bokaro,Petarbar,85.8468,23.6162,2023,7.8,1016,0,238,174,0.88,44,27,0.00,365,96,30,60,8,-,-,13.95,waterQuality_table36
+16,Jharkhand,Bokaro,Chandrapura,86.1185,23.7514,2023,7.64,1130,0,195,231,1.51,73,2,0.11,420,110,35,63,5,-,-,11.16,waterQuality_table36
+17,Jharkhand,Chatra,Behra Chocha,84.983,24.2187,2023,7.39,870,0,323,71,0.59,49,27,0.00,355,40,62,34,4,-,-,16.20,waterQuality_table36
+18,Jharkhand,Chatra,Chatra1,84.8721,24.2021,2023,7.63,1420,0,488,178,0.36,50,6,0.00,385,76,47,141,14,-,-,8.39,waterQuality_table36
+19,Jharkhand,Chatra,Gidhaur,85.0247,24.1757,2023,7.51,1609,0,543,153,1.51,99,47,0.00,565,94,80,95,26,-,-,16.58,waterQuality_table36
+20,Jharkhand,Chatra,Lohsinghna Khurd,84.8025,24.3459,2023,7.52,1771,0,519,238,1.53,86,38,0.09,550,62,96,150,9,-,-,17.62,waterQuality_table36
+21,Jharkhand,Chatra,Itkhori1,85.1662,24.3026,2023,7.72,583,0,250,39,0.81,25,8,0.12,220,34,33,30,3,-,-,4.06,waterQuality_table36
+22,Jharkhand,Chatra,Kanha Chatti,85.0318,24.2908,2023,7.63,1668,0,549,185,0.29,91,31,0.00,455,102,49,150,44,-,-,6.64,waterQuality_table36
+23,Jharkhand,Chatra,Bariya Chak,84.6426,24.2153,2023,8.17,483,0,214,32,0.86,11,13,0.00,190,36,24,19,9,-,-,0.72,waterQuality_table36
+24,Jharkhand,Chatra,Bandu,84.7583,24.0685,2023,7.41,431,0,183,21,0.5,26,5,0.05,185,28,28,12,4,-,-,2.72,waterQuality_table36
+25,Jharkhand,Chatra,Mayurhand,85.2423,24.2941,2023,7.83,1071,0,250,146,0.67,84,44,0.00,430,80,56,46,6,-,-,14.24,waterQuality_table36
+26,Jharkhand,Chatra,Barwadih,85.0618,24.1143,2023,7.66,448,0,146,36,0.51,27,34,0.00,155,28,21,19,21,-,-,1.06,waterQuality_table36
+27,Jharkhand,Chatra,Kukurman,84.6691,24.3078,2023,8.13,595,0,311,14,0.82,9,12,0.06,225,42,29,30,5,-,-,1.28,waterQuality_table36
+28,Jharkhand,Chatra,Bagra,84.8577,24.0367,2023,7.45,1158,0,372,131,0.46,53,42,0.00,375,88,38,85,13,-,-,2.68,waterQuality_table36
+29,Jharkhand,Chatra,Birhu,85.1824,23.9862,2023,7.5,689,0,153,75,0.17,86,34,0.00,245,66,19,43,3,-,-,0.00,waterQuality_table36
+30,Jharkhand,Chatra,Piri,85.1139,24.0043,2023,7.42,1365,0,525,92,0.69,95,32,0.00,490,88,66,65,45,-,-,2.99,waterQuality_table36
+31,Jharkhand,Chatra,Tutilawa1,85.0331,24.0387,2023,7.37,1369,0,384,170,0.3,95,40,0.00,540,134,50,62,6,-,-,2.82,waterQuality_table36
+32,Jharkhand,Chatra,Teliyadih,84.999,23.9537,2023,7.74,1917,0,555,259,0.47,97,42,0.00,530,144,41,165,55,-,-,4.37,waterQuality_table36
+33,Jharkhand,Deoghar,Deoghar,86.71,24.4863,2023,8.06,1201,0,397,135,0.46,55,35,0.13,385,78,46,90,13,-,-,0.00,waterQuality_table36
+34,Jharkhand,Deoghar,Jasidih,86.6455,24.5144,2023,7.89,1275,0,403,146,0.39,67,41,0.15,420,120,29,92,13,-,-,0.32,waterQuality_table36
+35,Jharkhand,Deoghar,Chaudharidih,86.5464,24.3616,2023,8.06,685,0,275,57,0.61,27,13,0.15,260,68,22,37,0,-,-,0.00,waterQuality_table36
+36,Jharkhand,Deoghar,Karon Bus Stand,86.7415,24.1244,2023,7.55,785,0,134,149,0.16,49,30,0.14,275,66,27,49,8,-,-,0.00,waterQuality_table36
+37,Jharkhand,Deoghar,Madhupur,86.6473,24.2677,2023,7.92,1731,0,531,220,0.72,85,35,0.21,615,167,48,112,6,-,-,1.21,waterQuality_table36
+38,Jharkhand,Deoghar,Rampur,86.6085,24.2058,2023,7.78,382,0,110,46,0.53,13,23,0.21,140,36,12,20,6,-,-,0.32,waterQuality_table36
+39,Jharkhand,Deoghar,Ghormara,86.8653,24.4485,2023,7.67,1121,0,348,135,0.41,49,39,0.19,400,72,53,69,10,-,-,0.00,waterQuality_table36
+40,Jharkhand,Deoghar,Palajori,87.011,24.2394,2023,8.13,967,0,311,114,0.61,42,28,0.14,360,78,40,54,7,-,-,0.00,waterQuality_table36
+41,Jharkhand,Deoghar,Sarath,86.8401,24.2374,2023,8.24,574,0,189,50,0.57,34,30,0.14,235,68,16,24,1,-,-,1.11,waterQuality_table36
+42,Jharkhand,Deoghar,Sarawan,86.7804,24.3842,2023,8.04,645,0,207,67,0.75,25,35,0.19,255,82,12,28,5,-,-,0.00,waterQuality_table36
+43,Jharkhand,Deoghar,Ashubandha,86.8945,24.3686,2023,7.74,403,0,153,43,0.75,6,12,0.14,170,32,22,13,1,-,-,1.02,waterQuality_table36
+44,Jharkhand,Dhanbad,Mahuda,86.2659,23.7508,2023,7.77,1123,0,317,135,0.68,81,34,0.00,370,120,17,84,6,-,-,23.66,waterQuality_table36
+45,Jharkhand,Dhanbad,Pandadih,86.5229,23.7462,2023,7.72,943,0,329,50,0.61,96,41,0.11,395,96,38,29,10,-,-,9.10,waterQuality_table36
+46,Jharkhand,Dhanbad,Basudeopur,86.3684,23.782,2023,8.02,1699,0,506,217,0.72,116,11,0.15,660,210,33,65,35,-,-,2.73,waterQuality_table36
+47,Jharkhand,Dhanbad,Dbl Buglow,86.4327,23.8035,2023,7.91,885,0,342,78,1.11,38,9,0.00,300,86,21,55,21,-,-,10.92,waterQuality_table36
+48,Jharkhand,Dhanbad,Dhaiya Ism,86.4355,23.8207,2023,8.28,611,0,220,46,0.52,42,23,0.00,255,54,29,20,3,-,-,13.65,waterQuality_table36
+49,Jharkhand,Dhanbad,Godhar Basti,86.3875,23.7858,2023,7.18,705,0,122,117,0.24,59,36,0.00,200,60,12,51,31,-,-,22.75,waterQuality_table36
+50,Jharkhand,Dhanbad,Pkroy College,86.4482,23.8137,2023,7.3,525,0,207,32,1.03,35,8,0.00,195,40,23,25,12,-,-,19.11,waterQuality_table36
+51,Jharkhand,Dhanbad,Purandih Jorapokhar,86.4761,23.7825,2023,8.09,1621,0,555,78,0.32,234,5,0.00,585,80,94,91,19,-,-,22.75,waterQuality_table36
+52,Jharkhand,Dhanbad,Govindpur,86.5238,23.8311,2023,7.84,1743,0,525,234,1.55,96,9,0.00,570,120,66,138,2,-,-,4.55,waterQuality_table36
+53,Jharkhand,Dhanbad,Dhansar Mrs,86.4119,23.7633,2023,7.63,452,0,98,57,0.31,49,16,0.00,125,36,9,41,11,-,-,15.47,waterQuality_table36
+54,Jharkhand,Dhanbad,Jharia,86.4117,23.7419,2023,7.51,736,0,275,50,0.85,61,15,0.27,265,56,30,37,18,-,-,20.93,waterQuality_table36
+55,Jharkhand,Dhanbad,Kandra Mandal Basti,86.457,23.6626,2023,7.7,855,0,329,43,1.04,81,10,0.00,355,96,28,33,2,-,-,19.11,waterQuality_table36
+56,Jharkhand,Dhanbad,Sindri Gosala More,86.4797,23.6513,2023,7.86,991,0,342,82,0.55,85,7,0.00,350,120,12,59,16,-,-,20.93,waterQuality_table36
+57,Jharkhand,Dhanbad,Balajee Mandir,86.305,23.7975,2023,7.83,1261,0,366,142,0.7,97,32,0.10,485,106,53,55,23,-,-,5.46,waterQuality_table36
+58,Jharkhand,Dhanbad,Nirsa,86.7068,23.7862,2023,7.82,962,0,305,92,0.49,96,3,0.00,310,92,19,56,34,-,-,0.00,waterQuality_table36
+59,Jharkhand,Dhanbad,Mairanwatand,86.6013,23.9391,2023,7.6,1725,0,549,217,0.57,67,42,0.20,560,156,41,117,40,-,-,7.28,waterQuality_table36
+60,Jharkhand,Dhanbad,Rajganj,86.3354,23.8731,2023,7.8,1214,0,311,202,0.5,40,29,0.19,415,118,29,80,16,-,-,0.00,waterQuality_table36
+61,Jharkhand,Dhanbad,Topchanchi,86.2029,23.9026,2023,7.94,1015,0,244,138,0.43,80,31,0.15,375,78,44,50,21,-,-,0.00,waterQuality_table36
+62,Jharkhand,Dhanbad,Tundi,86.4527,23.9854,2023,8.02,851,0,268,107,0.51,23,36,0.08,350,82,35,36,0,-,-,0.00,waterQuality_table36
+63,Jharkhand,Dumka,Chapodia,87.2875,24.3003,2023,7.27,464,0,195,39,0.0,11,2,0.09,215,20,40,7,0,-,-,0.00,waterQuality_table36
+64,Jharkhand,Dumka,Dumka(Db Ib),87.2495,24.2664,2023,7.43,887,0,232,99,0.52,85,31,0.00,240,80,10,81,19,-,-,0.26,waterQuality_table36
+65,Jharkhand,Dumka,Gopikandar,87.4856,24.426,2023,6.53,218,0,61,25,0.1,8,15,0.09,80,24,5,10,6,-,-,0.00,waterQuality_table36
+66,Jharkhand,Dumka,Chikania,87.1169,24.2639,2023,7.45,812,0,195,117,0.0,48,40,0.00,335,74,36,32,0,-,-,0.00,waterQuality_table36
+67,Jharkhand,Dumka,Jama1,87.1497,24.3488,2023,7.69,745,0,268,46,0.3,53,36,0.00,280,68,27,42,2,-,-,0.00,waterQuality_table36
+68,Jharkhand,Dumka,Parapalashi,87.184,24.375,2023,7.46,316,0,104,36,0.25,9,8,0.09,120,20,17,17,1,-,-,0.26,waterQuality_table36
+69,Jharkhand,Dumka,Jarmundi Db.Ib,87.0538,24.3927,2023,7.66,1098,0,268,160,0.29,55,41,0.19,470,122,40,34,4,-,-,0.00,waterQuality_table36
+70,Jharkhand,Dumka,Nunihaat,87.1311,24.478,2023,6.81,415,0,128,57,0.17,11,0,0.19,145,44,9,25,7,-,-,0.00,waterQuality_table36
+71,Jharkhand,Dumka,Kathikund,87.4261,24.3581,2023,7.43,879,0,262,71,0.08,76,42,0.25,345,96,26,38,7,-,-,0.00,waterQuality_table36
+72,Jharkhand,Dumka,Masalia,87.1804,24.1554,2023,7.0,756,0,177,107,0.02,40,40,0.16,315,74,32,23,11,-,-,3.03,waterQuality_table36
+73,Jharkhand,Dumka,Ramgargh,87.2483,24.5637,2023,7.3,959,0,317,89,0.17,56,43,0.07,380,90,38,44,2,-,-,0.00,waterQuality_table36
+74,Jharkhand,Dumka,Gamharia,87.1875,24.5694,2023,7.61,195,0,61,25,0.54,4,4,0.10,75,18,7,9,1,-,-,0.00,waterQuality_table36
+75,Jharkhand,Dumka,Masanjor,87.3111,24.1092,2023,7.37,190,0,61,18,0.14,12,1,0.11,80,22,6,7,0,-,-,0.00,waterQuality_table36
+76,Jharkhand,Dumka,Raneswar,87.41,24.0455,2023,7.81,254 8°1C),0,(m1g2/2L),67,0.42,(m3g0/L),(m1g9/L),(m0.g0/0L),(m1g50/L),38,13,38,6,-,-,0.56,waterQuality_table37
+77,Jharkhand,Dumka,Sikaripara,87.4687,24.2384,2023,7.59,350,0,92,36,0.26,21,33,0.00,140,44,7,14,4,-,-,0.91,waterQuality_table37
+78,Jharkhand,Dumka,Patabari,87.4102,24.2245,2023,7.82,1031,0,348,121,0.69,51,6,0.00,325,98,19,86,4,-,-,0.00,waterQuality_table37
+79,Jharkhand,E. Singhbhum,Baharagora,86.7167,22.2808,2023,7.53,1174,0,445,92,0.25,46,1,0.00,390,122,21,66,8,-,-,-,waterQuality_table37
+80,Jharkhand,E. Singhbhum,Jamirdih,86.7492,22.3036,2023,7.79,170,0,49,14,0.33,7,23,0.00,55,14,5,13,1,-,-,-,waterQuality_table37
+81,Jharkhand,E. Singhbhum,Hana Bautia,86.6742,22.2556,2023,7.73,257,0,67,11,0.42,21,23,0.00,75,20,6,14,6,-,-,-,waterQuality_table37
+82,Jharkhand,E. Singhbhum,Andharia,86.6347,22.4769,2023,7.91,217,0,79,18,0.42,8,14,0.00,105,34,5,2,0,-,-,-,waterQuality_table37
+83,Jharkhand,E. Singhbhum,Chakulia,86.7194,22.4794,2023,7.43,293,0,79,21,0.65,15,24,0.00,60,16,5,32,3,-,-,-,waterQuality_table37
+84,Jharkhand,E. Singhbhum,Kalapathar,86.7565,22.3987,2023,7.85,745,0,293,46,0.26,44,23,0.12,160,42,13,83,22,-,-,-,waterQuality_table37
+85,Jharkhand,E. Singhbhum,Lodhlisol (Kalapathar),86.7497,22.4197,2023,7.93,304,0,18,11,0.41,126,3,0.00,130,36,10,8,11,-,-,-,waterQuality_table37
+86,Jharkhand,E. Singhbhum,Dhalbhumgarh,86.5508,22.5094,2023,7.94,584,0,195,75,0.22,23,2,0.54,160,42,13,53,12,-,-,-,waterQuality_table37
+87,Jharkhand,E. Singhbhum,Ghatsila,86.4756,22.5842,2023,7.82,1289,0,451,82,0.47,127,4,0.00,440,124,32,68,28,-,-,-,waterQuality_table37
+88,Jharkhand,E. Singhbhum,Jamshedpur Bloodbank Bistupur,86.1592,22.8122,2023,7.62,284,0,98,18,0.35,18,4,0.00,90,20,10,16,3,-,-,-,waterQuality_table37
+89,Jharkhand,E. Singhbhum,Mariyamman Temple,86.2358,22.7842,2023,7.8,998,0,342,46,0.32,106,8,0.00,305,84,23,71,0,-,-,-,waterQuality_table37
+90,Jharkhand,E. Singhbhum,Rankini Madir Kadma,86.1669,22.8039,2023,7.8,679,0,238,43,0.49,66,9,0.00,210,58,16,52,7,-,-,-,waterQuality_table37
+91,Jharkhand,E. Singhbhum,Piplia,86.3314,22.7858,2023,7.89,1310,0,476,114,0.34,90,18,0.00,60,16,5,276,0,-,-,-,waterQuality_table37
+92,Jharkhand,E. Singhbhum,Sundarnagar1,86.1725,22.8278,2023,7.73,1974,0,616,305,0.31,50,3,0.00,285,78,22,324,1,-,-,-,waterQuality_table37
+93,Jharkhand,E. Singhbhum,Baridih,86.2053,22.8153,2023,7.91,818,0,311,50,0.58,73,7,0.00,270,72,22,59,4,-,-,-,waterQuality_table37
+94,Jharkhand,E. Singhbhum,Barmamines Thana,86.2081,22.7781,2023,7.66,1441,0,458,121,0.23,141,23,0.00,340,98,23,167,5,-,-,-,waterQuality_table37
+95,Jharkhand,E. Singhbhum,Birsa Nagar,86.2472,22.7872,2023,7.53,1050,0,342,89,0.28,72,23,0.00,290,70,28,96,3,-,-,-,waterQuality_table37
+96,Jharkhand,E. Singhbhum,Golmuri,86.2247,22.7961,2023,7.8,899,0,323,67,0.66,59,23,0.00,350,72,41,40,6,-,-,-,waterQuality_table37
+97,Jharkhand,E. Singhbhum,Jugsalai Thana,86.1847,22.7819,2023,7.7,691,0,256,43,0.88,49,21,0.00,205,58,15,58,6,-,-,-,waterQuality_table37
+98,Jharkhand,E. Singhbhum,Pardih,86.2006,22.8417,2023,7.82,739,0,256,64,0.8,56,7,0.31,300,70,30,28,1,-,-,-,waterQuality_table37
+99,Jharkhand,E. Singhbhum,Shitla Mandir Sakchi,86.2061,22.8069,2023,7.85,300,0,134,18,0.28,23,4,0.00,115,30,10,18,3,-,-,-,waterQuality_table37
+100,Jharkhand,E. Singhbhum,Telco,86.2306,22.7658,2023,7.59,831,0,317,50,0.62,69,16,0.00,305,96,16,51,2,-,-,-,waterQuality_table37
+101,Jharkhand,E. Singhbhum,Mosabani,86.4528,22.5244,2023,7.89,932,0,311,50,0.4,124,8,0.00,295,82,22,66,18,-,-,-,waterQuality_table37
+102,Jharkhand,E. Singhbhum,Kendadih,86.4247,22.5956,2023,7.58,1061,0,390,82,0.39,80,7,0.00,360,104,24,75,0,-,-,-,waterQuality_table37
+103,Jharkhand,E. Singhbhum,Gitilata,86.1847,22.6694,2023,7.76,866,0,262,75,0.36,82,0,0.22,300,82,23,46,2,-,-,-,waterQuality_table37
+104,Jharkhand,E. Singhbhum,Hata/Tirin,86.1497,22.6189,2023,7.54,1034,0,366,64,0.41,101,24,0.00,335,98,22,69,23,-,-,-,waterQuality_table37
+105,Jharkhand,E. Singhbhum,Kalikapur,86.285,22.6158,2023,7.82,2779,0,1049,192,0.38,227,23,0.00,450,136,27,423,9,-,-,-,waterQuality_table37
+106,Jharkhand,E. Singhbhum,Potka,86.2242,22.6256,2023,7.92,1045,0,384,114,0.25,46,1,0.00,475,124,40,22,0,-,-,-,waterQuality_table37
+107,Jharkhand,Garhwa,Bhawanathpur,83.5698,24.3911,2023,7.82,1108,0,409,107,0.87,46,28,0.00,275,38,44,114,22,-,-,8.38,waterQuality_table37
+108,Jharkhand,Garhwa,Garhwa,83.7988,24.1588,2023,7.59,1291,0,409,149,0.14,84,19,0.00,450,72,66,87,2,-,-,3.96,waterQuality_table37
+109,Jharkhand,Garhwa,Lagama,83.7362,24.1721,2023,7.51,738,0,146,99,0.47,75,42,0.15,285,44,43,36,1,-,-,0.00,waterQuality_table37
+110,Jharkhand,Garhwa,Obra,83.8271,24.0862,2023,7.22,1384,0,378,163,0.98,109,47,0.11,460,86,60,99,11,-,-,23.92,waterQuality_table37
+111,Jharkhand,Garhwa,Manjhian,83.8144,24.3234,2023,7.7,1731,0,445,231,0.24,128,56,0.00,490,40,95,145,45,-,-,21.52,waterQuality_table37
+112,Jharkhand,Garhwa,Meral,83.7016,24.1814,2023,7.52,1488,0,427,170,0.95,111,44,0.00,495,100,60,110,9,-,-,3.82,waterQuality_table37
+113,Jharkhand,Garhwa,Nagaruntari,83.5039,24.2815,2023,8.18,925,0,287,103,0.47,78,3,0.00,220,42,28,99,20,-,-,0.00,waterQuality_table37
+114,Jharkhand,Garhwa,Ramna1,83.6018,24.2319,2023,7.94,1603,0,482,185,0.4,120,25,0.00,540,82,81,110,19,-,-,3.96,waterQuality_table37
+115,Jharkhand,Garhwa,Bishrampur (Ranka),83.7297,23.8869,2023,8.01,1118,0,342,117,0.66,78,44,0.00,425,114,34,59,3,-,-,18.12,waterQuality_table37
+116,Jharkhand,Garhwa,Godarmana,83.7939,23.8095,2023,7.62,920,0,305,60,0.42,87,40,0.00,385,62,56,30,10,-,-,6.12,waterQuality_table37
+117,Jharkhand,Garhwa,Ranka,83.7939,23.9961,2023,7.63,1213,0,354,146,0.74,91,24,0.09,520,100,66,27,20,-,-,2.08,waterQuality_table37
+118,Jharkhand,Giridih,Bagodar,85.8336,24.084,2023,7.91,906,0,275,114,0.37,66,2,0.00,310,74,30,57,13,-,-,15.93,waterQuality_table37
+119,Jharkhand,Giridih,Bengabad,86.3569,24.3048,2023,7.75,1048,0,287,181,0.25,30,5,0.00,290,58,35,90,29,-,-,10.01,waterQuality_table37
+120,Jharkhand,Giridih,Maheshmunda1,86.3901,24.2324,2023,7.64,419,0,122,32,0.13,40,28,0.00,150,22,23,21,11,-,-,9.10,waterQuality_table37
+121,Jharkhand,Giridih,Barmasia,85.9317,24.2882,2023,7.98,722,0,244,85,0.29,26,20,0.20,215,64,13,66,0,-,-,16.38,waterQuality_table37
+122,Jharkhand,Giridih,Birini,85.9231,24.2817,2023,7.78,627,0,232,82,0.21,4,8,0.00,295,42,46,3,9,-,-,19.13,waterQuality_table37
+123,Jharkhand,Giridih,Dewri,86.1899,24.5148,2023,7.49,523,0,220,39,0.11,16,12,0.00,215,14,44,20,3,-,-,13.65,waterQuality_table37
+124,Jharkhand,Giridih,Dhanwar,85.9792,24.4055,2023,7.36,1058,0,348,135,0.22,40,19,0.00,365,88,35,68,11,-,-,9.10,waterQuality_table37
+125,Jharkhand,Giridih,Dumri,86.0196,23.9908,2023,8.1,1095,0,275,142,0.22,86,31,0.11,420,126,26,54,6,-,-,20.93,waterQuality_table37
+126,Jharkhand,Giridih,Gandey1,86.4399,24.1853,2023,7.64,525,0,122,53,0.17,59,28,0.16,195,22,34,31,0,-,-,17.29,waterQuality_table37
+127,Jharkhand,Giridih,Ganwan,85.9201,24.612,2023,7.69,701,0,244,43,0.14,64,32,0.00,225,62,17,51,11,-,-,8.46,waterQuality_table37
+128,Jharkhand,Giridih,Dhanidih,86.1991,24.2264,2023,7.76,212,0,92,14,0.06,6,8,0.00,60,12,7,19,3,-,-,14.38,waterQuality_table37
+129,Jharkhand,Giridih,Giridih,86.3053,24.1887,2023,8.23,518,0,201,36,0.77,31,14,0.19,160,52,7,42,4,-,-,17.75,waterQuality_table37
+130,Jharkhand,Giridih,Jamua Pwd Ib,86.1512,24.3697,2023,8.03,1027,0,226,170,0.32,70,23,0.00,270,76,19,97,24,-,-,11.83,waterQuality_table37
+131,Jharkhand,Giridih,Chirki (Pirtanr),86.1599,24.041,2023,7.7,623,0,140,82,0.03,51,31,0.12,240,62,21,29,8,-,-,11.83,waterQuality_table37
+132,Jharkhand,Giridih,Saria,85.8791,24.166,2023,7.89,1101,0,403,149,0.1,4,5,0.18,255,54,29,129,11,-,-,4.73,waterQuality_table37
+133,Jharkhand,Giridih,Khijri,86.0976,24.5466,2023,7.81,1245,0,329,174,0.22,86,28,0.00,300,62,35,136,16,-,-,9.10,waterQuality_table37
+134,Jharkhand,Godda,Boarijore,87.2778,25.0139,2023,7.73,1089,0,567,32,0.81,28,3,0.27,355,70,44,88,0,-,-,11.66,waterQuality_table37
+135,Jharkhand,Godda,Bargacha Hariyari,87.189,24.717,2023,7.99,660,0,281,43,1.32,26,8,0.10,225,36,33,45,7,-,-,0.00,waterQuality_table37
+136,Jharkhand,Godda,Daldali,87.2892,24.7997,2023,8.15,571,0,281,21,1.43,12,8,0.00,195,40,23,37,9,-,-,0.00,waterQuality_table37
+137,Jharkhand,Godda,Godda,87.2389,24.8367,2023,8.11,1063,0,439,85,1.22,33,16,0.13,355,46,58,81,1,-,-,20.39,waterQuality_table37
+138,Jharkhand,Godda,Jaminipaharpur,87.261,24.804,2023,7.96,609,0,183,85,0.22,14,20,0.19,270,60,29,14,4,-,-,0.00,waterQuality_table37
+139,Jharkhand,Godda,Kumardih,87.207,24.788,2023,8.1,780,0,342,46,1.63,23,18,0.06,180,34,23,96,4,-,-,0.00,waterQuality_table37
+140,Jharkhand,Godda,Pakariya,87.1741,24.8323,2023,8.03,554,0,189,67,0.77,19,5,0.21,245,60,23,12,5,-,-,11.32,waterQuality_table37
+141,Jharkhand,Godda,Gobra,87.1739,24.8917,2023,7.84,971,0,384,107,0.42,19,3,0.11,315,62,39,74,6,-,-,1.54,waterQuality_table37
+142,Jharkhand,Godda,Lalmatia,87.363,25.052,2023,7.79,1333,0,360,178,0.68,91,33,0.00,370,84,39,133,5,-,-,0.00,waterQuality_table37
+143,Jharkhand,Godda,Doi,87.3861,25.1503,2023,7.6,2365,0,458,430,0.41,173,30,0.23,820,178,91,155,19,-,-,1.17,waterQuality_table37
+144,Jharkhand,Godda,Maheshpur,87.2895,24.7998,2023,7.87,1185,0,378,156,1.6,35,31,0.10,320,78,30,124,2,-,-,0.00,waterQuality_table37
+145,Jharkhand,Godda,Bisaha,87.1986,24.9003,2023,8.05,851,0,470,18,0.95,11,5,0.08,220,48,24,90,7,-,-,0.00,waterQuality_table37
+146,Jharkhand,Godda,Poraiya Haat,87.179,24.677,2023,7.74,1223,0,323,195,0.72,46,28,0.12,520,98,67,40,2,-,-,1.34,waterQuality_table37
+147,Jharkhand,Godda,Chamudih,87.1294,24.6297,2023,8.08,546,0,262,39,1.28,3,1,0.00,210,44,24,22,10,-,-,1.70,waterQuality_table37
+148,Jharkhand,Godda,Raghunathpur,86.2339,24.7047,2023,7.84,1395,0,397,202,0.57,76,11,0.11,385,96,35,135,11,-,-,0.00,waterQuality_table37
+149,Jharkhand,Godda,Sunder Pahari,87.353,24.756,2023,7.82,673,0,281,67,0.59,10,3,0.00,275,68,26,27,2,-,-,1.30,waterQuality_table37
+150,Jharkhand,Godda,Thakurghanti,87.454,25.1291,2023,7.75,1151,0,586,46,0.61,23,3,0.00,335,86,29,109,5,-,-,1.30,waterQuality_table37
+151,Jharkhand,Gumla,Baisia,84.8297,22.8713,2023,8.05,1005,0,378,71,0.61,58,42,0.18,350,78,38,56,22,-,-,0.56,waterQuality_table37
+152,Jharkhand,Gumla,Bharno Bdo,84.8896,23.2332,2023,7.95,637,0,262,60,0.81,8,12,0.29,220,28,36,38,10,-,-,0.18,waterQuality_table37
+153,Jharkhand,Gumla,Bishnupur,84.3801,23.374,2023,7.88,809,0,226,85,0.49,59,44,0.17,300,76,27,47,3,-,-,0.01,waterQuality_table37
+154,Jharkhand,Gumla,Chainpur1,84.2422,23.1283,2023,7.8,1215,0,336,170,0.71,60,33,0.10,395,104,33,91,13,-,-,0.70,waterQuality_table37
+155,Jharkhand,Gumla,Dumri,84.1305,23.1646,2023,7.71,453,0,171,50,0.19,10,5,0.02,175,32,23,21,8,-,-,0.26,waterQuality_table37
+156,Jharkhand,Gumla,Adar,84.3934,23.2975,2023,7.8,1395,0,220,231,0.61,145,46,0.26,450,98,50,99,27,-,-,0.25,waterQuality_table37
+157,Jharkhand,Gumla,Ghagra,84.5581,23.2687,2023,7.92,1018,0,293,153,0.54,47,1,0.18,345,80,35,70,11,-,-,0.00,waterQuality_table37
+158,Jharkhand,Gumla,Anjam Gram,84.4828,23.1288,2023,7.89,692,0,232,78,0.95,21,25,0.08,250,54,28,41,8,-,-,0.00,waterQuality_table37
+159,Jharkhand,Gumla,Gumla1,84.5409,23.043,2023,7.86,1373,0,427,138,0.5,96,53,0.04,435,92,50,110,8,-,-,0.26,waterQuality_table37
+160,Jharkhand,Gumla,Kharka,84.5298,23.1668,2023,7.78,259 2°5C),0,(m2g2/0L),149,0.41,(m3g3/L),(m4g4/L),(m0.g1/1L),(m2g90/L),76,24,75,10,-,-,0.32,waterQuality_table38
+161,Jharkhand,Gumla,Kamdara,84.9067,22.909,2023,7.73,582,0,165,99,0.97,11,1,0.08,195,34,27,44,2,-,-,2.13,waterQuality_table38
+162,Jharkhand,Gumla,Baghma,84.6281,22.932,2023,8.06,1223,0,360,156,0.55,73,27,0.12,380,102,30,96,16,-,-,0.13,waterQuality_table38
+163,Jharkhand,Gumla,Palkot,84.6467,22.8783,2023,7.77,461,0,220,28,0.51,4,8,0.19,180,22,30,19,6,-,-,0.00,waterQuality_table38
+164,Jharkhand,Gumla,Kasir,84.3387,23.0595,2023,7.75,824,0,299,92,0.51,28,7,0.08,310,54,43,42,9,-,-,0.00,waterQuality_table38
+165,Jharkhand,Gumla,Raidih,84.4613,22.9551,2023,7.62,609,0,207,71,0.45,26,4,0.30,240,38,35,24,11,-,-,0.00,waterQuality_table38
+166,Jharkhand,Gumla,Nagfeni,84.6831,23.1182,2023,7.61,703,0,165,107,0.63,30,44,0.12,250,64,22,41,8,-,-,0.00,waterQuality_table38
+167,Jharkhand,Gumla,Sisai,84.7576,23.1677,2023,7.41,1091,0,275,124,0.6,103,48,0.12,350,76,39,82,12,-,-,0.00,waterQuality_table38
+168,Jharkhand,Hazaribagh,Konra-Barhi,85.4284,24.2983,2023,7.99,952,0,317,92,1.19,71,19,0.00,240,54,26,101,12,-,-,17.15,waterQuality_table38
+169,Jharkhand,Hazaribagh,Barkagaon,85.2193,23.856,2023,7.17,499,0,122,71,0.18,20,36,0.00,185,54,12,25,6,-,-,0.00,waterQuality_table38
+170,Jharkhand,Hazaribagh,Urimari,85.3096,23.6948,2023,7.49,467,0,153,46,0.73,42,3,0.00,165,56,6,25,11,-,-,0.00,waterQuality_table38
+171,Jharkhand,Hazaribagh,Barkatha,85.619,24.1661,2023,7.8,855,0,317,89,1.02,40,4,0.00,275,68,26,60,16,-,-,5.26,waterQuality_table38
+172,Jharkhand,Hazaribagh,Sakrej,85.5355,24.2086,2023,7.44,1409,0,403,174,0.8,92,46,0.00,375,136,9,126,44,-,-,4.36,waterQuality_table38
+173,Jharkhand,Hazaribagh,Tatijharia,85.6191,24.0221,2023,7.61,568,0,122,78,0.22,44,31,0.00,190,36,24,40,6,-,-,0.93,waterQuality_table38
+174,Jharkhand,Hazaribagh,Chano,85.8274,23.9755,2023,7.75,573,0,207,46,0.69,25,34,0.00,195,50,17,36,9,-,-,0.45,waterQuality_table38
+175,Jharkhand,Hazaribagh,Chalkusa,85.7136,24.2377,2023,7.63,2008,0,610,234,0.48,139,31,0.00,820,204,75,79,12,-,-,14.87,waterQuality_table38
+176,Jharkhand,Hazaribagh,Chauparan1,85.2508,24.3899,2023,7.63,2088,0,689,259,0.6,102,12,0.00,660,194,43,151,41,-,-,25.31,waterQuality_table38
+177,Jharkhand,Hazaribagh,Dari,85.3893,23.7148,2023,7.38,285,0,110,18,0.79,15,18,0.00,75,22,5,27,7,-,-,0.35,waterQuality_table38
+178,Jharkhand,Hazaribagh,Dasokhap,85.4274,23.8089,2023,7.8,735,0,317,39,1.43,45,11,0.00,255,64,23,49,4,-,-,1.32,waterQuality_table38
+179,Jharkhand,Hazaribagh,Daru,85.5478,24.0139,2023,7.44,878,0,232,89,0.31,97,30,0.00,235,54,24,87,12,-,-,0.00,waterQuality_table38
+180,Jharkhand,Hazaribagh,Amritnagar,85.4123,23.9938,2023,8.24,635,0,189,71,0.17,31,36,0.09,265,56,30,19,11,-,-,0.00,waterQuality_table38
+181,Jharkhand,Hazaribagh,Habib Nagar,85.3528,23.983,2023,7.27,1265,0,397,128,0.1,97,30,0.00,540,150,40,42,3,-,-,1.27,waterQuality_table38
+182,Jharkhand,Hazaribagh,Hatyari,85.4062,23.9037,2023,7.58,391,0,110,43,0.24,22,30,0.00,150,30,18,16,7,-,-,0.00,waterQuality_table38
+183,Jharkhand,Hazaribagh,Hazaribagh,85.3675,23.9924,2023,7.68,788,0,281,64,0.26,46,27,0.13,305,90,19,39,5,-,-,12.36,waterQuality_table38
+184,Jharkhand,Hazaribagh,Meru(Silwar),85.4518,24.0038,2023,7.01,710,0,220,57,0.1,52,49,0.00,245,66,19,43,14,-,-,3.70,waterQuality_table38
+185,Jharkhand,Hazaribagh,Kud Ashram,85.3534,23.9781,2023,7.29,576,0,195,57,0.17,21,35,0.00,210,40,27,29,10,-,-,7.43,waterQuality_table38
+186,Jharkhand,Hazaribagh,Masipiri,85.3732,23.9641,2023,7.71,861,0,305,64,0.85,80,7,0.00,310,102,13,38,31,-,-,7.93,waterQuality_table38
+187,Jharkhand,Hazaribagh,Old Bus Stand,85.3632,23.9935,2023,7.59,1631,0,500,199,0.13,85,44,0.08,670,184,51,62,9,-,-,9.38,waterQuality_table38
+188,Jharkhand,Hazaribagh,Sindur,85.3828,24.028,2023,7.87,1368,0,378,178,0.45,84,43,0.00,485,176,11,76,27,-,-,2.81,waterQuality_table38
+189,Jharkhand,Hazaribagh,Ichak More,85.3934,24.0897,2023,7.13,1093,0,323,124,0.34,68,44,0.16,420,80,53,55,7,-,-,0.31,waterQuality_table38
+190,Jharkhand,Hazaribagh,Bendi,85.2248,23.9803,2023,7.69,622,0,268,36,0.56,29,15,0.11,225,64,16,27,20,-,-,0.78,waterQuality_table38
+191,Jharkhand,Hazaribagh,Katkamsandi,85.2058,24.1088,2023,7.46,1191,0,317,163,0.4,62,54,0.00,495,170,17,44,3,-,-,8.55,waterQuality_table38
+192,Jharkhand,Hazaribagh,Garrikalan,85.1638,23.8706,2023,7.6,746,0,177,96,0.17,57,38,0.10,285,78,22,34,10,-,-,0.00,waterQuality_table38
+193,Jharkhand,Hazaribagh,Keradari,85.0867,23.8604,2023,7.57,1918,0,628,227,0.8,101,20,0.00,585,100,81,146,45,-,-,11.13,waterQuality_table38
+194,Jharkhand,Hazaribagh,Padma,85.3651,24.2055,2023,7.66,517,0,201,43,0.25,15,25,0.00,210,44,24,19,5,-,-,1.82,waterQuality_table38
+195,Jharkhand,Jamtara,Basti Palajori,87.1678,24.0544,2023,7.61,330,0,146,7,0.0,32,1,0.00,145,22,22,4,8,-,-,0.00,waterQuality_table38
+196,Jharkhand,Jamtara,Fatehpur,86.996,24.0964,2023,7.56,395,0,128,36,0.0,24,20,0.00,140,34,13,26,3,-,-,0.00,waterQuality_table38
+197,Jharkhand,Jamtara,Jamatara,86.7995,23.9622,2023,7.97,678,0,207,53,0.0,64,30,0.17,210,60,15,60,1,-,-,1.00,waterQuality_table38
+198,Jharkhand,Jamtara,Jasaydih,86.7011,24.0619,2023,8.11,1132,0,293,142,0.0,98,30,0.00,485,122,44,34,4,-,-,0.30,waterQuality_table38
+199,Jharkhand,Jamtara,Dhootala,87.1678,23.9194,2023,7.8,740,0,146,110,0.0,69,29,0.00,230,68,15,57,13,-,-,0.32,waterQuality_table38
+200,Jharkhand,Jamtara,Kundahit,87.1506,23.9748,2023,7.64,324,0,134,14,0.0,32,2,0.00,130,20,19,11,5,-,-,0.44,waterQuality_table38
+201,Jharkhand,Jamtara,Mihijam New,86.8822,23.8514,2023,7.75,925,0,299,92,0.33,52,36,0.23,305,74,29,72,4,-,-,0.54,waterQuality_table38
+202,Jharkhand,Jamtara,Nala,87.044,23.9202,2023,7.82,1172,0,366,124,0.62,82,31,0.00,270,62,28,139,8,-,-,6.71,waterQuality_table38
+203,Jharkhand,Jamtara,Mohanpur,86.6625,24.0194,2023,8.05,551,0,201,53,0.3,34,2,0.12,180,24,29,37,10,-,-,1.38,waterQuality_table38
+204,Jharkhand,Jamtara,Narayanpur,86.6174,24.0443,2023,7.82,246,0,85,14,0.0,26,9,0.20,85,16,11,14,5,-,-,0.18,waterQuality_table38
+205,Jharkhand,Khunti,Karra,85.1256,23.1267,2023,7.54,518,0,146,43,0.22,74,2,0.07,190,62,9,19,22,-,-,7.10,waterQuality_table38
+206,Jharkhand,Khunti,Lodhama,85.1956,23.2497,2023,7.56,195,0,67,25,0.29,4,5,0.23,70,16,7,8,7,-,-,0.00,waterQuality_table38
+207,Jharkhand,Khunti,Bala,85.1124,23.041,2023,8.01,205,0,79,21,0.27,5,3,0.13,80,20,7,6,6,-,-,0.00,waterQuality_table38
+208,Jharkhand,Khunti,Binagoan,85.1731,23.185,2023,7.81,215,0,61,32,0.42,4,10,0.00,80,22,6,6,11,-,-,0.00,waterQuality_table38
+209,Jharkhand,Khunti,Jariya,85.0301,23.039,2023,7.66,982,0,311,110,0.31,63,20,0.00,385,106,29,45,5,-,-,0.00,waterQuality_table38
+210,Jharkhand,Khunti,Kalimati,85.2878,23.1991,2023,7.83,588,0,220,28,0.82,69,1,0.23,230,74,11,26,5,-,-,0.00,waterQuality_table38
+211,Jharkhand,Khunti,Khunti,85.2798,23.0826,2023,7.74,220,0,67,28,0.26,11,0,0.05,100,34,4,4,0,-,-,0.52,waterQuality_table38
+212,Jharkhand,Khunti,Murhu,85.28,22.9625,2023,7.59,202,0,67,28,0.37,5,1,0.27,70,20,5,6,12,-,-,0.14,waterQuality_table38
+213,Jharkhand,Khunti,Pelaul,85.2313,23.0351,2023,7.69,203,0,67,21,0.29,7,10,0.00,85,14,12,7,2,-,-,0.00,waterQuality_table38
+214,Jharkhand,Khunti,Goilkera,85.0718,22.8002,2023,7.75,210,0,85,14,0.31,3,9,0.15,90,10,16,6,0,-,-,0.00,waterQuality_table38
+215,Jharkhand,Khunti,Dorma,85.1658,23.0072,2023,7.71,503,0,183,53,0.55,25,2,0.09,125,32,11,55,4,-,-,0.00,waterQuality_table38
+216,Jharkhand,Koderma,Jainagar,85.643,24.3759,2023,7.36,1885,0,488,284,0.39,104,41,0.00,650,46,130,119,29,-,-,22.14,waterQuality_table38
+217,Jharkhand,Koderma,Jhumri Tilaiya,85.5279,24.4342,2023,7.81,1759,0,494,238,0.64,98,44,0.00,615,46,122,116,12,-,-,3.43,waterQuality_table38
+218,Jharkhand,Koderma,Kodarma,85.5927,24.4652,2023,7.71,982,0,262,149,0.31,37,35,0.00,370,54,57,48,11,-,-,20.82,waterQuality_table38
+219,Jharkhand,Koderma,Karcheta,85.787,24.6649,2023,7.91,702,0,342,36,1.56,11,13,0.00,190,28,29,72,1,-,-,2.76,waterQuality_table38
+220,Jharkhand,Koderma,Buchitar,85.6668,24.4358,2023,7.88,924,0,317,82,0.31,63,31,0.00,340,50,52,49,10,-,-,14.55,waterQuality_table38
+221,Jharkhand,Latehar,Balumath,84.7899,23.8271,2023,8.08,1221,0,336,153,0.4,76,51,0.21,350,132,5,95,41,-,-,0.00,waterQuality_table38
+222,Jharkhand,Latehar,Barjatu,84.7996,23.8867,2023,8.1,1321,0,439,107,0.46,93,63,0.18,545,164,33,48,10,-,-,0.00,waterQuality_table38
+223,Jharkhand,Latehar,Barwadih,84.1108,23.8511,2023,7.64,1231,0,415,121,0.95,97,1,0.00,465,132,33,64,11,-,-,0.00,waterQuality_table38
+224,Jharkhand,Latehar,Betla,84.195,23.8884,2023,8.03,766,0,287,32,0.85,93,2,0.00,310,74,30,20,26,-,-,0.00,waterQuality_table38
+225,Jharkhand,Latehar,Chandwa,84.7389,23.6717,2023,7.8,597,0,183,78,0.65,35,1,0.00,230,64,17,27,6,-,-,2.56,waterQuality_table38
+226,Jharkhand,Latehar,Baresad(Lalmatia),84.141,23.593,2023,7.99,483,0,201,36,1.91,19,1,0.00,190,38,23,21,6,-,-,1.75,waterQuality_table38
+227,Jharkhand,Latehar,Garu,84.2373,23.677,2023,7.92,356,0,128,36,0.81,18,4,0.00,165,20,28,5,2,-,-,0.00,waterQuality_table38
+228,Jharkhand,Latehar,Chiru,84.6791,23.8844,2023,7.93,573,0,244,43,0.53,19,5,0.05,265,24,50,10,2,-,-,0.00,waterQuality_table38
+229,Jharkhand,Latehar,Latehar,84.4083,23.7458,2023,7.78,791,0,226,71,0.4,89,19,0.00,295,74,27,38,15,-,-,0.00,waterQuality_table38
+230,Jharkhand,Latehar,Aksi,84.1133,23.5108,2023,7.95,410,0,134,39,0.69,34,2,0.03,185,28,28,5,8,-,-,0.36,waterQuality_table38
+231,Jharkhand,Latehar,Mahuadanr,84.1141,23.3944,2023,8.17,310,0,92,11,0.61,50,12,0.03,140,14,26,6,2,-,-,3.48,waterQuality_table38
+232,Jharkhand,Latehar,Manika,84.3458,23.8503,2023,7.75,1125,0,299,99,0.33,130,54,0.25,400,146,9,53,36,-,-,2.95,waterQuality_table38
+233,Jharkhand,Loherdaga,Bhandara,84.734,23.3637,2023,7.89,538,0,220,57,1.26,5,3,0.27,220,52,22,20,3,-,-,0.00,waterQuality_table38
+234,Jharkhand,Loherdaga,Kisko1,84.6661,23.515,2023,7.66,364,0,146,39,0.61,4,4,0.25,150,20,24,8,10,-,-,0.00,waterQuality_table38
+235,Jharkhand,Loherdaga,Hinjla,84.8797,23.5414,2023,8.02,473,0,177,46,0.58,6,21,0.07,190,24,32,18,8,-,-,0.00,waterQuality_table38
+236,Jharkhand,Loherdaga,Kuru1,84.8173,23.5372,2023,7.48,790,0,140,163,0.56,12,43,0.26,250,72,17,56,19,-,-,0.08,waterQuality_table38
+237,Jharkhand,Loherdaga,Irgaon,84.7809,23.4212,2023,7.63,575,0,226,64,0.84,5,9,0.11,215,24,38,25,13,-,-,0.33,waterQuality_table38
+238,Jharkhand,Loherdaga,Lohardaga(Pwdib,84.6907,23.4466,2023,7.72,919,0,397,60,1.13,33,18,0.12,350,88,32,45,7,-,-,0.00,waterQuality_table38
+239,Jharkhand,Loherdaga,Peshrar Weekly Market,84.536,23.5542,2023,7.75,385,0,177,21,0.74,8,8,0.07,185,20,33,3,3,-,-,0.00,waterQuality_table38
+240,Jharkhand,Loherdaga,Senha Bdo,84.6512,23.3831,2023,7.57,803,0,153,121,0.67,60,48,0.04,255,56,28,65,4,-,-,0.46,waterQuality_table38
+241,Jharkhand,Pakur,Pahapur,87.5558,24.5268,2023,7.64,432,0,232,14,0.0,6,0,0.09,160,38,16,25,0,-,-,0.00,waterQuality_table38
+242,Jharkhand,Pakur,Amrapara,87.5644,24.5289,2023,8.1,333,0,134,18,0.0,23,10,0.00,150,32,17,7,1,-,-,0.00,waterQuality_table38
+243,Jharkhand,Pakur,Pochaibera,87.6041,24.5486,2023,7.0,274,0,73,36,0.26,16,10,0.00,120,40,5,8,0,-,-,0.63,waterQuality_table38
+244,Jharkhand,Pakur,Hiranpur,87.7026,24.7058,2023,7.87,257 1°8C),0,(m2g3/8L),92,0.11,(mg6/L),(m3g0/L),(m0.g0/9L),(m3g20/L),80,29,15,6,-,-,0.00,waterQuality_table39
+245,Jharkhand,Pakur,Kariodih,87.6145,24.7102,2023,7.92,467,0,122,53,0.0,33,33,0.15,205,42,24,12,2,-,-,0.00,waterQuality_table39
+246,Jharkhand,Pakur,Litipara,87.63,24.71,2023,7.0,1208,0,354,149,0.09,69,42,0.12,530,134,47,32,3,-,-,0.00,waterQuality_table39
+247,Jharkhand,Pakur,Litipara 2,87.6142,24.71,2023,7.48,518,0,262,25,0.26,5,5,0.00,180,56,10,29,12,-,-,0.98,waterQuality_table39
+248,Jharkhand,Pakur,Sahargram,87.7149,24.5694,2023,7.56,564,0,140,64,0.06,44,40,0.00,250,62,23,15,0,-,-,0.00,waterQuality_table39
+249,Jharkhand,Pakur,Pakur1,87.8342,24.6386,2023,7.51,362,0,85,43,0.08,24,31,0.00,155,48,9,11,2,-,-,0.33,waterQuality_table39
+250,Jharkhand,Pakur,Vikrampur,87.6754,24.7614,2023,7.0,478,0,92,96,0.09,13,21,0.00,140,50,4,38,11,-,-,0.00,waterQuality_table39
+251,Jharkhand,Pakur,Salgapara,87.6728,24.3792,2023,8.01,551,0,226,60,0.17,7,0,0.00,200,50,18,34,1,-,-,0.00,waterQuality_table39
+252,Jharkhand,Palamu,Bishrampur,83.9417,24.2458,2023,7.58,909,0,439,28,1.28,33,21,0.22,270,22,52,86,1,-,-,8.44,waterQuality_table39
+253,Jharkhand,Palamu,Ketat Kala,83.9055,24.225,2023,8.05,1105,0,500,82,1.49,19,4,0.00,315,28,60,95,26,-,-,15.28,waterQuality_table39
+254,Jharkhand,Palamu,Baraw,84.0414,24.0703,2023,7.74,1665,0,519,199,1.2,92,42,0.08,535,28,113,121,25,-,-,24.59,waterQuality_table39
+255,Jharkhand,Palamu,Chhatarpur,84.1988,24.3775,2023,7.55,1101,0,433,103,0.59,41,8,0.00,365,22,75,81,9,-,-,0.77,waterQuality_table39
+256,Jharkhand,Palamu,Daltenganj,84.0625,24.0669,2023,7.84,1819,0,708,163,0.73,74,25,0.00,560,100,75,137,43,-,-,6.04,waterQuality_table39
+257,Jharkhand,Palamu,Haidernagar,83.9506,24.4969,2023,7.93,1187,0,378,135,0.85,58,44,0.00,460,30,94,60,1,-,-,20.90,waterQuality_table39
+258,Jharkhand,Palamu,Hariharganj,84.2899,24.539,2023,7.69,405,0,183,21,0.7,16,11,0.11,160,30,21,16,5,-,-,0.60,waterQuality_table39
+259,Jharkhand,Palamu,Japla,84.002,24.5326,2023,7.86,1175,0,488,89,1.0,35,37,0.00,400,30,79,84,1,-,-,2.68,waterQuality_table39
+260,Jharkhand,Palamu,Sandha,84.0479,24.4616,2023,8.01,847,0,458,18,1.33,12,9,0.00,235,32,38,78,16,-,-,2.51,waterQuality_table39
+261,Jharkhand,Palamu,Lesliganj,84.225,24.0458,2023,8.12,1007,0,250,146,0.83,78,18,0.00,390,48,66,49,5,-,-,23.95,waterQuality_table39
+262,Jharkhand,Palamu,Rajhara,84.0393,24.1732,2023,7.32,1074,0,458,82,0.67,37,8,0.00,440,26,91,37,15,-,-,0.61,waterQuality_table39
+263,Jharkhand,Palamu,Kajri,84.078,24.1147,2023,8.19,485,0,244,18,0.54,11,8,0.00,210,66,11,14,0,-,-,0.00,waterQuality_table39
+264,Jharkhand,Palamu,Panki,84.4734,24.0341,2023,7.75,962,0,311,110,1.1,40,40,0.16,380,64,53,42,7,-,-,2.35,waterQuality_table39
+265,Jharkhand,Palamu,Sagalim,84.3489,24.065,2023,7.4,1478,0,439,174,0.5,88,47,0.21,545,36,111,85,9,-,-,6.98,waterQuality_table39
+266,Jharkhand,Palamu,Nawadih1,84.1228,24.1297,2023,8.23,1487,0,451,185,1.55,96,21,0.00,400,60,61,142,26,-,-,0.00,waterQuality_table39
+267,Jharkhand,Palamu,Patan,84.1759,24.1979,2023,7.78,806,0,244,99,0.49,30,41,0.00,330,56,46,32,2,-,-,3.56,waterQuality_table39
+268,Jharkhand,Palamu,Satbarwa,84.2507,23.9294,2023,7.86,824,0,415,39,0.32,10,11,0.00,335,30,63,24,18,-,-,0.00,waterQuality_table39
+269,Jharkhand,Ramgarh,Chitarpur Dw,85.6236,23.5743,2023,7.21,1035,0,372,64,0.34,94,33,0.16,370,76,44,47,34,-,-,13.16,waterQuality_table39
+270,Jharkhand,Ramgarh,Dulmi,85.6026,23.5306,2023,7.61,985,0,305,85,1.51,90,35,0.00,315,74,32,78,5,-,-,18.80,waterQuality_table39
+271,Jharkhand,Ramgarh,Kusumbha,85.5974,23.5592,2023,7.96,1285,0,336,167,0.33,98,31,0.00,430,88,51,85,23,-,-,9.21,waterQuality_table39
+272,Jharkhand,Ramgarh,Gola,85.7169,23.5389,2023,7.34,1360,0,348,192,1.07,86,36,0.08,480,146,28,90,6,-,-,2.16,waterQuality_table39
+273,Jharkhand,Ramgarh,Barkachumba,85.4414,23.6851,2023,7.89,809,0,287,78,0.42,34,25,0.00,355,60,50,21,5,-,-,4.04,waterQuality_table39
+274,Jharkhand,Ramgarh,Kanjgi,85.4619,23.6712,2023,7.76,1218,0,403,110,0.3,98,28,0.13,360,84,36,90,39,-,-,6.39,waterQuality_table39
+275,Jharkhand,Ramgarh,Kuju,85.5068,23.7267,2023,7.54,1129,0,287,138,0.82,94,40,0.09,440,136,24,48,18,-,-,9.21,waterQuality_table39
+276,Jharkhand,Ramgarh,Mandu,85.4698,23.8079,2023,7.78,759,0,146,110,1.2,78,27,0.12,260,42,38,52,2,-,-,3.01,waterQuality_table39
+277,Jharkhand,Ramgarh,Thakur Gora,85.4553,23.7107,2023,7.81,357,0,92,36,0.62,24,35,0.00,160,52,7,5,3,-,-,11.28,waterQuality_table39
+278,Jharkhand,Ramgarh,Barkakhana,85.4722,23.6215,2023,7.78,941,0,220,131,0.75,92,8,0.00,270,80,17,92,3,-,-,13.16,waterQuality_table39
+279,Jharkhand,Ramgarh,Bhurkunda,85.3606,23.6525,2023,7.72,544,0,177,43,0.71,40,30,0.00,205,40,26,28,3,-,-,6.30,waterQuality_table39
+280,Jharkhand,Ramgarh,Sirka,85.4405,23.643,2023,7.9,1019,0,384,64,1.68,62,41,0.00,315,86,24,89,2,-,-,17.86,waterQuality_table39
+281,Jharkhand,Ramgarh,Barlong,85.6061,23.5965,2023,7.85,1188,0,378,131,0.23,76,28,0.06,440,94,50,65,9,-,-,5.26,waterQuality_table39
+282,Jharkhand,Ramgarh,Ramgarh2A,85.5149,23.6264,2023,7.66,972,0,262,117,0.66,94,4,0.10,400,112,29,40,2,-,-,10.34,waterQuality_table39
+283,Jharkhand,Ranchi,Angara1,85.6069,23.4456,2023,7.86,441,0,189,36,0.43,13,2,0.05,150,26,21,29,5,-,-,2.51,waterQuality_table39
+284,Jharkhand,Ranchi,Barwadag,85.6923,23.3586,2023,7.95,770,0,256,82,0.64,39,23,0.00,310,80,27,31,8,-,-,0.00,waterQuality_table39
+285,Jharkhand,Ranchi,Jonha,85.6347,23.3836,2023,7.91,352,0,153,28,0.55,7,7,0.02,150,34,16,11,1,-,-,0.95,waterQuality_table39
+286,Jharkhand,Ranchi,Gondlipokhar,85.4876,23.4066,2023,7.56,732,0,134,146,0.41,32,27,0.00,235,46,29,57,7,-,-,1.74,waterQuality_table39
+287,Jharkhand,Ranchi,Berro,85.0284,23.3042,2023,7.77,245,0,55,36,0.26,10,19,0.00,100,20,12,9,1,-,-,0.00,waterQuality_table39
+288,Jharkhand,Ranchi,Bundu,85.5886,23.1755,2023,8.11,402,0,98,64,0.39,28,1,0.09,145,40,11,21,5,-,-,21.28,waterQuality_table39
+289,Jharkhand,Ranchi,Taimara,85.4974,23.2021,2023,7.61,244,0,67,36,0.27,13,5,0.00,85,18,10,14,2,-,-,0.00,waterQuality_table39
+290,Jharkhand,Ranchi,Burmoo,85.1319,23.5693,2023,8.11,221,0,55,32,0.16,4,20,0.00,80,10,13,12,2,-,-,0.00,waterQuality_table39
+291,Jharkhand,Ranchi,Bijupara Tangar,85.0223,23.4825,2023,8.06,682,0,122,135,0.14,30,24,0.00,195,42,22,62,6,-,-,0.51,waterQuality_table39
+292,Jharkhand,Ranchi,Sonsbazar,84.9533,23.5154,2023,8.11,458,0,73,78,0.12,12,56,0.00,160,30,21,29,3,-,-,0.22,waterQuality_table39
+293,Jharkhand,Ranchi,Chachgura,85.0732,23.3149,2023,7.99,284,0,43,53,0.11,2,41,0.00,100,18,13,15,5,-,-,0.00,waterQuality_table39
+294,Jharkhand,Ranchi,Itki,85.118,23.3378,2023,7.44,259,0,49,50,0.0,14,11,0.00,110,30,9,9,1,-,-,0.00,waterQuality_table39
+295,Jharkhand,Ranchi,Bit More,85.4128,23.4288,2023,7.6,477,0,61,99,0.12,15,40,0.00,110,22,13,57,2,-,-,0.20,waterQuality_table39
+296,Jharkhand,Ranchi,Bunti,85.3815,23.3964,2023,7.24,764,0,171,146,0.13,32,6,0.00,200,36,27,78,10,-,-,0.00,waterQuality_table39
+297,Jharkhand,Ranchi,Daily Market,85.3247,23.3658,2023,7.82,1219,0,195,245,0.36,88,16,0.00,375,82,41,102,10,-,-,8.18,waterQuality_table39
+298,Jharkhand,Ranchi,Harmu,85.2984,23.358,2023,7.8,388,0,92,67,0.72,18,9,0.00,80,16,10,25,47,-,-,0.65,waterQuality_table39
+299,Jharkhand,Ranchi,Hochar,85.4257,23.4274,2023,8.06,179,0,43,18,0.6,8,23,0.00,65,14,7,9,1,-,-,0.00,waterQuality_table39
+300,Jharkhand,Ranchi,Kanke Chowk,85.3308,23.4308,2023,7.92,973,0,128,209,0.14,38,58,0.21,295,62,34,86,4,-,-,0.25,waterQuality_table39
+301,Jharkhand,Ranchi,Kanke1,85.318,23.4357,2023,7.9,606,0,140,110,0.19,33,4,0.00,195,30,29,48,3,-,-,0.00,waterQuality_table39
+302,Jharkhand,Ranchi,Pithoria,85.2959,23.5176,2023,8.11,758,0,183,128,0.31,25,25,0.00,245,40,35,59,5,-,-,0.00,waterQuality_table39
+303,Jharkhand,Ranchi,Ramkrishna Mission Morabadi,85.3383,23.3992,2023,7.84,712,0,146,124,0.36,56,7,0.00,200,54,16,70,5,-,-,0.56,waterQuality_table39
+304,Jharkhand,Ranchi,Sukurhutu,85.3216,23.4358,2023,8.12,1729,0,372,309,0.69,96,25,0.11,470,62,77,173,11,-,-,28.52,waterQuality_table39
+305,Jharkhand,Ranchi,,85.293,23.357,2023,7.92,753,0,171,128,0.55,39,20,0.00,255,70,19,52,5,-,-,0.28,waterQuality_table39
+306,Jharkhand,Ranchi,Kakriya,85.0271,23.1644,2023,8.05,580,0,226,32,0.19,23,45,0.00,215,48,23,32,2,-,-,2.41,waterQuality_table39
+307,Jharkhand,Ranchi,Bishakhatanga,85.0249,23.3902,2023,7.81,171,0,55,18,0.46,3,16,0.00,70,14,9,6,1,-,-,0.00,waterQuality_table39
+308,Jharkhand,Ranchi,Mandar,85.087,23.4597,2023,7.99,985,0,195,174,0.23,40,56,0.00,300,64,34,85,6,-,-,2.19,waterQuality_table39
+309,Jharkhand,Ranchi,Bridge Ford School,85.3117,23.2628,2023,7.8,225,0,43,28,0.18,17,25,0.00,50,6,9,27,1,-,-,1.94,waterQuality_table39
+310,Jharkhand,Ranchi,Chutiya (Sani Mandir),85.3378,23.3553,2023,7.63,659,0,128,146,0.38,16,1,0.00,165,52,9,73,2,-,-,0.00,waterQuality_table39
+311,Jharkhand,Ranchi,Hanuman Mandir (Near Ag.Office),85.3158,23.3411,2023,7.69,494,0,122,78,0.15,26,9,0.00,170,36,19,35,2,-,-,1.29,waterQuality_table39
+312,Jharkhand,Ranchi,Kharsidag,85.3685,23.2641,2023,7.6,258,0,55,39,0.12,15,20,0.00,90,14,13,16,3,-,-,0.00,waterQuality_table39
+313,Jharkhand,Ranchi,Ladnapiri,85.4447,23.2543,2023,8.01,501,0,214,36,0.65,20,4,0.00,180,28,27,30,5,-,-,0.00,waterQuality_table39
+314,Jharkhand,Ranchi,Lalganj,85.415,23.3836,2023,7.71,245,0,49,43,0.1,6,23,0.00,85,16,11,16,2,-,-,2.65,waterQuality_table39
+315,Jharkhand,Ranchi,Lowadih,85.3619,23.3594,2023,7.82,1112,0,159,206,0.21,52,99,0.11,285,60,33,116,10,-,-,1.89,waterQuality_table39
+316,Jharkhand,Ranchi,Mani Tola (Doranda),85.32,23.3308,2023,7.82,981,0,256,163,0.32,26,26,0.14,240,58,23,111,6,-,-,0.91,waterQuality_table39
+317,Jharkhand,Ranchi,Pindarcom,85.3836,23.2842,2023,7.25,1195,0,214,249,1.35,61,9,0.19,365,40,64,101,6,-,-,0.00,waterQuality_table39
+318,Jharkhand,Ranchi,Rampur,85.4097,23.2886,2023,8.12,236,0,55,39,0.26,10,11,0.00,80,20,7,17,2,-,-,0.00,waterQuality_table39
+319,Jharkhand,Ranchi,Siramtoli,85.332,23.3528,2023,7.56,723,0,177,128,0.33,31,10,0.00,265,50,34,41,6,-,-,0.65,waterQuality_table39
+320,Jharkhand,Ranchi,Sithipokhartoli,85.2523,23.2704,2023,7.35,332,0,79,60,0.33,13,7,0.00,95,12,16,31,3,-,-,0.00,waterQuality_table39
+321,Jharkhand,Ranchi,Tati Silway(E.F.),85.4442,23.3761,2023,7.97,547,0,79,121,0.08,16,27,0.00,155,48,9,50,6,-,-,0.00,waterQuality_table39
+322,Jharkhand,Ranchi,Hatia,85.3058,23.3128,2023,7.93,607,0,67,135,0.12,16,52,0.00,180,30,26,52,6,-,-,0.00,waterQuality_table39
+323,Jharkhand,Ranchi,Chutupalu,85.5039,23.5217,2023,7.31,512,0,122,89,0.42,28,6,0.00,205,42,24,21,6,-,-,0.00,waterQuality_table39
+324,Jharkhand,Ranchi,Hombai B.I.T. Mesra,85.4111,23.4233,2023,7.88,793,0,171,146,0.17,17,43,0.00,185,38,22,95,5,-,-,0.00,waterQuality_table39
+325,Jharkhand,Ranchi,Ormanji,85.4273,23.4411,2023,8.06,418,0,98,71,0.17,26,2,0.00,150,24,22,24,6,-,-,3.46,waterQuality_table39
+326,Jharkhand,Ranchi,Tungri Tola,85.4247,23.4381,2023,7.66,351,0,73,71,0.18,8,10,0.00,120,20,17,27,1,-,-,0.00,waterQuality_table39
+327,Jharkhand,Ranchi,Ukrid,85.4854,23.4989,2023,7.34,331,0,122,36,0.2,14,5,0.00,135,24,18,13,2,-,-,1.59,waterQuality_table39
+328,Jharkhand,Ranchi,Bajra,85.2793,23.373,2023,7.81,2151 °5C5),0,(m1g8/3L),224,0.13,(m6g3/L),(m5g8/L),(m0.g0/0L),(m3g20/L),50,47,112,10,-,-,0.00,waterQuality_table40
+329,Jharkhand,Ranchi,Hurhuri,85.2193,23.4411,2023,7.72,322,0,73,60,0.12,5,17,0.00,120,40,5,18,1,-,-,0.00,waterQuality_table40
+330,Jharkhand,Ranchi,Khatitanr,85.2252,23.4142,2023,7.93,252,0,67,32,0.7,5,25,0.00,110,32,7,5,2,-,-,2.27,waterQuality_table40
+331,Jharkhand,Ranchi,Kita,85.7599,23.3654,2023,7.62,592,0,189,89,0.3,16,1,0.00,150,28,19,62,6,-,-,0.42,waterQuality_table40
+332,Jharkhand,Ranchi,Patrahatu,85.7642,23.2941,2023,7.44,370,0,104,53,0.16,13,13,0.00,100,8,19,38,3,-,-,3.42,waterQuality_table40
+333,Jharkhand,Ranchi,Silli,85.8415,23.3602,2023,7.34,557,0,177,71,0.3,26,7,0.00,165,32,21,50,3,-,-,0.00,waterQuality_table40
+334,Jharkhand,Ranchi,Sonahatu,85.7055,23.1794,2023,7.91,391,0,128,53,0.19,8,5,0.00,155,40,13,18,2,-,-,0.00,waterQuality_table40
+335,Jharkhand,Ranchi,Rangamati,85.8316,22.987,2023,8.06,1086,0,214,181,0.28,84,26,0.11,395,100,35,63,9,-,-,0.95,waterQuality_table40
+336,Jharkhand,Ranchi,Tamar,85.6639,23.0568,2023,8.01,283,0,85,39,0.15,16,1,0.00,110,20,15,16,1,-,-,1.65,waterQuality_table40
+337,Jharkhand,Sahebganj,Barharwa,87.7663,24.8526,2023,7.76,261,0,116,21,0.21,2,2,0.20,120,28,12,5,0,-,-,0.00,waterQuality_table40
+338,Jharkhand,Sahebganj,Kotalpokhar,87.8183,24.7435,2023,8.22,153,0,67,14,0.27,2,0,0.19,70,10,11,3,0,-,-,12.25,waterQuality_table40
+339,Jharkhand,Sahebganj,Baramasia,87.6535,24.8603,2023,8.04,635,0,342,21,0.34,7,2,0.00,225,54,22,42,0,-,-,0.71,waterQuality_table40
+340,Jharkhand,Sahebganj,Barhait,87.6109,24.8853,2023,7.09,389,0,189,21,0.18,6,5,0.11,160,38,16,11,7,-,-,0.41,waterQuality_table40
+341,Jharkhand,Sahebganj,Chotakadma,87.5695,24.8626,2023,7.71,628,0,281,46,0.25,14,6,0.00,240,72,15,32,3,-,-,1.25,waterQuality_table40
+342,Jharkhand,Sahebganj,Borio,87.5941,25.0358,2023,8.01,838,0,317,85,0.36,34,5,0.00,175,48,13,98,23,-,-,0.00,waterQuality_table40
+343,Jharkhand,Sahebganj,Harinchara Chowk,87.6138,25.0303,2023,7.56,1344,0,445,195,0.11,8,28,0.00,475,130,36,86,10,-,-,0.00,waterQuality_table40
+344,Jharkhand,Sahebganj,Maricho,87.6238,25.0722,2023,7.46,609,0,281,39,0.19,12,5,0.11,235,66,17,33,0,-,-,0.00,waterQuality_table40
+345,Jharkhand,Sahebganj,Belbhadri,87.4889,25.2475,2023,7.85,512,0,256,21,0.59,9,9,0.11,205,50,19,22,2,-,-,0.00,waterQuality_table40
+346,Jharkhand,Sahebganj,Mandro,87.4978,25.1383,2023,8.02,1317,0,445,174,0.47,17,35,0.00,450,144,22,80,29,-,-,0.11,waterQuality_table40
+347,Jharkhand,Sahebganj,Taljhari,87.7903,25.0586,2023,7.93,656,0,299,50,0.56,9,1,0.08,180,66,4,69,0,-,-,0.00,waterQuality_table40
+348,Jharkhand,Sahebganj,Ranga,87.6889,24.8556,2023,7.91,482,0,238,25,0.51,8,1,0.00,215,50,22,12,1,-,-,0.22,waterQuality_table40
+349,Jharkhand,Sahebganj,Rajmahal,87.8368,25.0511,2023,7.83,897,0,360,78,0.54,18,25,0.00,365,98,29,34,8,-,-,3.50,waterQuality_table40
+350,Jharkhand,Sahebganj,Ghatselumpur,87.763,25.1275,2023,7.64,1385,0,512,178,0.41,14,8,0.00,545,196,13,60,15,-,-,0.00,waterQuality_table40
+351,Jharkhand,Sahebganj,Mangal Hat,87.7767,25.0761,2023,7.51,1100,0,378,128,0.37,33,28,0.00,415,132,21,42,35,-,-,0.33,waterQuality_table40
+352,Jharkhand,Sahebganj,Sahebganj1,87.6316,25.2154,2023,7.78,1271,0,439,128,0.59,60,40,0.00,505,112,55,58,1,-,-,3.94,waterQuality_table40
+353,Jharkhand,Sahebganj,Dihari,87.5202,25.2668,2023,8.14,780,0,427,21,0.2,5,4,0.00,350,92,29,14,9,-,-,0.00,waterQuality_table40
+354,Jharkhand,Sahebganj,Hazipur,87.5006,25.2894,2023,7.8,1464,0,458,224,0.49,20,28,0.00,540,120,58,66,39,-,-,0.00,waterQuality_table40
+355,Jharkhand,Sahebganj,Sakrigali,87.7124,25.2428,2023,7.77,1309,0,354,224,0.64,12,42,0.00,470,112,46,76,15,-,-,5.54,waterQuality_table40
+356,Jharkhand,Sahebganj,Taljhari1,87.2423,25.0823,2023,7.32,446,0,183,36,0.66,8,15,0.12,180,48,15,14,10,-,-,0.11,waterQuality_table40
+357,Jharkhand,Sahebganj,Udhwa,87.842,24.972,2023,7.72,1219,0,354,174,0.55,40,39,0.00,435,126,29,70,16,-,-,0.00,waterQuality_table40
+358,Jharkhand,Saraikela,Dugni,85.9969,22.7664,2023,7.71,267,0,110,18,0.09,14,2,0.33,110,30,9,10,1,-,-,-,waterQuality_table40
+359,Jharkhand,Saraikela,Bhaludih,86.0893,22.9007,2023,7.99,1167,0,397,82,0.44,130,4,0.00,475,124,40,46,2,-,-,-,waterQuality_table40
+360,Jharkhand,Saraikela,Chandil,86.025,22.9542,2023,7.85,1200,0,342,85,0.34,190,2,1.30,480,130,38,53,2,-,-,-,waterQuality_table40
+361,Jharkhand,Saraikela,Kandra,86.0583,22.8583,2023,7.91,1073,0,342,110,0.31,81,22,0.00,410,106,35,58,0,-,-,-,waterQuality_table40
+362,Jharkhand,Saraikela,Bagra Sai,86.0456,22.6319,2023,8.06,470,0,165,28,0.15,58,4,0.00,145,32,16,42,1,-,-,-,waterQuality_table40
+363,Jharkhand,Saraikela,Keshargaria,85.9358,22.5861,2023,8.01,643,0,214,57,0.18,63,1,0.00,225,70,12,43,3,-,-,-,waterQuality_table40
+364,Jharkhand,Saraikela,Nabibera,86.0069,22.6403,2023,8.12,2443,0,915,206,0.69,155,22,0.00,1060,304,73,73,1,-,-,-,waterQuality_table40
+365,Jharkhand,Saraikela,Harison,85.8506,22.7533,2023,8.14,678,0,256,57,0.51,38,12,0.00,280,62,30,29,1,-,-,-,waterQuality_table40
+366,Jharkhand,Saraikela,Jamdih,86.17,22.99,2023,7.82,882,0,275,78,0.15,91,15,0.00,385,96,35,24,2,-,-,-,waterQuality_table40
+367,Jharkhand,Saraikela,Lupungdih,86.1042,22.9608,2023,7.92,892,0,256,89,0.51,89,20,0.00,275,62,29,76,4,-,-,-,waterQuality_table40
+368,Jharkhand,Saraikela,Saraikela,85.9208,22.7042,2023,7.93,1217,0,500,82,0.23,78,2,0.00,350,102,23,113,9,-,-,-,waterQuality_table40
+369,Jharkhand,Simdega,Bano,84.9097,22.6472,2023,8.05,625,0,256,50,0.75,25,7,0.00,250,26,45,25,5,-,-,0.00,waterQuality_table40
+370,Jharkhand,Simdega,Bolba,84.3472,22.43,2023,8.12,737,0,226,64,0.21,53,47,0.22,250,54,28,42,20,-,-,0.24,waterQuality_table40
+371,Jharkhand,Simdega,Baribringa,84.8654,22.5337,2023,7.45,317,0,146,18,0.53,10,1,0.00,135,14,24,11,0,-,-,5.84,waterQuality_table40
+372,Jharkhand,Simdega,Jaldega,84.8127,22.5769,2023,8.12,715,0,244,78,0.6,40,6,0.05,260,62,26,39,8,-,-,1.69,waterQuality_table40
+373,Jharkhand,Simdega,Lamboi,84.6671,22.5355,2023,7.76,312,0,146,21,0.32,5,2,0.05,125,36,9,12,3,-,-,0.00,waterQuality_table40
+374,Jharkhand,Simdega,Tengratuku,84.7311,22.5529,2023,8.16,804,0,268,96,0.72,37,5,0.00,225,34,34,79,6,-,-,0.00,waterQuality_table40
+375,Jharkhand,Simdega,Lachara Gargh (Kolebira),84.8591,22.6443,2023,7.94,828,0,238,82,0.46,62,49,0.18,275,78,19,58,8,-,-,25.61,waterQuality_table40
+376,Jharkhand,Simdega,Puthritoli,84.7368,22.7615,2023,7.75,172,0,79,11,0.28,6,0,0.00,85,10,15,1,1,-,-,0.00,waterQuality_table40
+377,Jharkhand,Simdega,Kurdeg,84.133,22.5664,2023,8.02,695,0,250,71,0.5,28,12,0.11,300,64,34,22,2,-,-,1.26,waterQuality_table40
+378,Jharkhand,Simdega,Biru,84.5504,22.6846,2023,7.91,852,0,250,60,0.48,37,121,0.00,350,50,55,24,18,-,-,0.00,waterQuality_table40
+379,Jharkhand,Simdega,Simdega,84.4924,22.6107,2023,7.87,375,0,61,64,0.55,11,42,0.09,140,20,22,19,7,-,-,0.00,waterQuality_table40
+380,Jharkhand,Simdega,Kerio,84.5801,22.4582,2023,7.15,1179,0,366,131,0.44,93,5,0.00,405,78,51,71,26,-,-,0.00,waterQuality_table40
+381,Jharkhand,Simdega,Thethai Thangar,84.5076,22.4996,2023,7.99,1310,0,519,142,0.67,27,2,0.00,430,114,35,95,13,-,-,6.32,waterQuality_table40
+382,Jharkhand,W Singhbhum,Bandgaon,85.3297,22.8611,2023,8.09,1164,0,458,110,0.39,27,23,0.12,335,64,43,105,14,-,-,-,waterQuality_table40
+383,Jharkhand,W Singhbhum,Hesadih,85.3547,22.7861,2023,7.91,372,0,146,28,0.32,9,19,0.56,160,42,13,10,2,-,-,-,waterQuality_table40
+384,Jharkhand,W Singhbhum,Kereikela,85.5392,22.7086,2023,7.83,986,0,342,92,0.17,48,17,0.00,375,122,17,44,4,-,-,-,waterQuality_table40
+385,Jharkhand,W Singhbhum,Chaibasa,85.805,22.5456,2023,8.01,1197,0,403,110,0.61,102,6,0.00,445,128,30,68,4,-,-,-,waterQuality_table40
+386,Jharkhand,W Singhbhum,Ckp (Ulidih),85.6517,22.6711,2023,7.92,661,0,293,43,0.22,26,2,0.00,240,46,30,41,0,-,-,-,waterQuality_table40
+387,Jharkhand,W Singhbhum,Hat Gamhariya,85.7358,22.2617,2023,7.84,641,0,311,25,0.27,18,13,0.00,225,52,23,40,6,-,-,-,waterQuality_table40
+388,Jharkhand,W Singhbhum,Bhandgaon,85.5944,22.0892,2023,7.95,730,0,317,75,0.14,3,2,0.23,240,52,27,49,18,-,-,-,waterQuality_table40
+389,Jharkhand,W Singhbhum,Jagannathpur,85.6364,22.2211,2023,7.95,614,0,195,53,0.25,53,22,0.00,240,82,9,31,1,-,-,-,waterQuality_table40
+390,Jharkhand,W Singhbhum,Jaitgarh,85.6756,22.0717,2023,8.13,409,0,153,32,0.51,24,4,0.00,130,32,12,30,2,-,-,-,waterQuality_table40
+391,Jharkhand,W Singhbhum,Jhinkpani,85.7736,22.4167,2023,8.05,1013,0,372,71,0.69,78,22,0.00,265,72,21,110,2,-,-,-,waterQuality_table40
+392,Jharkhand,W Singhbhum,Khuntpani,85.7225,22.6233,2023,7.99,494,0,195,43,0.34,25,2,0.45,220,62,16,12,0,-,-,-,waterQuality_table40
+393,Jharkhand,W Singhbhum,Putida,85.7647,22.5892,2023,7.91,453,0,171,46,0.53,15,9,0.00,190,42,21,16,3,-,-,-,waterQuality_table40
+394,Jharkhand,W Singhbhum,Barajamda,85.4114,22.1644,2023,7.78,505,0,177,43,0.32,37,13,0.00,190,42,21,25,5,-,-,-,waterQuality_table40
+395,Jharkhand,W Singhbhum,Noamundi,85.5044,22.1603,2023,7.72,780,0,317,71,0.25,5,24,0.00,335,86,29,23,2,-,-,-,waterQuality_table40
+396,Jharkhand,W Singhbhum,Toretopa Noamundi,85.5128,22.1603,2023,7.93,431,0,201,28,0.03,11,0,0.00,170,50,11,20,2,-,-,-,waterQuality_table40
+397,Jharkhand,W Singhbhum,Kokcho,85.9117,22.4678,2023,7.81,445,0,165,43,0.19,24,0,0.00,180,46,16,18,0,-,-,-,waterQuality_table40

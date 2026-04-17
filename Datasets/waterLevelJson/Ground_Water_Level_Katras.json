@@ -1,0 +1,31 @@
+{
+  "station": {
+    "Station Code": "234848086173001",
+    "Station Name": "Katras",
+    "Station Type": "Ground water",
+    "Agency Name": "Cgwb",
+    "State": "Jharkhand",
+    "District": "Dhanbad",
+    "Tehsil": "Baghmara cum katras",
+    "Data Acquisition": "Manual",
+    "Block": "Baghmara cum katras",
+    "Village": "Katras",
+    "Latitude": "23.8133",
+    "Longitude": "86.2917",
+    "Data Available From": "1989-01-01",
+    "Latest  Data Available": "2016-05-15",
+    "Type of Well": "Dug well",
+    "Aquifer Type": "-",
+    "Well Depth": "14.6",
+    "Unit": "m"
+  },
+  "readings": [
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2016-05-15T06:00:00",
+      "water_level_m": 4.11,
+      "unit": "m"
+    }
+  ]
+}

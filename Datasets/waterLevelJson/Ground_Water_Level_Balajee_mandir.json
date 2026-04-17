@@ -1,0 +1,87 @@
+{
+  "station": {
+    "Station Code": "234802086284404",
+    "Station Name": "Balajee mandir",
+    "Station Type": "Ground water",
+    "Agency Name": "Cgwb",
+    "State": "Jharkhand",
+    "District": "Dhanbad",
+    "Tehsil": "-",
+    "Data Acquisition": "Manual",
+    "Block": "-",
+    "Village": "-",
+    "Latitude": "23.8006",
+    "Longitude": "86.4789",
+    "Data Available From": "2023-01-10",
+    "Latest  Data Available": "2024-11-30",
+    "Type of Well": "-",
+    "Aquifer Type": "-",
+    "Well Depth": "-",
+    "Unit": "m"
+  },
+  "readings": [
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-01-10T11:00:00",
+      "water_level_m": 5.47,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-05-30T11:00:00",
+      "water_level_m": 6.96,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-08-30T11:00:00",
+      "water_level_m": 6.15,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-11-10T11:00:00",
+      "water_level_m": 7.32,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-01-10T11:00:00",
+      "water_level_m": 6.94,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-02-07T01:00:00",
+      "water_level_m": 6.94,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-05-30T11:00:00",
+      "water_level_m": 8.1,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-08-30T11:00:00",
+      "water_level_m": 5.83,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-11-30T11:00:00",
+      "water_level_m": 6.08,
+      "unit": "m"
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+{
+  "station": {
+    "Station Code": "234711086274101",
+    "Station Name": "Nirsa ecl l.qtr",
+    "Station Type": "Ground water",
+    "Agency Name": "Cgwb",
+    "State": "Jharkhand",
+    "District": "Dhanbad",
+    "Tehsil": "Dhanbad cum kenduadi",
+    "Data Acquisition": "Manual",
+    "Block": "Dhanbad cum kenduadi",
+    "Village": "Nirsa ecl l.qtr",
+    "Latitude": "23.7864",
+    "Longitude": "86.4614",
+    "Data Available From": "1994-01-01",
+    "Latest  Data Available": "2024-11-30",
+    "Type of Well": "Dug well",
+    "Aquifer Type": "-",
+    "Well Depth": "15.3",
+    "Unit": "m"
+  },
+  "readings": [
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2015-01-05T06:00:00",
+      "water_level_m": 2.0,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2015-05-15T06:00:00",
+      "water_level_m": 2.94,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2015-08-25T06:00:00",
+      "water_level_m": 3.45,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2015-11-05T06:00:00",
+      "water_level_m": 1.73,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2016-05-15T06:00:00",
+      "water_level_m": 3.0,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2016-11-05T06:00:00",
+      "water_level_m": 2.11,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2017-01-05T06:00:00",
+      "water_level_m": 2.75,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2017-05-15T06:00:00",
+      "water_level_m": 3.6,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2017-08-25T06:00:00",
+      "water_level_m": 1.25,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2017-11-05T06:00:00",
+      "water_level_m": 1.62,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2018-01-10T06:00:00",
+      "water_level_m": 2.9,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2020-01-10T00:00:00",
+      "water_level_m": 2.02,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2020-11-30T00:00:00",
+      "water_level_m": 1.91,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2022-01-30T07:00:00",
+      "water_level_m": 1.65,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-05-30T11:00:00",
+      "water_level_m": 1.95,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-08-30T11:00:00",
+      "water_level_m": 1.75,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2023-11-10T11:00:00",
+      "water_level_m": 2.15,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-01-10T11:00:00",
+      "water_level_m": 1.7,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-02-07T01:00:00",
+      "water_level_m": 1.7,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-05-30T11:00:00",
+      "water_level_m": 1.9,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-08-30T11:00:00",
+      "water_level_m": 1.64,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-11-30T11:00:00",
+      "water_level_m": 2.43,
+      "unit": "m"
+    }
+  ]
+}

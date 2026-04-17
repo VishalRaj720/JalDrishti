@@ -1,0 +1,87 @@
+{
+  "station": {
+    "Station Code": "234435086260201",
+    "Station Name": "Bagha_jharia",
+    "Station Type": "Ground water",
+    "Agency Name": "Cgwb",
+    "State": "Jharkhand",
+    "District": "Dhanbad",
+    "Tehsil": "Jharia-jorapokhar-si",
+    "Data Acquisition": "Manual",
+    "Block": "Jharia-jorapokhar-si",
+    "Village": "Jharia",
+    "Latitude": "23.7431",
+    "Longitude": "86.4339",
+    "Data Available From": "2013-11-05",
+    "Latest  Data Available": "2024-08-30",
+    "Type of Well": "Dug well",
+    "Aquifer Type": "Unconfined",
+    "Well Depth": "10.72",
+    "Unit": "m"
+  },
+  "readings": [
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2015-01-05T06:00:00",
+      "water_level_m": 0.79,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2015-05-15T06:00:00",
+      "water_level_m": 1.2,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2015-11-05T06:00:00",
+      "water_level_m": 2.7,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2016-01-05T06:00:00",
+      "water_level_m": 2.75,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2017-01-05T06:00:00",
+      "water_level_m": 1.95,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2022-01-30T07:00:00",
+      "water_level_m": 2.15,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2022-08-27T06:00:00",
+      "water_level_m": 8.25,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-02-07T01:00:00",
+      "water_level_m": 1.7,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2024-08-30T11:00:00",
+      "water_level_m": 1.7,
+      "unit": "m"
+    }
+  ]
+}

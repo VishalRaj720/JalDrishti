@@ -1,0 +1,38 @@
+{
+  "station": {
+    "Station Code": "234745086251501",
+    "Station Name": "Dhanbad",
+    "Station Type": "Ground water",
+    "Agency Name": "Cgwb",
+    "State": "Jharkhand",
+    "District": "Dhanbad",
+    "Tehsil": "Dhanbad cum kenduadi",
+    "Data Acquisition": "Manual",
+    "Block": "Dhanbad cum kenduadi",
+    "Village": "Dhanbad",
+    "Latitude": "23.7958",
+    "Longitude": "86.4208",
+    "Data Available From": "2009-08-25",
+    "Latest  Data Available": "2018-08-30",
+    "Type of Well": "Dug well",
+    "Aquifer Type": "-",
+    "Well Depth": "10.4",
+    "Unit": "m"
+  },
+  "readings": [
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2018-05-30T06:00:00",
+      "water_level_m": 6.15,
+      "unit": "m"
+    },
+    {
+      "data_type_code": "HGZ",
+      "data_type_description": "MANUAL-Water Level",
+      "timestamp": "2018-08-30T00:00:00",
+      "water_level_m": 4.49,
+      "unit": "m"
+    }
+  ]
+}
