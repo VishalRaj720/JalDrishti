@@ -40,6 +40,14 @@ geopandas==1.0.1
 shapely==2.0.6
 openpyxl==3.1.5
 
+# ML (Month 4: feature engineering + baseline models)
+numpy==1.26.4
+scipy==1.13.1
+scikit-learn==1.5.2
+joblib==1.4.2
+shap==0.46.0
+matplotlib==3.9.2
+
 # Monitoring (stubs)
 sentry-sdk[fastapi]==2.19.2
 prometheus-fastapi-instrumentator==7.0.0

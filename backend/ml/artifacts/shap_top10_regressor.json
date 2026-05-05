@@ -1,0 +1,45 @@
+{
+  "method": "shap_tree_explainer",
+  "top_features": [
+    {
+      "feature": "hydraulic_conductivity",
+      "mean_abs_shap": 147.6513058059426
+    },
+    {
+      "feature": "dtw_decadal_avg",
+      "mean_abs_shap": 93.82344316061136
+    },
+    {
+      "feature": "distance_to_nearest_isr_km",
+      "mean_abs_shap": 69.16590797279233
+    },
+    {
+      "feature": "transmissivity",
+      "mean_abs_shap": 61.963148438519255
+    },
+    {
+      "feature": "porosity",
+      "mean_abs_shap": 51.14885906166861
+    },
+    {
+      "feature": "storage_coefficient",
+      "mean_abs_shap": 51.09830591509476
+    },
+    {
+      "feature": "thickness",
+      "mean_abs_shap": 46.656525215479775
+    },
+    {
+      "feature": "specific_yield",
+      "mean_abs_shap": 37.15146798225694
+    },
+    {
+      "feature": "nearest_isr_injection_rate",
+      "mean_abs_shap": 29.367029029807362
+    },
+    {
+      "feature": "year",
+      "mean_abs_shap": 19.17644192850889
+    }
+  ]
+}

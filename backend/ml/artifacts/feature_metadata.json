@@ -1,0 +1,76 @@
+{
+  "numeric_features": [
+    "porosity",
+    "hydraulic_conductivity",
+    "transmissivity",
+    "specific_yield",
+    "storage_coefficient",
+    "dtw_decadal_avg",
+    "thickness",
+    "transmissivity_to_porosity_ratio",
+    "distance_to_nearest_isr_km",
+    "nearest_isr_injection_rate",
+    "well_depth",
+    "month",
+    "year",
+    "vulnerability_proxy"
+  ],
+  "categorical_features": [
+    "aquifer_type",
+    "season"
+  ],
+  "all_features": [
+    "porosity",
+    "hydraulic_conductivity",
+    "transmissivity",
+    "specific_yield",
+    "storage_coefficient",
+    "dtw_decadal_avg",
+    "thickness",
+    "transmissivity_to_porosity_ratio",
+    "distance_to_nearest_isr_km",
+    "nearest_isr_injection_rate",
+    "well_depth",
+    "month",
+    "year",
+    "vulnerability_proxy",
+    "aquifer_type",
+    "season"
+  ],
+  "aquifer_type_vocab": [
+    "basalt",
+    "charnockite",
+    "gneiss",
+    "limestone",
+    "sandstone",
+    "alluvium",
+    "basement_gneissic_complex",
+    "granite",
+    "intrusive",
+    "laterite",
+    "quartzite",
+    "schist",
+    "unknown"
+  ],
+  "season_vocab": [
+    "pre_monsoon",
+    "monsoon",
+    "post_monsoon"
+  ],
+  "classification_classes": [
+    "safe",
+    "marginal",
+    "unsafe"
+  ],
+  "thresholds": {
+    "tds_unsafe": 1000.0,
+    "tds_marginal": 500.0,
+    "uranium_ppb_unsafe": 30.0,
+    "uranium_ppb_marginal": 15.0,
+    "ec_unsafe": 3000.0,
+    "ec_marginal": 1500.0
+  },
+  "row_count": 893,
+  "regressor_path": "tds_regressor.joblib",
+  "classifier_path": "contamination_classifier.joblib"
+}
