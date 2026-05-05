@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JalDrishti — Groundwater Contamination Assessment Platform</title>
+  <link rel="stylesheet" href="jaldrishti-tokens.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- Leaflet JS (must load after React, before our components) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLI=" crossorigin="anonymous"></script>
+
+  <!-- App data (mock fallback) -->
+  <script src="jaldrishti-data.js"></script>
+  <!-- API client -->
+  <script src="jaldrishti-api.js"></script>
+  <!-- Tweaks panel -->
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <!-- Shared components -->
+  <script type="text/babel" src="jaldrishti-components.jsx"></script>
+  <!-- Screen components -->
+  <script type="text/babel" src="jaldrishti-screens.jsx"></script>
+  <!-- Map dashboard -->
+  <script type="text/babel" src="jaldrishti-map.jsx"></script>
+
+  <style>
+    html, body, #root { height: 100%; overflow: hidden; }
+
+    /* ── Header ── */
+    .jd-header {
+      height: 64px; background: #fff; border-bottom: 1px solid #E2E8F0;
+      display: flex; align-items: center; padding: 0 20px;
+      gap: 0; z-index: 100; position: relative;
+      box-shadow: 0 1px 6px rgba(0,0,0,.06);
+      flex-shrink: 0;
+    }
+    .jd-logo { display: flex; align-items: center; gap: 10; text-decoration: none; color: inherit; }
+    .jd-logo-icon { width: 34px; height: 34px; }
+    .jd-logo-text { font-size: 17px; font-weight: 700; color: #0D7377; letter-spacing: -.02em; }
+    .jd-logo-sub  { font-size: 10px; color: #64748B; font-weight: 400; line-height: 1.2; }
+    .jd-nav { display: flex; gap: 2px; margin: 0 auto; }
+    .jd-nav-btn {
+      padding: 6px 14px; border-radius: 7px; font-size: 13px; font-weight: 500;
+      color: #64748B; background: none; border: none; cursor: pointer;
+      transition: all .15s; white-space: nowrap;
+    }
+    .jd-nav-btn:hover  { background: #f1f5f9; color: #1e293b; }
+    .jd-nav-btn.active { background: #edf9fa; color: #0D7377; font-weight: 600; }
+    .jd-right { display: flex; align-items: center; gap: 10; }
+    .jd-role-badge { padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; letter-spacing: .05em; }
+    .jd-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #fff; cursor: pointer; }
+    .jd-avatar-menu { position: absolute; top: 52px; right: 16px; background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px; z-index: 300; min-width: 180px; animation: fadeIn .15s; }
+    .jd-avatar-menu-item { padding: 8px 12px; border-radius: 6px; font-size: 13px; color: #1e293b; cursor: pointer; }
+    .jd-avatar-menu-item:hover { background: #f8fafc; }
+
+    /* ── Main layout ── */
+    .jd-main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Left panel ── */
+    .jd-panel {
+      width: 320px; flex-shrink: 0; background: #fff;
+      border-right: 1px solid #E2E8F0;
+      display: flex; flex-direction: column;
+      box-shadow: 2px 0 8px rgba(0,0,0,.04);
+    }
+    .jd-panel-search { padding: 12px 12px 0; }
+    .jd-search-input {
+      width: 100%; height: 34px; padding: 0 12px; font-size: 13px;
+      border: 1px solid #E2E8F0; border-radius: 7px; outline: none;
+      color: #1e293b; background: #f8fafc; font-family: var(--font-sans);
+    }
+    .jd-search-input:focus { border-color: #0D7377; background: #fff; }
+    .jd-panel-layers { padding: 12px; border-bottom: 1px solid #f1f5f9; }
+    .jd-layer-row { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+    .jd-layer-row:hover { background: #f8fafc; }
+    .jd-layer-toggle { width: 28px; height: 16px; border-radius: 8px; position: relative; transition: background .2s; flex-shrink: 0; cursor: pointer; }
+    .jd-layer-toggle-thumb { position: absolute; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: left .2s; }
+    .jd-panel-list { flex: 1; overflow-y: auto; padding: 8px 12px 80px; }
+    .jd-entity-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; margin-bottom: 3px; }
+    .jd-entity-row:hover { background: #f8fafc; border-color: #E2E8F0; }
+    .jd-fab { position: absolute; bottom: 20px; left: 20px; width: 44px; height: 44px; background: #0D7377; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; box-shadow: 0 4px 14px rgba(13,115,119,.4); cursor: pointer; border: none; transition: transform .15s; z-index: 10; }
+    .jd-fab:hover { transform: scale(1.08); }
+
+    /* ── Content / Full pages ── */
+    .jd-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* ── Login ── */
+    .login-bg {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #0d1520;
+      background-image:
+        radial-gradient(ellipse at 20% 80%, rgba(13,115,119,.25) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(59,130,246,.15) 0%, transparent 50%),
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,.025) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,.025) 40px);
+      font-family: var(--font-sans);
+    }
+    .login-card {
+      width: 400px; background: #fff; border-radius: 14px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.04);
+      padding: 40px; animation: fadeIn .3s;
+    }
+    .login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+    .login-tagline { font-size: 12px; color: #64748B; margin-bottom: 28px; line-height: 1.5; }
+    .login-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .login-label { font-size: 12px; font-weight: 500; color: #475569; }
+    .login-input {
+      height: 42px; padding: 0 14px; font-size: 14px; border: 1px solid #E2E8F0;
+      border-radius: 8px; outline: none; color: #1e293b; transition: border .15s;
+      font-family: var(--font-sans);
+    }
+    .login-input:focus { border-color: #0D7377; }
+
+    /* Responsive tweaks */
+    @media (max-width: 900px) {
+      .jd-panel { width: 240px; }
+      .jd-logo-sub { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "userRole": "ADMIN",
+  "defaultScreen": "map",
+  "showPlumes": true,
+  "mapBasemap": "dark"
+}/*EDITMODE-END*/;
+
+// ── Error Boundary ────────────────────────────────────────────
+// Catches any render crash in the tree and shows a readable error
+// instead of a blank white screen.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error('[JalDrishti ErrorBoundary]', error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, fontFamily: 'monospace', background: '#fff', minHeight: '100vh' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#b91c1c', marginBottom: 12 }}>
+            Render Error — check the browser console for details
+          </div>
+          <pre style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 16, fontSize: 13, color: '#b91c1c', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {this.state.error?.message}
+            {'\n\n'}
+            {this.state.error?.stack}
+          </pre>
+          <button onClick={() => this.setState({ error: null })}
+            style={{ marginTop: 16, padding: '8px 20px', background: '#0D7377', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ── Pull external components from window into local scope ─────
+// All text/babel external files run before this inline script
+// (Babel Standalone chains their fetch-promises). Destructuring
+// here guarantees the names are in local scope so JSX references
+// never fall back to a possibly-undefined global lookup.
+const {
+  // jaldrishti-components.jsx
+  RiskBadge       = () => null,
+  StatusChip      = () => null,
+  TypeBadge       = () => null,
+  ProvenanceDot   = () => null,
+  Skeleton        = () => null,
+  StatCard        = () => null,
+  SectionHeader   = () => null,
+  Btn             = () => null,
+  Tabs            = () => null,
+  Input           = () => null,
+  Select          = () => null,
+  Modal           = () => null,
+  Drawer          = () => null,
+  EmptyState      = () => null,
+  InfoBox         = () => null,
+  Breadcrumb      = () => null,
+  // jaldrishti-screens.jsx
+  DistrictDrawer        = () => null,
+  BlockDrawer           = () => null,
+  AquiferDrawer         = () => null,
+  ISRDrawer             = () => null,
+  SimulationModal       = () => null,
+  MonitoringStationPage = () => null,
+  WaterQualityPage      = () => null,
+  DataIngestionPage     = () => null,
+  UserManagementPage    = () => null,
+  AnalyticsDashboard    = () => null,
+  // jaldrishti-map.jsx
+  MapDashboard    = () => <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748B', fontSize:14 }}>Map loading…</div>,
+  // tweaks-panel.jsx
+  useTweaks       = (d) => [d, () => {}],
+  TweaksPanel     = ({ children }) => null,
+  TweakSection    = () => null,
+  TweakToggle     = () => null,
+  TweakSelect     = () => null,
+} = window;
+
+// ── Logo SVG ──────────────────────────────────────────────────
+function WaterDropLogo({ size = 34, color = '#0D7377' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 34 34" fill="none" className="jd-logo-icon">
+      <circle cx="17" cy="17" r="16" fill={color} opacity=".12" />
+      <path d="M17 4 C17 4 8 14 8 20 C8 25.5 12 30 17 30 C22 30 26 25.5 26 20 C26 14 17 4 17 4Z" fill={color} />
+      <ellipse cx="13" cy="21" rx="2.5" ry="3.5" fill="rgba(255,255,255,.35)" transform="rotate(-20 13 21)" />
+    </svg>
+  );
+}
+
+// ── Header ────────────────────────────────────────────────────
+function Header({ screen, setScreen, userRole, currentUser, onSignOut, onRoleChange }) {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const roleColors = {
+    ADMIN:   { bg: '#fee2e2', color: '#b91c1c' },
+    ANALYST: { bg: '#eff6ff', color: '#1d4ed8' },
+    VIEWER:  { bg: '#f0fdf4', color: '#15803d' },
+  };
+  const rc = roleColors[userRole];
+  const navItems = [
+    { id: 'map',       label: 'Map' },
+    { id: 'dashboard', label: 'Analytics' },
+    { id: 'ingest',    label: 'Data Ingest', roleReq: ['ADMIN','ANALYST'] },
+    { id: 'users',     label: 'Users', roleReq: ['ADMIN'] },
+  ].filter(n => !n.roleReq || n.roleReq.includes(userRole));
+
+  return (
+    <div className="jd-header">
+      <div className="jd-logo" style={{ marginRight: 16 }}>
+        <WaterDropLogo />
+        <div>
+          <div className="jd-logo-text">JalDrishti</div>
+          <div className="jd-logo-sub">Groundwater Assessment</div>
+        </div>
+      </div>
+      <nav className="jd-nav">
+        {navItems.map(n => (
+          <button key={n.id} className={`jd-nav-btn${screen === n.id ? ' active' : ''}`}
+            onClick={() => setScreen(n.id)}>{n.label}</button>
+        ))}
+      </nav>
+      <div className="jd-right">
+        <span className="jd-role-badge" style={{ background: rc.bg, color: rc.color }}>{userRole}</span>
+        <div style={{ position: 'relative' }}>
+          <div className="jd-avatar" style={{ background: '#0D7377' }}
+            onClick={() => setMenuOpen(v => !v)}>
+            {userRole[0]}
+          </div>
+          {menuOpen && (
+            <div className="jd-avatar-menu">
+              <div style={{ padding: '8px 12px 6px', borderBottom: '1px solid #f1f5f9', marginBottom: 4 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>{currentUser?.username ?? 'admin'}</div>
+                <div style={{ fontSize: 11, color: '#64748B' }}>{currentUser?.email ?? 'admin@jaldrishti.local'}</div>
+              </div>
+              <div style={{ padding: '4px', borderBottom: '1px solid #f1f5f9', marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: '#64748B', padding: '4px 8px', fontWeight: 500 }}>Switch Role (Demo)</div>
+                {['ADMIN','ANALYST','VIEWER'].map(r => (
+                  <div key={r} className="jd-avatar-menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, color: r === userRole ? '#0D7377' : '#1e293b', fontWeight: r === userRole ? 600 : 400 }}
+                    onClick={() => { onRoleChange(r); setMenuOpen(false); }}>
+                    {r === userRole && <span style={{ fontSize: 12 }}>✓</span>}
+                    {r}
+                  </div>
+                ))}
+              </div>
+              <div className="jd-avatar-menu-item" onClick={onSignOut} style={{ color: '#DC2626' }}>Sign Out</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Left Panel ────────────────────────────────────────────────
+function LeftPanel({ layers, setLayers, onDistrictClick, onAquiferClick, onISRClick, onStationClick, userRole }) {
+  const [search, setSearch] = React.useState('');
+  const layerDefs = [
+    { key: 'districts', label: 'Districts',   color: '#0D7377', icon: '⬡' },
+    { key: 'blocks',    label: 'Blocks',       color: '#64748B', icon: '▦' },
+    { key: 'aquifers',  label: 'Aquifers',     color: '#3B82F6', icon: '◎' },
+    { key: 'isrPoints', label: 'ISR Points',   color: '#F59E0B', icon: '◆' },
+    { key: 'plumes',    label: 'Plumes',       color: '#f97316', icon: '◉' },
+    { key: 'stations',  label: 'Stations',     color: '#0D7377', icon: '●' },
+    { key: 'wells',     label: 'Wells',        color: '#8b5cf6', icon: '◆' },
+  ];
+
+  const filtered = search
+    ? window.DISTRICTS.filter(d => d.name.toLowerCase().includes(search.toLowerCase()))
+    : window.DISTRICTS;
+
+  return (
+    <div className="jd-panel" style={{ position: 'relative' }}>
+      {/* Search */}
+      <div className="jd-panel-search">
+        <input className="jd-search-input" placeholder="Search districts, blocks, aquifers…"
+          value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {/* Layer toggles */}
+      <div className="jd-panel-layers">
+        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Layers</div>
+        {layerDefs.map(l => (
+          <div key={l.key} className="jd-layer-row" onClick={() => setLayers(lrs => ({ ...lrs, [l.key]: !lrs[l.key] }))}>
+            <div className="jd-layer-toggle" style={{ background: layers[l.key] ? l.color : '#E2E8F0' }}>
+              <div className="jd-layer-toggle-thumb" style={{ left: layers[l.key] ? '14px' : '2px' }} />
+            </div>
+            <span style={{ fontSize: 12, color: layers[l.key] ? l.color : '#94a3b8', fontWeight: 500, width: 18, textAlign: 'center' }}>{l.icon}</span>
+            <span style={{ fontSize: 13, color: '#1e293b', flex: 1 }}>{l.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Entity list */}
+      <div className="jd-panel-list">
+        {layers.districts && (
+          <div>
+            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Districts</div>
+            {filtered.map(d => (
+              <div key={d.id} className="jd-entity-row" onClick={() => onDistrictClick(d)}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#1e293b' }}>{d.name}</div>
+                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{d.blocks} blocks · {d.aquifers} aquifers</div>
+                </div>
+                <RiskBadge level={d.risk} />
+              </div>
+            ))}
+          </div>
+        )}
+        {layers.aquifers && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Aquifers</div>
+            {window.AQUIFERS.filter(a => !search || a.name.toLowerCase().includes(search.toLowerCase())).map(aq => (
+              <div key={aq.id} className="jd-entity-row" onClick={() => onAquiferClick(aq)}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#1e293b' }}>{aq.name}</div>
+                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{aq.type} · {aq.minDepth}–{aq.maxDepth}m</div>
+                </div>
+                <RiskBadge level={aq.risk} />
+              </div>
+            ))}
+          </div>
+        )}
+        {layers.isrPoints && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>ISR Points</div>
+            {window.ISR_POINTS.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
+              <div key={p.id} className="jd-entity-row" onClick={() => onISRClick(p)}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#1e293b' }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 1, fontFamily: 'Roboto Mono, monospace' }}>{p.lat.toFixed(4)}°N</div>
+                </div>
+                <span style={{ fontSize: 11, color: p.endDate ? '#64748B' : '#16A34A', fontWeight: 600 }}>{p.endDate ? 'CLOSED' : 'ACTIVE'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {layers.stations && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Monitoring Stations</div>
+            {window.MONITORING_STATIONS.map(st => (
+              <div key={st.id} className="jd-entity-row" onClick={() => onStationClick(st)}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#1e293b' }}>{st.name}</div>
+                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>{st.village}</div>
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: st.level > 15 ? '#DC2626' : st.level > 10 ? '#F59E0B' : '#16A34A' }}>{st.level} mbgl</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* FAB */}
+      {userRole !== 'VIEWER' && (
+        <button className="jd-fab" title="Add new entity">+</button>
+      )}
+    </div>
+  );
+}
+
+// ── Login ─────────────────────────────────────────────────────
+function LoginPage({ onLogin }) {
+  const [email, setEmail] = React.useState('admin@jaldrishti.local');
+  const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    if (!email)    { setError('Email is required.');    return; }
+    if (!password) { setError('Password is required.'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      // Try real backend first
+      const data = await window.apiLogin(email, password);
+      const role = (data.user?.role ?? 'viewer').toUpperCase();
+      onLogin(role, data.user);
+    } catch (apiErr) {
+      // Fallback: accept seeded demo credentials without backend
+      const DEMO = {
+        'admin@jaldrishti.local':   { password: 'admin123',   role: 'ADMIN'   },
+        'analyst@jaldrishti.local': { password: 'analyst123', role: 'ANALYST' },
+        'viewer@jaldrishti.local':  { password: 'viewer123',  role: 'VIEWER'  },
+        // legacy
+        'admin@jaldrishti.gov.in':  { password: 'admin123',   role: 'ADMIN'   },
+      };
+      const demo = DEMO[email.toLowerCase()];
+      if (demo && demo.password === password) {
+        onLogin(demo.role, { username: email.split('@')[0], email, role: demo.role.toLowerCase() });
+      } else {
+        setError(apiErr.message || 'Invalid credentials. Try admin@jaldrishti.local / admin123');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="login-bg">
+      <div className="login-card">
+        <div className="login-logo">
+          <WaterDropLogo size={42} />
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#0D7377', letterSpacing: '-.03em' }}>JalDrishti</div>
+          </div>
+        </div>
+        <div className="login-tagline">
+          Groundwater Contamination Assessment Platform<br />
+          <span style={{ color: '#94a3b8', fontSize: 11 }}>Government of Jharkhand · CGWB Collaboration</span>
+        </div>
+        {error && (
+          <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#b91c1c', marginBottom: 12 }}>{error}</div>
+        )}
+        <form onSubmit={handleLogin}>
+          <div className="login-field">
+            <label className="login-label">Email Address</label>
+            <input className="login-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@jaldrishti.gov.in" autoFocus />
+          </div>
+          <div className="login-field">
+            <label className="login-label">Password</label>
+            <input className="login-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+          </div>
+          <button type="submit" disabled={loading} style={{
+            width: '100%', height: 44, background: loading ? '#64748B' : '#0D7377', color: '#fff',
+            border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
+            marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            fontFamily: 'var(--font-sans)', transition: 'background .2s',
+          }}>
+            {loading ? (
+              <><span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin .8s linear infinite' }} /> Signing in…</>
+            ) : 'Sign In'}
+          </button>
+        </form>
+        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: '#94a3b8' }}>
+          Need access? <span style={{ color: '#0D7377', cursor: 'pointer', fontWeight: 500 }}>Contact your administrator</span>
+        </div>
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'center', gap: 16, fontSize: 11, color: '#94a3b8' }}>
+          <span>Ministry of Jal Shakti</span><span>·</span><span>CPCB</span><span>·</span><span>CGWB</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Root App ──────────────────────────────────────────────────
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const [loggedIn,   setLoggedIn]   = React.useState(false);
+  const [currentUser,setCurrentUser]= React.useState(null);
+  const [screen,     setScreen]     = React.useState('map');
+  const [userRole,   setUserRole]   = React.useState('ADMIN');
+  const [layers,     setLayers]     = React.useState({
+    districts: true, blocks: false, aquifers: true,
+    isrPoints: true, plumes: tweaks?.showPlumes ?? true,
+    stations: true, wells: true,
+  });
+
+  // Drawer / overlay state
+  const [drawer,    setDrawer]    = React.useState(null);  // { type, data }
+  const [subScreen, setSubScreen] = React.useState(null);  // { type, data }
+  const [simModal,  setSimModal]  = React.useState(null);  // isr point
+
+  // Sync tweaks → state
+  React.useEffect(() => { setUserRole(tweaks.userRole); }, [tweaks.userRole]);
+  React.useEffect(() => { setLayers(l => ({ ...l, plumes: tweaks.showPlumes })); }, [tweaks.showPlumes]);
+
+  function handleLogin(role, user) {
+    setLoggedIn(true);
+    setCurrentUser(user);
+    setUserRole(role);
+  }
+
+  function handleSignOut() {
+    window.apiLogout?.();
+    setLoggedIn(false);
+    setCurrentUser(null);
+  }
+
+  function openDistrictDrawer(d)  { setDrawer({ type: 'district', data: d }); setSubScreen(null); }
+  function openBlockDrawer(b)     { setDrawer({ type: 'block',    data: b }); setSubScreen(null); }
+  function openAquiferDrawer(aq)  { setDrawer({ type: 'aquifer',  data: aq }); setSubScreen(null); }
+  function openISRDrawer(isr)     { setDrawer({ type: 'isr',      data: isr }); setSubScreen(null); }
+  function openStationPage(st)    { setSubScreen({ type: 'station', data: st }); setDrawer(null); }
+  function openWQPage(w)          { setSubScreen({ type: 'wq',      data: w }); setDrawer(null); }
+  function closeDrawer()          { setDrawer(null); }
+  function closeSubScreen()       { setSubScreen(null); }
+
+  if (!loggedIn) return <LoginPage onLogin={handleLogin} />;
+
+  const isMapScreen = screen === 'map';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'Inter, sans-serif' }}>
+      <Header
+        screen={screen} setScreen={s => { setScreen(s); setDrawer(null); setSubScreen(null); }}
+        userRole={userRole}
+        currentUser={currentUser}
+        onSignOut={handleSignOut}
+        onRoleChange={r => { setUserRole(r); setTweak('userRole', r); }}
+      />
+
+      <div className="jd-main">
+        {/* Left panel: map screen only */}
+        {isMapScreen && !subScreen && (
+          <LeftPanel
+            layers={layers} setLayers={setLayers}
+            onDistrictClick={openDistrictDrawer}
+            onAquiferClick={openAquiferDrawer}
+            onISRClick={openISRDrawer}
+            onStationClick={openStationPage}
+            userRole={userRole}
+          />
+        )}
+
+        {/* Content area */}
+        <div className="jd-content">
+          {/* Sub-screen: full page overlays */}
+          {subScreen?.type === 'station' && (
+            <MonitoringStationPage station={subScreen.data} onBack={closeSubScreen} userRole={userRole} />
+          )}
+          {subScreen?.type === 'wq' && (
+            <WaterQualityPage well={subScreen.data} onBack={closeSubScreen} />
+          )}
+
+          {/* Map screen */}
+          {isMapScreen && !subScreen && (
+            <MapDashboard
+              layers={layers} setLayers={setLayers}
+              onDistrictClick={openDistrictDrawer}
+              onAquiferClick={openAquiferDrawer}
+              onISRClick={openISRDrawer}
+              onStationClick={openStationPage}
+              onWellClick={openWQPage}
+              activeDrawer={drawer ? { type: drawer.type, id: drawer.data?.id } : null}
+            />
+          )}
+
+          {/* Full-page screens */}
+          {screen === 'dashboard' && <AnalyticsDashboard />}
+          {screen === 'ingest'    && <DataIngestionPage />}
+          {screen === 'users'     && <UserManagementPage />}
+        </div>
+
+        {/* Right drawers */}
+        {drawer?.type === 'district' && (
+          <DistrictDrawer
+            district={drawer.data} onClose={closeDrawer}
+            onBlockClick={openBlockDrawer}
+            onRunSimulation={() => setSimModal(window.ISR_POINTS[0])}
+            userRole={userRole}
+          />
+        )}
+        {drawer?.type === 'block' && (
+          <BlockDrawer
+            block={drawer.data} onClose={closeDrawer}
+            onStationClick={openStationPage}
+            onWaterQualityClick={openWQPage}
+            userRole={userRole}
+          />
+        )}
+        {drawer?.type === 'aquifer' && (
+          <AquiferDrawer
+            aquifer={drawer.data} onClose={closeDrawer}
+            onRunSimulation={() => setSimModal(window.ISR_POINTS[0])}
+            userRole={userRole}
+          />
+        )}
+        {drawer?.type === 'isr' && (
+          <ISRDrawer
+            isrPoint={drawer.data} onClose={closeDrawer}
+            onRunSimulation={() => setSimModal(drawer.data)}
+            userRole={userRole}
+          />
+        )}
+      </div>
+
+      {/* Simulation modal */}
+      {simModal && (
+        <SimulationModal
+          isrPoint={simModal}
+          onClose={() => setSimModal(null)}
+          onComplete={() => console.log('Simulation complete')}
+        />
+      )}
+
+      {/* Tweaks panel */}
+      <TweaksPanel>
+        <TweakSection title="User & Access">
+          <TweakSelect
+            label="User Role"
+            value={tweaks.userRole}
+            options={['ADMIN','ANALYST','VIEWER']}
+            onChange={v => setTweak('userRole', v)}
+          />
+        </TweakSection>
+        <TweakSection title="Map Settings">
+          <TweakToggle
+            label="Show Contamination Plumes"
+            value={tweaks.showPlumes}
+            onChange={v => setTweak('showPlumes', v)}
+          />
+          <TweakSelect
+            label="Default Screen"
+            value={tweaks.defaultScreen}
+            options={['map','dashboard','ingest','users']}
+            onChange={v => setTweak('defaultScreen', v)}
+          />
+        </TweakSection>
+        <TweakSection title="Quick Actions">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button onClick={() => { setScreen('map'); setDrawer({ type: 'district', data: window.DISTRICTS[0] }); }}
+              style={{ padding: '7px 12px', background: '#edf9fa', color: '#0D7377', border: '1px solid #a7dfe1', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+              → Open Giridih District
+            </button>
+            <button onClick={() => { setScreen('map'); setDrawer({ type: 'isr', data: window.ISR_POINTS[0] }); }}
+              style={{ padding: '7px 12px', background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+              → Open ISR-Jadugoda-01
+            </button>
+            <button onClick={() => setSimModal(window.ISR_POINTS[0])}
+              style={{ padding: '7px 12px', background: '#f0fdf4', color: '#16A34A', border: '1px solid #bbf7d0', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+              → Open Simulation Modal
+            </button>
+            <button onClick={() => openStationPage(window.MONITORING_STATIONS[0])}
+              style={{ padding: '7px 12px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+              → Open Monitoring Station
+            </button>
+            <button onClick={() => openWQPage(window.WELLS[1])}
+              style={{ padding: '7px 12px', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+              → Open Water Quality (Critical)
+            </button>
+          </div>
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
+</script>
+
+<!-- Thumbnail for bundler -->
+<template id="__bundler_thumbnail">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 56">
+  <rect width="80" height="56" fill="#0d1520"/>
+  <path d="M40 10 C40 10 26 22 26 30 C26 38 32.5 44 40 44 C47.5 44 54 38 54 30 C54 22 40 10 40 10Z" fill="#0D7377" opacity=".9"/>
+  <rect x="8" y="8" width="20" height="40" rx="2" fill="rgba(255,255,255,.06)"/>
+  <rect x="10" y="12" width="16" height="3" rx="1" fill="rgba(255,255,255,.3)"/>
+  <rect x="10" y="18" width="12" height="2" rx="1" fill="rgba(255,255,255,.15)"/>
+  <rect x="10" y="23" width="14" height="2" rx="1" fill="rgba(255,255,255,.15)"/>
+</svg>
+</template>
+</body>
+</html>

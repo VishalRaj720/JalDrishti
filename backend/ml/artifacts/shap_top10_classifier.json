@@ -1,0 +1,45 @@
+{
+  "method": "shap_tree_explainer",
+  "top_features": [
+    {
+      "feature": "distance_to_nearest_isr_km",
+      "mean_abs_shap": 0.04503490807382328
+    },
+    {
+      "feature": "nearest_isr_injection_rate",
+      "mean_abs_shap": 0.028823047680465473
+    },
+    {
+      "feature": "transmissivity_to_porosity_ratio",
+      "mean_abs_shap": 0.023691076370306086
+    },
+    {
+      "feature": "dtw_decadal_avg",
+      "mean_abs_shap": 0.019445310826779597
+    },
+    {
+      "feature": "year",
+      "mean_abs_shap": 0.01909580373662718
+    },
+    {
+      "feature": "specific_yield",
+      "mean_abs_shap": 0.012096866942766385
+    },
+    {
+      "feature": "thickness",
+      "mean_abs_shap": 0.01131904262171104
+    },
+    {
+      "feature": "transmissivity",
+      "mean_abs_shap": 0.011264286385518966
+    },
+    {
+      "feature": "storage_coefficient",
+      "mean_abs_shap": 0.008820525681106476
+    },
+    {
+      "feature": "porosity",
+      "mean_abs_shap": 0.008700871951619903
+    }
+  ]
+}

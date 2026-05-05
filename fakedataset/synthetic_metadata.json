@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-05-04T18:38:30.159219+00:00",
+  "seed": 42,
+  "method": "gaussian_copula_empirical_marginals",
+  "n_samples": 500,
+  "n_wells": 50,
+  "real_rows_used_for_fit": 397,
+  "forced_unsafe_pct": 0.25,
+  "forced_marginal_pct": 0.35,
+  "files": {
+    "wells": "fakedataset\\synthetic_wells.csv",
+    "samples": "fakedataset\\synthetic_water_samples.csv"
+  }
+}

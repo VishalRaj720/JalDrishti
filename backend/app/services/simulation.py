@@ -7,22 +7,18 @@ Designed to be called from a Celery task for async execution.
 import uuid
 import math
 import random
-import asyncio
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from datetime import datetime, timezone
 
-import httpx
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.repositories.simulation import SimulationRepository
 from app.repositories.aquifer import AquiferRepository
 from app.repositories.isr_point import IsrPointRepository
 from app.models.simulation import Simulation, SimulationAquifer
-from app.exceptions import (
-    SimulationDataError, ResourceNotFoundError, MLServiceError
-)
+from app.services.ml_prediction import predict_for_simulation
+from app.exceptions import ResourceNotFoundError
 
 
 # ── Physics helpers (Advection-Dispersion Equation stub) ──────────
@@ -83,37 +79,9 @@ def _recovery_suggestion(porosity: Optional[float]) -> str:
     return "Low porosity: permeable reactive barrier (PRB) installation suggested."
 
 
-# ── ML Service call ───────────────────────────────────────────────
-
-async def _call_ml_service(isr_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Call the ML microservice; fall back to stub if unavailable."""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{settings.ML_SERVICE_URL}/predict",
-                json=isr_data,
-            )
-            resp.raise_for_status()
-            return resp.json()
-    except Exception as exc:
-        logger.warning(f"ML service unreachable: {exc}. Using stub predictions.")
-        # Stub: realistic values from Jharkhand aquifer data ranges
-        uranium = round(random.uniform(0.01, 0.12), 4)
-        return {
-            "concentration": {
-                "uranium": {
-                    "max": uranium,
-                    "unit": "mg/L",
-                    "who_limit": 0.03,
-                    "exceeds_limit": uranium > 0.03,
-                }
-            },
-            "vulnerability": {
-                "risk_level": random.choice(["low", "medium", "high"]),
-                "probability": round(random.uniform(0.4, 0.95), 2),
-                "model": "stub_v0",
-            },
-        }
+# ── ML predictions ────────────────────────────────────────────────
+# In-process MLPredictionService (Month 4) replaces the legacy stub.
+# HTTP fallback to settings.ML_SERVICE_URL preserved for Month 9 microservice.
 
 
 # ── Main Simulation Service ───────────────────────────────────────
@@ -173,18 +141,21 @@ class SimulationService:
             # ── 4. Spatial query for impacted aquifers ────────────
             impacted = await self.aquifer_repo.get_intersecting_plume(plume_wkt)
 
-            # ── 5. Call ML service ────────────────────────────────
+            # ── 5. Call MLPredictionService (Month 4 baseline) ───
+            avg_porosity = (
+                sum(a.porosity for a in impacted if a.porosity) / max(len(impacted), 1)
+            )
             ml_input = {
                 "lon": lon,
                 "lat": lat,
                 "injection_rate": isr.injection_rate or 100.0,
                 "gradient_angle_deg": gradient_angle_deg,
                 "aquifer_count": len(impacted),
-                "avg_porosity": (
-                    sum(a.porosity for a in impacted if a.porosity) / max(len(impacted), 1)
-                ),
+                "avg_porosity": avg_porosity,
             }
-            ml_result = await _call_ml_service(ml_input)
+            ml_result = await predict_for_simulation(
+                self.db, isr, impacted, sample_date=datetime.now(timezone.utc),
+            )
 
             # ── 6. Compute affected area (stub: π*rx*ry) ──────────
             rx = 50 * math.sqrt(365) / 1000  # km
