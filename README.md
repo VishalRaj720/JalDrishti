@@ -1,50 +1,151 @@
-# JalDrishti — Groundwater Contamination Assessment Platform
+# JalDrishti
 
-JalDrishti models how uranium and other contaminant plumes propagate through aquifer systems from ISR (In-Situ Recovery) mining injection points. It supports spatial queries, asynchronous physics simulations, ML-based concentration predictions, and role-based access control.
+JalDrishti is a groundwater contamination impact assessment platform focused on ISR (In-Situ Recovery) mining scenarios in Jharkhand. The current repository contains a substantial FastAPI backend, seeded geospatial and water-quality data pipelines, baseline ML assets, and a static browser prototype for the UI.
 
----
+## Status Snapshot
 
-## Table of Contents
+Reviewed against the repository on 2026-05-06.
 
-- [Tech Stack](#tech-stack)
-- [Local Development Setup](#local-development-setup)
-- [Docker Setup](#docker-setup)
-- [Architecture](#architecture)
-- [API Reference](#api-reference)
-- [Test Credentials](#test-credentials)
-- [Known Limitations](#known-limitations)
+- Backend API is the most complete part of the project.
+- Month 3 data foundation work is present: schema extensions, ingestion flows, monitoring wells, water samples, and supporting datasets.
+- Month 4 baseline ML work is present: synthetic data generation, feature engineering, model training scripts, SHAP analysis, and committed ML artifacts.
+- Frontend is currently a static HTML + JSX prototype in `frontend/`, not a Vite or packaged React application.
+- `docker-compose.yml` defines backend infrastructure, but the referenced `ml-service/` directory is missing and there is no frontend container.
+- Backend tests are wired up, but the current test environment is incomplete because `aiosqlite` is not listed in `backend/requirements.txt`.
 
----
+## Current Repository Layout
 
-## Tech Stack
+```text
+JalDrishti/
+|-- backend/            FastAPI app, Alembic migrations, Celery tasks, ML code, tests
+|-- frontend/           Static React/Babel prototype and browser-side API client
+|-- docs/               Project notes and progress docs for Month 3 and Month 4
+|-- Datasets/           GeoJSON, CSV, and JSON source datasets
+|-- fakedataset/        Synthetic wells and water samples used for baseline ML
+|-- .claude/            Project guidance and working notes for Claude Code
+|-- docker-compose.yml  Local infra definition for DB, Redis, backend, Celery, Flower, ml-service
+`-- architecture_analysis.md
+```
 
-| Layer | Technology |
-|---|---|
-| Backend framework | FastAPI (async) + Python 3.12 |
-| ORM / Database | SQLAlchemy 2.0 (async) + PostgreSQL 16 + PostGIS 3.4 + GeoAlchemy2 |
-| Migrations | Alembic |
-| Task queue | Celery 5.4 + Redis 7 |
-| Auth | JWT HS256 — access tokens (15 min) + refresh tokens (7 days), argon2 hashing |
-| Caching | Redis (DB 0 = cache, DB 1 = broker, DB 2 = Celery results) |
-| Monitoring | Prometheus (`/metrics`), Celery Flower (port 5555), Sentry (optional) |
-| Frontend | React 18 + TypeScript + Vite |
-| State | Redux Toolkit + TanStack React Query v5 |
-| UI | Material UI v5 + Tailwind CSS |
-| Maps | Leaflet + react-leaflet |
-| Charts | Recharts |
-| Real-time | Socket.io-client (simulation progress via WebSocket) |
-| Forms | Formik + Yup |
+## What Is Implemented
 
----
+### Backend
 
-## Local Development Setup
+The backend is built with FastAPI, SQLAlchemy async, PostgreSQL/PostGIS, Alembic, Celery, Redis, and Pydantic settings.
+
+Implemented areas:
+
+- JWT auth with access and refresh tokens
+- Role-based access control for `admin`, `analyst`, and `viewer`
+- District, block, aquifer, and ISR point management
+- District GeoJSON export
+- Monitoring station and groundwater reading APIs
+- Monitoring well and water sample APIs
+- Bulk ingestion endpoints for district GeoJSON, subdistrict GeoJSON, aquifer GeoJSON, groundwater-level JSON, and water-quality CSV
+- Async simulation trigger with Celery-first execution and FastAPI background fallback
+- Redis cache wrapper and bbox caching for monitoring-well queries
+- Prometheus metrics at `/metrics`
+
+### Simulation and ML
+
+The simulation path is implemented, but still partially heuristic:
+
+- Plume footprint generation is based on a simplified ADE-style ellipse
+- Aquifer impact detection uses PostGIS spatial intersection
+- Prediction path uses a three-level fallback:
+  1. In-process sklearn artifacts from `backend/ml/artifacts/`
+  2. HTTP call to `ML_SERVICE_URL`
+  3. Randomized stub payload
+- Monte Carlo uncertainty and recovery suggestions are included in simulation output
+
+Month 4 ML assets included in the repository:
+
+- `backend/ml/features.py`
+- `backend/ml/feature_pipeline.py`
+- `backend/ml/train_baselines.py`
+- `backend/ml/shap_analysis.py`
+- `backend/ml/artifacts/tds_regressor.joblib`
+- `backend/ml/artifacts/contamination_classifier.joblib`
+- `backend/ml/artifacts/training_metrics.json`
+- `backend/ml/artifacts/shap_top10_regressor.json`
+- `backend/ml/artifacts/shap_top10_classifier.json`
+
+### Frontend
+
+The frontend in this repo is a prototype, not the production React app described in some older docs.
+
+What exists today:
+
+- `frontend/JalDrishti.html` as the entry point
+- JSX files loaded in-browser through Babel Standalone
+- Leaflet-based map UI
+- Browser-side API client in `frontend/jaldrishti-api.js`
+- Mock dataset fallback in `frontend/jaldrishti-data.js`
+- Screenshots showing the prototype UI states
+
+Behavior:
+
+- The prototype attempts to use the FastAPI backend at `http://localhost:8000/api/v1`
+- If the backend is unavailable, key flows fall back to mock/demo data
+
+## API Surface
+
+All API routes are mounted under `/api/v1`.
+
+Main route groups:
+
+- `/auth`
+- `/users`
+- `/districts`
+- `/districts/{district_id}/blocks`
+- `/blocks`
+- `/aquifers`
+- `/isr-points`
+- `/simulations`
+- `/blocks/{block_id}/monitoring-stations`
+- `/monitoring-stations`
+- `/monitoring-wells`
+- `/water-samples`
+- `/ingest`
+
+Useful non-versioned routes:
+
+- `/health`
+- `/docs`
+- `/redoc`
+- `/metrics`
+
+## Data Assets
+
+Repository data sources include:
+
+- District and sub-district boundary GeoJSON files in `Datasets/`
+- Aquifer GeoJSON files in `Datasets/`
+- Groundwater-level JSON files in `Datasets/waterLevelJson/`
+- Water-quality CSV in `Datasets/waterQuality_jharkhand.csv`
+- Synthetic wells and samples in `fakedataset/`
+
+Based on the Month 3 and Month 4 project docs, the seeded data pipeline is intended to support:
+
+- 25 districts
+- 275 blocks
+- 24 aquifers
+- 29 monitoring stations
+- 419 groundwater readings
+- 397 monitoring wells
+- 397 water samples
+- 500 synthetic water samples across 50 synthetic wells
+
+## Local Development
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
-- PostgreSQL 16 with the PostGIS extension
-- Redis server running on `localhost:6379`
+- Python 3.12 recommended
+- PostgreSQL 16 with PostGIS
+- Redis 7
+- A browser for the frontend prototype
+
+Node.js is not required for the current frontend prototype because it is not built with npm in this checkout.
 
 ### 1. Database
 
@@ -54,305 +155,196 @@ CREATE DATABASE groundwater_db;
 CREATE EXTENSION IF NOT EXISTS postgis;
 ```
 
-### 2. Backend
+### 2. Backend setup
 
 ```bash
 cd backend
-
-# Create and activate virtual environment
 python -m venv .venv
-source .venv/bin/activate        # Windows: .\.venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-# Copy the sample below into backend/.env and update credentials if needed
 ```
 
-**`backend/.env`**
+Activate the virtual environment:
+
+```bash
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# macOS / Linux
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Create `backend/.env` if needed. The app already has development defaults in `app/config.py`, but an explicit `.env` is safer:
+
 ```env
 APP_ENV=development
 DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/groundwater_db
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=groundwater_db
+DB_USER=postgres
+DB_PASSWORD=YOUR_PASSWORD
 REDIS_URL=redis://localhost:6379/0
 CELERY_BROKER_URL=redis://localhost:6379/1
 CELERY_RESULT_BACKEND=redis://localhost:6379/2
-JWT_SECRET=change-this-to-a-random-secret
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=15
-REFRESH_TOKEN_EXPIRE_DAYS=7
+JWT_SECRET=change-this-secret
+JWT_REFRESH_SECRET=change-this-refresh-secret
 ML_SERVICE_URL=http://localhost:8001
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+CORS_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000
 RATE_LIMIT_PER_MINUTE=60
 ```
 
+Run migrations and seed base users:
+
 ```bash
-# Run database migrations
 alembic upgrade head
-
-# Seed default users and base data
 python -m scripts.seed
-
-# (Optional) Seed monitoring stations and water samples
-python -m scripts.seed_month3_data
-
-# Start the API server
-uvicorn app.main:app --reload
-# API available at http://localhost:8000
-# Swagger docs at http://localhost:8000/docs
 ```
 
-To run async simulations, start the Celery worker in a separate terminal:
+Optional data seed for the Month 3 dataset layer:
+
+```bash
+python -m scripts.seed_month3_data
+```
+
+Start the API:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Backend URLs:
+
+- API root: `http://localhost:8000/`
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+- Health check: `http://localhost:8000/health`
+
+### 3. Celery worker
+
+If you want async simulations through Celery instead of FastAPI background tasks:
 
 ```bash
 cd backend
-source .venv/bin/activate
 celery -A app.celery_app worker --loglevel=info
 ```
 
-### 3. Frontend
-
-```bash
-cd frontend
-npm install
-```
-
-**`frontend/.env`**
-```env
-VITE_API_BASE_URL=/api/v1
-VITE_WS_URL=ws://localhost:8000
-```
-
-```bash
-npm run dev
-# App available at http://localhost:5173
-```
-
----
-
-## Docker Setup
-
-> **Note:** The `ml-service` directory is not included in this repository. Running `docker-compose up` will fail for the `ml-service` container. Comment out or remove the `ml-service` block in `docker-compose.yml` before running.
-
-```bash
-# In docker-compose.yml: remove or comment out the ml-service service block
-
-docker-compose up --build
-```
-
-Services started:
-
-| Service | Port | Description |
-|---|---|---|
-| Backend (FastAPI) | 8000 | REST API |
-| Frontend (Vite) | 5173 | React SPA |
-| PostgreSQL + PostGIS | 5432 | Primary database |
-| Redis | 6379 | Cache + task broker |
-| Celery Worker | — | Background simulation tasks |
-| Flower | 5555 | Celery task monitoring UI |
-
-After the stack is up, seed the database:
-
-```bash
-docker exec jaldrishti_backend python -m scripts.seed
-```
-
----
-
-## Architecture
-
-### Infrastructure Topology
-
-```
-Browser
-  ↕ HTTP  (Vite proxy: /api/v1 → localhost:8000)
-  ↕ WS    (Socket.io → localhost:8000)
-
-FastAPI (port 8000)
-  ├── PostgreSQL + PostGIS (port 5432)  ← primary data store
-  ├── Redis DB 0                        ← response cache (TTL 3600s)
-  ├── Redis DB 1                        ← Celery task broker
-  └── httpx → ML Service (port 8001)   ← concentration predictions (optional)
-
-Celery Worker
-  ├── Redis DB 1  ← receives tasks
-  ├── Redis DB 2  ← stores results
-  ├── PostgreSQL  ← persists simulation output
-  └── httpx → ML Service
-
-Flower (port 5555)  ← Celery monitoring UI
-Prometheus scrape at /metrics
-```
-
-### Backend Layer Structure
-
-```
-backend/app/
-├── main.py            # App factory, middleware, error handlers
-├── config.py          # Pydantic Settings (env-driven, @lru_cache singleton)
-├── database.py        # Async SQLAlchemy engine + session factory
-├── dependencies.py    # FastAPI DI: get_db, get_current_user, require_roles()
-├── cache.py           # Redis async wrapper (get/set/delete/invalidate_pattern)
-├── celery_app.py      # Celery instance configuration
-├── api/v1/            # 12 route modules (see API Reference below)
-├── services/          # Business logic layer (ingestion.py is 24 KB — most complex)
-├── repositories/      # Async DB access via generic BaseRepository pattern
-├── models/            # 17 SQLAlchemy ORM models
-├── schemas/           # Pydantic v2 request/response schemas
-└── tasks/             # Celery task definitions (simulation.py, aggregation.py)
-```
-
-**Request flow:**
-
-```
-HTTP Request
-  → FastAPI Router  (api/v1/*.py)
-      DI: AsyncSession, current_user, require_roles()
-  → Service Layer   (services/*.py)
-      orchestrates business logic, calls repositories and ML service
-  → Repository Layer (repositories/*.py)
-      SQL via SQLAlchemy async session
-  → PostgreSQL + PostGIS
-```
-
-### Data Models
-
-All models inherit `UUIDPrimaryKeyMixin` (UUID primary key) and `TimestampMixin` (`created_at`, `updated_at`). Spatial columns use `postgresql_using="gist"` indices for fast intersection queries.
-
-| Model | Key Fields |
-|---|---|
-| `User` | email, hashed_password, role (admin / analyst / viewer) |
-| `District` | name, geometry (MULTIPOLYGON, SRID 4326) |
-| `Block` | name, district_id, geometry |
-| `Aquifer` | name, type (12 enum values), geometry, porosity, hydraulic_conductivity, transmissivity |
-| `IsrPoint` | location (POINT), injection_rate |
-| `Simulation` | status, affected_area, vulnerability JSONB, concentration JSONB, task_id |
-| `PlumeParameter` | dispersivity_l/t, retardation_factor, decay_constant |
-| `SimulationAquifer` | junction table (simulation_id ↔ aquifer_id) |
-| `MonitoringStation` | location, elevation, installation_date |
-| `MonitoringWell` | depth, casing_material, station_id |
-| `WaterSample` | sample_date, parameters (JSONB), well_id |
-
-### Simulation Pipeline (Core Feature)
-
-`SimulationService` runs as a 9-step Celery task:
-
-1. Extract ISR point lon/lat from PostGIS WKB geometry via Shapely
-2. Compute groundwater gradient angle (stub: random NE angle pending real piezometric data)
-3. Compute plume ellipse via Advection-Dispersion Equation (ADE):
-   `rx = dispersivity_L × √days`, `ry = dispersivity_T × √days`
-4. PostGIS spatial query — find aquifers intersecting the plume polygon
-5. POST to `ML_SERVICE_URL/predict` for concentration/vulnerability predictions (falls back to realistic stubs if unreachable)
-6. Compute affected area (`π × rx × ry`)
-7. Monte Carlo uncertainty estimation (100 runs, ±15% Gaussian noise)
-8. Generate recovery suggestion based on average aquifer porosity
-9. Persist to `Simulation` record + insert `SimulationAquifer` junction rows
-
-Real-time progress is pushed to the frontend via Socket.io on the `useSimulationWebSocket` hook.
-
-### Frontend Architecture
-
-```
-frontend/src/
-├── api/
-│   ├── axiosInstance.ts   # Axios with queue-based token refresh on 401
-│   └── *.ts               # Per-resource API modules
-├── redux/slices/
-│   ├── authSlice.ts        # Access/refresh tokens, current user
-│   ├── simulationsSlice.ts # Active simulation tracking
-│   └── uiSlice.ts          # Modals, drawers, alerts
-├── pages/                  # 7 lazy-loaded page components
-├── components/             # Feature-organized UI components
-├── hooks/                  # Custom hooks (useRBAC, useSimulationWebSocket, etc.)
-├── routes/
-│   ├── AppRoutes.tsx       # Route definitions with React.lazy
-│   └── ProtectedRoute.tsx  # Auth guard + role guard
-└── websocket/              # Socket.io client setup
-```
-
-**State management:**
-- **Redux** — auth tokens (needed outside React tree in axiosInstance), active simulations, UI state
-- **React Query** — all server data with 5-min stale / 10-min GC; handles background refetch
-
-**Token refresh:** The axios interceptor queues all concurrent requests during a refresh, replays them on success, and dispatches logout on failure — preventing thundering-herd duplicate refresh calls.
-
-**RBAC:** `useRBAC` hook gates UI elements. `ProtectedRoute` with `allowedRoles` prop gates routes. Backend enforces the same rules via `require_roles()` in `dependencies.py`.
-
-### End-to-End Simulation Flow
-
-```
-Frontend                  FastAPI               Celery Worker          DB / ML
-   │                         │                       │                   │
-   ├─ POST /simulations ────►│                       │                   │
-   │                         ├─ INSERT Simulation ──────────────────────►│
-   │                         ├─ Enqueue task ───────►│                   │
-   │◄─ {id, status:pending} ─┤                       │                   │
-   │                         │                       ├─ UPDATE running ─►│
-   │                         │                       ├─ Load ISR geom ──►│
-   │                         │                       ├─ Compute ADE plume│
-   │                         │                       ├─ Spatial query ──►│
-   │                         │                       ├─ POST /predict ──►ML
-   │                         │                       ├─ Monte Carlo      │
-   │                         │                       ├─ UPDATE completed►│
-   │◄─ WS: progress events ──┼───────────────────────┤                   │
-   │                         │                       │                   │
-   ├─ GET /simulations/{id} ►│                       │                   │
-   │◄─ Full result JSON ─────┤                       │                   │
-```
-
----
-
-## API Reference
-
-All routes are prefixed `/api/v1`. Swagger UI available at `http://localhost:8000/docs`.
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| POST | `/auth/token` | public | Login, returns access + refresh tokens |
-| POST | `/auth/refresh` | refresh token | Issue new access token |
-| GET | `/auth/me` | any role | Current user info |
-| GET/POST | `/users` | admin | User management |
-| GET/POST/PATCH/DELETE | `/districts` | viewer+ | District CRUD + spatial queries |
-| GET/POST/PATCH/DELETE | `/blocks` | viewer+ | Block CRUD |
-| GET/POST/PATCH/DELETE | `/aquifers` | viewer+ | Aquifer CRUD |
-| GET/POST/PATCH/DELETE | `/isr-points` | analyst+ | ISR injection point management |
-| POST | `/simulations` | analyst+ | Trigger new simulation |
-| GET | `/simulations/{id}` | viewer+ | Poll simulation status and results |
-| POST | `/ingest` | analyst+ | Bulk GeoJSON / Excel / CSV upload |
-| GET | `/monitoring-stations` | viewer+ | Monitoring station time-series |
-| GET | `/water-samples` | viewer+ | Water sample records |
-| GET | `/metrics` | public | Prometheus metrics |
-
----
-
-## Test Credentials
-
-Seeded by `python -m scripts.seed`:
-
-| Role | Email | Password | Permissions |
-|---|---|---|---|
-| admin | `admin@jaldrishti.local` | `admin123` | Full access, user management |
-| analyst | `analyst@jaldrishti.local` | `analyst123` | Run simulations, edit ISR points |
-| viewer | `viewer@jaldrishti.local` | `viewer123` | Read-only |
-
----
-
-## Running Tests
-
-Tests use in-memory SQLite (no PostGIS required). Spatial queries are mocked.
+Optional Flower dashboard:
 
 ```bash
 cd backend
-pytest tests/                                       # all tests
-pytest tests/test_auth.py::test_login_success -v   # single test
+celery -A app.celery_app flower --port=5555
 ```
 
----
+### 4. Optional Month 4 ML pipeline
 
-## Known Limitations
+These scripts exist and are documented in the repo:
 
-- **`ml-service` directory is absent** — `docker-compose up` will fail unless the `ml-service` block is removed from `docker-compose.yml`. The backend falls back to realistic stub predictions automatically when `ML_SERVICE_URL` is unreachable.
-- **Simulation gradient angle is stubbed** — currently uses `random.uniform(30, 90)`; real piezometric data integration is pending.
-- **`KEYS` command in cache invalidation** — `cache_invalidate_pattern()` uses Redis `KEYS` (O(N)); replace with `SCAN` before high-traffic use.
-- **TypeScript errors present** — run `npm run build` in `frontend/` to see current type errors before making frontend changes.
-- **No rate limit on simulation enqueue** — a user can queue many Celery tasks via repeated `POST /simulations`.
+```bash
+cd backend
+python -m ml.synthetic
+python -m ml.load_synthetic
+python -m ml.feature_pipeline
+python -m ml.train_baselines
+python -m ml.shap_analysis
+```
+
+## Running the Frontend Prototype
+
+Because the current frontend is a static HTML prototype, the simplest way to run it is to serve the `frontend/` directory locally:
+
+```bash
+cd frontend
+python -m http.server 4173
+```
+
+Then open:
+
+```text
+http://localhost:4173/JalDrishti.html
+```
+
+Notes:
+
+- The page loads React, Babel, and Leaflet from CDNs.
+- The prototype first tries the local FastAPI backend.
+- If the backend is unavailable, much of the UI still works with mock data.
+- Default demo credentials in the prototype match the seeded backend users:
+  - `admin@jaldrishti.local` / `admin123`
+  - `analyst@jaldrishti.local` / `analyst123`
+  - `viewer@jaldrishti.local` / `viewer123`
+
+## Docker
+
+`docker-compose.yml` currently defines these services:
+
+- `db`
+- `redis`
+- `backend`
+- `celery-worker`
+- `flower`
+- `ml-service`
+
+Current caveats:
+
+- `ml-service` points to `./ml-service`, but that directory is not present in this repository.
+- There is no frontend service in the compose file.
+- The compose setup is useful mainly for backend infrastructure.
+
+If you want to use compose today, comment out or remove the `ml-service` block first:
+
+```bash
+docker-compose up --build
+```
+
+## Testing
+
+Backend tests live in `backend/tests/`.
+
+Test command:
+
+```bash
+cd backend
+pytest tests
+```
+
+Current status:
+
+- The test suite is configured to use in-memory SQLite with `sqlite+aiosqlite:///:memory:`
+- In the current checkout, `aiosqlite` is missing from `backend/requirements.txt`
+- As a result, `pytest tests` currently fails at import time until `aiosqlite` is installed
+
+## Seeded Users
+
+Created by `python -m scripts.seed`:
+
+| Role | Email | Password |
+|---|---|---|
+| admin | `admin@jaldrishti.local` | `admin123` |
+| analyst | `analyst@jaldrishti.local` | `analyst123` |
+| viewer | `viewer@jaldrishti.local` | `viewer123` |
+
+## Documentation Index
+
+Useful repo documents:
+
+- `docs/overview.md` - broad project explanation and study notes
+- `docs/FEBRUARY_month3.md` - Month 3 data-foundation delivery notes
+- `docs/month4.md` - Month 4 feature engineering and baseline ML notes
+- `architecture_analysis.md` - repo architecture analysis
+- `.claude/CLAUDE.md` - project guidance and workflow notes for Claude Code
+
+Some of these documents describe planned or historical architecture that is broader than what is runnable in the current checkout. Treat this README as the source of truth for the repository's present state.
+
+## Known Gaps
+
+- Frontend is a prototype bundle, not a packaged React/Vite application.
+- `docker-compose.yml` references a missing `ml-service/` directory.
+- Simulation physics still use stubbed/randomized groundwater gradient logic.
+- Development defaults in `backend/app/config.py` and `docker-compose.yml` include placeholder or weak secrets and should be overridden in real environments.
+- Tests are not currently runnable from a fresh install without adding `aiosqlite`.
+- Some older docs still describe a fuller frontend architecture than what exists in `frontend/` today.
