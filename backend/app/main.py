@@ -61,10 +61,14 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # ── CORS ──────────────────────────────────────────────────────
+    # Frontend uses JWT in Authorization headers (not cookies), so
+    # allow_credentials=False is correct and permits allow_origins=["*"].
+    # In production, restrict to the specific deployed origins.
+    origins = settings.cors_origins_list if settings.APP_ENV == "production" else ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
+        allow_origins=origins,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -109,3 +113,7 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+# if __name__=='__main__':
+#     import uvicorn
+#     uvicorn.run(app, host="localhost", port=8000)
