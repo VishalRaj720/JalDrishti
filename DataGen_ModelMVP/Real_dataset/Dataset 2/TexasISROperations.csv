@@ -1,0 +1,14 @@
+﻿ISR_OpName,MineData_SRC, ProdPeriods,IAEA_FlowRate,Grade_U3O8,Grade_RMK_SRC,Production_U3O8,AvgRecFactor,AvgRecFactor_RMK_SRC,MinRecFactor,MaxRecFactor,Oxidant_O2,Oxidant_RMK_SRC,Leachant,Leachant_RMK_SRC,Mineral,Mineral_RMK_SRC,DOE_PregLiqGrade
+Alta Mesa,"IAEA, 2016",2006-2012,1150,"0.12, 0.15","DOE, 1989; IAEA, 2016",4621600,81,,58,111,500,"IAEA, 2016",NaHCO3,"plus natural groundwater carbonate concentrations;  IAEA, 2016","pitchblende, coffinite and brannerite","brannerite (?); IAEA, 2016",45
+Alta Mesa  PAA-1,"Beahm, 2016",,,,,1610000,84,,,,,,,,,,
+Alta Mesa  PAA-2,"Beahm, 2016",,,,,1498200,74,,,,,,,,,,
+Alta Mesa  PAA-3,"Beahm, 2016",,,,,290400,111,,,,,,,,,,
+Alta Mesa  PAA-4,"Beahm, 2016",,,,,850000,87,,,,,,,,,,
+Alta Mesa  PAA-5,"Beahm, 2016",,,,,35000,58,,,,,,,,,,
+Alta Mesa  PAA-6,"Beahm, 2016",,,,,338000,,"NA, on standby",,,,,,,,,
+Alta Mesa  PAA-7,"Beahm, 2016",,,,,,,,,,,,,,,,
+Kingsville Dome,"DOE, 1989; IAEA, 2016; UR_INC, 2016c","1988 - 1990, 1996 - 1999, 2006 - 2009",1200,"0.13, 0.165","IAEA, 2016; DOE, 1989",4240200,,,,,400,"IAEA, 2016",NaHCO3,"IAEA, 2016",,,77
+Mt. Lucas,"IAEA, 2016",1983-1987,640,,,2069425,,,,,200-500,"IAEA, 2016","HCO3-, Na2CO3","IAEA, 2016; DOE, 1989",,,
+La Palangana Mine (Palangana),"UEC, 2014; UEC, 2016",2010-2014,550,0.13," as uranium, IAEA, 2016",560000,43,,31,40,200-400,"IAEA, 2016",HCO3-,"IAEA, 2016",uranininte and pitchblende; sooty pitchblende with oil,"IAEA, 2016",
+Palangana Dome,"UEC, 2014; SRK, 2010; IAEA, 2016","1977 - 1980, 1985 - 1986",680,,,340000,33,,32,34,,"H2O2; Larson, 1978"," (NH4)2CO3, HCO3-","10 g/L; Larson, 1978","uraninite, coffinite","Larson, 1978; IAEA, 1980",
+Rosita,"UR_INC, 2016c","1990-1992, 1995-1999, 2009",800,"0.17, 0.169","IAEA, 2016; DOE, 1989",2650200,44,"IAEA, 2016; Rosita: Includes production from PAA1, PAA2 but not PAA3,PAA4",,,400-500,"saturated, depending on water depth; IAEA, 2016","NaHCO3,  HCO3-","275-1000 mg/L; IAEA, 2016",uraninite or coffinite,"IAEA, 2016",81

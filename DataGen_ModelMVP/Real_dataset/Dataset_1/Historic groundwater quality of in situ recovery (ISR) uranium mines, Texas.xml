@@ -1,0 +1,183 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>Hall, S.M.</origin>
+        <origin>Hennesy, Theresa Bridges</origin>
+        <pubdate>2014</pubdate>
+        <title>Historic groundwater quality of in situ recovery (ISR) uranium mines, Texas</title>
+        <geoform>tabular digital data</geoform>
+        <onlink>https://dx.doi.org/10.5066/F74T6GC4</onlink>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>In situ recovery (ISR) uranium mining is a technique in which uranium is extracted by a series of injection and recovery wells developed in a permeable sandstone host rock. Chemical constituents (lixiviants) are added to groundwater injection wells to mobilize uranium into groundwater. Before mining, baseline water quality is measured by sampling groundwater from the aquifer intended to be mined and over and underlying units over a geographic area that reflects the proposed mine location. After mining, groundwater is restored using a variety of techniques intended to return groundwater quality to as close to baseline as practicable. After groundwater has been restored, groundwater quality is monitored to determine if the groundwater chemistry has stabilized. The impact of ISR mining on groundwater is poorly understood because records archiving these impacts are difficult to locate. The USGS collected as many historic records describing ISR well fields as they could locate between 2008 and 2014. This data release summarizes historic records from ISR mines developed in Texas and compiled into spreadsheets by USGS mostly from records maintained by the Texas Commission on Environmental Quality.</abstract>
+      <purpose>The historic groundwater geochemistry database of uranium in-situ recovery (ISR) mines in Texas was compiled from obscure public sources to make it readily available to the public and scientific researchers. This data is of interest because of current concerns about groundwater restoration following uranium ISR mining in aquifers throughout the U.S.</purpose>
+      <supplinf>None</supplinf>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <sngdate>
+          <caldate>unknown</caldate>
+        </sngdate>
+      </timeinfo>
+      <current>ground condition</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>None planned</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-100.52</westbc>
+        <eastbc>-95.97</eastbc>
+        <northbc>28.47</northbc>
+        <southbc>26.52</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>None</themekt>
+        <themekey>Uranium</themekey>
+        <themekey>in situ recovery</themekey>
+        <themekey>ground water quality</themekey>
+        <themekey>uranium mines</themekey>
+      </theme>
+      <theme>
+        <themekt>EnergyResourceActivities</themekt>
+        <themekey>uranium</themekey>
+      </theme>
+      <theme>
+        <themekt>USGS Metadata Identifier</themekt>
+        <themekey>USGS:5d1ce55ce4b0941bde64cd53</themekey>
+      </theme>
+      <place>
+        <placekt>None</placekt>
+        <placekey>South Texas</placekey>
+        <placekey>South Texas</placekey>
+        <placekey>Texas</placekey>
+      </place>
+    </keywords>
+    <accconst>None</accconst>
+    <useconst>This data is provisional and subject to revision. The data are released on the condition that neither the USGS nor the United States Government may be held liable for any damages resulting from its authorized or unauthorized use.
+
+Use of trade names is for descriptive purposes only, and does not imply endorsement by the U.S. Government.</useconst>
+    <ptcontac>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey</cntorg>
+          <cntper>Susan Hall</cntper>
+        </cntorgp>
+        <cntpos>Uranium Geologist</cntpos>
+        <cntaddr>
+          <addrtype>mailing and physical address</addrtype>
+          <address>West 6th Ave. &amp; Kipling St., DFC Bldg. 25 MS 939</address>
+          <city>Denver</city>
+          <state>Colorado</state>
+          <postal>80225</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>3032361656</cntvoice>
+        <cntemail>susanhall@usgs.gov</cntemail>
+      </cntinfo>
+    </ptcontac>
+    <browse>
+      <browsen>https://www.sciencebase.gov/catalog/file/get/5d1ce55ce4b0941bde64cd53?f=__disk__2f%2Fa5%2F6b%2F2fa56be1c6d9286aeca95441f8a35c277c7dce60</browsen>
+      <browsed>The browse graphic shows the location of the data.</browsed>
+      <browset>PNG</browset>
+    </browse>
+    <datacred>Susan Hall and Theresa Hennesy</datacred>
+    <native>Microsoft Excel</native>
+  </idinfo>
+  <eainfo>
+    <overview>
+      <eaover>The detailed description below desribes the contents of the dataset.</eaover>
+      <eadetcit>The speadsheet in comprised of several individual worksheets.  A description of each of these follows:
+
+Metadata:  A worksheet containing some definitions as well as a description of each worksheet in the spreadsheet.
+
+Description: This worksheet includes the mine name, operator, number of well fields, or production authorization areas (PAAs), location, year the aquifer exemption for this mine was permitted and released, the geologic formation that was mined, and the status of the mine as of 2014. Note that information about the operator was taken from summary sheets provided by TCEQ and may not reflect multiple owners or the history of ownership of a particular mine.
+
+Location Map: This worksheet shows the location of all ISR aquifer exemptions permitted in Texas (Texas Commission on Environmental Quality, 2014). Not all areas for which an aquifer exemption was permitted were mined. See the Description worksheet for a summary of the mines that were developed and information about each aquifer exemption.
+
+Baseline: This worksheet summarizes pre-mining baseline water quality for those PAAs in Texas for which data was available in the Texas Commission on Environmental Quality (TCEQ) records. Groundwater quality for ISR mines in Texas is determined by measuring 26 constituents prior to mining. The Standards worksheet lists these constituents. The baseline chemistry of groundwater at ISR sites is established for use as a post-mining restoration goal.  
+Baseline in historic mines in this data set is set as the highest average concentration of an analyte as determined from samples collected from either monitoring or production area wells. A minimum of 5 wells are required to establish baseline, and these wells must be distributed at a density of at least 1 well every 4 acres at unspecified time intervals (Murray, 2014). Changes in Texas law in 2013 establish a range of values rather than an average within each PAA. However the data in this publication were not collected when these regulations were in effect. The TCEQ Underground Injection Control (UIC) Section sampling protocols direct that wells be pumped until conductivity is approximately constant. When analyzing for As, Cd, Fe, Mn, Hg, Mo, Se and U samples are to be collected in 1 gallon plastic containers, filtered and acidified to a pH of less than 2. When analyzing for other constituents, 1-liter plastic containers are required, and samples are to be cooled to 4 degrees Celsius (Texas Commission on Environmental Quality, 2009).
+The USGS visited the TCEQ offices in Austin, Texas in 2008 and 2009, and scanned original groundwater analysis reports for ISR mines that TCEQ maintains in their offices. TCEQ also provided USGS with a digital database of some historic groundwater geochemistry in PAAs that had been compiled and maintained by John Santos, an employee of the TCEQ UIC program (Santos, 2009). The database constructed by Santos was cross-checked against TCEQ groundwater analysis reports (GARs) by USGS, and corrected where necessary using the original data from the GARs as the best record for a particular well field. Where original regulatory data could not be found, the Santos database was used as shown by italicized entries in the worksheet. 
+Baseline in the TCEQ reports is termed “original restoration value” as it was set as the primary goal for measuring successful groundwater restoration. Higher restoration targets were set by TCEQ when the operator demonstrated that: groundwater had stabilized for 180 days, reasonable restoration efforts had been applied, groundwater fell within pre-mining class of use, further efforts would be of limited benefit considering how much water, energy or other natural resource was consumed, and reasonable efforts protecting human health and the environment were applied in evaluating the restoration results by TCEQ (State of Texas, 2014).  Amended restoration targets are set by TCEQ, and do not directly reflect the degrees of restoration achieved so are not reproduced here. 
+
+End of Mining:   Ground water quality measured during or at the end of mining, but before groundwater restoration, was available for only a few PAAs. This data is presented in the End of Mining worksheet.
+
+Final Post-restoration:  The average concentration of constituents in groundwater achieved after restoration is complete is recorded in the Final Post-restoration worksheet.  This data was not available for all PAAs. On this worksheet the mine and PAA is listed, the method used to restore groundwater, restoration start and end dates, pore volumes and million gallons of pore water removed, and the average concentration of groundwater quality constituents in the PAAs after restoration. All data is from TECQ records, except where indicated in references. Restoration method, start and end dates is taken from final sampling sheets when possible and is thought to reflect the methods actually employed at the mine rather than those listed as planned in mine planning documents.
+A number of methods used to return groundwater to baseline quality are recorded, although not for all PAAs. These restoration methods include groundwater sweep during which groundwater in the producing zone is pumped at a high enough rate that groundwater form the surrounding aquifer “sweeps in” displacing mining impacted water. Injection is the restoration process when water of better quality than that in the mined portion of the aquifer is injected into the mined area to promote restoration. In some mines groundwater in the impacted zone was pumped to the surface and treated by reverse osmosis, electro dialysis reversal or ion exchange systems.   
+Final restoration values are measured at least 180 days after restoration is completed. Three sets of samples are collected from multiple wells penetrating the mined aquifer at a minimum of 30 days between samples (Texas Commission on Environmental Quality, 2009). Final post-restoration is termed “Final Restoration” or “Restored” in TCEQ water quality summaries and in documents submitted to TCEQ by mine operators. 
+
+Standards:  The Standards worksheet lists water quality standards for drinking water set by the EPA (U.S. Environmental Protection Agency, 2014) and Texas Water Development Board (Texas Water Development Board, 2014). Before uranium mining, aquifers that contain uranium mineralization and groundwater with constituents in excess of these standards are exempted from maintaining water quality at drinking water standards.
+
+Referencs:  References listed in this file.</eadetcit>
+    </overview>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>U.S. Geological Survey</cntorg>
+          <cntper>GS ScienceBase</cntper>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing address</addrtype>
+          <address>Denver Federal Center, Building 810, Mail Stop 302</address>
+          <city>Denver</city>
+          <state>CO</state>
+          <postal>80225</postal>
+          <country>United States</country>
+        </cntaddr>
+        <cntvoice>1-888-275-8747</cntvoice>
+        <cntemail>sciencebase@usgs.gov</cntemail>
+      </cntinfo>
+    </distrib>
+    <resdesc>Downloadable Data</resdesc>
+    <distliab>This data is provisional and subject to revision. The data are released on the condition that neither the USGS nor the United States Government may be held liable for any damages resulting from its authorized or unauthorized use.</distliab>
+    <stdorder>
+      <digform>
+        <digtinfo>
+          <formname>MS Excel</formname>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>https://dx.doi.org/10.5066/F74T6GC4</networkr>
+              </networka>
+            </computer>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <fees>0</fees>
+    </stdorder>
+    <custom>This product can be downloaded individually using any one of the Network_Resource_Name URL above.</custom>
+  </distinfo>
+  <metainfo>
+    <metd>20200813</metd>
+    <metc>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>USGS</cntorg>
+          <cntper>Gregory L. Gunther</cntper>
+        </cntorgp>
+        <cntpos>Data Management Project Leader</cntpos>
+        <cntaddr>
+          <addrtype>mailing and physical address</addrtype>
+          <address>PO Box 25046 MS 939 Denver Federal Center</address>
+          <city>Denver</city>
+          <state>Colorado</state>
+          <postal>80225</postal>
+        </cntaddr>
+        <cntvoice>3032365884</cntvoice>
+        <cntemail>datamgt@usgs.gov</cntemail>
+      </cntinfo>
+    </metc>
+    <metstdn>FGDC Content Standards for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+  </metainfo>
+</metadata>
