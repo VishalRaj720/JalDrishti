@@ -80,8 +80,8 @@ def _recovery_suggestion(porosity: Optional[float]) -> str:
 
 
 # ── ML predictions ────────────────────────────────────────────────
-# In-process MLPredictionService (Month 4) replaces the legacy stub.
-# HTTP fallback to settings.ML_SERVICE_URL preserved for Month 9 microservice.
+# predict_for_simulation() is a transparent deterministic placeholder for now;
+# Month 2 wires in the trained uranium model from DataGen_ModelMVP/pipeline.
 
 
 # ── Main Simulation Service ───────────────────────────────────────

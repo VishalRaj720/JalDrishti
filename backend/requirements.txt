@@ -15,18 +15,10 @@ pydantic==2.10.4
 pydantic-settings==2.6.1
 email-validator==2.2.0
 
-# Auth
+# Auth (single access token + RBAC)
 python-jose[cryptography]==3.3.0
 passlib[argon2]==1.7.4
 argon2-cffi==23.1.0
-
-# Async HTTP (for ML service calls)
-httpx==0.28.1
-
-# Celery + Redis
-celery==5.4.0
-redis==5.2.1
-flower==2.0.1
 
 # Rate limiting
 slowapi==0.1.9
@@ -34,26 +26,22 @@ slowapi==0.1.9
 # Logging
 loguru==0.7.3
 
-# Data ingestion
+# Data ingestion + ML pipeline (DataGen_ModelMVP/pipeline)
 pandas==2.2.3
 geopandas==1.0.1
 shapely==2.0.6
 openpyxl==3.1.5
-
-# ML (Month 4: feature engineering + baseline models)
 numpy==1.26.4
 scipy==1.13.1
 scikit-learn==1.5.2
 joblib==1.4.2
-shap==0.46.0
-matplotlib==3.9.2
 
-# Monitoring (stubs)
-sentry-sdk[fastapi]==2.19.2
+# Metrics
 prometheus-fastapi-instrumentator==7.0.0
 
-# Testing
+# Testing (in-memory SQLite + async client)
 pytest==8.3.4
 pytest-asyncio==0.24.0
+aiosqlite==0.20.0
 httpx==0.28.1
 anyio==4.7.0

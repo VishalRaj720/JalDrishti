@@ -30,9 +30,8 @@ class MonitoringStation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
     )
 
-    __table_args__ = (
-        Index("ix_monitoring_stations_block_id", "block_id"),
-    )
+    # block_id already gets `ix_monitoring_stations_block_id` from index=True above;
+    # a duplicate explicit Index broke create_all ("already exists").
 
 
 class GroundwaterLevelReading(UUIDPrimaryKeyMixin, Base):

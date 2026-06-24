@@ -1,0 +1,38 @@
+{
+  "numeric_features": [
+    "distance_from_isr_km",
+    "days_since_injection",
+    "injection_rate_gpm",
+    "ore_grade_pct",
+    "aquifer_transmissivity_m2day",
+    "aquifer_hydraulic_conductivity_mday",
+    "aquifer_porosity",
+    "aquifer_specific_yield_pct",
+    "depth_to_water_m",
+    "aquifer_thickness_m",
+    "rainfall_mm"
+  ],
+  "categorical_features": [
+    "aquifer_type",
+    "season"
+  ],
+  "regression_targets": [
+    "uranium_ppb",
+    "tds_mg_l",
+    "sulfate_mg_l",
+    "ph"
+  ],
+  "classification_target": "risk_class",
+  "risk_classes": [
+    "safe",
+    "marginal",
+    "unsafe"
+  ],
+  "uranium_target_transform": "log1p",
+  "thresholds": {
+    "uranium_unsafe_ppb": 30.0,
+    "uranium_marginal_ppb": 15.0,
+    "tds_unsafe_mgl": 1000.0,
+    "sulfate_unsafe_mgl": 400.0
+  }
+}

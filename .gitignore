@@ -64,3 +64,10 @@ myvenv/
 .claude
 docs/
 utilities/
+
+# Trained model binaries — regenerate with `python -m pipeline.train`
+# (the small unified_dataset.csv, feature_schema.json and metrics.json ARE tracked)
+DataGen_ModelMVP/pipeline/artifacts/*.joblib
+
+# Generated data-quality report (rebuilt by `python -m scripts.seed`)
+backend/reports/

@@ -22,15 +22,10 @@ class Settings(BaseSettings):
     DB_USER: str = "postgres"
     DB_PASSWORD: str = "040812"
 
-    # JWT
+    # JWT (single access token; refresh-token rotation removed in the slim-down)
     JWT_SECRET: str = "change-this-secret"
-    JWT_REFRESH_SECRET: str = "change-this-refresh-secret"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8h — practical for a single-token prototype
 
     # CORS (comma-separated)
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000"
@@ -38,16 +33,6 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]
-
-    # ML Service
-    ML_SERVICE_URL: str = "http://localhost:8001"
-
-    # Celery
-    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
-
-    # Sentry
-    SENTRY_DSN: str = ""
 
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60

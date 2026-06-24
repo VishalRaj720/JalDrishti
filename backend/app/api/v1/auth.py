@@ -1,15 +1,13 @@
-"""Auth router: signup, login, refresh token."""
+"""Auth router: signup, login, logout, me."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.schemas.auth import SignupRequest, LoginRequest, TokenResponse, RefreshRequest
+from app.schemas.auth import SignupRequest, LoginRequest, TokenResponse
 from app.schemas.user import UserResponse
 from app.schemas.common import MessageResponse
 from app.services.user import UserService
-from app.services.auth import (
-    create_access_token, create_refresh_token, decode_refresh_token
-)
+from app.services.auth import create_access_token
 from app.exceptions import AppException
 from app.dependencies import get_current_user
 from app.models.user import User
@@ -32,7 +30,6 @@ async def login_for_access_token(
         user = await svc.authenticate(form_data.username, form_data.password)
         return TokenResponse(
             access_token=create_access_token(str(user.id), user.role),
-            refresh_token=create_refresh_token(str(user.id), user.role),
         )
     except AppException as e:
         # OAuth2 spec suggests 400 for invalid grant, but we can propagate 401/400 from service
@@ -57,19 +54,6 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
         user = await svc.authenticate(payload.email, payload.password)
         return TokenResponse(
             access_token=create_access_token(str(user.id), user.role),
-            refresh_token=create_refresh_token(str(user.id), user.role),
-        )
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
-
-
-@router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(payload: RefreshRequest):
-    try:
-        data = decode_refresh_token(payload.refresh_token)
-        return TokenResponse(
-            access_token=create_access_token(data["sub"], data["role"]),
-            refresh_token=create_refresh_token(data["sub"], data["role"]),
         )
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)

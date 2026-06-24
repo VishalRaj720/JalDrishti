@@ -1,0 +1,11 @@
+﻿MineName,MineData_RMK_SRC,OrePorosity,OrePorosity_SRC,FormPerm,FormPerm_SRC,AqExemptArea_EPA,ExempThick_EPA,AqExempt_SRC,AvgDissolvedSolids,AvgDissolvedSolids_SRC,ThickByAreaExVol,ExemptPWVol
+"Alta Mesa, original",,28-40,"IAEA, 2016",5000,"DOE, 1989",1840,400,"EPA, 2018","870, 1000","TCEQ, 2013, IAEA, 2016",736000,8.15E+10
+"Alta Mesa, revised","TCEQ, 2013",,,,,5457,470,"EPA, 2018",,,2564790,2.84E+11
+"Kingsville Dome, original",,"30, 32","IAEA, 2016; DOE, 1989",4700,"DOE, 1989",547,200,"EPA, 2018",900-1300,"IAEA, 2016",109400,1.11E+10
+Kingsville Dome Ext,,,,,,2135,390,"EPA, 2018",,,832650,8.41E+10
+Mt Lucas,,"28, 27, 23","IAEA, 2016; EverestMC, 1986b; Knape, 1984",,,6023,375,"EPA, 2018",850,"Knape, 1984",2258625,1.91E+11
+Palangana Mine,Permit number UR03070,25,"IAEA, 2016",,,6272,585,"EPA, 2018",1000-1100,"IAEA, 2016",3669120,2.99E+11
+Palangana Dome,Permit number UR02051,"10-30, 23","Larson, 1978; Knape, 1984",0-1500,"Larson, 1978",200,326,"EPA, 2018",878,"Knape, 1984",65200,4.57E+09
+Rosita,An average of range of thicknesses is used to compute the volume,30,"IAEA, 2016; DOE, 1989",,,200,170,"EPA, 2018",1800,"IAEA, 2016",34000,3.32E+09
+Rosita,An average of range of thicknesses is used to compute the volume,,,3000,"DOE, 1989",1000,40,"EPA, 2018",,,40000,3.91E+09
+Rosita Ext,,,,,,70,400,"EPA, 2018",,,28000,2.74E+09

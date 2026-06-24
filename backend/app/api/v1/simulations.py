@@ -21,37 +21,25 @@ async def trigger_simulation(
 ):
     """
     Trigger a new simulation for an ISR point.
-    Runs asynchronously via Celery (falls back to BackgroundTasks).
-    Returns a job_id to poll.
+
+    The simulation is lightweight (no heavy physics), so it runs in a FastAPI
+    BackgroundTask — no Celery/Redis required. Returns a job_id to poll.
     """
     try:
         svc = SimulationService(db)
         sim = await svc.create_pending(isr_id)
-
-        # Try Celery first; fall back to FastAPI BackgroundTasks
-        try:
-            from app.tasks.simulation import run_simulation_task
-            task = run_simulation_task.delay(str(sim.id))
-            await svc.sim_repo.update(sim, {"task_id": task.id})
-            return JobResponse(
-                job_id=str(sim.id),
-                status="queued",
-                message=f"Simulation queued. Poll GET /api/v1/simulations/{sim.id}",
-            )
-        except Exception:
-            # Celery unavailable: run in BackgroundTask
-            background_tasks.add_task(_run_simulation_bg, sim.id)
-            return JobResponse(
-                job_id=str(sim.id),
-                status="queued",
-                message=f"Simulation started in background. Poll GET /api/v1/simulations/{sim.id}",
-            )
+        background_tasks.add_task(_run_simulation_bg, sim.id)
+        return JobResponse(
+            job_id=str(sim.id),
+            status="queued",
+            message=f"Simulation started in background. Poll GET /api/v1/simulations/{sim.id}",
+        )
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 async def _run_simulation_bg(sim_id: uuid.UUID):
-    """Background task wrapper for when Celery is unavailable."""
+    """Background task wrapper: runs the simulation in its own DB session."""
     from app.database import AsyncSessionLocal
     async with AsyncSessionLocal() as db:
         svc = SimulationService(db)
