@@ -6,18 +6,12 @@ from app.models.block import Block  # noqa: F401
 from app.models.aquifer import Aquifer, AquiferType  # noqa: F401
 from app.models.isr_point import IsrPoint  # noqa: F401
 from app.models.simulation import Simulation, SimulationAquifer, PlumeParameter  # noqa: F401
-
-from app.models.hydraulic_head import HydraulicHead  # noqa: F401
-from app.models.ml_model import MLModel, MLModelType  # noqa: F401
 from app.models.monitoring_station import MonitoringStation, GroundwaterLevelReading  # noqa: F401
 
-# Month 3 additions
+# Data ingestion + Month 3 monitoring
 from app.models.data_source import DataSource  # noqa: F401
 from app.models.monitoring_well import MonitoringWell  # noqa: F401
 from app.models.water_sample import WaterSample  # noqa: F401
-from app.models.contamination_event import ContaminationEvent  # noqa: F401
-from app.models.spatial_analysis_result import SpatialAnalysisResult  # noqa: F401
-from app.models.piezometric_head import PiezometricHead  # noqa: F401
 
 __all__ = [
     "User", "UserRole",
@@ -26,15 +20,8 @@ __all__ = [
     "Aquifer", "AquiferType",
     "IsrPoint",
     "Simulation", "SimulationAquifer", "PlumeParameter",
-
-    "HydraulicHead",
-    "MLModel", "MLModelType",
     "MonitoringStation", "GroundwaterLevelReading",
-
     "DataSource",
     "MonitoringWell",
     "WaterSample",
-    "ContaminationEvent",
-    "SpatialAnalysisResult",
-    "PiezometricHead",
 ]

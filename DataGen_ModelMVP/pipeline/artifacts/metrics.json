@@ -1,0 +1,151 @@
+{
+  "n_rows": 3473,
+  "provenance": {
+    "synthetic": 3000,
+    "jharkhand_real": 342,
+    "texas_real": 131
+  },
+  "uranium_regressor": {
+    "overall": {
+      "n": 694,
+      "r2_log": 0.858,
+      "mae_log": 0.8187,
+      "median_abs_err_ppb": 35.092
+    },
+    "real_only": {
+      "n": 107,
+      "r2_log": 0.6899,
+      "mae_log": 1.0856,
+      "median_abs_err_ppb": 3.779
+    },
+    "feature_importances": [
+      {
+        "feature": "distance_from_isr_km",
+        "importance": 0.6993
+      },
+      {
+        "feature": "days_since_injection",
+        "importance": 0.1773
+      },
+      {
+        "feature": "aquifer_hydraulic_conductivity_mday",
+        "importance": 0.0411
+      },
+      {
+        "feature": "injection_rate_gpm",
+        "importance": 0.027
+      },
+      {
+        "feature": "ore_grade_pct",
+        "importance": 0.0209
+      },
+      {
+        "feature": "aquifer_type_sandstone",
+        "importance": 0.0102
+      },
+      {
+        "feature": "aquifer_thickness_m",
+        "importance": 0.0039
+      },
+      {
+        "feature": "season_monsoon",
+        "importance": 0.0033
+      },
+      {
+        "feature": "aquifer_specific_yield_pct",
+        "importance": 0.0027
+      },
+      {
+        "feature": "season_pre_monsoon",
+        "importance": 0.0027
+      },
+      {
+        "feature": "aquifer_porosity",
+        "importance": 0.0024
+      },
+      {
+        "feature": "season_winter",
+        "importance": 0.0023
+      }
+    ]
+  },
+  "risk_classifier": {
+    "overall": {
+      "n": 695,
+      "accuracy": 0.705,
+      "macro_f1": 0.5727
+    },
+    "real_only": {
+      "n": 108,
+      "accuracy": 0.5463,
+      "macro_f1": 0.5609
+    },
+    "feature_importances": [
+      {
+        "feature": "distance_from_isr_km",
+        "importance": 0.3971
+      },
+      {
+        "feature": "days_since_injection",
+        "importance": 0.2243
+      },
+      {
+        "feature": "ore_grade_pct",
+        "importance": 0.1256
+      },
+      {
+        "feature": "injection_rate_gpm",
+        "importance": 0.1139
+      },
+      {
+        "feature": "aquifer_hydraulic_conductivity_mday",
+        "importance": 0.0204
+      },
+      {
+        "feature": "aquifer_thickness_m",
+        "importance": 0.0163
+      },
+      {
+        "feature": "season_monsoon",
+        "importance": 0.0148
+      },
+      {
+        "feature": "aquifer_specific_yield_pct",
+        "importance": 0.0124
+      },
+      {
+        "feature": "season_pre_monsoon",
+        "importance": 0.0108
+      },
+      {
+        "feature": "season_winter",
+        "importance": 0.0104
+      },
+      {
+        "feature": "aquifer_transmissivity_m2day",
+        "importance": 0.0096
+      },
+      {
+        "feature": "season_post_monsoon",
+        "importance": 0.0086
+      }
+    ]
+  },
+  "cotargets": {
+    "tds_mg_l": {
+      "n_test": 691,
+      "r2": 0.6041,
+      "mae": 320.691
+    },
+    "sulfate_mg_l": {
+      "n_test": 692,
+      "r2": 0.5154,
+      "mae": 86.606
+    },
+    "ph": {
+      "n_test": 690,
+      "r2": 0.2516,
+      "mae": 0.181
+    }
+  }
+}

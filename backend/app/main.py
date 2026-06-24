@@ -25,12 +25,6 @@ logger.add(
     serialize=False,
 )
 
-# ── Sentry (optional) ─────────────────────────────────────────────
-if settings.SENTRY_DSN:
-    import sentry_sdk
-    sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=0.1)
-    logger.info("Sentry initialized.")
-
 # ── Rate limiter ──────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"])
 
