@@ -71,3 +71,5 @@ DataGen_ModelMVP/pipeline/artifacts/*.joblib
 
 # Generated data-quality report (rebuilt by `python -m scripts.seed`)
 backend/reports/
+datasets_source.md
+My_Proposal.pdf

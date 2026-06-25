@@ -113,7 +113,7 @@ async def get_data_quality_report(_=Depends(require_any_role)):
     if not _REPORT_PATH.exists():
         raise HTTPException(
             status_code=404,
-            detail="No data_quality_report.json yet. Run `python -m scripts.seed_month3_data`.",
+            detail="No data_quality_report.json yet. Run `python -m scripts.seed`.",
         )
     try:
         return json.loads(_REPORT_PATH.read_text())

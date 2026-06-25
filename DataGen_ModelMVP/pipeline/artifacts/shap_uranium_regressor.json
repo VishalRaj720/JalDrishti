@@ -1,0 +1,66 @@
+{
+  "model": "uranium_regressor",
+  "method": "sklearn_feature_importances",
+  "top_features": [
+    {
+      "feature": "distance_from_isr_km",
+      "shap_mean_abs": 0.699311
+    },
+    {
+      "feature": "days_since_injection",
+      "shap_mean_abs": 0.177463
+    },
+    {
+      "feature": "aquifer_hydraulic_conductivity_mday",
+      "shap_mean_abs": 0.041186
+    },
+    {
+      "feature": "injection_rate_gpm",
+      "shap_mean_abs": 0.027
+    },
+    {
+      "feature": "ore_grade_pct",
+      "shap_mean_abs": 0.020767
+    },
+    {
+      "feature": "aquifer_type_sandstone",
+      "shap_mean_abs": 0.010131
+    },
+    {
+      "feature": "aquifer_thickness_m",
+      "shap_mean_abs": 0.003922
+    },
+    {
+      "feature": "season_monsoon",
+      "shap_mean_abs": 0.003326
+    },
+    {
+      "feature": "aquifer_specific_yield_pct",
+      "shap_mean_abs": 0.002749
+    },
+    {
+      "feature": "season_pre_monsoon",
+      "shap_mean_abs": 0.002707
+    },
+    {
+      "feature": "aquifer_porosity",
+      "shap_mean_abs": 0.002333
+    },
+    {
+      "feature": "season_winter",
+      "shap_mean_abs": 0.002294
+    },
+    {
+      "feature": "season_post_monsoon",
+      "shap_mean_abs": 0.00179
+    },
+    {
+      "feature": "aquifer_transmissivity_m2day",
+      "shap_mean_abs": 0.001312
+    },
+    {
+      "feature": "depth_to_water_m",
+      "shap_mean_abs": 0.000789
+    }
+  ]
+}

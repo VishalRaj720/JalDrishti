@@ -1,0 +1,66 @@
+{
+  "model": "cotarget_sulfate_mg_l",
+  "method": "sklearn_feature_importances",
+  "top_features": [
+    {
+      "feature": "distance_from_isr_km",
+      "shap_mean_abs": 0.442372
+    },
+    {
+      "feature": "days_since_injection",
+      "shap_mean_abs": 0.289048
+    },
+    {
+      "feature": "injection_rate_gpm",
+      "shap_mean_abs": 0.070717
+    },
+    {
+      "feature": "ore_grade_pct",
+      "shap_mean_abs": 0.070652
+    },
+    {
+      "feature": "season_winter",
+      "shap_mean_abs": 0.027552
+    },
+    {
+      "feature": "aquifer_hydraulic_conductivity_mday",
+      "shap_mean_abs": 0.022772
+    },
+    {
+      "feature": "aquifer_thickness_m",
+      "shap_mean_abs": 0.012137
+    },
+    {
+      "feature": "season_monsoon",
+      "shap_mean_abs": 0.010504
+    },
+    {
+      "feature": "season_post_monsoon",
+      "shap_mean_abs": 0.009085
+    },
+    {
+      "feature": "aquifer_specific_yield_pct",
+      "shap_mean_abs": 0.008388
+    },
+    {
+      "feature": "aquifer_transmissivity_m2day",
+      "shap_mean_abs": 0.006782
+    },
+    {
+      "feature": "season_pre_monsoon",
+      "shap_mean_abs": 0.006414
+    },
+    {
+      "feature": "aquifer_type_basalt",
+      "shap_mean_abs": 0.005479
+    },
+    {
+      "feature": "aquifer_type_alluvium",
+      "shap_mean_abs": 0.004212
+    },
+    {
+      "feature": "aquifer_porosity",
+      "shap_mean_abs": 0.003591
+    }
+  ]
+}

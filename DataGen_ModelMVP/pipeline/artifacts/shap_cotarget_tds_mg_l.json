@@ -1,0 +1,66 @@
+{
+  "model": "cotarget_tds_mg_l",
+  "method": "sklearn_feature_importances",
+  "top_features": [
+    {
+      "feature": "distance_from_isr_km",
+      "shap_mean_abs": 0.530923
+    },
+    {
+      "feature": "days_since_injection",
+      "shap_mean_abs": 0.196163
+    },
+    {
+      "feature": "injection_rate_gpm",
+      "shap_mean_abs": 0.073974
+    },
+    {
+      "feature": "ore_grade_pct",
+      "shap_mean_abs": 0.070138
+    },
+    {
+      "feature": "aquifer_hydraulic_conductivity_mday",
+      "shap_mean_abs": 0.035961
+    },
+    {
+      "feature": "season_monsoon",
+      "shap_mean_abs": 0.01463
+    },
+    {
+      "feature": "aquifer_specific_yield_pct",
+      "shap_mean_abs": 0.011901
+    },
+    {
+      "feature": "season_pre_monsoon",
+      "shap_mean_abs": 0.009996
+    },
+    {
+      "feature": "aquifer_transmissivity_m2day",
+      "shap_mean_abs": 0.009685
+    },
+    {
+      "feature": "depth_to_water_m",
+      "shap_mean_abs": 0.008217
+    },
+    {
+      "feature": "season_post_monsoon",
+      "shap_mean_abs": 0.007265
+    },
+    {
+      "feature": "aquifer_porosity",
+      "shap_mean_abs": 0.007257
+    },
+    {
+      "feature": "aquifer_thickness_m",
+      "shap_mean_abs": 0.007185
+    },
+    {
+      "feature": "season_winter",
+      "shap_mean_abs": 0.006983
+    },
+    {
+      "feature": "rainfall_mm",
+      "shap_mean_abs": 0.002584
+    }
+  ]
+}
