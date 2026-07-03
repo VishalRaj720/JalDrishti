@@ -1,0 +1,9 @@
+outputs/*.csv
+outputs/*.json
+outputs/*.joblib
+outputs/*.png
+outputs/_*.txt
+ml/artifacts/*.joblib
+ml/artifacts/*.png
+__pycache__/
+*.pyc

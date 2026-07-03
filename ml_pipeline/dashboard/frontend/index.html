@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JalDrishti — ISR Plume Surrogate</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div id="app">
+  <aside id="panel">
+    <header class="brand">
+      <h1>JalDrishti</h1>
+      <p>Alkaline-ISR plume surrogate · Jharkhand · <em>theoretical screening</em></p>
+    </header>
+
+    <section class="card pin-card">
+      <div class="card-title">① Drop a pin on the map</div>
+      <div id="pin-info" class="pin-info muted">Click anywhere in Jharkhand to select an ISR site…</div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">② Contaminant &amp; aquifer regime</div>
+      <div class="seg" id="species-seg">
+        <button data-v="uranium_ppb" class="active">Uranium</button>
+        <button data-v="sulfate_mg_l">Sulfate</button>
+        <button data-v="tds_mg_l">TDS</button>
+      </div>
+      <label class="lbl">Hydrogeologic regime</label>
+      <div class="seg" id="regime-seg">
+        <button data-v="" class="active">Auto (pin)</button>
+        <button data-v="fractured">Fractured</button>
+        <button data-v="porous">Weathered/Porous</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">③ Operational &amp; hydro sliders</div>
+      <div class="slider"><label>Injection rate <span class="u">m³/day</span><b id="v-inj">2500</b></label>
+        <input type="range" id="inj" min="200" max="8000" step="50" value="2500"></div>
+      <div class="slider"><label>Bleed <span class="u">%</span><b id="v-bleed">2.0</b></label>
+        <input type="range" id="bleed" min="0" max="8" step="0.1" value="2.0"></div>
+      <div class="slider"><label>Operation duration <span class="u">yr</span><b id="v-op">8</b></label>
+        <input type="range" id="op" min="1" max="20" step="0.5" value="8"></div>
+      <div class="slider"><label>Hydraulic gradient <span class="u">i</span><b id="v-grad">0.005</b></label>
+        <input type="range" id="grad" min="0.0005" max="0.03" step="0.0005" value="0.005"></div>
+      <div class="slider"><label>Evaluation time <span class="u">yr</span><b id="v-time">10</b></label>
+        <input type="range" id="time" min="0" max="20" step="0.5" value="10"></div>
+      <div class="slider"><label>Wellfield width <span class="u">m</span><b id="v-width">300</b></label>
+        <input type="range" id="width" min="50" max="1200" step="10" value="300"></div>
+      <div class="slider azimuth"><label>Fracture strike azimuth <span class="u">°</span><b id="v-az">45</b></label>
+        <input type="range" id="az" min="0" max="360" step="5" value="45"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">④ Prediction engine</div>
+      <div class="seg" id="mode-seg">
+        <button data-v="ml" class="active">ML Surrogate (P10–P90)</button>
+        <button data-v="analytical">Analytical engine</button>
+      </div>
+      <div id="ml-status" class="muted small"></div>
+    </section>
+
+    <section class="metrics">
+      <div class="metric danger">
+        <div class="m-label">Total Vulnerable Area</div>
+        <div class="m-value"><span id="m-area">–</span> <span class="m-unit">ha</span></div>
+        <div class="m-band" id="m-area-band"></div>
+      </div>
+      <div class="metric">
+        <div class="m-label">Max Migration Distance</div>
+        <div class="m-value"><span id="m-dist">–</span> <span class="m-unit">m</span></div>
+        <div class="m-band" id="m-dist-band"></div>
+      </div>
+      <div class="metric two">
+        <div><div class="m-label">Excursion Prob.</div><div class="m-value sm"><span id="m-pex">–</span>%</div></div>
+        <div><div class="m-label">BIS breach</div><div class="m-value sm"><span id="m-breach" class="badge">–</span></div></div>
+      </div>
+      <div class="metric two">
+        <div><div class="m-label">Peak conc.</div><div class="m-value sm" id="m-peak">–</div></div>
+        <div><div class="m-label">Boundary conc.</div><div class="m-value sm" id="m-bnd">–</div></div>
+      </div>
+    </section>
+
+    <section class="card legend">
+      <div class="card-title">Legend</div>
+      <div class="legend-row"><span class="sw bis"></span> BIS breach contour (vulnerable area)</div>
+      <div class="legend-row"><span class="sw plume"></span> Plume concentration (×BIS)</div>
+      <div class="legend-row"><span class="sw ring"></span> Monitoring / compliance ring</div>
+      <div class="legend-row" id="env-legend"><span class="sw env"></span> ML migration envelope (P10/P50/P90)</div>
+    </section>
+
+    <p class="disclaimer">⚠ Uncalibrated theoretical surrogate (porous-Texas → fractured-Jharkhand
+      domain transfer, no field calibration). For screening &amp; education only — not for permitting.</p>
+  </aside>
+
+  <main id="map"></main>
+  <div id="spinner" class="spinner hidden"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

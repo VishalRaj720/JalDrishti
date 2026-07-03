@@ -1,0 +1,151 @@
+{
+  "quantile": {
+    "affected_area_ha": {
+      "n": 5926,
+      "r2_p50": 0.9662,
+      "mae_p50": 7.1879,
+      "coverage_raw": 0.448,
+      "coverage_calibrated": 0.8,
+      "mean_width_calibrated": 29.4645,
+      "conformal_delta": 0.07338,
+      "pinball_p10": 0.02604,
+      "pinball_p90": 0.0252
+    },
+    "max_migration_distance_m": {
+      "n": 5926,
+      "r2_p50": 0.9825,
+      "mae_p50": 49.6469,
+      "coverage_raw": 0.5397,
+      "coverage_calibrated": 0.8002,
+      "mean_width_calibrated": 215.9976,
+      "conformal_delta": 0.0278,
+      "pinball_p10": 0.01551,
+      "pinball_p90": 0.01447
+    },
+    "compliance_conc": {
+      "n": 6000,
+      "r2_p50": 0.9244,
+      "mae_p50": 434.4394,
+      "coverage_raw": 0.6322,
+      "coverage_calibrated": 0.802,
+      "mean_width_calibrated": 1825.4633,
+      "conformal_delta": 0.04775,
+      "pinball_p10": 0.08194,
+      "pinball_p90": 0.07486
+    }
+  },
+  "config": {
+    "n_splits": 5,
+    "quantiles": [
+      0.1,
+      0.5,
+      0.9
+    ],
+    "features": [
+      "regime_is_fractured",
+      "K_m_day",
+      "gradient_i",
+      "phi_mobile",
+      "phi_total",
+      "darcy_flux_q",
+      "seepage_velocity_v",
+      "Kd_L_kg",
+      "retardation_Rd",
+      "contaminant_velocity_vc",
+      "alpha_L",
+      "alpha_T",
+      "anisotropy_ratio",
+      "D_L",
+      "D_T",
+      "peclet_L",
+      "pore_volumes_PV",
+      "dimensionless_time_tau",
+      "dual_porosity_beta",
+      "Q_in_m3_day",
+      "Q_out_m3_day",
+      "bleed_fraction",
+      "Q_net_m3_day",
+      "containment_eta",
+      "operation_days",
+      "wellfield_width_m",
+      "source_conc_C0",
+      "background_conc_Cb",
+      "Xc_m",
+      "time_years",
+      "is_post_closure",
+      "is_uranium_ppb",
+      "is_sulfate_mg_l",
+      "is_tds_mg_l"
+    ],
+    "monotone": [
+      0,
+      1,
+      1,
+      -1,
+      0,
+      1,
+      1,
+      -1,
+      -1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      1,
+      0,
+      -1,
+      -1,
+      -1,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0
+    ],
+    "xgb_params": {
+      "n_estimators": 450,
+      "max_depth": 5,
+      "learning_rate": 0.05,
+      "subsample": 0.85,
+      "colsample_bytree": 0.85,
+      "reg_lambda": 1.5,
+      "tree_method": "hist",
+      "random_state": 42
+    }
+  },
+  "pex": {
+    "n": 6000,
+    "r2": 0.9161,
+    "mae": 0.0692
+  },
+  "breach": {
+    "n": 6000,
+    "auc": 0.9987,
+    "brier": 0.014,
+    "accuracy@0.5": 0.9798
+  },
+  "monotonicity_check": {
+    "area_increases_with_Q_in": true,
+    "area_decreases_with_bleed": true,
+    "area_Q_in_lo_hi_ha": [
+      36.38,
+      38.41
+    ],
+    "area_bleed_lo_hi_ha": [
+      38.6,
+      38.11
+    ],
+    "max_violation_ha": 0.005093
+  }
+}
