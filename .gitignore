@@ -73,3 +73,6 @@ DataGen_ModelMVP/pipeline/artifacts/*.joblib
 backend/reports/
 datasets_source.md
 My_Proposal.pdf
+
+derivationsfurther.md
+FAQ.md

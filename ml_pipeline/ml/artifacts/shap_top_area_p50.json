@@ -1,0 +1,46 @@
+{
+  "model": "area_p50",
+  "method": "shap_mean_abs",
+  "top10": [
+    {
+      "feature": "Xc_m",
+      "importance": 0.49376
+    },
+    {
+      "feature": "wellfield_width_m",
+      "importance": 0.31829
+    },
+    {
+      "feature": "alpha_L",
+      "importance": 0.27494
+    },
+    {
+      "feature": "source_conc_C0",
+      "importance": 0.07733
+    },
+    {
+      "feature": "pore_volumes_PV",
+      "importance": 0.06689
+    },
+    {
+      "feature": "time_years",
+      "importance": 0.06639
+    },
+    {
+      "feature": "peclet_L",
+      "importance": 0.06618
+    },
+    {
+      "feature": "D_L",
+      "importance": 0.03926
+    },
+    {
+      "feature": "contaminant_velocity_vc",
+      "importance": 0.0334
+    },
+    {
+      "feature": "is_tds_mg_l",
+      "importance": 0.02905
+    }
+  ]
+}

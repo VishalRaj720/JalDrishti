@@ -1,0 +1,46 @@
+{
+  "model": "excursion_probability",
+  "method": "shap_mean_abs",
+  "top10": [
+    {
+      "feature": "Xc_m",
+      "importance": 0.32455
+    },
+    {
+      "feature": "source_conc_C0",
+      "importance": 0.05993
+    },
+    {
+      "feature": "contaminant_velocity_vc",
+      "importance": 0.05377
+    },
+    {
+      "feature": "dimensionless_time_tau",
+      "importance": 0.0327
+    },
+    {
+      "feature": "seepage_velocity_v",
+      "importance": 0.03059
+    },
+    {
+      "feature": "time_years",
+      "importance": 0.03024
+    },
+    {
+      "feature": "alpha_L",
+      "importance": 0.03014
+    },
+    {
+      "feature": "D_L",
+      "importance": 0.02677
+    },
+    {
+      "feature": "pore_volumes_PV",
+      "importance": 0.02535
+    },
+    {
+      "feature": "is_tds_mg_l",
+      "importance": 0.02001
+    }
+  ]
+}

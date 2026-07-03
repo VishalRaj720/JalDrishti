@@ -1,0 +1,46 @@
+{
+  "model": "breach_classifier",
+  "method": "shap_mean_abs",
+  "top10": [
+    {
+      "feature": "Xc_m",
+      "importance": 6.71259
+    },
+    {
+      "feature": "source_conc_C0",
+      "importance": 1.54661
+    },
+    {
+      "feature": "alpha_L",
+      "importance": 1.04263
+    },
+    {
+      "feature": "dimensionless_time_tau",
+      "importance": 1.02607
+    },
+    {
+      "feature": "is_tds_mg_l",
+      "importance": 0.74433
+    },
+    {
+      "feature": "pore_volumes_PV",
+      "importance": 0.58107
+    },
+    {
+      "feature": "contaminant_velocity_vc",
+      "importance": 0.45933
+    },
+    {
+      "feature": "time_years",
+      "importance": 0.34756
+    },
+    {
+      "feature": "alpha_T",
+      "importance": 0.25422
+    },
+    {
+      "feature": "gradient_i",
+      "importance": 0.25217
+    }
+  ]
+}
