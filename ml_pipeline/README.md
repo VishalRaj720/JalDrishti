@@ -136,6 +136,16 @@ python -m ml_pipeline.ml.predict          # demo: analytical vs ML toggle
   evaluated coverage on the rows that set δ (an identity, not a validation).
 - **One risk number:** `excursion_probability` = breach fraction of the same MC
   draws; the separate breach classifier is retired.
+- **Phase 3.5 — constrain the estimate, free the uncertainty:** monotone
+  constraints apply to the **P50 central estimate only**; the P10/P90 band edges
+  are unconstrained (`dataset.CONSTRAIN_BANDS`). A quantile band of the switch-
+  like compliance concentration is not monotone in every driver, and forcing it
+  cost ~0.7 R² on the compliance P90 and ~0.16 on the migration P10, which the
+  conformal δ then absorbed as blunt, over-wide bands. Freeing the edges lifts
+  compliance P90 R² 0.15→0.83 and migration P10 0.69→0.85, leaves every P50
+  unchanged (physics + on-manifold intact), holds 80% coverage, and shrinks the
+  bands 27–33%. (Verified empirically first: the front-minus-ring feature was
+  redundant and MC labels are clean — the constraints were the cause.)
 
 Top SHAP drivers (v2): dispersivity `alpha_L`, advective front `Xc_m`, wellfield
 width, clean-up front `Xc_clean_m`, source concentration.

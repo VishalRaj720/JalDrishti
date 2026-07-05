@@ -57,28 +57,28 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|sulfate_mg_l": 0.68607,
-      "fractured|tds_mg_l": 0.66913,
-      "fractured|uranium_ppb": 0.41024,
-      "porous|sulfate_mg_l": 0.62738,
-      "porous|tds_mg_l": 0.47432,
-      "porous|uranium_ppb": 0.32559
+      "fractured|sulfate_mg_l": 0.73162,
+      "fractured|tds_mg_l": 0.65713,
+      "fractured|uranium_ppb": 0.28233,
+      "porous|sulfate_mg_l": 0.51224,
+      "porous|tds_mg_l": 0.39086,
+      "porous|uranium_ppb": 0.23179
     },
     "max_migration_distance_m": {
-      "fractured|sulfate_mg_l": 1.24073,
-      "fractured|tds_mg_l": 0.77096,
-      "fractured|uranium_ppb": 0.44778,
-      "porous|sulfate_mg_l": 0.73905,
-      "porous|tds_mg_l": 0.53495,
-      "porous|uranium_ppb": 0.32093
+      "fractured|sulfate_mg_l": 0.90832,
+      "fractured|tds_mg_l": 0.49088,
+      "fractured|uranium_ppb": 0.2375,
+      "porous|sulfate_mg_l": 0.46606,
+      "porous|tds_mg_l": 0.32335,
+      "porous|uranium_ppb": 0.1709
     },
     "compliance_conc": {
-      "fractured|sulfate_mg_l": 0.9915,
-      "fractured|tds_mg_l": 0.63023,
-      "fractured|uranium_ppb": 2.87862,
-      "porous|sulfate_mg_l": 1.34231,
-      "porous|tds_mg_l": 0.68491,
-      "porous|uranium_ppb": 2.48311
+      "fractured|sulfate_mg_l": 0.80423,
+      "fractured|tds_mg_l": 0.43147,
+      "fractured|uranium_ppb": 1.89414,
+      "porous|sulfate_mg_l": 1.02042,
+      "porous|tds_mg_l": 0.52096,
+      "porous|uranium_ppb": 1.5024
     }
   },
   "monotone_maps": {
@@ -187,6 +187,9 @@
       "restoration_years": -1
     }
   },
+  "constrained_bands": [
+    "p50"
+  ],
   "point_target": "excursion_probability",
   "band_semantics": "P10/P90 = parameter-uncertainty quantiles (Kd, local K, beta, gradient/seasonality, dispersivity, bleed drift), conformally widened per regime x species to contain the true MC band at 80%",
   "training_envelope": {

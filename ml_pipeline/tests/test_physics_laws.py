@@ -384,6 +384,19 @@ def test_porous_override_is_alive():
     assert xc["tds_mg_l"] > 5.0 * xc["uranium_ppb"], xc   # conservative outruns sorbing
 
 
+def test_band_constraint_policy():
+    """Phase 3.5: only the P50 central estimate is monotone-constrained; the
+    P10/P90 uncertainty band edges are free (they can't represent the switch-
+    like compliance tail under hard constraints)."""
+    from ml_pipeline.ml.dataset import monotone_tuple, CONSTRAIN_BANDS, MODEL_FEATURES
+    assert CONSTRAIN_BANDS == ("p50",)
+    p50 = monotone_tuple("compliance_conc", "p50")
+    p90 = monotone_tuple("compliance_conc", "p90")
+    assert any(s != 0 for s in p50), "P50 must stay constrained (physics)"
+    assert all(s == 0 for s in p90), "P10/P90 must be free"
+    assert len(p50) == len(MODEL_FEATURES)
+
+
 def test_mc_field_matches_single_solve():
     """The vectorized MC field evaluator must agree with solve_plume for a
     single parameter set on the same grid size."""

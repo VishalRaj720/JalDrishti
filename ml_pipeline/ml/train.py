@@ -39,7 +39,7 @@ import xgboost as xgb
 from ml_pipeline.ml.dataset import (
     load_training_frame, censor_mask, MODEL_FEATURES, monotone_tuple,
     BAND_TARGETS, BANDS, POINT_TARGET, ALPHA, ARTIFACT_DIR,
-    GROUP_COL, POLYGON_COL, mondrian_cells, Xy,
+    GROUP_COL, POLYGON_COL, mondrian_cells, Xy, CONSTRAIN_BANDS,
 )
 
 N_SPLITS = 5
@@ -49,9 +49,9 @@ COMMON = dict(n_estimators=450, max_depth=5, learning_rate=0.05,
               tree_method="hist", random_state=42)
 
 
-def _model(target: str) -> xgb.XGBRegressor:
+def _model(target: str, band: str = "p50") -> xgb.XGBRegressor:
     return xgb.XGBRegressor(objective="reg:squarederror",
-                            monotone_constraints=monotone_tuple(target), **COMMON)
+                            monotone_constraints=monotone_tuple(target, band), **COMMON)
 
 
 def _subframe(df: pd.DataFrame, censor: bool) -> pd.DataFrame:
@@ -80,7 +80,7 @@ def train_band_target(df: pd.DataFrame, target: str, cfg: dict):
     fold_r2 = []
     for tr, te in gkf.split(X, yt["p50"], groups):
         for b in BANDS:
-            m = _model(target)
+            m = _model(target, b)
             m.fit(X.iloc[tr], yt[b][tr])
             oof[b][te] = m.predict(X.iloc[te])
         fold_r2.append(round(float(r2_score(
@@ -135,7 +135,7 @@ def train_band_target(df: pd.DataFrame, target: str, cfg: dict):
         "deltas": deltas,
     }
 
-    final = {b: _model(target).fit(X, yt[b]) for b in BANDS}
+    final = {b: _model(target, b).fit(X, yt[b]) for b in BANDS}
     return final, metrics
 
 
@@ -269,6 +269,7 @@ def train_all():
         "log_targets": [t for t, c in BAND_TARGETS.items() if c["log"]],
         "deltas": {t: metrics["bands"][t]["deltas"] for t in BAND_TARGETS},
         "monotone_maps": MONOTONE_MAPS,
+        "constrained_bands": list(CONSTRAIN_BANDS),
         "point_target": POINT_TARGET,
         "band_semantics": ("P10/P90 = parameter-uncertainty quantiles "
                            "(Kd, local K, beta, gradient/seasonality, dispersivity, "
