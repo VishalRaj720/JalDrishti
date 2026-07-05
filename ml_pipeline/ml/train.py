@@ -1,217 +1,286 @@
 """
-ml_pipeline.ml.train  (PHASE 3 -- physics-guided training)
-========================================================
-Trains the surrogate with three hard guardrails:
+ml_pipeline.ml.train  (PHASE 3 v2 -- physics-guided training)
+===========================================================
+Trains the surrogate with the remediated guardrails (2026-07 plan):
 
-  1. LEAKAGE CONTROL  -- GroupKFold(5) on scenario_id; a scenario's 15
-     (time x species) rows are never split across train/test.
-  2. PHYSICS CONTROL  -- XGBoost monotone_constraints from dataset.MONOTONE_MAP
-     (higher injection -> larger plume; higher bleed/retardation -> smaller).
-  3. UNCERTAINTY      -- quantile loss gives P10/P50/P90 (non-crossing) for the
-     map-able predictive bands; a breach classifier + P_ex regressor for risk.
+  1. LEAKAGE CONTROL   -- GroupKFold(5) on scenario_id (primary skill number)
+                          PLUS leave-aquifer-out GroupKFold on polygon_id (the
+                          honest "new site" stress number, reported separately).
+  2. PHYSICS CONTROL   -- PER-TARGET monotone maps (dataset.MONOTONE_MAPS);
+                          verified post-fit ON-MANIFOLD: the raw operating
+                          point is swept through the same feature builder used
+                          at inference, so coupled features move together
+                          (the old single-feature sweep could only ever pass).
+  3. UNCERTAINTY       -- labels are MC P10/P50/P90 (parameter uncertainty);
+                          one squared-error model per (target, band), then
+                          CONFORMAL calibration done honestly:
+                            * conformity scores from GroupKFold OOF predictions,
+                            * aggregated per (Mondrian cell x scenario) by max,
+                            * delta from a 50% calibration split of scenarios,
+                            * coverage REPORTED on the untouched other 50%
+                          (the old pipeline evaluated coverage on the same rows
+                          that set the delta -- an identity, not a validation).
 
-Artifacts -> ml/artifacts/ ; CV metrics -> ml/artifacts/metrics.json.
+Artifacts -> ml/artifacts/ ; metrics -> ml/artifacts/metrics.json.
 Run:  python -m ml_pipeline.ml.train
 """
 from __future__ import annotations
 
 import json
+import math
 import time
 import numpy as np
 import pandas as pd
 import joblib
 from sklearn.model_selection import GroupKFold
-from sklearn.metrics import (
-    r2_score, mean_absolute_error, roc_auc_score, brier_score_loss,
-    accuracy_score,
-)
+from sklearn.metrics import r2_score, mean_absolute_error
 import xgboost as xgb
 
 from ml_pipeline.ml.dataset import (
-    load_training_frame, Xy, MODEL_FEATURES, monotone_tuple, QUANTILE_TARGETS,
-    POINT_TARGET, CLASS_TARGET, QUANTILES, ARTIFACT_DIR,
+    load_training_frame, censor_mask, MODEL_FEATURES, monotone_tuple,
+    BAND_TARGETS, BANDS, POINT_TARGET, ALPHA, ARTIFACT_DIR,
+    GROUP_COL, POLYGON_COL, mondrian_cells, Xy,
 )
 
 N_SPLITS = 5
+CAL_SPLIT_SEED = 0
 COMMON = dict(n_estimators=450, max_depth=5, learning_rate=0.05,
               subsample=0.85, colsample_bytree=0.85, reg_lambda=1.5,
               tree_method="hist", random_state=42)
-MONO = monotone_tuple()
+
+
+def _model(target: str) -> xgb.XGBRegressor:
+    return xgb.XGBRegressor(objective="reg:squarederror",
+                            monotone_constraints=monotone_tuple(target), **COMMON)
+
+
+def _subframe(df: pd.DataFrame, censor: bool) -> pd.DataFrame:
+    return df[~censor_mask(df)] if censor else df
+
+
+def _cal_eval_split(scenario_ids: np.ndarray) -> set:
+    """Deterministic 50% calibration split of unique scenario ids."""
+    uniq = np.unique(scenario_ids)
+    rng = np.random.default_rng(CAL_SPLIT_SEED)
+    rng.shuffle(uniq)
+    return set(uniq[: len(uniq) // 2].tolist())
 
 
 # --------------------------------------------------------------------------- #
-def pinball(y, q_pred, alpha):
-    d = y - q_pred
-    return float(np.mean(np.maximum(alpha * d, (alpha - 1) * d)))
+def train_band_target(df: pd.DataFrame, target: str, cfg: dict):
+    """OOF-CV the three band models, conformalize honestly, refit on all rows."""
+    sub = _subframe(df, cfg["censor_offscale"])
+    X = sub[MODEL_FEATURES].astype(float)
+    groups = sub[GROUP_COL].to_numpy()
+    cells = mondrian_cells(sub).to_numpy()
+    yt = {b: np.log1p(sub[f"{target}_{b}"].to_numpy()) for b in BANDS}
 
-
-def _quantile_model():
-    return xgb.XGBRegressor(objective="reg:quantileerror",
-                            quantile_alpha=np.array(QUANTILES),
-                            monotone_constraints=MONO, **COMMON)
-
-
-# --------------------------------------------------------------------------- #
-def train_quantile_target(df, target, cfg) -> tuple[xgb.XGBRegressor, dict]:
-    """GroupKFold-CV a multi-quantile regressor, then fit on all rows."""
-    X, y, groups = Xy(df, target, censor_offscale=cfg["censor_offscale"])
-    y = y.to_numpy()
-    yt = np.log1p(y) if cfg["log"] else y.copy()
     gkf = GroupKFold(n_splits=N_SPLITS)
+    oof = {b: np.full(len(sub), np.nan) for b in BANDS}
+    fold_r2 = []
+    for tr, te in gkf.split(X, yt["p50"], groups):
+        for b in BANDS:
+            m = _model(target)
+            m.fit(X.iloc[tr], yt[b][tr])
+            oof[b][te] = m.predict(X.iloc[te])
+        fold_r2.append(round(float(r2_score(
+            np.expm1(yt["p50"][te]), np.expm1(oof["p50"][te]))), 4))
 
-    oof = np.full((len(y), len(QUANTILES)), np.nan)
-    for tr, te in gkf.split(X, yt, groups):
-        m = _quantile_model()
-        m.fit(X.iloc[tr], yt[tr])
-        oof[te] = m.predict(X.iloc[te])
-    # --- Conformalized Quantile Regression (Romano et al. 2019) -------------
-    # The synthetic physics is near-deterministic given X, so raw quantile heads
-    # under-cover out-of-fold. Calibrate in the (transformed) model space using
-    # the OOF conformity score E = max(qlo - y, y - qhi); widen by its (1-alpha)
-    # empirical quantile so the P10-P90 band achieves ~80% coverage.
-    qlo, qhi = oof[:, 0], oof[:, 2]                 # transformed space
-    E = np.maximum(qlo - yt, yt - qhi)
-    alpha = 0.20
-    n = len(yt)
-    k = min(int(np.ceil((n + 1) * (1 - alpha))), n)
-    delta = float(np.sort(E)[k - 1])               # conformal half-correction
-    lo_cal_t, hi_cal_t = qlo - delta, qhi + delta
+    # rearrange BEFORE any conformity computation (heads can cross per-row)
+    lo = np.minimum(oof["p10"], oof["p50"])
+    hi = np.maximum(oof["p90"], oof["p50"])
 
-    # back-transform (raw and calibrated)
-    inv = (lambda a: np.clip(np.expm1(a), 0, None)) if cfg["log"] else (lambda a: np.clip(a, 0, None))
-    p10, p50, p90 = inv(oof[:, 0]), inv(oof[:, 1]), inv(oof[:, 2])
-    p10c, p90c = inv(lo_cal_t), inv(hi_cal_t)
+    band_metrics = {"r2": {}, "mae": {}}
+    for b, pred in (("p10", lo), ("p50", oof["p50"]), ("p90", hi)):
+        y_raw, p_raw = np.expm1(yt[b]), np.clip(np.expm1(pred), 0, None)
+        band_metrics["r2"][b] = round(float(r2_score(y_raw, p_raw)), 4)
+        band_metrics["mae"][b] = round(float(mean_absolute_error(y_raw, p_raw)), 4)
+
+    # --- honest Mondrian split-conformal (log space, scenario-level scores) ---
+    E = np.maximum(lo - yt["p10"], yt["p90"] - hi)   # band-containment score
+    edf = pd.DataFrame({"E": E, "cell": cells, "scen": groups})
+    scen_scores = edf.groupby(["cell", "scen"])["E"].max().reset_index()
+    cal = _cal_eval_split(groups)
+    is_cal = scen_scores["scen"].isin(cal)
+
+    deltas = {}
+    for cell, g in scen_scores[is_cal].groupby("cell"):
+        s = np.sort(g["E"].to_numpy())
+        k = min(int(math.ceil((len(s) + 1) * (1 - ALPHA))), len(s))
+        deltas[cell] = round(float(s[k - 1]), 5)
+
+    # coverage on the UNTOUCHED evaluation half
+    row_eval = ~pd.Series(groups).isin(cal).to_numpy()
+    d_row = pd.Series(cells).map(deltas).to_numpy()
+    covered = (lo - d_row <= yt["p10"]) & (yt["p90"] <= hi + d_row)
+    cov_rows = float(np.mean(covered[row_eval]))
+    scen_eval = scen_scores[~is_cal]
+    cov_scen = float(np.mean(scen_eval["E"].to_numpy()
+                             <= scen_eval["cell"].map(deltas).to_numpy()))
+    per_cell = {c: round(float(np.mean(covered[row_eval & (cells == c)])), 3)
+                for c in np.unique(cells)}
+    y90_raw = np.expm1(yt["p90"])
+    tail = row_eval & (y90_raw >= np.quantile(y90_raw[row_eval], 0.95))
+    cov_tail = float(np.mean(covered[tail])) if tail.any() else float("nan")
 
     metrics = {
-        "n": int(len(y)),
-        "r2_p50": round(float(r2_score(y, p50)), 4),
-        "mae_p50": round(float(mean_absolute_error(y, p50)), 4),
-        "coverage_raw": round(float(np.mean((y >= p10) & (y <= p90))), 4),
-        "coverage_calibrated": round(float(np.mean((y >= p10c) & (y <= p90c))), 4),
-        "mean_width_calibrated": round(float(np.mean(p90c - p10c)), 4),
-        "conformal_delta": round(delta, 5),
-        "pinball_p10": round(pinball(yt, oof[:, 0], 0.10), 5),
-        "pinball_p90": round(pinball(yt, oof[:, 2], 0.90), 5),
+        "n": int(len(sub)),
+        "n_censored": int(len(df) - len(sub)),
+        **band_metrics,
+        "r2_p50_per_fold": fold_r2,
+        "coverage": {"rows_eval": round(cov_rows, 4),
+                     "scenarios_eval": round(cov_scen, 4),
+                     "tail_top5_rows": round(cov_tail, 4),
+                     "per_cell_rows": per_cell},
+        "deltas": deltas,
     }
-    final = _quantile_model().fit(X, yt)
+
+    final = {b: _model(target).fit(X, yt[b]) for b in BANDS}
     return final, metrics
 
 
-def train_point_regressor(df) -> tuple[xgb.XGBRegressor, dict]:
-    X, y, groups = Xy(df, POINT_TARGET)
+def polygon_stress_cv(df: pd.DataFrame, target: str, cfg: dict) -> dict:
+    """Leave-aquifer-out CV (P50 band only): honest 'new hydrogeology' skill."""
+    sub = _subframe(df, cfg["censor_offscale"])
+    X = sub[MODEL_FEATURES].astype(float)
+    y = np.log1p(sub[f"{target}_p50"].to_numpy())
+    polys = sub[POLYGON_COL].to_numpy()
+    n_splits = min(N_SPLITS, len(np.unique(polys)))
+    oof = np.full(len(sub), np.nan)
+    for tr, te in GroupKFold(n_splits=n_splits).split(X, y, polys):
+        m = _model(target)
+        m.fit(X.iloc[tr], y[tr])
+        oof[te] = m.predict(X.iloc[te])
+    return {"r2_p50": round(float(r2_score(np.expm1(y), np.clip(np.expm1(oof), 0, None))), 4),
+            "mae_p50": round(float(mean_absolute_error(np.expm1(y), np.clip(np.expm1(oof), 0, None))), 4),
+            "n_polygons": int(len(np.unique(polys)))}
+
+
+def train_point_regressor(df: pd.DataFrame):
+    X, y, groups, _ = Xy(df, POINT_TARGET)
     gkf = GroupKFold(n_splits=N_SPLITS)
     oof = np.full(len(y), np.nan)
     for tr, te in gkf.split(X, y, groups):
-        m = xgb.XGBRegressor(objective="reg:squarederror",
-                             monotone_constraints=MONO, **COMMON)
+        m = _model(POINT_TARGET)
         m.fit(X.iloc[tr], y.iloc[tr])
         oof[te] = np.clip(m.predict(X.iloc[te]), 0, 1)
     metrics = {"n": int(len(y)),
                "r2": round(float(r2_score(y, oof)), 4),
                "mae": round(float(mean_absolute_error(y, oof)), 4)}
-    final = xgb.XGBRegressor(objective="reg:squarederror",
-                             monotone_constraints=MONO, **COMMON).fit(X, y)
-    return final, metrics
-
-
-def train_classifier(df) -> tuple[xgb.XGBClassifier, dict]:
-    X, y, groups = Xy(df, CLASS_TARGET)
-    gkf = GroupKFold(n_splits=N_SPLITS)
-    oof = np.full(len(y), np.nan)
-    for tr, te in gkf.split(X, y, groups):
-        m = xgb.XGBClassifier(objective="binary:logistic", eval_metric="logloss",
-                              monotone_constraints=MONO, **COMMON)
-        m.fit(X.iloc[tr], y.iloc[tr])
-        oof[te] = m.predict_proba(X.iloc[te])[:, 1]
-    metrics = {"n": int(len(y)),
-               "auc": round(float(roc_auc_score(y, oof)), 4),
-               "brier": round(float(brier_score_loss(y, oof)), 4),
-               "accuracy@0.5": round(float(accuracy_score(y, (oof >= 0.5))), 4)}
-    final = xgb.XGBClassifier(objective="binary:logistic", eval_metric="logloss",
-                              monotone_constraints=MONO, **COMMON).fit(X, y)
+    final = _model(POINT_TARGET).fit(X, y)
     return final, metrics
 
 
 # --------------------------------------------------------------------------- #
-def verify_monotonicity(models: dict, df, tol_ha: float = 1e-2) -> dict:
-    """Empirically confirm the constraints bind: sweep one feature (others held
-    at a REAL in-distribution baseline -- uranium species), check the predicted
-    area moves the physically-correct direction. `tol_ha` ignores sub-1e-2 ha
-    tree-boundary / expm1 round-off (constraints are exact only in log space)."""
-    X = df[MODEL_FEATURES].astype(float)
-    base = X.median()
-    base["is_uranium_ppb"], base["is_sulfate_mg_l"], base["is_tds_mg_l"] = 1.0, 0.0, 0.0
-    qm = models["quantile"]["affected_area_ha"]
+def verify_on_manifold(band_models: dict) -> dict:
+    """Sweep the RAW OPERATING POINT through the inference feature builder so
+    all coupled features move together, then check the trained P50 area:
+      * higher Q_in at FIXED Q_net -> non-decreasing (the honest user law);
+      * higher Q_net at fixed Q_in -> non-increasing (containment)."""
+    from ml_pipeline.ml.predict import features_from_inputs
+    base = dict(regime="fractured", K_m_day=1.12, gradient_i=0.006,
+                phi_mobile=0.008, n_total=0.03, grain_density=2750.0,
+                kd_L_kg=1.0, beta=8.0, Q_in_m3_day=2500.0, bleed_fraction=0.016,
+                operation_years=8.0, wellfield_width_m=300.0, thickness_m=37.5,
+                source_conc_C0=15000.0, background_conc_Cb=2.0,
+                species="uranium_ppb", time_years=10.0)
 
-    def sweep(feature, n=30):
-        lo, hi = X[feature].quantile(0.02), X[feature].quantile(0.98)
-        Xs = pd.DataFrame([base.copy() for _ in range(n)])
-        Xs[feature] = np.linspace(lo, hi, n)
-        return np.expm1(qm.predict(Xs[MODEL_FEATURES])[:, 1])   # P50, ha
+    def p50_area(**over):
+        X, _, _ = features_from_inputs(**{**base, **over})
+        return float(np.clip(np.expm1(
+            band_models["affected_area_ha"]["p50"].predict(X)[0]), 0, None))
 
-    q, b = sweep("Q_in_m3_day"), sweep("bleed_fraction")
+    Q_net = 40.0
+    qs = (500.0, 1500.0, 3000.0, 5000.0)
+    area_q = [round(p50_area(Q_in_m3_day=q, bleed_fraction=Q_net / q), 2) for q in qs]
+    bleeds = (0.0, 0.02, 0.05, 0.08)
+    area_b = [round(p50_area(bleed_fraction=b), 2) for b in bleeds]
+    tol_q = 0.02 * max(max(area_q) - min(area_q), 1.0)
+    tol_b = 0.02 * max(max(area_b) - min(area_b), 1.0)
     return {
-        "area_increases_with_Q_in": bool(q[-1] >= q[0] and np.min(np.diff(q)) > -tol_ha),
-        "area_decreases_with_bleed": bool(b[-1] <= b[0] and np.max(np.diff(b)) < tol_ha),
-        "area_Q_in_lo_hi_ha": [round(float(q[0]), 2), round(float(q[-1]), 2)],
-        "area_bleed_lo_hi_ha": [round(float(b[0]), 2), round(float(b[-1]), 2)],
-        "max_violation_ha": round(float(max(max(-np.min(np.diff(q)), 0.0),
-                                            max(np.max(np.diff(b)), 0.0))), 6),
+        "area_p50_vs_Q_in_at_fixed_Qnet": area_q,
+        "area_p50_vs_bleed_at_fixed_Q_in": area_b,
+        "qin_law_holds": bool(all(b >= a - tol_q for a, b in zip(area_q, area_q[1:]))),
+        "bleed_law_holds": bool(all(b <= a + tol_b for a, b in zip(area_b, area_b[1:]))),
     }
 
 
+# --------------------------------------------------------------------------- #
 def train_all():
     t0 = time.time()
     ARTIFACT_DIR.mkdir(exist_ok=True)
     df = load_training_frame()
-    print(f"Training on {len(df)} rows / {df['scenario_id'].nunique()} scenarios, "
-          f"{len(MODEL_FEATURES)} features, GroupKFold({N_SPLITS})\n")
+    print(f"Training v2 on {len(df)} rows / {df[GROUP_COL].nunique()} scenarios / "
+          f"{df[POLYGON_COL].nunique()} polygons, {len(MODEL_FEATURES)} features, "
+          f"GroupKFold({N_SPLITS}) + honest Mondrian split-CQR\n")
 
-    models = {"quantile": {}}
-    metrics = {"quantile": {}, "config": {
-        "n_splits": N_SPLITS, "quantiles": list(QUANTILES),
-        "features": MODEL_FEATURES, "monotone": list(MONO),
+    band_models, metrics = {}, {"bands": {}, "stress_polygon_cv": {}, "config": {
+        "n_splits": N_SPLITS, "alpha": ALPHA, "features": MODEL_FEATURES,
+        "n_constrained_per_target": {t: sum(1 for s in monotone_tuple(t) if s)
+                                     for t in list(BAND_TARGETS) + [POINT_TARGET]},
         "xgb_params": COMMON}}
 
-    for target, cfg in QUANTILE_TARGETS.items():
-        m, mt = train_quantile_target(df, target, cfg)
-        models["quantile"][target] = m
-        metrics["quantile"][target] = mt
-        joblib.dump(m, ARTIFACT_DIR / f"quantile_{target}.joblib")
-        print(f"[quantile] {target:26s} R2(P50)={mt['r2_p50']:.3f}  "
-              f"MAE={mt['mae_p50']:.2f}  coverage raw={mt['coverage_raw']:.2f}"
-              f" -> calib={mt['coverage_calibrated']:.2f}")
+    for target, cfg in BAND_TARGETS.items():
+        models, mt = train_band_target(df, target, cfg)
+        band_models[target] = models
+        metrics["bands"][target] = mt
+        for b, m in models.items():
+            joblib.dump(m, ARTIFACT_DIR / f"band_{target}_{b}.joblib")
+        cov = mt["coverage"]
+        print(f"[bands] {target:26s} R2(P50)={mt['r2']['p50']:.3f}  "
+              f"MAE(P50)={mt['mae']['p50']:.2f}  "
+              f"coverage rows={cov['rows_eval']:.3f} scen={cov['scenarios_eval']:.3f} "
+              f"tail={cov['tail_top5_rows']:.3f}")
+        metrics["stress_polygon_cv"][target] = polygon_stress_cv(df, target, cfg)
+        print(f"        leave-aquifer-out R2(P50)={metrics['stress_polygon_cv'][target]['r2_p50']:.3f}"
+              f"  (vs scenario-CV {mt['r2']['p50']:.3f})")
 
-    models["pex"], metrics["pex"] = train_point_regressor(df)
-    joblib.dump(models["pex"], ARTIFACT_DIR / "pex_regressor.joblib")
-    print(f"[regress]  excursion_probability    R2={metrics['pex']['r2']:.3f}  "
+    pex_model, metrics["pex"] = train_point_regressor(df)
+    joblib.dump(pex_model, ARTIFACT_DIR / "pex_regressor.joblib")
+    print(f"[point] excursion_probability     R2={metrics['pex']['r2']:.3f}  "
           f"MAE={metrics['pex']['mae']:.3f}")
 
-    models["breach"], metrics["breach"] = train_classifier(df)
-    joblib.dump(models["breach"], ARTIFACT_DIR / "breach_classifier.joblib")
-    print(f"[classify] breaches_bis             AUC={metrics['breach']['auc']:.3f}  "
-          f"Brier={metrics['breach']['brier']:.3f}  acc={metrics['breach']['accuracy@0.5']:.3f}")
+    mono = verify_on_manifold(band_models)
+    metrics["monotonicity_on_manifold"] = mono
+    print("\n[on-manifold] area vs Q_in@fixed-Qnet:", mono["area_p50_vs_Q_in_at_fixed_Qnet"],
+          "->", "OK" if mono["qin_law_holds"] else "VIOLATED")
+    print("[on-manifold] area vs bleed@fixed-Qin: ", mono["area_p50_vs_bleed_at_fixed_Q_in"],
+          "->", "OK" if mono["bleed_law_holds"] else "VIOLATED")
 
-    mono = verify_monotonicity(models, df)
-    metrics["monotonicity_check"] = mono
-    print("\n[monotonicity] area INCREASES with Q_in:", mono["area_increases_with_Q_in"],
-          "| area DECREASES with bleed:", mono["area_decreases_with_bleed"])
-    print("   area Q_in[lo->hi]:", mono["area_Q_in_lo_hi_ha"],
-          "ha | area bleed[lo->hi]:", mono["area_bleed_lo_hi_ha"],
-          "ha | max numerical violation:", mono["max_violation_ha"], "ha")
-
-    # model card for the dashboard / predict.py
+    from ml_pipeline.config import parameters as P
+    from ml_pipeline.ml.dataset import MONOTONE_MAPS
+    # Per-regime hydro support (P1 guard): the (phi_mobile, Rd, K) box the model
+    # actually saw, so serving can flag out-of-distribution hydrogeology (e.g. a
+    # regime override or manual phi/K that lands where no training row exists).
+    hydro_support = {}
+    for flag, name in ((1, "fractured"), (0, "porous")):
+        sub = df[df["regime_is_fractured"] == flag]
+        if len(sub):
+            hydro_support[name] = {
+                "phi_mobile": [float(sub["phi_mobile"].min()), float(sub["phi_mobile"].max())],
+                "retardation_Rd": [float(sub["retardation_Rd"].min()), float(sub["retardation_Rd"].max())],
+                "K_m_day": [float(sub["K_m_day"].min()), float(sub["K_m_day"].max())],
+            }
     (ARTIFACT_DIR / "model_card.json").write_text(json.dumps({
-        "features": MODEL_FEATURES, "monotone_constraints": list(MONO),
-        "quantiles": list(QUANTILES), "quantile_targets": list(QUANTILE_TARGETS),
-        "log_targets": [t for t, c in QUANTILE_TARGETS.items() if c["log"]],
-        "conformal_deltas": {t: metrics["quantile"][t]["conformal_delta"]
-                             for t in QUANTILE_TARGETS},
-        "point_target": POINT_TARGET, "class_target": CLASS_TARGET,
+        "version": 2,
+        "features": MODEL_FEATURES,
+        "band_targets": list(BAND_TARGETS),
+        "bands": list(BANDS),
+        "log_targets": [t for t, c in BAND_TARGETS.items() if c["log"]],
+        "deltas": {t: metrics["bands"][t]["deltas"] for t in BAND_TARGETS},
+        "monotone_maps": MONOTONE_MAPS,
+        "point_target": POINT_TARGET,
+        "band_semantics": ("P10/P90 = parameter-uncertainty quantiles "
+                           "(Kd, local K, beta, gradient/seasonality, dispersivity, "
+                           "bleed drift), conformally widened per regime x species "
+                           f"to contain the true MC band at {int((1-ALPHA)*100)}%"),
+        "training_envelope": {k: list(v) for k, v in P.OPERATIONAL_RANGES.items()},
+        "hydro_support": hydro_support,
+        "compliance_buffer_m": P.COMPLIANCE_BUFFER_M,
     }, indent=2))
     (ARTIFACT_DIR / "metrics.json").write_text(json.dumps(metrics, indent=2))
     print(f"\nDONE in {time.time()-t0:.1f}s -> artifacts in {ARTIFACT_DIR}")
-    return models, metrics
+    return band_models, metrics
 
 
 if __name__ == "__main__":

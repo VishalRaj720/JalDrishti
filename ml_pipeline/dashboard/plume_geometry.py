@@ -76,8 +76,14 @@ def _decimate(ring: np.ndarray, max_pts: int = 160) -> np.ndarray:
     return ring[idx]
 
 
-def field_to_contours(field, *, lon0, lat0, azimuth_deg, threshold, background):
-    """PlumeResult -> list of contour dicts in lon/lat for Leaflet polygons."""
+def field_to_contours(field, *, lon0, lat0, azimuth_deg, threshold, background,
+                      x_offset_m: float = 0.0):
+    """PlumeResult -> list of contour dicts in lon/lat for Leaflet polygons.
+
+    x_offset_m shifts the solver frame along the flow axis before rotation:
+    the transport engine puts x=0 at the DOWNGRADIENT WELLFIELD EDGE, while the
+    map pin marks the wellfield centre -> pass x_offset_m = W/2.
+    """
     X, Y, C = field.X, field.Y, field.C
     c_abs = C + background
     out = []
@@ -86,7 +92,7 @@ def field_to_contours(field, *, lon0, lat0, azimuth_deg, threshold, background):
         polys = []
         for ring in rings_m:
             ring = _decimate(np.asarray(ring))
-            polys.append([list(local_to_lonlat(px, py, lon0, lat0, azimuth_deg))
+            polys.append([list(local_to_lonlat(px + x_offset_m, py, lon0, lat0, azimuth_deg))
                           for px, py in ring])
         if polys:
             out.append({"level": round(spec["level"], 4), "is_bis": spec["is_bis"],
@@ -106,9 +112,10 @@ def compliance_ring(lon0, lat0, azimuth_deg, radius_m, n=72):
 
 
 def ml_envelope_ellipses(lon0, lat0, azimuth_deg, migration_bands: dict,
-                         aspect_ratio: float, n=64):
+                         aspect_ratio: float, n=64, x_offset_m: float = 0.0):
     """Dashed ML migration envelopes (P10/P50/P90) as oriented ellipses:
-    semi-major = migration distance along strike, semi-minor = major/aspect."""
+    semi-major = migration distance along strike, semi-minor = major/aspect.
+    x_offset_m anchors the ellipse at the source plane (wellfield edge)."""
     aspect = max(aspect_ratio, 1.0)
     res = {}
     for q, dist in migration_bands.items():
@@ -117,7 +124,8 @@ def ml_envelope_ellipses(lon0, lat0, azimuth_deg, migration_bands: dict,
         ring = []
         for k in range(n + 1):
             th = 2 * math.pi * k / n
-            ring.append(list(local_to_lonlat(a * math.cos(th), b * math.sin(th),
+            ring.append(list(local_to_lonlat(x_offset_m + a * math.cos(th),
+                                              b * math.sin(th),
                                               lon0, lat0, azimuth_deg)))
         res[q] = ring
     return res

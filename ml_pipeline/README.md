@@ -24,7 +24,9 @@ ml_pipeline/
 │   ├── train.py                  #   GroupKFold CV, quantile heads, CQR, breach/P_ex
 │   ├── predict.py                #   unified API: analytical vs ML surrogate (Phase-4 toggle)
 │   └── shap_analysis.py          #   SHAP feature attribution
-├── dashboard/                    # PHASE 4 (next): Streamlit "drop a pin" UI
+├── dashboard/                    # PHASE 4: FastAPI backend + Leaflet frontend
+│   │                             #   (envelope guard, extrapolation flag, HCO3->Kd)
+├── tests/                        # physics-law regression tests (run under pytest)
 └── outputs/                      # generated artifacts (gitignored)
 ```
 
@@ -63,11 +65,28 @@ Texas and Jharkhand — a model trained on them is geometry-agnostic.
 
 ## Phase 2 transport (analytical, no Flopy/MODFLOW binaries)
 
-Domenico (1987) continuous-source 2D solution with retarded velocity, anisotropic
-dispersion (fractured → long narrow plume; porous → round), dual-porosity matrix-diffusion
-tailing for fractured zones (Goltz & Roberts 1986), and two-phase advection
-(contained during operation, drifting post-closure). Milliseconds per field →
-suitable for both bulk training-data generation and live dashboard recompute.
+Domenico (1987) continuous-source 2D solution, upgraded in the 2026-07 Phase-0/1
+remediation:
+
+- **Geometry:** source plane at the **downgradient wellfield edge** (conservative
+  areal-source convention); compliance ring at `COMPLIANCE_BUFFER_M` beyond it.
+- **Three-phase kinematics:** operation (front at `v·(1−η)`, with η =
+  `min(1, Q_net/(q·b·W))` mass-balance capture — complete capture possible),
+  restoration (front held; source stepped to `residual·C0` from the real Texas
+  post-restoration sheets via Domenico superposition), post-closure drift.
+- **Fractured regime:** time-dependent apparent retardation `R_app(t)` (closed-form
+  retarded clock, Goltz & Roberts 1986) + the Tang/Frind/Sudicky (1981) matrix-
+  diffusion kernel as an early-arrival envelope — Kd acts physically through the
+  matrix-retardation group σ; open apertures give early far breakthrough.
+- **Time-consistent throughput:** PV/BV, the tanh source widening and the
+  dispersivity length scale are evaluated at the time slice, not end-of-operation.
+- **Incremental exceedance:** area/breach scored on mining-attributable
+  concentration `max(threshold − background, 0.1·threshold)` — ambient water
+  already at the limit cannot flood the grid.
+
+Milliseconds per field → suitable for both bulk training-data generation and live
+dashboard recompute. Physics laws are regression-tested on the LABELS
+(`ml_pipeline/tests/test_physics_laws.py`), not on the constrained model.
 
 ## Run it
 
@@ -82,10 +101,14 @@ python -m ml_pipeline.data_prep.feature_engineering
 # Phase 2a — analytical engine demo (fractured vs porous plume)
 python -m ml_pipeline.physics.transport
 
-# Phase 2b — generate the statewide synthetic training set
-python -m ml_pipeline.synthetic.generate --scenarios 400 --mc 16
-#   -> outputs/synthetic_training.csv  (one row per scenario × time × species; has scenario_id)
-#   -> outputs/synthetic_meta.json
+# Physics-law regression tests (labels, not the model)
+python -m pytest ml_pipeline/tests/test_physics_laws.py -q
+
+# Phase 2b — generate the statewide synthetic training set (v2: MC band labels)
+python -m ml_pipeline.synthetic.generate --scenarios 900 --mc 48
+#   -> outputs/synthetic_training.csv  (scenario_id + polygon_id groups;
+#      P10/P50/P90 parameter-uncertainty labels per target)
+#   -> outputs/synthetic_meta.json     (use --out <path> to write elsewhere)
 
 # Phase 3 — train the physics-guided surrogate
 python -m ml_pipeline.ml.train            # -> ml/artifacts/*.joblib + metrics.json + model_card.json
@@ -93,20 +116,37 @@ python -m ml_pipeline.ml.shap_analysis    # -> ml/artifacts/shap_top_*.json (+ P
 python -m ml_pipeline.ml.predict          # demo: analytical vs ML toggle
 ```
 
-### Phase 3 guardrails (enforced + verified)
-- **No leakage:** `GroupKFold(5)` on `scenario_id` — a scenario's 15 (time×species) rows never split across folds.
-- **Physics-faithful monotonicity:** XGBoost `monotone_constraints` from `dataset.MONOTONE_MAP`
-  (Q_in→larger, bleed/Rd/Kd/containment→smaller, K/i/time→larger). Verified empirically post-fit.
-  Source-zone width is throughput-coupled so "higher injection → larger plume" is *physical*, not forced.
-- **Mappable uncertainty:** quantile heads (P10/P50/P90) + **Conformalized Quantile Regression**
-  (Romano et al. 2019) → calibrated 80% coverage (raw 0.45–0.63 → 0.80).
-- **Held-out skill (GroupKFold OOF):** area R²=0.97, migration R²=0.98, compliance-conc R²=0.92,
-  P_ex R²=0.92, breach AUC=0.999. Top SHAP drivers: advective front `Xc`, source conc, dispersivity, time.
+### Phase 3 guardrails (v2 — enforced + honestly verified)
+- **No leakage, two skill numbers:** `GroupKFold(5)` on `scenario_id` (interpolation
+  skill) **and** leave-aquifer-out CV on `polygon_id` (new-hydrogeology skill,
+  enabled by jittered pins): area R² 0.94 / 0.92, migration 0.90 / 0.87,
+  compliance-conc 0.88 / 0.87, P_ex R² 0.94 (MAE 0.062).
+- **Per-target monotone maps** (`dataset.MONOTONE_MAPS`) — the shared v1 tuple
+  forced signs the physics violates. Q_out (the collinear constraint back-door)
+  is dropped. Verified **on-manifold** post-fit: the raw operating point is swept
+  through the inference feature builder, so coupled features move together —
+  area rises with Q_in at fixed Q_net and falls with bleed at fixed Q_in.
+- **Bands that mean something:** labels are MC P10/P50/P90 over parameter
+  uncertainty (Kd, local log-K, β, gradient×seasonality, dispersivity, bleed
+  drift; common random numbers). Conformal calibration is **honest Mondrian
+  split-CQR**: OOF conformity scores aggregated per (regime×species cell ×
+  scenario) by max, δ from a 50% calibration split, coverage reported on the
+  untouched half — scenario-level ≈ 0.80–0.82, every cell ≥ 0.88 row-level
+  (fractured/uranium included), top-5% tail ≈ 0.89–0.91. The v1 pipeline
+  evaluated coverage on the rows that set δ (an identity, not a validation).
+- **One risk number:** `excursion_probability` = breach fraction of the same MC
+  draws; the separate breach classifier is retired.
 
-## Targets produced for Phase 3
-`affected_area_ha` · `max_migration_distance_m` · `peak_conc` / `delta_peak` ·
-`compliance_conc` · `breaches_bis` (BIS breach at monitoring ring) ·
-`excursion_probability` (Monte-Carlo over Kd/β/gradient/dispersivity uncertainty).
+Top SHAP drivers (v2): dispersivity `alpha_L`, advective front `Xc_m`, wellfield
+width, clean-up front `Xc_clean_m`, source concentration.
+
+## Targets produced for Phase 3 (v2: distributional)
+`{affected_area_ha, max_migration_distance_m, compliance_conc}_{p10,p50,p90}` —
+Monte-Carlo parameter-uncertainty quantiles (Kd triangular, local log-K
+heterogeneity, β, gradient×seasonality, dispersivity, bleed drift; common
+random numbers across the whole run) · `excursion_probability` (breach fraction
+of the SAME draws — the separate breach classifier is retired) · deterministic
+central `affected_area_ha` / `compliance_conc` / `peak_conc` kept as reference.
 
 ## Key literature (cited inline in `config/parameters.py`)
 BIS IS 10500:2012 · WHO 2017 (U 30 µg/L) · EPA 402-R-99-004B (U Kd) · Davis/USGS Naturita

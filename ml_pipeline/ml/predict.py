@@ -1,8 +1,8 @@
 """
-ml_pipeline.ml.predict  (PHASE 3 -- inference API for the dashboard)
-==================================================================
-One module, two engines, identical output schema -- so the Phase-4 "Analytical
-vs ML Surrogate" toggle is a one-line switch:
+ml_pipeline.ml.predict  (PHASE 3 v2 -- inference API for the dashboard)
+=====================================================================
+One module, two engines, identical output schema -- so the "Analytical vs ML
+Surrogate" toggle is a one-line switch:
 
     out = predict(mode, **inputs)          # mode in {"analytical","ml"}
     out = {
@@ -10,17 +10,22 @@ vs ML Surrogate" toggle is a one-line switch:
        "migration_m":      {"p10","p50","p90"},
        "compliance_conc":  {"p10","p50","p90"},
        "excursion_probability": float,
-       "breach_probability":    float,
+       "breach_probability":    float,   # == excursion_probability (v2: the
+                                         # separate breach classifier is retired)
+       "off_scale": bool, "Xc_m": float,
     }
 
-ML path: XGBoost quantile heads + conformal calibration (fast, gives bands).
-Analytical path: the Domenico engine + Monte-Carlo excursion (ground truth).
+v2 band semantics: P10/P90 are PARAMETER-UNCERTAINTY quantiles (Kd, local K
+heterogeneity, beta, gradient/seasonality, dispersivity, bleed drift) learned
+from MC-labelled physics, conformally widened per regime x species (Mondrian
+split-CQR) to contain the true MC band at 80%.
 
-`inputs` are the same raw operating point the dashboard sliders produce:
+`inputs` are the raw operating point the dashboard produces:
   regime, K_m_day, gradient_i, phi_mobile, n_total, grain_density,
   kd_L_kg, beta, Q_in_m3_day, bleed_fraction, operation_years,
   wellfield_width_m, thickness_m, source_conc_C0, background_conc_Cb,
-  species, time_years.
+  species, time_years, restoration_years (opt), downtime_fraction (opt),
+  gradient_seasonal_amp (opt).
 """
 from __future__ import annotations
 
@@ -32,12 +37,21 @@ import pandas as pd
 import joblib
 
 from ml_pipeline.data_prep.feature_engineering import build_feature_row, FEATURE_COLUMNS
-from ml_pipeline.physics.transport import simulate_plume, effective_travel_distance
-from ml_pipeline.ml.dataset import MODEL_FEATURES, ARTIFACT_DIR, SPECIES_ONEHOT
+from ml_pipeline.physics.transport import simulate_plume, MAX_GRID_REACH_M
+from ml_pipeline.ml.dataset import MODEL_FEATURES, ARTIFACT_DIR, BANDS, cell_key
 from ml_pipeline.config import parameters as P
 
 SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
-COMPLIANCE_BUFFER_M = 100.0
+
+
+@functools.lru_cache(maxsize=1)
+def _restoration_residual() -> dict:
+    """Per-species residual source fraction (Texas post-restoration data)."""
+    try:
+        from ml_pipeline.data_prep.texas_loader import texas_restoration_residual
+        return texas_restoration_residual()
+    except Exception:
+        return dict(P.RESTORATION_FALLBACK_RESIDUAL)
 
 
 # --------------------------------------------------------------------------- #
@@ -47,20 +61,29 @@ def features_from_inputs(*, regime, K_m_day, gradient_i, phi_mobile, n_total,
                          grain_density, kd_L_kg, beta, Q_in_m3_day, bleed_fraction,
                          operation_years, wellfield_width_m, thickness_m,
                          source_conc_C0, background_conc_Cb, species,
-                         time_years) -> tuple[pd.DataFrame, dict, float]:
+                         time_years, restoration_years: float = 0.0,
+                         downtime_fraction: float = 0.0,
+                         gradient_seasonal_amp: float = 0.0
+                         ) -> tuple[pd.DataFrame, dict, float]:
     op_days = operation_years * 365.0
     t_days = time_years * 365.0
+    rest_days = max(float(restoration_years), 0.0) * 365.0
+    residual = _restoration_residual().get(species, 1.0) if rest_days > 0 else 1.0
     feat = build_feature_row(
         regime=regime, domain_is_texas=False, K_m_day=K_m_day, gradient_i=gradient_i,
         phi_mobile=phi_mobile, n_total=n_total, grain_density=grain_density,
         kd_L_kg=kd_L_kg, beta=beta, Q_in_m3_day=Q_in_m3_day,
         bleed_fraction=bleed_fraction, operation_days=op_days,
         wellfield_width_m=wellfield_width_m, thickness_m=thickness_m,
-        source_conc_C0=source_conc_C0, background_conc_Cb=background_conc_Cb)
-    Xc = effective_travel_distance(feat["contaminant_velocity_vc"],
-                                   feat["containment_eta"], t_days, op_days)
+        source_conc_C0=source_conc_C0, background_conc_Cb=background_conc_Cb,
+        eval_time_days=t_days, restoration_days=rest_days,
+        downtime_fraction=downtime_fraction,
+        gradient_seasonal_amp=gradient_seasonal_amp,
+        residual_fraction=residual)
+    Xc = feat["_Xc_eval_m"]                     # same kinematics as the labels
     row = {k: feat[k] for k in FEATURE_COLUMNS}
     row["Xc_m"] = Xc
+    row["Xc_clean_m"] = feat["_Xc_clean_m"]
     row["time_years"] = time_years
     row["is_post_closure"] = int(t_days > op_days)
     for sp in SPECIES:
@@ -70,39 +93,51 @@ def features_from_inputs(*, regime, K_m_day, gradient_i, phi_mobile, n_total,
 
 
 # --------------------------------------------------------------------------- #
-# ML surrogate
+# ML surrogate (v2: per-band models + Mondrian conformal deltas)
 # --------------------------------------------------------------------------- #
 class MLSurrogate:
     def __init__(self, artifact_dir: Path = ARTIFACT_DIR):
         self.dir = Path(artifact_dir)
         self.card = json.loads((self.dir / "model_card.json").read_text())
-        self.q_models = {t: joblib.load(self.dir / f"quantile_{t}.joblib")
-                         for t in self.card["quantile_targets"]}
+        if self.card.get("version", 1) < 2:
+            raise RuntimeError("model_card.json is v1 -- retrain with "
+                               "`python -m ml_pipeline.ml.train` on v2 data")
+        self.models = {t: {b: joblib.load(self.dir / f"band_{t}_{b}.joblib")
+                           for b in self.card["bands"]}
+                       for t in self.card["band_targets"]}
         self.pex = joblib.load(self.dir / "pex_regressor.joblib")
-        self.breach = joblib.load(self.dir / "breach_classifier.joblib")
         self.log_targets = set(self.card["log_targets"])
-        self.deltas = self.card["conformal_deltas"]
+        self.deltas = self.card["deltas"]
 
-    def _quantiles(self, target, X):
-        raw = np.asarray(self.q_models[target].predict(X))[0]   # [P10,P50,P90] transformed
-        d = self.deltas[target]
-        lo, mid, hi = raw[0] - d, raw[1], raw[2] + d            # conformal widen
+    def _bands(self, target: str, X: pd.DataFrame, cell: str) -> dict:
+        lo = float(self.models[target]["p10"].predict(X)[0])
+        mid = float(self.models[target]["p50"].predict(X)[0])
+        hi = float(self.models[target]["p90"].predict(X)[0])
+        # rearrange (heads can cross), then Mondrian conformal widening
+        lo, hi = min(lo, mid), max(hi, mid)
+        d = self.deltas[target].get(cell, 0.0)
+        lo, hi = lo - d, hi + d
         if target in self.log_targets:
             lo, mid, hi = np.expm1(lo), np.expm1(mid), np.expm1(hi)
         lo, mid, hi = (float(max(v, 0.0)) for v in (lo, mid, hi))
-        # Multi-quantile heads can cross per-row; rearrange so P10<=P50<=P90
-        # while keeping the median head as P50 (Chernozhukov et al. rearrangement).
         lo, hi = min(lo, mid), max(hi, mid)
         return {"p10": lo, "p50": mid, "p90": hi}
 
     def predict(self, **inputs) -> dict:
-        X, _, _ = features_from_inputs(**inputs)
+        X, _, Xc = features_from_inputs(**inputs)
+        cell = cell_key(inputs["regime"], inputs["species"])
+        p_ex = float(np.clip(self.pex.predict(X)[0], 0, 1))
         return {
-            "area_ha": self._quantiles("affected_area_ha", X),
-            "migration_m": self._quantiles("max_migration_distance_m", X),
-            "compliance_conc": self._quantiles("compliance_conc", X),
-            "excursion_probability": float(np.clip(self.pex.predict(X)[0], 0, 1)),
-            "breach_probability": float(self.breach.predict_proba(X)[0, 1]),
+            "area_ha": self._bands("affected_area_ha", X, cell),
+            "migration_m": self._bands("max_migration_distance_m", X, cell),
+            "compliance_conc": self._bands("compliance_conc", X, cell),
+            "excursion_probability": p_ex,
+            # v2: single coherent risk number (breach classifier retired)
+            "breach_probability": p_ex,
+            # area/migration models were trained with off-scale rows censored:
+            # beyond MAX_GRID_REACH the surrogate extrapolates -- flag it.
+            "off_scale": bool(Xc > MAX_GRID_REACH_M),
+            "Xc_m": float(Xc),
         }
 
 
@@ -112,36 +147,45 @@ def _surrogate() -> MLSurrogate:
 
 
 # --------------------------------------------------------------------------- #
-# Analytical engine (same schema; deterministic central + MC excursion)
+# Analytical engine (same schema; deterministic central + MC bands/excursion)
 # --------------------------------------------------------------------------- #
-def predict_analytical(*, n_mc: int = 24, seed: int = 0, **inputs) -> dict:
+def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
     species = inputs["species"]
     threshold = P.EXCURSION_THRESHOLDS[species]
+    rest_years = float(inputs.get("restoration_years", 0.0) or 0.0)
     X, feat, Xc = features_from_inputs(**inputs)
+    residual = feat["residual_fraction"]
     op_days = inputs["operation_years"] * 365.0
     t_days = inputs["time_years"] * 365.0
-    x_comp = inputs["wellfield_width_m"] / 2.0 + COMPLIANCE_BUFFER_M
 
     res = simulate_plume(feat, species_C0=inputs["source_conc_C0"],
                          background=inputs["background_conc_Cb"], threshold=threshold,
-                         t_days=t_days, operation_days=op_days, grid_n=200,
-                         compliance_x=x_comp)
+                         t_days=t_days, operation_days=op_days,
+                         restoration_days=rest_years * 365.0,
+                         residual_fraction=residual, grid_n=200,
+                         compliance_x=P.COMPLIANCE_BUFFER_M)
     m = res.metrics
 
     # excursion probability via the same parameter-uncertainty MC as Phase 2
-    from ml_pipeline.synthetic.generate import excursion_probability
+    from ml_pipeline.synthetic.generate import excursion_probability, mc_draws
     scn = dict(width=inputs["wellfield_width_m"], regime=inputs["regime"],
                K=inputs["K_m_day"], phi_mobile=inputs["phi_mobile"],
                n_total=inputs["n_total"], grain_density=inputs["grain_density"],
                beta=inputs["beta"], gradient=inputs["gradient_i"],
-               Q_in=inputs["Q_in_m3_day"], bleed=inputs["bleed_fraction"],
+               Q_in=inputs["Q_in_m3_day"],
+               Q_net=inputs["Q_in_m3_day"] * inputs["bleed_fraction"],
+               bleed=inputs["bleed_fraction"],
                thickness=inputs["thickness_m"],
+               downtime=float(inputs.get("downtime_fraction", 0.0) or 0.0),
+               seasonal_amp=float(inputs.get("gradient_seasonal_amp", 0.0) or 0.0),
                C0={species: inputs["source_conc_C0"]},
                Cb={species: inputs["background_conc_Cb"]})
-    rng = np.random.default_rng(seed)
-    p_ex = excursion_probability(scn, species, t_days, op_days, rng, n_mc)
+    draws = mc_draws(n_mc, seed)
+    p_ex = excursion_probability(scn, species, t_days, op_days, draws,
+                                 rest_days=rest_years * 365.0,
+                                 residual_fraction=residual)
 
-    def pt(v):  # analytical is a point estimate -> degenerate band
+    def pt(v):  # analytical central run is a point estimate -> degenerate band
         return {"p10": float(v), "p50": float(v), "p90": float(v)}
     return {
         "area_ha": pt(m["affected_area_ha"]),
@@ -149,6 +193,8 @@ def predict_analytical(*, n_mc: int = 24, seed: int = 0, **inputs) -> dict:
         "compliance_conc": pt(m["compliance_conc"]),
         "excursion_probability": float(p_ex),
         "breach_probability": float(m["breaches_at_compliance"]),
+        "off_scale": bool(m["off_scale"]),
+        "Xc_m": float(m["Xc_m"]),
         "_field": res,   # full plume grid for the heatmap
     }
 
@@ -168,13 +214,16 @@ if __name__ == "__main__":
                 wellfield_width_m=300, thickness_m=37.5, source_conc_C0=15000,
                 background_conc_Cb=2.0, species="uranium_ppb", time_years=10)
     a = predict("analytical", **demo)
-    m = predict("ml", **demo)
     print("ANALYTICAL  area=%.1f ha  migration=%.0f m  P_ex=%.2f  breach=%.0f"
           % (a["area_ha"]["p50"], a["migration_m"]["p50"], a["excursion_probability"],
              a["breach_probability"]))
-    print("ML P50      area=%.1f ha  migration=%.0f m  P_ex=%.2f  breach=%.2f"
-          % (m["area_ha"]["p50"], m["migration_m"]["p50"], m["excursion_probability"],
-             m["breach_probability"]))
-    print("ML bands    area[P10,P90]=[%.1f, %.1f]  migration[P10,P90]=[%.0f, %.0f]"
-          % (m["area_ha"]["p10"], m["area_ha"]["p90"],
-             m["migration_m"]["p10"], m["migration_m"]["p90"]))
+    try:
+        m = predict("ml", **demo)
+        print("ML P50      area=%.1f ha  migration=%.0f m  P_ex=%.2f"
+              % (m["area_ha"]["p50"], m["migration_m"]["p50"], m["excursion_probability"]))
+        print("ML bands    area[P10,P90]=[%.1f, %.1f]  migration[P10,P90]=[%.0f, %.0f]"
+              % (m["area_ha"]["p10"], m["area_ha"]["p90"],
+                 m["migration_m"]["p10"], m["migration_m"]["p90"]))
+    except (FileNotFoundError, RuntimeError) as e:
+        print(f"ML surrogate unavailable ({e}) -- run "
+              "`python -m ml_pipeline.ml.train` after regenerating v2 data.")

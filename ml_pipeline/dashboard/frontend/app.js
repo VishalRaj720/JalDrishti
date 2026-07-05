@@ -64,7 +64,8 @@ function setPin(lon, lat) {
 const sliders = [
   ["inj", "v-inj", v => v], ["bleed", "v-bleed", v => (+v).toFixed(1)],
   ["op", "v-op", v => v], ["grad", "v-grad", v => (+v).toFixed(4)],
-  ["time", "v-time", v => v], ["width", "v-width", v => v], ["az", "v-az", v => v],
+  ["time", "v-time", v => v], ["width", "v-width", v => v],
+  ["rest", "v-rest", v => v], ["az", "v-az", v => v],
 ];
 sliders.forEach(([id, lab, fmt]) => {
   const el = document.getElementById(id);
@@ -95,6 +96,7 @@ function payload() {
     injection_rate_m3_day: +val("inj"), bleed_percent: +val("bleed"),
     operation_years: +val("op"), gradient_i: +val("grad"),
     time_years: +val("time"), wellfield_width_m: +val("width"),
+    restoration_years: +val("rest"),
     azimuth_deg: +val("az"), mode: "both",
   };
 }
@@ -143,14 +145,23 @@ function render() {
     color: "#6fd1ff", weight: 1.6, dashArray: "6 5", fill: false,
   }).addTo(plumeLayer).bindTooltip(`Monitoring ring (${r.plume.compliance_ring.radius_m} m)`);
 
-  // ML migration envelope (only in ML mode)
+  // ML migration envelope (only in ML mode). When the request is outside the
+  // validated training envelope (or the front runs off the gridded reach), the
+  // conformal 80% guarantee is void here -> render amber + heavy dash and say so.
   if (state.mode === "ml" && r.ml_envelope) {
     const env = r.ml_envelope;
+    const mlm = r.metrics.ml;
+    const beyond = (r.extrapolation && r.extrapolation.length > 0) ||
+                   (mlm && mlm.off_scale);
+    const col = beyond ? "#ffb84d" : "#c08bff";
+    const note = beyond ? " · beyond validated range" : "";
     [["p90", 0.9], ["p50", 1.6], ["p10", 0.9]].forEach(([q, w]) => {
       if (!env[q]) return;
       L.polygon(ll(env[q]), {
-        color: "#c08bff", weight: w, dashArray: q === "p50" ? "2 0" : "4 6", fill: false, opacity: .9,
-      }).addTo(plumeLayer).bindTooltip(`ML migration ${q.toUpperCase()}`);
+        color: col, weight: w,
+        dashArray: beyond ? "2 7" : (q === "p50" ? "2 0" : "4 6"),
+        fill: false, opacity: beyond ? 1 : .9,
+      }).addTo(plumeLayer).bindTooltip(`ML migration ${q.toUpperCase()}${note}`);
     });
   }
 
@@ -164,15 +175,16 @@ function renderMetrics(r) {
 
   // status line
   document.getElementById("ml-status").textContent =
-    r.ml_status === "ok" ? (useML ? "Showing ML surrogate with conformal P10–P90 bands."
+    r.ml_status === "ok" ? (useML ? "ML surrogate — P10–P90 = parameter uncertainty (Kd, K heterogeneity, gradient, dispersivity), conformally calibrated per regime & species."
                                   : "Showing deterministic analytical engine.")
                          : `ML surrogate ${r.ml_status} — showing analytical.`;
 
   if (useML) {
+    const beyond = (r.extrapolation && r.extrapolation.length > 0) || m.off_scale;
     setNum("m-area", m.area_ha.p50.toFixed(1));
-    band("m-area-band", m.area_ha, "ha");
+    band("m-area-band", m.area_ha, "ha", beyond);
     setNum("m-dist", m.migration_m.p50.toFixed(0));
-    band("m-dist-band", m.migration_m, "m");
+    band("m-dist-band", m.migration_m, "m", beyond);
     pct("m-pex", m.excursion_probability);
     breach("m-breach", m.breach_probability >= 0.5);
     document.getElementById("m-bnd").textContent = fmtC(m.compliance_conc.p50, U);
@@ -187,12 +199,53 @@ function renderMetrics(r) {
   }
   document.getElementById("m-peak").textContent = fmtC(r.plume.peak_conc, U);
   document.getElementById("env-legend").style.opacity = (state.mode === "ml") ? 1 : .35;
+
+  // extrapolation / off-scale warnings
+  const warns = [];
+  const beyondML = useML && ((r.extrapolation && r.extrapolation.length > 0) || m.off_scale);
+  if (r.extrapolation && r.extrapolation.length)
+    warns.push(`Outside the ML training range (${r.extrapolation.join(", ")}).`);
+  if (useML && m.off_scale)
+    warns.push("Front beyond the validated grid reach.");
+  else if (!useML && r.plume.off_scale)
+    warns.push("Front beyond the gridded domain — area/distance are lower bounds.");
+  // The analytical engine is a physics solver with NO training range: it stays
+  // valid at any input. When the ML bands are void, surface it as the fallback.
+  if (beyondML) {
+    const a = r.metrics.analytical;
+    warns.push(`ML bands are unvalidated here — analytical physics estimate (valid at any input): `
+      + `area ${a.area_ha.toFixed(1)} ha · migration ${a.migration_m.toFixed(0)} m · `
+      + `boundary ${fmtC(a.compliance_conc, U)}.`);
+  }
+  const wb = document.getElementById("warn-banner");
+  wb.textContent = warns.join(" ");
+  wb.classList.toggle("hidden", warns.length === 0);
+
+  // hydro readout: show retardation Rd (why a plume is slow) + regime-override note
+  renderHydro(r.hydro);
+}
+
+function renderHydro(h) {
+  const el = document.getElementById("hydro-line");
+  if (!el || !h) return;
+  const parts = [`Rd≈<b>${h.retardation_Rd}</b>`, `φ=<b>${h.phi_mobile}</b>`,
+                 `Kd=<b>${h.Kd_L_kg}</b> L/kg`];
+  let note = "";
+  if (h.regime_overridden)
+    note = `<span class="muted"> · regime overridden to <b>${h.regime}</b> `
+         + `(natural: ${h.natural_regime}) — using representative ${h.regime} materials</span>`;
+  el.innerHTML = parts.join(" · ") + note;
 }
 
 /* ---------------- helpers ---------------- */
 function setNum(id, v) { document.getElementById(id).textContent = v; }
-function band(id, b, u) {
-  document.getElementById(id).textContent = `P10–P90: ${b.p10.toFixed(u === "ha" ? 1 : 0)}–${b.p90.toFixed(u === "ha" ? 1 : 0)} ${u}`;
+function band(id, b, u, beyond) {
+  const d = u === "ha" ? 1 : 0;
+  const el = document.getElementById(id);
+  const tag = beyond ? "⚠ extrapolated (80% guarantee void)"
+                     : "parameter uncertainty · 80% conformal";
+  el.textContent = `P10–P90: ${b.p10.toFixed(d)}–${b.p90.toFixed(d)} ${u} · ${tag}`;
+  el.classList.toggle("beyond", !!beyond);
 }
 function pct(id, p) { document.getElementById(id).textContent = (p * 100).toFixed(0); }
 function breach(id, yes) {
@@ -205,6 +258,25 @@ function fmtC(v, u) {
   return (v >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(1)) + " " + u;
 }
 function spinner(on) { document.getElementById("spinner").classList.toggle("hidden", !on); }
+
+/* ---------------- drift monitor poll ---------------- */
+function pollDrift() {
+  fetch(`${API}/api/drift`).then(r => r.json()).then(d => {
+    const el = document.getElementById("drift-badge");
+    if (!el) return;
+    if (d.drifting) {
+      const bad = Object.entries(d.per_metric)
+        .filter(([, v]) => v.drifting)
+        .map(([k, v]) => `${k} ${(v.median_rel * 100).toFixed(0)}%`);
+      el.textContent = `⚠ Surrogate drift: analytical vs ML median gap high on ${bad.join(", ")} `
+        + `(over ${d.n_requests} requests). Retrain or restrict inputs.`;
+      el.classList.add("on");
+    } else {
+      el.classList.remove("on");
+    }
+  }).catch(() => {});
+}
+setInterval(pollDrift, 20000);
 
 /* default pin so the app shows something immediately (E. Singhbhum schist belt) */
 setTimeout(() => setPin(86.2, 22.8), 400);

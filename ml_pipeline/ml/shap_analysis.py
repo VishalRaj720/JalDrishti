@@ -50,9 +50,9 @@ def run():
     X = df[MODEL_FEATURES].astype(float).sample(min(SAMPLE_N, len(df)), random_state=0)
 
     jobs = {
-        "area_p50": (joblib.load(ARTIFACT_DIR / "quantile_affected_area_ha.joblib"), 1),
+        "area_p50": (joblib.load(ARTIFACT_DIR / "band_affected_area_ha_p50.joblib"), None),
+        "migration_p50": (joblib.load(ARTIFACT_DIR / "band_max_migration_distance_m_p50.joblib"), None),
         "excursion_probability": (joblib.load(ARTIFACT_DIR / "pex_regressor.joblib"), None),
-        "breach_classifier": (joblib.load(ARTIFACT_DIR / "breach_classifier.joblib"), None),
     }
     results = {}
     for name, (model, p50) in jobs.items():

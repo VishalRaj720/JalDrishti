@@ -126,6 +126,9 @@ def load_jharkhand_water_quality() -> pd.DataFrame:
         "tds_mg_l": ec * EC_TO_TDS_FACTOR,   # EC -> TDS [Freeze & Cherry]
         "fluoride_mg_l": num("F (mg/L)"),
         "nitrate_mg_l": num("NO3"),
+        # carbonate system -- controls uranium Kd under alkaline ISR [DAVIS, EPA99]
+        "hco3_mg_l": num("HCO3"),
+        "co3_mg_l": num("CO3 (mg/L)"),
     })
     return out.dropna(subset=["longitude", "latitude"]).reset_index(drop=True)
 
@@ -162,6 +165,7 @@ def baseline_at_point(lon: float, lat: float, wq: pd.DataFrame | None = None) ->
         "sulfate_mg_l": float(r["sulfate_mg_l"]) if pd.notna(r["sulfate_mg_l"]) else np.nan,
         "tds_mg_l": float(r["tds_mg_l"]) if pd.notna(r["tds_mg_l"]) else np.nan,
         "ph": float(r["ph"]) if pd.notna(r["ph"]) else np.nan,
+        "hco3_mg_l": float(r["hco3_mg_l"]) if pd.notna(r.get("hco3_mg_l")) else np.nan,
         "district": r.get("district"),
         "dist_deg": float(np.sqrt(d2.min())),
     }

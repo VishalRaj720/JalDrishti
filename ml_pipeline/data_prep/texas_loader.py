@@ -49,6 +49,15 @@ def parse_numeric_range(value) -> tuple[float, float, float]:
     s = str(value).strip()
     if s in {"", "-", "NaN", "nan", "Not available", "Not Found"}:
         return (np.nan, np.nan, np.nan)
+    # Plain numerics INCLUDING scientific notation ('8.15E+10') first -- the
+    # regex path below would split the mantissa and exponent into two numbers.
+    try:
+        f = float(s)
+        if np.isfinite(f):
+            return (f, f, f)
+        return (np.nan, np.nan, np.nan)
+    except ValueError:
+        pass
     s_clean = s.replace("%", "").replace(">", " ").replace("<", " ").replace("~", " ")
     s_clean = s_clean.replace("Upto", " ").replace("upto", " ").replace("Up to", " ")
     # A hyphen BETWEEN two digits is a range separator ("20-300"), not a minus
@@ -254,6 +263,28 @@ def texas_source_signature() -> dict[str, tuple[float, float]]:
     return out
 
 
+def texas_restoration_residual() -> dict[str, float]:
+    """Per-species residual source fraction after restoration, derived from the
+    real sheets:  residual = median('Final Post-restoration') / median('End of
+    Mining').  This is the C_rest/C0 step applied by the transport engine's
+    restoration superposition. Clipped to [0.02, 1.0]; falls back to config
+    values when a sheet is too sparse.
+    """
+    from ml_pipeline.config.parameters import RESTORATION_FALLBACK_RESIDUAL
+    geo = load_texas_geochem()
+    eom, post = geo["End of Mining"], geo["Final Post-restoration"]
+    mapping = {"uranium_ppb": "Uranium", "sulfate_mg_l": "Sulfate", "tds_mg_l": "TDS"}
+    out = {}
+    for key, col in mapping.items():
+        e = pd.to_numeric(eom.get(col), errors="coerce").dropna() if col in eom else pd.Series(dtype=float)
+        p = pd.to_numeric(post.get(col), errors="coerce").dropna() if col in post else pd.Series(dtype=float)
+        if len(e) >= 2 and len(p) >= 2 and e.median() > 0:
+            out[key] = float(np.clip(p.median() / e.median(), 0.02, 1.0))
+        else:
+            out[key] = RESTORATION_FALLBACK_RESIDUAL[key]
+    return out
+
+
 if __name__ == "__main__":
     geo = load_texas_geochem()
     for k, v in geo.items():
@@ -270,3 +301,4 @@ if __name__ == "__main__":
     ops = load_operations()
     print("[operations] leachants=", sorted(set(ops["leachant"]) - {""}))
     print("[source signature]", texas_source_signature())
+    print("[restoration residual C_rest/C0]", texas_restoration_residual())

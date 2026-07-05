@@ -78,6 +78,20 @@ EXCURSION_THRESHOLDS = {
     "tds_mg_l": BIS_LIMITS["tds_mg_l"][1],
 }
 
+# Monitoring/compliance ring distance DOWNGRADIENT OF THE WELLFIELD EDGE.
+# The Domenico source plane sits at the downgradient edge (conservative areal-
+# source convention), so the ring is at x = COMPLIANCE_BUFFER_M in solver
+# coordinates and at (W/2 + COMPLIANCE_BUFFER_M) from the wellfield centre pin.
+# Single source of truth -- generate.py / predict.py / server.py import this.
+COMPLIANCE_BUFFER_M = 100.0
+
+# Excursions are scored on the MINING-ATTRIBUTABLE (incremental) concentration:
+#   breach if C_plume >= max(threshold - background, INCREMENTAL_FLOOR*threshold)
+# The floor keeps the criterion meaningful when the ambient baseline already
+# sits at/above the limit (otherwise any pin in naturally poor water would
+# "breach" over the whole grid regardless of the mine).
+INCREMENTAL_FLOOR = 0.10
+
 # EC (uS/cm) -> TDS (mg/L). waterQuality_jharkhand.csv has EC but not TDS.
 # Factor 0.55-0.75 typical; 0.64 standard for mixed groundwater. [Freeze & Cherry]
 EC_TO_TDS_FACTOR = 0.64
@@ -196,6 +210,10 @@ KD_RANGES = {  # L/kg
 #    beta = theta_immobile / theta_mobile  (capacity ratio). Matrix diffusion
 #    stores solute -> extra retardation + tailing. [Goltz & Roberts 1986]
 #    Only applied when regime == "fractured" (toggle in dashboard).
+#    mass_transfer_omega drives the TIME-DEPENDENT apparent retardation
+#    R_app(t) = 1 + beta*(1 - exp(-omega*t*(1+beta)/beta)): the front travels
+#    unretarded at early time (matrix uptake immature) and approaches the
+#    asymptotic 1+beta at late time. [Goltz & Roberts 1986 first-order model]
 # ---------------------------------------------------------------------------
 DUAL_POROSITY = {
     "enabled_for": ("fractured",),
@@ -204,28 +222,141 @@ DUAL_POROSITY = {
 }
 
 # ---------------------------------------------------------------------------
-# 6. Operational envelope for the synthetic loop (Phase 2) -- realistic ISR ranges.
-#    Q_in injection, bleed fraction (Q_out = Q_in*(1+bleed)), operation years.
-#    Texas bleed is typically 0.5-3 % to hold the cone of depression. [ISRGOL]
+# 5b. Discrete-fracture matrix-diffusion kernel (fractured regime).
+#     Tang, Frind & Sudicky (1981) / Neretnieks (1980) zero-fracture-dispersion
+#     solution: C/C0 = erfc[ sigma * t_w / (2*sqrt(t - t_w)) ], with the
+#     matrix-diffusion group
+#         sigma = theta_m * sqrt(R_m * De) / b_half        [1/sqrt(day)]
+#     (theta_m matrix porosity, R_m matrix retardation -- where Kd finally
+#     acts in fractured rock -- De effective matrix diffusion, b_half the
+#     fracture HALF-aperture). Small aperture => huge flow-wetted surface =>
+#     strong attenuation; open fractures => early far breakthrough.
 # ---------------------------------------------------------------------------
-OPERATIONAL_RANGES = {
-    "injection_rate_m3_day": (200.0, 5000.0),   # wellfield-scale Q_in
-    "bleed_fraction":        (0.005, 0.030),    # (Q_out - Q_in)/Q_in
-    "operation_years":       (1.0, 12.0),       # active mining duration
-    "horizon_years":         (0.0, 20.0),       # total sim time incl. post-closure
-    "hydraulic_gradient":    (0.0005, 0.02),    # dimensionless i (dashboard slider)
-    "wellfield_width_m":     (100.0, 800.0),    # source half-width proxy
+FRACTURE = {
+    # full hydraulic aperture 2b (m): (low, central, high). Crystalline-rock
+    # apertures 50-500 um. [Neretnieks 1980; Tang et al. 1981; Freeze & Cherry]
+    "full_aperture_m": (1.0e-4, 2.5e-4, 5.0e-4),
+    # effective matrix diffusion coefficient De = tau * D0 (m2/day);
+    # D0 ~ 5-7e-10 m2/s, tortuosity ~0.1 => ~5e-6 m2/day. [Neretnieks 1980]
+    "De_m2_day": 5.0e-6,
 }
 
-# Lixiviant-contacted SOURCE zone grows (capped) with gross pore-volume
-# throughput PV: injecting more solution over more time flushes/contacts a
-# larger rock volume, enlarging the contaminated source. This makes the
-# hydrogeology law "higher injection -> larger plume" hold in the physics itself
-# (so the Phase-3 monotone +1 on Q_in is faithful, not forced), while BLEED /
-# containment still governs downgradient excursion. tanh-saturating so the
-# source can never blow up beyond (1 + SOURCE_PV_GAIN) x the permitted width.
-SOURCE_PV_GAIN = 0.40    # max +40% effective source width at high throughput
-SOURCE_PV_REF = 8.0      # pore-volume scale at which widening half-saturates
+# ---------------------------------------------------------------------------
+# 5c. Alkalinity control on uranium Kd (CORRECTED 2026-07 regime audit).
+#     Uranyl-carbonate complexation suppresses U sorption -> higher carbonate
+#     lowers Kd. CRITICAL CONTEXT: this surrogate models an ALKALINE-ISR plume,
+#     which CARRIES its own lixiviant carbonate (NaHCO3, 500-1000+ mg/L). So in
+#     the near/mid field the carbonate that controls Kd is lixiviant-dominated
+#     and HIGH regardless of the AMBIENT bicarbonate. The KD_RANGES values above
+#     already encode this alkaline suppression (that is why porous U Kd is
+#     0.5-2.5, not the 10+ of neutral groundwater).
+#
+#     Therefore ambient HCO3 may only push Kd DOWN further (extra suppression in
+#     already-carbonate-rich groundwater) -- it must NEVER amplify Kd above the
+#     central alkaline value. The pre-audit version amplified at low ambient HCO3
+#     (scale > 1), which -- stacked on a mismatched porosity from the regime
+#     toggle -- produced an unphysical Rd ~ 635 and a frozen plume.
+#
+#     NOTE: the plume Kd used by the transport engine is sampled from KD_RANGES
+#     directly (train == serve). This helper is retained for OPTIONAL ambient
+#     far-field context only; it is not applied to the near-field plume Kd.
+# ---------------------------------------------------------------------------
+KD_ALKALINITY = {"ref_hco3_mg_l": 300.0, "exponent": 1.3}
+
+def alkalinity_adjusted_kd(kd_central: float, hco3_mg_l: float | None,
+                           kd_lo: float, kd_hi: float) -> float:
+    """Ambient-alkalinity Kd modifier, SUPPRESSION-ONLY. Returns kd_central when
+    HCO3 is unknown or low; only high ambient carbonate lowers Kd. Never exceeds
+    kd_central (the alkaline-ISR plume already carries suppressing carbonate)."""
+    if hco3_mg_l is None or not (hco3_mg_l == hco3_mg_l) or hco3_mg_l <= 0:
+        return kd_central
+    scale = (hco3_mg_l / KD_ALKALINITY["ref_hco3_mg_l"]) ** (-KD_ALKALINITY["exponent"])
+    scale = min(scale, 1.0)                      # suppression-only: never amplify
+    return float(min(max(kd_central * scale, kd_lo), kd_hi))
+
+# ---------------------------------------------------------------------------
+# 5c-bis. Regime material archetypes (2026-07 regime audit fix).
+#     The dashboard's regime toggle asks "what if this site behaved as
+#     fractured / weathered-porous instead?". Transport style then depends on
+#     the MATERIAL (mobile & total porosity, grain density), not just the
+#     equation branch. Reusing the pin's crystalline materials under the porous
+#     branch built a physics chimera (schist porosity n_total=0.03 into porous
+#     bulk sorption -> Rd ~ 635). When the user overrides the regime AWAY from
+#     the pin's natural regime, substitute these regime-typical materials so the
+#     hypothetical rock is internally consistent. K (measured T/b) and thickness
+#     stay from the pin -- they are the location's data. [Freeze & Cherry 1979]
+# ---------------------------------------------------------------------------
+#     Values are chosen to be REPRESENTATIVE of, and INSIDE, each regime's
+#     training support (so the ML surrogate stays valid under the toggle rather
+#     than always tripping the OOD guard). Porous phi_mobile 0.06 sits in the
+#     training porous range [0.01, 0.08]; n_total from TOTAL_POROSITY typicals.
+REGIME_ARCHETYPE = {
+    "fractured": {"phi_mobile": 0.008, "n_total": 0.03, "grain_density": 2700.0},
+    "porous":    {"phi_mobile": 0.060, "n_total": 0.30, "grain_density": 2650.0},
+}
+
+# ---------------------------------------------------------------------------
+# 5d. Restoration (aquifer clean-up) phase. Texas practice: multi-pore-volume
+#     sweep with strong net extraction after mining stops. Modelled as:
+#     front HELD during restoration (active hydraulic control), source strength
+#     stepped down to residual_fraction * C0 at the end of restoration, and a
+#     clean-water replacement front launched from the source plane (Domenico
+#     superposition). residual_fraction is derived at runtime from the Texas
+#     'Final Post-restoration' / 'End of Mining' sheets; these are fallbacks.
+# ---------------------------------------------------------------------------
+RESTORATION_FALLBACK_RESIDUAL = {
+    "uranium_ppb": 0.30, "sulfate_mg_l": 0.50, "tds_mg_l": 0.50,
+}
+
+# ---------------------------------------------------------------------------
+# 6. Operational envelope for the synthetic loop (Phase 2) -- realistic ISR ranges,
+#    WIDENED (2026-07 review) to cover the dashboard sliders so served inputs
+#    stay inside training support. Q_in injection, bleed fraction
+#    (Q_out = Q_in*(1+bleed)), operation years. Texas *production* bleed is
+#    typically 0.5-3 %; the range extends to 0-8 % to cover no-bleed failure
+#    states and aggressive containment. [ISRGOL]
+# ---------------------------------------------------------------------------
+OPERATIONAL_RANGES = {
+    "injection_rate_m3_day": (200.0, 8000.0),   # wellfield-scale Q_in
+    # DECOUPLED containment knob (Phase-2 v2): net extraction Q_net = Q_out-Q_in
+    # is sampled INDEPENDENTLY of Q_in (clipped to <= 10% of Q_in), so the model
+    # can separate "more throughput" from "more capture". bleed_fraction is the
+    # derived diagnostic Q_net/Q_in and its envelope is the clip bound.
+    "net_extraction_m3_day": (0.0, 400.0),
+    "bleed_fraction":        (0.0, 0.10),       # derived: Q_net/Q_in (clip bound)
+    "operation_years":       (1.0, 20.0),       # active mining duration
+    "horizon_years":         (0.0, 20.0),       # total sim time incl. post-closure
+    "hydraulic_gradient":    (0.0005, 0.02),    # dimensionless i (dashboard slider)
+    "wellfield_width_m":     (100.0, 800.0),    # source full-width
+    "restoration_years":     (0.0, 10.0),       # post-mining clean-up sweep
+}
+
+# Operational irregularities (Phase-2 v2): industrial reality injected into the
+# synthetic loop. Downtime episodes suspend hydraulic capture (eta -> 0 while
+# the pumps are down => effective eta = eta*(1 - downtime_fraction)); the
+# seasonal gradient amplitude and bleed drift enter the parameter-uncertainty
+# Monte Carlo (they widen the outcome distribution rather than shift the mean).
+# Placeholder ranges -- to be re-fit from TCEQ excursion records + the CGWB
+# water-level seasonality (plan Phase 5).
+IRREGULARITY = {
+    "downtime_episodes_per_year": (0.0, 2.0),
+    "downtime_days_per_episode":  (5.0, 30.0),
+    "downtime_fraction_max":      0.30,
+    "gradient_seasonal_amp":      (0.0, 0.40),   # relative seasonal swing of i
+    "qnet_drift_mult":            (0.6, 1.3),    # bleed-stream drift (MC)
+    "restoration_prob":           0.5,           # scenarios with a restoration phase
+    "residual_noise_mult":        (0.7, 1.5),    # spread around Texas residuals
+}
+
+# Lixiviant-contacted SOURCE zone grows (capped) with cumulative throughput.
+# Driver = BULK volumes injected, BV = Q_in * min(t, t_op) / V_pattern_bulk
+# (pattern bulk volume pi*(W/2)^2*b) -- porosity-independent by design, so the
+# coupling stays LIVE in fractured rock (tiny phi) instead of saturating, and
+# time-consistent: at t < t_op only the volume injected SO FAR widens the source.
+#   W_eff(t) = W * (1 + SOURCE_BV_GAIN * tanh(BV(t) / SOURCE_BV_REF))
+# tanh-saturating so the source never exceeds (1 + gain) x the permitted width.
+SOURCE_BV_GAIN = 0.40    # max +40% effective source width at high throughput
+SOURCE_BV_REF = 2.0      # bulk pattern volumes at which widening half-saturates
 
 # Source-term signatures (end-of-mining minus baseline) are derived at runtime
 # from the Texas sheets; these are only fallbacks if those rows are unusable.

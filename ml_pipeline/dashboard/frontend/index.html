@@ -19,6 +19,7 @@
     <section class="card pin-card">
       <div class="card-title">① Drop a pin on the map</div>
       <div id="pin-info" class="pin-info muted">Click anywhere in Jharkhand to select an ISR site…</div>
+      <div id="hydro-line" class="pin-info small" style="margin-top:6px"></div>
     </section>
 
     <section class="card">
@@ -45,11 +46,13 @@
       <div class="slider"><label>Operation duration <span class="u">yr</span><b id="v-op">8</b></label>
         <input type="range" id="op" min="1" max="20" step="0.5" value="8"></div>
       <div class="slider"><label>Hydraulic gradient <span class="u">i</span><b id="v-grad">0.005</b></label>
-        <input type="range" id="grad" min="0.0005" max="0.03" step="0.0005" value="0.005"></div>
+        <input type="range" id="grad" min="0.0005" max="0.02" step="0.0005" value="0.005"></div>
       <div class="slider"><label>Evaluation time <span class="u">yr</span><b id="v-time">10</b></label>
         <input type="range" id="time" min="0" max="20" step="0.5" value="10"></div>
       <div class="slider"><label>Wellfield width <span class="u">m</span><b id="v-width">300</b></label>
-        <input type="range" id="width" min="50" max="1200" step="10" value="300"></div>
+        <input type="range" id="width" min="100" max="800" step="10" value="300"></div>
+      <div class="slider"><label>Restoration sweep <span class="u">yr</span><b id="v-rest">0</b></label>
+        <input type="range" id="rest" min="0" max="10" step="0.5" value="0"></div>
       <div class="slider azimuth"><label>Fracture strike azimuth <span class="u">°</span><b id="v-az">45</b></label>
         <input type="range" id="az" min="0" max="360" step="5" value="45"></div>
     </section>
@@ -61,6 +64,8 @@
         <button data-v="analytical">Analytical engine</button>
       </div>
       <div id="ml-status" class="muted small"></div>
+      <div id="warn-banner" class="banner hidden"></div>
+      <div id="drift-badge"></div>
     </section>
 
     <section class="metrics">
