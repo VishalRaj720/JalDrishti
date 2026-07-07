@@ -1,0 +1,32 @@
+{
+  "grid_km": 5.0,
+  "radius_km": 30.0,
+  "min_segments": 20,
+  "sigma_km": 15.0,
+  "n_segments_total": 1826,
+  "structural_classes": {
+    "Structural Lineaments-Dyke": 39,
+    "Structural Lineaments-Joint/Fracture": 799,
+    "Structural Lineaments-Axial trace of fold": 8,
+    "Structural Lineaments-Fault": 9,
+    "Structural Lineaments-Shear Zone": 15
+  },
+  "grid_shape": [
+    82,
+    97
+  ],
+  "cells_in_jh": 3247,
+  "supported_cells": 2597,
+  "global_mean_strike_deg": 79.5,
+  "global_V": 0.676,
+  "mean_strike_pctiles": [
+    69.5,
+    79.5,
+    89.9
+  ],
+  "V_pctiles": [
+    0.361,
+    0.628,
+    0.779
+  ]
+}
