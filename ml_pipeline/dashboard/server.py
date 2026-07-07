@@ -241,13 +241,17 @@ def api_predict(req: PredictRequest):
     L_disp = max(fm["Xc_m"], inputs["wellfield_width_m"], 1.0)
     alpha_L = P.longitudinal_dispersivity(L_disp)
     from ml_pipeline.physics.transport import shallow_impact_screening
+    # D3: per-district shallow-aquifer base from the NAQUIM reports (falls back to
+    # the state-wide VERTICAL default for districts without a report).
+    from ml_pipeline.data_prep.naquim_vertical import vertical_params_at
+    vparams = vertical_params_at(req.lon, req.lat)
     vertical = shallow_impact_screening(
         C0=inputs["source_conc_C0"], background=inputs["background_conc_Cb"],
         threshold=threshold, Xc_m=fm["Xc_m"],
         source_width_m=inputs["wellfield_width_m"], alpha_L=alpha_L,
         alpha_V=alpha_L * P.VERTICAL["alpha_V_ratio"],
         ore_depth_m=req.ore_depth_m, ore_thickness_m=req.ore_thickness_m,
-        layer1_base_m=P.VERTICAL["layer1_base_m"], K_m_day=inputs["K_m_day"],
+        layer1_base_m=vparams["layer1_base_m"], K_m_day=inputs["K_m_day"],
         # confining Layer-2 porosity is FIXED (fractured bedrock, not the ore
         # regime); the regime enters through vertical anisotropy Kv/Kh instead.
         phi_confining=P.VERTICAL["phi_confining"],
@@ -255,6 +259,13 @@ def api_predict(req: PredictRequest):
         upward_gradient=P.VERTICAL["upward_gradient"],
         t_days=req.time_years * 365.0,
         wellbore_failure_prob=P.VERTICAL["wellbore_failure_prob"])
+    # D3: attach per-district provenance for the shallow-aquifer base
+    vertical["district"] = vparams["district"]
+    vertical["layer1_base_source"] = vparams["source"]
+    vertical["layer1_base_confidence"] = vparams["confidence"]
+    if vparams["fracture_min_m"] is not None:
+        vertical["fractured_aquifer_range_m"] = [vparams["fracture_min_m"],
+                                                 vparams["fracture_max_m"]]
 
     # Module 2: user-facing ore-zone notice (uranium only)
     ore = hydro.get("ore_zone", {})

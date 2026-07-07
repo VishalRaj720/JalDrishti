@@ -1,0 +1,25 @@
+district,layer1_base_m,fracture_min_m,fracture_max_m,aq2_confined,source,confidence,notes
+Bokaro,20,30,235,semi,Chandra-Nawadih & Dhanbad-block NAQUIM p18/p27,low,weathered granite-gneiss 0-30 m; WL 3.5-11.6 mbgl
+Chatra,22,20,173,semi,Chatra NAQUIM p21/p38-41,high,Aquifer-I bottom 12-30 m; fractures 20-173 m major to 120 m; WL 4-10 mbgl
+Deoghar,19,15,125,semi,Deoghar NAQUIM p22/p39,high,weathered 9-30 m avg 18.9; Aquifer-II 25-116 m; WL 2.6-12.5 mbgl
+Dhanbad,20,20,181,semi,Dhanbad NAQUIM p25-28,high,weathered 0-30 m (one VES 43); fractures 20-181 m; WL 4-10 mbgl
+Dumka,22,13,176,semi,Dumka NAQUIM p26/p31,high,weathering 6-41 m; fractures 13-176 m major to 100 m; WL 2-10.8 mbgl
+East Singhbum,20,20,258,yes,CGWB E-Singhbhum District Profile (belt; NAQUIM PDF broken),high,weathered 15-34 m; fractures 20-147 m to ~258 m; deep confined; WL 4-15 mbgl
+Garhwa,13,9,164,semi,Garhwa NAQUIM p25-28,high,weathered 5.6-35 m mostly <15; fractures 9-164 m; WL 3-16 mbgl
+Giridih,15,22,189,semi,Giridih NAQUIM p25-28,high,weathered 8-25 m (one 36); fractures 22-189 m major to 100 m; WL 3.3-13 mbgl
+Godda,20,17,100,semi,Godda NAQUIM p29/p48,high,weathered 9-30 m; Aquifer-II 17-100 m; WL 2.1-13 mbgl
+Gumla,18,17,160,semi,Gumla NAQUIM p26/p42,high,weathered residuum 10-33 m; Aquifer-II 1.8-160 m; WL 0.3-12.5 mbgl
+Hazaribagh,15,15,150,semi,regional estimate (no NAQUIM report; adjacent Giridih/Koderma/Ramgarh),regional_estimate,Chotanagpur granite-gneiss analogue
+Jamtara,20,12,140,semi,Jamtara NAQUIM p26-28,high,weathered 0-30 m; fractures 12-140 m; WL 4-10.7 mbgl
+Khunti,15,8,90,semi,Khunti & Khunti_lohar NAQUIM p17/p32,med,fractured wells 184-201 m deep; shallow fractures 8-29 m; WL 1.6-6 mbgl
+Koderma,13,19,140,semi,Koderma NAQUIM p33/p36,high,Aquifer-I bottom 3-16 m weathered 6-25; Aquifer-II 19-140 m; WL 5-12.5 mbgl
+Latehar,16,11,182,semi,Latehar NAQUIM p23/p40,high,weathered 5.7-28 m; fractures 11-182 m major 15-130; WL 2.6-11.8 mbgl
+Lohardaga,22,11,130,semi,Lohardaga NAQUIM p22/p40,high,weathered residuum 15-30 m; Aquifer-II 13-109 m; WL 4.6-13.8 mbgl
+Pakur,14,12,181,semi,Pakur NAQUIM p24/p38-39,high,weathered basalt/laterite 6-36 m mostly 6-14; Aquifer-II 12-181 m; WL 2.2-11.5 mbgl
+Palamu,14,10,170,semi,regional estimate (no NAQUIM report; adjacent Garhwa/Latehar),regional_estimate,western granite-gneiss/Gondwana analogue
+Ramgarh,18,20,150,semi,regional estimate (no NAQUIM report; adjacent Ranchi/Bokaro/Hazaribagh),regional_estimate,Damodar-valley granite-gneiss analogue
+Ranchi,20,30,121,semi,Khelri-Lapung & Khunti_lohar NAQUIM p20/p32,med,weathered to 30 m; Aquifer-II 30-121 m; WL 1.3-16 mbgl
+Sahebganj,18,30,156,semi,Sahebganj NAQUIM p53-56,high,weathered basalt/laterite 5-29 m (to 60 locally); Aquifer-II 10-156 m; WL 2.8-14.8 mbgl
+Saraikela Kharsawan,20,20,200,yes,belt analogue (E/W Singhbhum; bundled NAQUIM PDF broken),med,Singhbhum craton; weathered ~15-25 m; deep confined fractures
+Simdega,18,11,182,semi,Simdega NAQUIM p22/p50-52,high,weathered 2.5-45 m Aquifer-I 5.5-24; Aquifer-II 11.5-182 m
+West Singhbhum,18,14,200,yes,W-Singhbhum NAQUIM p42-48,high,weathered 12-24 m (granite); productive fractures <45 m to 180-200; deep confined
