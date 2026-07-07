@@ -369,5 +369,65 @@ FALLBACK_SOURCE_CONC = {
 # Geographic bounds of Jharkhand (for validating dropped pins / dashboard map).
 JHARKHAND_BOUNDS = {"lon_min": 83.3, "lon_max": 88.0, "lat_min": 21.9, "lat_max": 25.5}
 
+# ---------------------------------------------------------------------------
+# 7. Ore-body masking (Module 2). ISR leaches uranium only where uranium ore
+#    exists; elsewhere the lixiviant perturbs non-radiological chemistry only.
+#    The 3-tier source-term policy for the URANIUM species:
+#      deposit -> full Texas-derived C0 (real ore)
+#      belt    -> BELT_C0_FRACTION x C0  (Singhbhum envelope = low-confidence,
+#                 explicitly hypothetical ore)
+#      none    -> trace only: max(NON_ORE_U_TRACE_MULT x ambient, floor). An
+#                 oxygenated alkaline lixiviant mobilizes a little U from ordinary
+#                 crustal rock (~2-4 ppm U), so "a few x ambient" is more honest
+#                 than exactly-baseline, and stays FAR below the BIS 30 ppb limit
+#                 -> the incremental uranium plume is ~zero by construction.
+#    Sulfate / TDS are untouched by tier (reagent chemistry exists wherever
+#    fluid is injected). The name below must match the CSV's envelope row.
+# ---------------------------------------------------------------------------
+ORE_BELT_NAME = "Singhbhum Thrust Belt (regional envelope)"
+ORE_DEPOSIT_BUFFER_DEG = 0.0045      # ~500 m halo around each surveyed deposit
+BELT_C0_FRACTION = 0.30              # prospective-belt hypothetical source strength
+NON_ORE_U_TRACE_MULT = 3.0          # trace-leach uranium = 3 x ambient background
+NON_ORE_U_TRACE_FLOOR_PPB = 5.0     # absolute floor for the trace term
+
+# ---------------------------------------------------------------------------
+# 8. Vertical stratification (Module 5A -- 2.5D). Hard-rock Jharkhand profile:
+#    Layer 1 (0-30 m)     weathered / saprolite PHREATIC aquifer -> village wells.
+#    Layer 2 (30 m..ore)  fractured bedrock, SEMI-confining -- anisotropic K, NOT
+#                         impermeable. Vertical fracture connectivity is exactly
+#                         the excursion pathway; there is rarely a clean aquitard.
+#    Layer 3 (ore_depth)  mineralized shear zone = hypothetical ISR target.
+#    The deep horizontal plume (2D area/migration/compliance) is UNCHANGED by
+#    this module: the plan-view solve is depth-integrated and the vertical factor
+#    is used ONLY in the shallow-impact screening below -- so those metrics keep
+#    their existing trained surrogate (no retraining). This adds a SCREENING
+#    estimate of how much could reach Layer 1 (transparent index, not calibrated).
+#    Defaults are chosen so the estimate DISCRIMINATES by depth / anisotropy /
+#    gradient rather than pinning at 0 or 1. Re-fit later from CGWB NAQUIM +
+#    UCIL/AMD vertical-excursion records (plan Phase 5/6).
+# ---------------------------------------------------------------------------
+VERTICAL = {
+    "layer1_base_m": 30.0,           # base of the shallow drinking-water aquifer
+    "alpha_V_ratio": 0.025,          # alpha_V / alpha_L (Gelhar 1992: 0.01-0.05)
+    # The confining Layer 2 is fractured HARD ROCK in both regime interpretations
+    # (it is the bedrock between saprolite and ore), so its mobile porosity is
+    # FIXED at the fractured value. Toggling the ORE-zone regime must not change
+    # the barrier's porosity -- feeding the ore regime's phi into the confining
+    # leakage was a conflation (fixed 2026-07-06): it made "porous" spuriously
+    # safer via a porosity that does not belong to the confining layer.
+    "phi_confining": 0.008,          # Layer-2 fractured-bedrock mobile porosity
+    # Vertical anisotropy Kv/Kh is where the regime DOES belong: fractured rock's
+    # sub-vertical joint sets raise vertical conductivity; weathered/porous is more
+    # layered (Kv << Kh). This is the physically-correct channel for "fractured is
+    # riskier vertically". [screening values -- re-fit from GSI Bhukosh structure]
+    "Kv_Kh_by_regime": {"fractured": 0.03, "porous": 0.008},
+    "upward_gradient": 0.005,        # net upward head gradient (injection driven)
+    "wellbore_failure_prob": 0.05,   # base rate: casing / legacy-borehole shortcut
+    "ore_depth_default_m": 150.0,
+    "ore_thickness_default_m": 20.0,
+    "ore_depth_range_m": (50.0, 600.0),
+    "ore_thickness_range_m": (2.0, 100.0),
+}
+
 # Reproducibility
 RANDOM_SEED = 42

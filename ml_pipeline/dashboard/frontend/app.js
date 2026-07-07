@@ -11,9 +11,52 @@ const state = {
 
 /* ---------------- map ---------------- */
 const map = L.map("map", { zoomControl: true }).setView([23.6, 85.3], 7);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-  attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 19,
-}).addTo(map);
+
+/* three toggleable basemaps: dark (default), light, satellite — no API keys */
+const BASEMAPS = {
+  dark: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 19,
+  }),
+  light: L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 19,
+  }),
+  satellite: L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { attribution: "Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+      maxZoom: 19 }),
+};
+state.mapStyle = "dark";
+BASEMAPS[state.mapStyle].addTo(map);
+document.getElementById("map").classList.add("bg-dark");
+
+function setMapStyle(style) {
+  if (style === state.mapStyle || !BASEMAPS[style]) return;
+  map.removeLayer(BASEMAPS[state.mapStyle]);
+  state.mapStyle = style;
+  BASEMAPS[style].addTo(map);
+  const el = document.getElementById("map");
+  el.classList.remove("bg-dark", "bg-light", "bg-sat");
+  el.classList.add(style === "satellite" ? "bg-sat" : `bg-${style}`);
+  document.querySelectorAll("#basemap-ctl button")
+    .forEach(b => b.classList.toggle("active", b.dataset.v === style));
+}
+
+const BasemapControl = L.Control.extend({
+  options: { position: "topright" },
+  onAdd() {
+    const div = L.DomUtil.create("div", "basemap-ctl");
+    div.id = "basemap-ctl";
+    div.innerHTML =
+      `<button data-v="dark" class="active" title="Dark map">Dark</button>` +
+      `<button data-v="light" title="Light map">Light</button>` +
+      `<button data-v="satellite" title="Satellite imagery">Satellite</button>`;
+    L.DomEvent.disableClickPropagation(div);
+    div.querySelectorAll("button").forEach(btn =>
+      btn.addEventListener("click", () => setMapStyle(btn.dataset.v)));
+    return div;
+  },
+});
+map.addControl(new BasemapControl());
 
 const plumeLayer = L.layerGroup().addTo(map);
 let pinMarker = null;
@@ -37,8 +80,60 @@ fetch(`${API}/api/aquifers`).then(r => r.json()).then(gj => {
   }).addTo(map);
 }).catch(() => {});
 
+/* ---------------- Module 1: state boundary (mask + client-side reject) ------ */
+let JH_RINGS = null;   // [[ [lon,lat], ... ], ...] exterior rings for point-in-poly
+
+function ringsFromGeom(geom) {
+  const polys = geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates];
+  return polys.map(poly => poly[0]);   // exterior ring of each part
+}
+function pointInRing(lon, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > lat) !== (yj > lat)) &&
+        (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function inJharkhand(lon, lat) {
+  if (!JH_RINGS) return true;             // not loaded yet -> let the server decide
+  return JH_RINGS.some(r => pointInRing(lon, lat, r));
+}
+
+fetch(`${API}/api/boundary`).then(r => r.json()).then(geom => {
+  JH_RINGS = ringsFromGeom(geom);
+  // inverse mask: a world rectangle with Jharkhand punched out (dims the outside)
+  const world = [[-85, -179], [-85, 179], [85, 179], [85, -179]];
+  L.polygon([world, ...JH_RINGS.map(ll)], {
+    stroke: false, fillColor: "#000", fillOpacity: 0.55, interactive: false,
+  }).addTo(map);
+  JH_RINGS.forEach(r => L.polygon(ll(r), {
+    color: "#6fd1ff", weight: 1.4, fill: false, interactive: false, opacity: 0.7,
+  }).addTo(map));
+}).catch(() => {});
+
+/* ---------------- Module 2: ore deposits + Singhbhum belt overlay ----------- */
+fetch(`${API}/api/ore`).then(r => r.json()).then(gj => {
+  L.geoJSON(gj, {
+    style: f => f.properties.tier === "deposit"
+      ? { color: "#ff2d2d", weight: 1.4, fillColor: "#ff2d2d", fillOpacity: 0.22 }
+      : { color: "#e8833a", weight: 1.2, dashArray: "5 5", fillColor: "#e8833a", fillOpacity: 0.05 },
+    onEachFeature: (f, layer) => layer.bindTooltip(
+      `${f.properties.tier === "deposit" ? "Uranium deposit" : "Prospective belt"}: <b>${f.properties.name}</b>`,
+      { className: "aq-tip", sticky: true }),
+  }).addTo(map);
+}).catch(() => {});
+
 /* ---------------- pin drop ---------------- */
-map.on("click", e => setPin(e.latlng.lng, e.latlng.lat));
+map.on("click", e => {
+  const lon = e.latlng.lng, lat = e.latlng.lat;
+  if (!inJharkhand(lon, lat)) {
+    toast("Outside Jharkhand — this tool has data only for the state.");
+    return;
+  }
+  setPin(lon, lat);
+});
 
 function setPin(lon, lat) {
   state.pin = { lon, lat };
@@ -47,7 +142,10 @@ function setPin(lon, lat) {
     radius: 7, color: "#fff", weight: 2, fillColor: "#ff2d2d", fillOpacity: 1,
   }).addTo(map).bindTooltip("ISR injection point", { direction: "top" });
 
-  fetch(`${API}/api/pin?lon=${lon}&lat=${lat}`).then(r => r.json()).then(info => {
+  fetch(`${API}/api/pin?lon=${lon}&lat=${lat}`).then(r => {
+    if (!r.ok) return r.json().then(e => { throw e; });
+    return r.json();
+  }).then(info => {
     const b = info.baseline || {};
     const bv = b[state.species];
     document.getElementById("pin-info").innerHTML =
@@ -56,8 +154,27 @@ function setPin(lon, lat) {
       `φ=<b>${info.phi_mobile}</b> · b≈<b>${info.thickness_m}</b> m<br>` +
       `<span class="muted small">Baseline ${SPECIES_NAME[state.species]}: ` +
       `${bv == null ? "n/a" : bv + " " + SPECIES_UNIT[state.species]}</span>`;
+    renderConfidence(info.data_confidence);
     runPredict();
+  }).catch(err => {
+    // out-of-bounds (422) or resolve failure: reject cleanly, no stale plume
+    if (pinMarker) map.removeLayer(pinMarker);
+    state.pin = null; plumeLayer.clearLayers();
+    const msg = (err && err.detail && err.detail.message) || "Could not resolve this location.";
+    toast(msg);
   });
+}
+
+function renderConfidence(dc) {
+  const el = document.getElementById("conf-line");
+  if (!el) return;
+  if (!dc || dc.level !== "low") { el.classList.add("hidden"); return; }
+  const bits = [];
+  if (dc.reasons.includes("outside_mapped_aquifer")) bits.push("pin outside mapped aquifers (borrowed K/φ)");
+  if (dc.reasons.includes("nearest_well_far"))
+    bits.push(`nearest water-quality well ≈ ${dc.nearest_well_km} km away`);
+  el.innerHTML = `⚠ Low data confidence: ${bits.join("; ")}.`;
+  el.classList.remove("hidden");
 }
 
 /* ---------------- controls ---------------- */
@@ -66,6 +183,7 @@ const sliders = [
   ["op", "v-op", v => v], ["grad", "v-grad", v => (+v).toFixed(4)],
   ["time", "v-time", v => v], ["width", "v-width", v => v],
   ["rest", "v-rest", v => v], ["az", "v-az", v => v],
+  ["oredepth", "v-oredepth", v => v], ["orethick", "v-orethick", v => v],
 ];
 sliders.forEach(([id, lab, fmt]) => {
   const el = document.getElementById(id);
@@ -98,6 +216,7 @@ function payload() {
     time_years: +val("time"), wellfield_width_m: +val("width"),
     restoration_years: +val("rest"),
     azimuth_deg: +val("az"), mode: "both",
+    ore_depth_m: +val("oredepth"), ore_thickness_m: +val("orethick"),
   };
 }
 const val = id => document.getElementById(id).value;
@@ -166,6 +285,68 @@ function render() {
   }
 
   renderMetrics(r);
+  renderNotice(r.notice);
+  renderVertical(r.vertical);
+}
+
+/* ---------------- Module 2: ore-zone notice ---------------- */
+function renderNotice(notice) {
+  const el = document.getElementById("ore-notice");
+  if (!el) return;
+  el.textContent = notice || "";
+  el.classList.toggle("hidden", !notice);
+}
+
+/* ---------------- Module 5A: shallow-impact metric + depth schematic -------- */
+function renderVertical(v) {
+  const badge = document.getElementById("m-vert-band");
+  const note = document.getElementById("m-vert-note");
+  if (!v) { if (badge) { badge.textContent = "–"; badge.className = "badge"; } return; }
+  setNum("m-vert", (v.shallow_impact_probability * 100).toFixed(0));
+  badge.textContent = v.risk_band;
+  badge.className = "badge " + v.risk_band;
+  const yrs = v.years_to_vertical_breakthrough;
+  note.textContent = `${v.separation_m} m confining separation · dominant: `
+    + `${v.dominant_pathway.replace(/_/g, " ")}`
+    + (yrs != null ? ` · ~${yrs} yr to vertical breakthrough` : "");
+  renderDepth(v);
+}
+
+function renderDepth(v) {
+  const svg = document.getElementById("depth-schematic");
+  const leg = document.getElementById("depth-legend");
+  if (!svg) return;
+  const W = 190, H = 210, top = 12, bot = H - 12, x0 = 14, x1 = 96;
+  const maxD = Math.max(v.ore_depth_m + v.ore_thickness_m + 40, 200);
+  const y = d => top + (bot - top) * (d / maxD);
+  const rect = (ya, yb, fill, op) =>
+    `<rect x="${x0}" y="${ya}" width="${x1 - x0}" height="${Math.max(yb - ya, 1)}" `
+    + `fill="${fill}" fill-opacity="${op}"/>`;
+  const oreTop = y(v.ore_depth_m - v.ore_thickness_m / 2);
+  const oreBot = y(v.ore_depth_m + v.ore_thickness_m / 2);
+  const l1 = y(v.layer1_base_m);
+  const riskCol = { contained: "#37d39b", low: "#37d39b", moderate: "#ffb84d", high: "#ff5a5a" }[v.risk_band] || "#8b97a7";
+  let s = "";
+  s += rect(y(0), l1, "#3f8cff", 0.35);                 // Layer 1 shallow aquifer
+  s += rect(l1, oreTop, "#8b97a7", 0.16);               // Layer 2 fractured bedrock
+  s += rect(oreTop, oreBot, "#ff2d2d", 0.55);           // Layer 3 ore zone
+  // upward pathway arrow, coloured by risk
+  s += `<line x1="${(x0 + x1) / 2}" y1="${oreTop}" x2="${(x0 + x1) / 2}" y2="${l1}" `
+     + `stroke="${riskCol}" stroke-width="2" stroke-dasharray="3 3" marker-end="url(#ah)"/>`;
+  s += `<defs><marker id="ah" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">`
+     + `<path d="M0,0 L6,3 L0,6 Z" fill="${riskCol}"/></marker></defs>`;
+  // water-table hatch at top
+  s += `<line x1="${x0}" y1="${y(0) + 1}" x2="${x1}" y2="${y(0) + 1}" stroke="#6fd1ff" stroke-width="1.2"/>`;
+  // depth labels
+  const lab = (d, t) => `<text x="${x1 + 4}" y="${y(d) + 3}" fill="#8b97a7" font-size="8">${t}</text>`;
+  s += lab(0, "0 m") + lab(v.layer1_base_m, v.layer1_base_m + " m")
+     + lab(v.ore_depth_m, v.ore_depth_m + " m");
+  svg.innerHTML = s;
+  if (leg) leg.innerHTML =
+    `<b style="color:#6fd1ff">Layer 1</b> shallow wells (0–${v.layer1_base_m} m)<br>`
+    + `<b style="color:#8b97a7">Layer 2</b> fractured bedrock<br>`
+    + `<b style="color:#ff5a5a">Layer 3</b> ore / ISR zone (${v.ore_depth_m} m)<br>`
+    + `<span style="color:${riskCol}">▲ upward pathway → ${(v.shallow_impact_probability * 100).toFixed(0)}%</span>`;
 }
 
 function renderMetrics(r) {
@@ -259,6 +440,16 @@ function fmtC(v, u) {
 }
 function spinner(on) { document.getElementById("spinner").classList.toggle("hidden", !on); }
 
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add("hidden"), 3200);
+}
+
 /* ---------------- drift monitor poll ---------------- */
 function pollDrift() {
   fetch(`${API}/api/drift`).then(r => r.json()).then(d => {
@@ -278,5 +469,6 @@ function pollDrift() {
 }
 setInterval(pollDrift, 20000);
 
-/* default pin so the app shows something immediately (E. Singhbhum schist belt) */
-setTimeout(() => setPin(86.2, 22.8), 400);
+/* default pin: Jaduguda — India's first uranium mine, a real ore/deposit zone,
+   so the app opens on a full uranium simulation (not a suppressed non-ore one) */
+setTimeout(() => setPin(86.347, 22.652), 400);

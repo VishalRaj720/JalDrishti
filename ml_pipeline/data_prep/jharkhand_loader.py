@@ -139,6 +139,11 @@ def load_jharkhand_water_quality() -> pd.DataFrame:
 def aquifer_at_point(lon: float, lat: float, aquifers=None) -> dict | None:
     """Return the hydrogeology dict of the aquifer polygon containing (lon, lat),
     or the nearest polygon if the pin lands in a gap. Used by the dashboard.
+
+    Adds two data-confidence carry-throughs (Module 1):
+      _pip_fallback : True when the pin fell outside ALL mapped polygons and we
+                      substituted the nearest one (its K/phi are borrowed).
+      _dist_deg     : degrees from the pin to that nearest polygon (0 on a hit).
     """
     from shapely.geometry import Point
     if aquifers is None:
@@ -147,11 +152,17 @@ def aquifer_at_point(lon: float, lat: float, aquifers=None) -> dict | None:
     hit = aquifers[aquifers.contains(pt)]
     if len(hit) == 0:
         # nearest polygon (degrees distance is fine at state scale for selection)
-        idx = aquifers.geometry.distance(pt).idxmin()
+        dists = aquifers.geometry.distance(pt)
+        idx = dists.idxmin()
         row = aquifers.loc[idx]
+        fallback, dist_deg = True, float(dists.min())
     else:
         row = hit.iloc[0]
-    return {k: row[k] for k in aquifers.columns if k != "geometry"}
+        fallback, dist_deg = False, 0.0
+    out = {k: row[k] for k in aquifers.columns if k != "geometry"}
+    out["_pip_fallback"] = fallback
+    out["_dist_deg"] = dist_deg
+    return out
 
 
 def baseline_at_point(lon: float, lat: float, wq: pd.DataFrame | None = None) -> dict:

@@ -80,9 +80,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   border:1px solid rgba(255,184,77,.35);border-radius:8px;padding:7px 9px;margin-top:8px}
 
 /* ---------- map ---------- */
-#map{flex:1;height:100%}
-.leaflet-container{background:#0a0d12}
+#map{flex:1;height:100%;background:#0a0d12}
+#map.bg-light{background:#e6e9ec}
+#map.bg-sat{background:#12161c}
 .plume-tip{font-size:12px}
+
+/* ---------- basemap toggle (floating control, topright) ---------- */
+.basemap-ctl{background:rgba(15,18,24,.85);backdrop-filter:blur(3px);
+  border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:4px;
+  display:flex;gap:3px;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.basemap-ctl button{background:transparent;border:none;color:#b7c0cc;
+  font-size:11px;font-weight:600;padding:6px 10px;border-radius:6px;
+  cursor:pointer;transition:.15s;white-space:nowrap;font-family:inherit}
+.basemap-ctl button:hover{color:#fff;background:rgba(255,255,255,.08)}
+.basemap-ctl button.active{background:var(--accent);color:#04121e}
 
 .spinner{position:absolute;top:14px;right:14px;width:22px;height:22px;border:3px solid rgba(63,182,255,.25);
   border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;z-index:1000}
@@ -91,3 +102,30 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
 /* aquifer overlay tooltip */
 .aq-tip{background:#161b22;border:1px solid var(--line);color:var(--text);font-size:11px}
+
+/* ---------- Module 2: ore-zone notice + legend ---------- */
+.banner.ore{color:#ffd27f;background:rgba(232,131,58,.10);border-color:rgba(232,131,58,.4)}
+.sw.ore{background:rgba(255,45,45,.25);border:1.5px solid #ff2d2d}
+.sw.belt{background:rgba(232,131,58,.15);border:1.5px dashed var(--frac)}
+#conf-line{color:var(--warn)}
+#conf-line.hidden,.banner.ore.hidden{display:none}
+
+/* ---------- Module 1: out-of-bounds toast ---------- */
+.toast{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:1200;
+  background:rgba(255,90,90,.95);color:#2a0a0a;font-size:12.5px;font-weight:700;
+  padding:9px 16px;border-radius:9px;box-shadow:0 3px 14px rgba(0,0,0,.4);
+  transition:opacity .3s}
+.toast.hidden{opacity:0;pointer-events:none}
+
+/* ---------- Module 5A: depth schematic + shallow-impact metric ---------- */
+.depth-wrap{display:flex;gap:10px;margin-top:8px;align-items:stretch}
+#depth-schematic{width:130px;height:auto;flex:none;background:var(--card2);
+  border:1px solid var(--line);border-radius:8px}
+.depth-legend{flex:1;line-height:1.55;align-self:center}
+.depth-legend b{color:var(--text)}
+.metric.vert{border-color:rgba(63,182,255,.35);
+  background:linear-gradient(180deg,rgba(63,182,255,.06),var(--card))}
+.badge.contained{background:rgba(55,211,155,.18);color:var(--ok)}
+.badge.low{background:rgba(55,211,155,.14);color:var(--ok)}
+.badge.moderate{background:rgba(255,184,77,.18);color:var(--warn)}
+.badge.high{background:rgba(255,90,90,.2);color:var(--danger)}

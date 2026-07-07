@@ -48,6 +48,7 @@ from ml_pipeline.dashboard.plume_geometry import (
     field_to_contours, compliance_ring, ml_envelope_ellipses,
 )
 from ml_pipeline.dashboard.drift import MONITOR
+from ml_pipeline.data_prep.boundary import in_jharkhand, boundary_geojson
 
 FRONTEND = Path(__file__).resolve().parent / "frontend"
 
@@ -91,6 +92,13 @@ class PredictRequest(BaseModel):
                                      le=_OR["wellfield_width_m"][1])
     restoration_years: float = Field(0, ge=0, le=_OR["restoration_years"][1])
     azimuth_deg: float = Field(45, ge=0, le=360)
+    # Module 5A (2.5D): depth of the ore/ISR target zone + its vertical extent
+    ore_depth_m: float = Field(P.VERTICAL["ore_depth_default_m"],
+                               ge=P.VERTICAL["ore_depth_range_m"][0],
+                               le=P.VERTICAL["ore_depth_range_m"][1])
+    ore_thickness_m: float = Field(P.VERTICAL["ore_thickness_default_m"],
+                                   ge=P.VERTICAL["ore_thickness_range_m"][0],
+                                   le=P.VERTICAL["ore_thickness_range_m"][1])
     mode: str = "both"                             # analytical | ml | both
     # expert overrides (None -> resolved from the pin / literature)
     kd_L_kg: float | None = Field(None, ge=0, le=50)
@@ -105,10 +113,22 @@ def _bands(d: dict) -> dict:
     return {"p10": round(d["p10"], 3), "p50": round(d["p50"], 3), "p90": round(d["p90"], 3)}
 
 
-def _in_jharkhand(lon: float, lat: float, pad: float = 1.0) -> bool:
+# Module 1: strict boundary. The state bbox is a cheap pre-filter; the dissolved
+# district polygon (data_prep.boundary) is authoritative.
+_OUTSIDE_JH = {
+    "code": "OUTSIDE_JHARKHAND",
+    "message": ("Coordinate is outside Jharkhand. This tool has aquifer and "
+                "water-quality data only for Jharkhand; predictions elsewhere "
+                "would be fabricated."),
+}
+
+
+def _in_jharkhand(lon: float, lat: float) -> bool:
     B = P.JHARKHAND_BOUNDS
-    return (B["lon_min"] - pad <= lon <= B["lon_max"] + pad
-            and B["lat_min"] - pad <= lat <= B["lat_max"] + pad)
+    if not (B["lon_min"] <= lon <= B["lon_max"]
+            and B["lat_min"] <= lat <= B["lat_max"]):
+        return False                                   # far outside -> skip PIP
+    return in_jharkhand(lon, lat)                       # authoritative polygon test
 
 
 @app.get("/api/health")
@@ -128,8 +148,23 @@ def health():
 @app.get("/api/pin")
 def api_pin(lon: float = Query(...), lat: float = Query(...)):
     if not _in_jharkhand(lon, lat):
-        raise HTTPException(400, "pin outside the Jharkhand region")
+        raise HTTPException(422, _OUTSIDE_JH)
     return pin_info(lon, lat)
+
+
+@app.get("/api/boundary")
+def api_boundary():
+    """Dissolved Jharkhand state boundary (lon/lat GeoJSON geometry) for the map
+    outline + client-side inverse mask. Simplified to keep the payload light."""
+    return JSONResponse(boundary_geojson())
+
+
+@app.get("/api/ore")
+def api_ore():
+    """Uranium deposit polygons + Singhbhum belt envelope (Module 2 overlay), so
+    users can see which zones carry a real / hypothetical / no uranium source."""
+    from ml_pipeline.data_prep.ore_loader import ore_geojson
+    return JSONResponse(ore_geojson())
 
 
 @app.get("/api/aquifers")
@@ -144,7 +179,7 @@ def api_aquifers():
 @app.post("/api/predict")
 def api_predict(req: PredictRequest):
     if not _in_jharkhand(req.lon, req.lat):
-        raise HTTPException(400, "pin outside the Jharkhand region")
+        raise HTTPException(422, _OUTSIDE_JH)
     payload = req.model_dump()
     try:
         inputs, hydro = resolve_inputs(payload)
@@ -169,29 +204,69 @@ def api_predict(req: PredictRequest):
     aspect = fm["max_downgradient_m"] / max(fm["plume_halfwidth_m"], 1.0)
 
     # --- ML surrogate (bands), if artifacts present ---
-    ml_metrics, envelope, ml_status = None, None, "ok"
-    try:
-        m = predict("ml", **inputs)
-        ml_metrics = {
-            "area_ha": _bands(m["area_ha"]),
-            "migration_m": _bands(m["migration_m"]),
-            "compliance_conc": _bands(m["compliance_conc"]),
-            "excursion_probability": round(m["excursion_probability"], 3),
-            "breach_probability": round(m["breach_probability"], 3),
-            "off_scale": bool(m.get("off_scale", False)),
-        }
-        envelope = ml_envelope_ellipses(
-            req.lon, req.lat, req.azimuth_deg,
-            {k: m["migration_m"][k] for k in ("p10", "p50", "p90")}, aspect,
-            x_offset_m=half_w)
-    except Exception as e:
-        m = None
-        ml_status = f"unavailable: {type(e).__name__} ({e})"
+    # Module 2: in a non-ore zone the uranium source term is clamped to a trace
+    # level (far outside the surrogate's training envelope), so bypass the ML
+    # call entirely and let the analytical engine report the ~zero U plume.
+    ml_metrics, envelope, ml_status, m = None, None, "ok", None
+    if hydro.get("u_suppressed"):
+        ml_status = "suppressed: non-ore zone (no radiological source term)"
+    else:
+        try:
+            m = predict("ml", **inputs)
+            ml_metrics = {
+                "area_ha": _bands(m["area_ha"]),
+                "migration_m": _bands(m["migration_m"]),
+                "compliance_conc": _bands(m["compliance_conc"]),
+                "excursion_probability": round(m["excursion_probability"], 3),
+                "breach_probability": round(m["breach_probability"], 3),
+                "off_scale": bool(m.get("off_scale", False)),
+            }
+            envelope = ml_envelope_ellipses(
+                req.lon, req.lat, req.azimuth_deg,
+                {k: m["migration_m"][k] for k in ("p10", "p50", "p90")}, aspect,
+                x_offset_m=half_w)
+        except Exception as e:
+            m = None
+            ml_status = f"unavailable: {type(e).__name__} ({e})"
 
     # drift monitor: record analytical-vs-ML disagreement for this request
     disagreement = MONITOR.record(
         a, m, extrapolation=extrapolation,
         off_scale=bool(fm.get("off_scale", False)))
+
+    # Module 5A (2.5D): screening estimate of shallow (Layer-1) aquifer impact.
+    # Uses the deep plume's front reach + source term; the horizontal metrics are
+    # untouched. alpha_L is recomputed from the same scale-dependent law the
+    # transport engine uses (L = max(front reach, wellfield width)).
+    L_disp = max(fm["Xc_m"], inputs["wellfield_width_m"], 1.0)
+    alpha_L = P.longitudinal_dispersivity(L_disp)
+    from ml_pipeline.physics.transport import shallow_impact_screening
+    vertical = shallow_impact_screening(
+        C0=inputs["source_conc_C0"], background=inputs["background_conc_Cb"],
+        threshold=threshold, Xc_m=fm["Xc_m"],
+        source_width_m=inputs["wellfield_width_m"], alpha_L=alpha_L,
+        alpha_V=alpha_L * P.VERTICAL["alpha_V_ratio"],
+        ore_depth_m=req.ore_depth_m, ore_thickness_m=req.ore_thickness_m,
+        layer1_base_m=P.VERTICAL["layer1_base_m"], K_m_day=inputs["K_m_day"],
+        # confining Layer-2 porosity is FIXED (fractured bedrock, not the ore
+        # regime); the regime enters through vertical anisotropy Kv/Kh instead.
+        phi_confining=P.VERTICAL["phi_confining"],
+        Kv_Kh_ratio=P.VERTICAL["Kv_Kh_by_regime"].get(inputs["regime"], 0.01),
+        upward_gradient=P.VERTICAL["upward_gradient"],
+        t_days=req.time_years * 365.0,
+        wellbore_failure_prob=P.VERTICAL["wellbore_failure_prob"])
+
+    # Module 2: user-facing ore-zone notice (uranium only)
+    ore = hydro.get("ore_zone", {})
+    notice = None
+    if species == "uranium_ppb":
+        if ore.get("zone") == "none":
+            notice = ("Non-Ore Zone: restricting simulation to non-radiological "
+                      "chemistry (sulfate / TDS). No uranium source term at this "
+                      "location — ISR here would not leach uranium.")
+        elif ore.get("zone") == "belt":
+            notice = ("Prospective Belt (Singhbhum envelope): hypothetical "
+                      "low-confidence ore assumed — uranium source term reduced.")
 
     return {
         "pin": {"lon": req.lon, "lat": req.lat},
@@ -200,6 +275,9 @@ def api_predict(req: PredictRequest):
         "threshold": threshold,
         "azimuth_deg": req.azimuth_deg,
         "mode": req.mode,
+        "notice": notice,
+        "ore_zone": ore,
+        "vertical": vertical,
         # inputs outside the deployed model's training envelope (ML bands
         # are extrapolating there; the conformal 80% guarantee is void)
         "extrapolation": extrapolation,

@@ -20,6 +20,8 @@
       <div class="card-title">① Drop a pin on the map</div>
       <div id="pin-info" class="pin-info muted">Click anywhere in Jharkhand to select an ISR site…</div>
       <div id="hydro-line" class="pin-info small" style="margin-top:6px"></div>
+      <div id="conf-line" class="pin-info small hidden"></div>
+      <div id="ore-notice" class="banner ore hidden"></div>
     </section>
 
     <section class="card">
@@ -68,6 +70,18 @@
       <div id="drift-badge"></div>
     </section>
 
+    <section class="card">
+      <div class="card-title">⑤ Depth &amp; vertical stratification</div>
+      <div class="slider"><label>Ore / ISR target depth <span class="u">m</span><b id="v-oredepth">150</b></label>
+        <input type="range" id="oredepth" min="50" max="600" step="10" value="150"></div>
+      <div class="slider"><label>Ore zone thickness <span class="u">m</span><b id="v-orethick">20</b></label>
+        <input type="range" id="orethick" min="2" max="100" step="1" value="20"></div>
+      <div class="depth-wrap">
+        <svg id="depth-schematic" viewBox="0 0 190 210" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="depth-legend" class="depth-legend muted small"></div>
+      </div>
+    </section>
+
     <section class="metrics">
       <div class="metric danger">
         <div class="m-label">Total Vulnerable Area</div>
@@ -87,6 +101,11 @@
         <div><div class="m-label">Peak conc.</div><div class="m-value sm" id="m-peak">–</div></div>
         <div><div class="m-label">Boundary conc.</div><div class="m-value sm" id="m-bnd">–</div></div>
       </div>
+      <div class="metric vert">
+        <div class="m-label">Shallow Aquifer Impact <span class="muted">(Layer 1 · village wells)</span></div>
+        <div class="m-value sm"><span id="m-vert">–</span>% <span id="m-vert-band" class="badge">–</span></div>
+        <div class="m-band" id="m-vert-note"></div>
+      </div>
     </section>
 
     <section class="card legend">
@@ -95,6 +114,7 @@
       <div class="legend-row"><span class="sw plume"></span> Plume concentration (×BIS)</div>
       <div class="legend-row"><span class="sw ring"></span> Monitoring / compliance ring</div>
       <div class="legend-row" id="env-legend"><span class="sw env"></span> ML migration envelope (P10/P50/P90)</div>
+      <div class="legend-row"><span class="sw ore"></span> Uranium deposit (ore) · <span class="sw belt"></span> Singhbhum belt</div>
     </section>
 
     <p class="disclaimer">⚠ Uncalibrated theoretical surrogate (porous-Texas → fractured-Jharkhand
@@ -103,6 +123,7 @@
 
   <main id="map"></main>
   <div id="spinner" class="spinner hidden"></div>
+  <div id="toast" class="toast hidden"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"

@@ -21,10 +21,34 @@ from ml_pipeline.data_prep.jharkhand_loader import (
     aquifer_at_point, baseline_at_point,
 )
 from ml_pipeline.data_prep.texas_loader import texas_source_signature
+from ml_pipeline.data_prep.ore_loader import ore_zone_at
 from ml_pipeline.ml.dataset import ARTIFACT_DIR
 
 SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
 _BG_DEFAULT = {"uranium_ppb": 1.0, "sulfate_mg_l": 20.0, "tds_mg_l": 300.0}
+
+# Data-confidence thresholds (Module 1). Beyond ~20 km the nearest water-quality
+# well is a weak proxy; outside all mapped aquifer polygons the K/phi are borrowed.
+_FAR_WELL_DEG = 0.18          # ~20 km at Jharkhand latitude
+_DEG_TO_KM = 111.0
+
+
+def _data_confidence(h: dict, b: dict) -> dict:
+    """Telemetry on how well-supported a pin is by real data. `level: "low"`
+    when the pin fell outside all mapped aquifer polygons OR the nearest
+    water-quality well is far (the resolved hydrogeology/baseline is borrowed)."""
+    reasons = []
+    if h.get("_pip_fallback"):
+        reasons.append("outside_mapped_aquifer")
+    dd = b.get("dist_deg")
+    if dd is not None and dd == dd and dd > _FAR_WELL_DEG:
+        reasons.append("nearest_well_far")
+    return {
+        "level": "low" if reasons else "ok",
+        "reasons": reasons,
+        "nearest_well_km": (round(float(dd) * _DEG_TO_KM, 1)
+                            if dd is not None and dd == dd else None),
+    }
 
 
 @functools.lru_cache(maxsize=1)
@@ -117,6 +141,7 @@ def pin_info(lon: float, lat: float) -> dict:
                       else round(float(b["hco3_mg_l"]), 1)),
         "baseline": {k: (None if (b[k] != b[k]) else round(float(b[k]), 2))
                      for k in SPECIES if k in b},
+        "data_confidence": _data_confidence(h, b),
     }
 
 
@@ -175,6 +200,19 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     if cb is None or cb != cb:
         cb = _BG_DEFAULT[species]
 
+    # Module 2: ore-body mask. ISR leaches uranium only where uranium ore exists.
+    # Clamp the URANIUM source term by zone; sulfate/TDS (lixiviant reagents)
+    # are unaffected. `u_suppressed` tells the server to bypass the ML surrogate
+    # for uranium (the clamped C0 is far outside the model's training support).
+    ore_zone = ore_zone_at(lon, lat)
+    u_suppressed = False
+    if species == "uranium_ppb":
+        if ore_zone["zone"] == "belt":
+            c0 = c0 * P.BELT_C0_FRACTION
+        elif ore_zone["zone"] == "none":
+            c0 = max(float(cb) * P.NON_ORE_U_TRACE_MULT, P.NON_ORE_U_TRACE_FLOOR_PPB)
+            u_suppressed = True
+
     inputs = dict(
         regime=regime,
         K_m_day=_override(payload, "K_m_day", h["K_m_day"]),
@@ -217,5 +255,9 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         "hco3_mg_l": (None if b.get("hco3_mg_l") != b.get("hco3_mg_l")
                       else round(float(b["hco3_mg_l"]), 1)),
         "district": b.get("district"),
+        "data_confidence": _data_confidence(h, b),
+        # Module 2: ore-body zone + whether the uranium source term was clamped
+        "ore_zone": ore_zone,
+        "u_suppressed": u_suppressed,
     }
     return inputs, hydro

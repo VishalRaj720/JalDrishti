@@ -79,3 +79,12 @@ My_Proposal.pdf
 /mdFiles
 commit.txt
 
+/fetch_data
+
+# Large / bulky datasets — regenerate via fetch_data/ scripts, don't commit.
+# (comments MUST be on their own line — an inline # becomes part of the pattern)
+# 703 MB GLO-30 DEM — rebuild with fetch_data/fetchDEM.py + mosaic_dem.py
+Datasets/jharkhand_glo30_dem.tif
+# 109 MB of CGWB NAQUIM source PDFs (reference material)
+Datasets/naquim_reference/Jharkhand_NAQUIM_Reports/
+newdataset/

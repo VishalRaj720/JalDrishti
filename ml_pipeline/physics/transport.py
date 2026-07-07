@@ -215,6 +215,112 @@ def concentration_point(x: float, y: float, p: TransportParams) -> float:
 
 
 # --------------------------------------------------------------------------- #
+# Vertical stratification (Module 5A -- 2.5D). The deep (ore-zone) plume above
+# is solved in plan view; these helpers estimate how much of it could reach the
+# SHALLOW drinking-water aquifer (Layer 1), WITHOUT touching the horizontal
+# metrics (A_vert at the plume centre is ~1, so area/migration are unchanged).
+# --------------------------------------------------------------------------- #
+def vertical_attenuation(z_m: float, H_m: float, alpha_V: float,
+                         x_m: float) -> float:
+    """Domenico vertical-dispersion factor for a source of vertical thickness H,
+    at height z above the source centre and along-flow distance x:
+        A_vert = 1/2 [ erf((z+H/2)/(2 sqrt(aV x))) - erf((z-H/2)/(2 sqrt(aV x))) ]
+    Fraction (0..1) of source concentration reaching height z by vertical
+    dispersion -- ~1 within the source band, decaying sharply above it. For a
+    deep confined plume this is tiny, which is the physically correct 'the
+    shallow aquifer is not immediately polluted' result."""
+    tw = 2.0 * math.sqrt(max(alpha_V, 1e-4) * max(x_m, 1e-3))
+    return float(0.5 * (erf((z_m + H_m / 2.0) / tw) - erf((z_m - H_m / 2.0) / tw)))
+
+
+def _vertical_risk_band(p: float) -> str:
+    if p < 0.05:
+        return "contained"
+    if p < 0.20:
+        return "low"
+    if p < 0.50:
+        return "moderate"
+    return "high"
+
+
+def shallow_impact_screening(*, C0: float, background: float, threshold: float,
+                             Xc_m: float, source_width_m: float, alpha_L: float,
+                             alpha_V: float, ore_depth_m: float,
+                             ore_thickness_m: float, layer1_base_m: float,
+                             K_m_day: float, phi_confining: float,
+                             Kv_Kh_ratio: float, upward_gradient: float,
+                             t_days: float, wellbore_failure_prob: float) -> dict:
+    """SCREENING estimate of how much the deep plume could impact the Layer-1
+    (shallow drinking-water) aquifer. Three independent pathways OR-combined:
+
+      (1) dispersive  -- upward Domenico spreading; conc reaching Layer 1 vs the
+                         incremental BIS threshold. Tiny for deep confined ore.
+      (2) advective   -- upward Darcy leakage through the semi-confining fractured
+                         zone: v_up = Kv*i / phi ; barrier crossed if v_up*t >= dz.
+      (3) wellbore    -- casing / legacy-borehole shortcut (base rate; Singhbhum
+                         has decades of AMD drilling).
+
+    Returns the combined index AND every component so it stays interpretable.
+    This is a transparent screening index, NOT a calibrated probability."""
+    # Two separations: the dispersive factor is referenced to the source CENTRE
+    # (its erf edges already carry the +/-H/2 half-thickness), while the advective
+    # barrier is the intact confining rock from the ore TOP up to the shallow
+    # aquifer base -- so a thicker ore body (top nearer the surface) shortens the
+    # advective path. (Pre-2026-07-06 both used the centre, so thickness was inert.)
+    dz_centre = max(ore_depth_m - layer1_base_m, 1.0)
+    dz_adv = max(ore_depth_m - ore_thickness_m / 2.0 - layer1_base_m, 1.0)
+    thr_inc = max(threshold - background, P.INCREMENTAL_FLOOR * threshold)
+    # concentration gate for the ADVECTIVE / WELLBORE pathways: a shortcut
+    # preserves concentration (~C0, minimal dilution), so it can only breach the
+    # shallow limit if the source itself is above it. A sub-threshold source
+    # (e.g. clamped non-ore uranium) therefore poses no vertical excursion.
+    # The dispersive pathway dilutes, so it stays continuous (below).
+    conc_factor = 1.0 if C0 >= thr_inc else 0.0
+
+    # (1) dispersive: max over horizontal x of C0 * A_long(x) * A_vert(z, x).
+    # z = dz_centre; A_vert's +/-H/2 edges make it top-aware for thickness.
+    xs = np.linspace(max(source_width_m / 2.0, 1.0), max(Xc_m, source_width_m), 60)
+    a_long = _long_factor(xs, Xc_m, alpha_L)
+    a_vert = np.array([vertical_attenuation(dz_centre, ore_thickness_m, alpha_V, float(x))
+                       for x in xs])
+    conc_shallow = float(np.max(C0 * a_long * a_vert))
+    p_disp = float(np.clip(conc_shallow / max(thr_inc, 1e-9), 0.0, 1.0))
+
+    # (2) advective upward leakage through the confining fractured zone. The
+    # barrier-crossed fraction is hydraulic (over the ore-top-to-shallow gap);
+    # scale by conc_factor so a weak source that crosses is not a threshold breach.
+    Kv = max(K_m_day, 0.0) * max(Kv_Kh_ratio, 0.0)
+    v_up = Kv * max(upward_gradient, 0.0) / max(phi_confining, 1e-3)   # m/day
+    d_up = v_up * max(t_days, 0.0)
+    barrier_crossed = float(np.clip(d_up / dz_adv, 0.0, 1.0))
+    p_adv = barrier_crossed * conc_factor
+    yrs_break = (dz_adv / v_up / 365.0) if v_up > 1e-9 else float("inf")
+
+    # (3) wellbore/legacy-borehole shortcut -- base rate, concentration-gated
+    p_well = (float(wellbore_failure_prob) * conc_factor
+              if C0 > background else 0.0)
+
+    p_shallow = 1.0 - (1.0 - p_disp) * (1.0 - p_adv) * (1.0 - p_well)
+    pathways = {"dispersive": p_disp, "advective_leakage": p_adv, "wellbore": p_well}
+    dominant = (max(pathways, key=pathways.get) if p_shallow >= 0.05 else "contained")
+    return {
+        "separation_m": round(dz_adv, 1),   # intact confining rock: ore-top -> shallow base
+        "layer1_base_m": round(float(layer1_base_m), 1),
+        "ore_depth_m": round(float(ore_depth_m), 1),
+        "ore_thickness_m": round(float(ore_thickness_m), 1),
+        "conc_reaching_shallow": round(conc_shallow, 3),
+        "a_vert_max": round(float(np.max(a_vert)), 6),
+        "advective_breakthrough_fraction": round(barrier_crossed, 3),
+        "years_to_vertical_breakthrough": (None if not np.isfinite(yrs_break)
+                                           else round(yrs_break, 1)),
+        "shallow_impact_probability": round(p_shallow, 3),
+        "risk_band": _vertical_risk_band(p_shallow),
+        "pathways": {k: round(v, 3) for k, v in pathways.items()},
+        "dominant_pathway": dominant,
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Result container, grid, metrics
 # --------------------------------------------------------------------------- #
 @dataclass
