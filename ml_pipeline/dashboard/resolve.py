@@ -206,8 +206,16 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     # for uranium (the clamped C0 is far outside the model's training support).
     ore_zone = ore_zone_at(lon, lat)
     u_suppressed = False
+    ore_grade_pct = None
     if species == "uranium_ppb":
-        if ore_zone["zone"] == "belt":
+        if ore_zone["zone"] == "deposit":
+            # D4: scale the deposit's C0 by its real ore grade (IAEA UDEPO),
+            # clipped to the trained uranium source-signature envelope.
+            from ml_pipeline.data_prep.ore_grades import grade_c0_factor
+            factor, ore_grade_pct = grade_c0_factor(ore_zone["deposit_name"])
+            env_lo, env_hi = min(source_sig[species]), max(source_sig[species])
+            c0 = float(np.clip(c0 * factor, env_lo, env_hi))
+        elif ore_zone["zone"] == "belt":
             c0 = c0 * P.BELT_C0_FRACTION
         elif ore_zone["zone"] == "none":
             c0 = max(float(cb) * P.NON_ORE_U_TRACE_MULT, P.NON_ORE_U_TRACE_FLOOR_PPB)
@@ -259,5 +267,7 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         # Module 2: ore-body zone + whether the uranium source term was clamped
         "ore_zone": ore_zone,
         "u_suppressed": u_suppressed,
+        # D4: deposit ore grade (%U) used to scale the uranium C0, if applicable
+        "ore_grade_pct_u": ore_grade_pct,
     }
     return inputs, hydro

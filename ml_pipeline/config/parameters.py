@@ -390,6 +390,12 @@ BELT_C0_FRACTION = 0.30              # prospective-belt hypothetical source stre
 NON_ORE_U_TRACE_MULT = 3.0          # trace-leach uranium = 3 x ambient background
 NON_ORE_U_TRACE_FLOOR_PPB = 5.0     # absolute floor for the trace term
 
+# D4: grade-scaled deposit C0. The Texas-derived uranium C0 encodes the Texas ISR
+# reference ore grade; each surveyed deposit's C0 is rescaled by its IAEA-UDEPO
+# grade relative to this. Texas roll-front ISR ore ~0.05-0.10% U3O8 = 0.04-0.08%
+# U -> 0.05% U as the representative the C0 midpoint sits in (both sides %U).
+URANIUM_GRADE_REF_PCT = 0.05        # %U; deposit grade == this -> C0 unchanged
+
 # ---------------------------------------------------------------------------
 # 8. Vertical stratification (Module 5A -- 2.5D). Hard-rock Jharkhand profile:
 #    Layer 1 (0-30 m)     weathered / saprolite PHREATIC aquifer -> village wells.
