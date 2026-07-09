@@ -52,3 +52,11 @@ def test_regional_grain_is_ENE():
 def test_out_of_grid_clamped():
     s = strike_at(200.0, 200.0)
     assert 0.0 <= s["mean_strike_deg"] < 180.0
+
+
+def test_border_pin_is_finite_and_bounded():
+    # Stage A: validity-weighted bilinear must keep a border pin sane even when
+    # most bilinear corners are out-of-Jharkhand cells (global fallback there)
+    s = strike_at(83.5, 25.4)
+    assert 0.0 <= s["mean_strike_deg"] < 180.0
+    assert 0.0 <= s["circular_variance"] <= 1.0

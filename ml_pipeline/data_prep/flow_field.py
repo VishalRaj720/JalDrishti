@@ -69,6 +69,12 @@ SIGMA_KM = 12.0           # Gaussian distance weight scale for the plane fit
 DEM_SMOOTH_KM = 10.0      # Gaussian smoothing radius for the topo fallback
 DEM_TARGET_KM = 2.0       # decimate the 30 m DEM to ~this before smoothing
 SUBDUED_FACTOR = 0.5      # water-table gradient ~ this x topographic slope [hard rock]
+DTW_MIN_STATIONS = 3      # min nearby stations to fill a cell's depth-to-water
+
+# Stage-A runtime knobs (flow_at)
+COHERENCE_MIN = 0.15      # |interp unit-vector resultant| below this = near a divide
+AMP_KAPPA = 0.15          # fit-quality penalty folded into seasonal_amp (r2=0 -> +KAPPA)
+AMP_DEM_BUMP = 0.10       # extra gradient uncertainty for DEM-fallback (non-station) cells
 
 _GI_LO, _GI_HI = P.OPERATIONAL_RANGES["hydraulic_gradient"]        # (0.0005, 0.02)
 _AMP_HI = P.IRREGULARITY["gradient_seasonal_amp"][1]               # 0.40
@@ -88,6 +94,10 @@ def _load_stations() -> pd.DataFrame:
              .unstack("season").reindex(columns=SEASONS))
     st = coords.join(piv)
     st["depth_annual"] = st[list(SEASONS)].mean(axis=1, skipna=True)  # bias-corrected
+    # seasonal extremes of depth-to-water for the vertical-screening receptor:
+    # shallowest table (min depth, post-monsoon) is the conservative receptor.
+    st["depth_shallow"] = st[list(SEASONS)].min(axis=1, skipna=True)
+    st["depth_deep"] = st[list(SEASONS)].max(axis=1, skipna=True)
     st = st.dropna(subset=["depth_annual"]).reset_index()
     st["dem_elev"] = _sample_dem(st["longitude"].to_numpy(), st["latitude"].to_numpy())
     st = st[np.isfinite(st["dem_elev"])].reset_index(drop=True)
@@ -181,6 +191,9 @@ def build_flow_field() -> dict:
     lons_s, lats_s = st["longitude"].to_numpy(), st["latitude"].to_numpy()
     h_ann = st["h_annual"].to_numpy()
     h_seas = {s: st[f"h_{s}"].to_numpy() for s in SEASONS}
+    dep_ann = st["depth_annual"].to_numpy()          # depth-to-water [m bgl]
+    dep_sh = st["depth_shallow"].to_numpy()          # shallowest (min) season
+    dep_dp = st["depth_deep"].to_numpy()             # deepest (max) season
 
     B = P.JHARKHAND_BOUNDS
     dlat = GRID_KM * 1000.0 / M_PER_DEG
@@ -198,6 +211,10 @@ def build_flow_field() -> dict:
     grad_i = np.full((H, W), np.nan); amp = np.zeros((H, W))
     source = np.zeros((H, W), dtype=np.int8); n_sup = np.zeros((H, W), dtype=np.int16)
     fit_r2 = np.full((H, W), np.nan); in_jh = np.zeros((H, W), dtype=bool)
+    # depth-to-water (m bgl) per cell: annual mean + seasonal shallow/deep. NaN
+    # where too few stations -> flow_at returns None there (screening falls back).
+    dtw_mean = np.full((H, W), np.nan); dtw_shallow = np.full((H, W), np.nan)
+    dtw_deep = np.full((H, W), np.nan)
     # median station gradient / amp -> fill value for DEM cells' amp
     station_amps = []
 
@@ -208,7 +225,17 @@ def build_flow_field() -> dict:
             # candidate stations within radius (cheap metric box then circle)
             dE = (lons_s - lon0) * M_PER_DEG * cos_lat
             dN = (lats_s - lat0) * M_PER_DEG
-            near = np.hypot(dE, dN) <= radius_m
+            dcell = np.hypot(dE, dN)
+            near = dcell <= radius_m
+            # depth-to-water: distance-weighted mean of nearby stations (its own
+            # support test -- broader than the plane fit, needs no gradient)
+            if near.sum() >= DTW_MIN_STATIONS:
+                ww = np.exp(-(dcell[near] / sigma_m) ** 2)
+                wsum = ww.sum()
+                if wsum > 1e-9:
+                    dtw_mean[j, i] = float(np.sum(ww * dep_ann[near]) / wsum)
+                    dtw_shallow[j, i] = float(np.sum(ww * dep_sh[near]) / wsum)
+                    dtw_deep[j, i] = float(np.sum(ww * dep_dp[near]) / wsum)
             fit = None
             if near.sum() >= MIN_STATIONS:
                 fit = _plane_gradient(lon0, lat0, lons_s[near], lats_s[near],
@@ -251,7 +278,10 @@ def build_flow_field() -> dict:
     np.savez_compressed(
         FLOW_NPZ, lon_c=lon_c, lat_c=lat_c, flow_e=flow_e, flow_n=flow_n,
         gradient_i=grad_i, seasonal_amp=amp, source=source, n_support=n_sup,
-        fit_r2=fit_r2, in_jh=in_jh)
+        fit_r2=fit_r2, in_jh=in_jh,
+        dtw_mean=dtw_mean, dtw_shallow=dtw_shallow, dtw_deep=dtw_deep)
+    dtw_cells = int(np.isfinite(dtw_mean[in_jh]).sum())
+    dtw_jh = dtw_shallow[in_jh & np.isfinite(dtw_shallow)]
     meta = {
         "grid_km": GRID_KM, "radius_km": RADIUS_KM, "min_stations": MIN_STATIONS,
         "sigma_km": SIGMA_KM, "dem_smooth_km": DEM_SMOOTH_KM,
@@ -260,9 +290,12 @@ def build_flow_field() -> dict:
         "cells_in_jh": int(in_jh.sum()),
         "station_cells": int(((source == 1) & in_jh).sum()),
         "dem_cells": int(((source == 0) & in_jh).sum()),
+        "dtw_cells_in_jh": dtw_cells,
         "median_fit_r2": float(np.nanmedian(fit_r2[in_jh & (source == 1)])),
         "gradient_i_pctiles": [float(np.percentile(grad_i[in_jh], q)) for q in (10, 50, 90)],
         "seasonal_amp_pctiles": [float(np.percentile(amp[in_jh], q)) for q in (10, 50, 90)],
+        "dtw_shallow_pctiles_m": ([round(float(np.percentile(dtw_jh, q)), 2) for q in (10, 50, 90)]
+                                  if dtw_jh.size else None),
     }
     FLOW_META.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return meta
@@ -277,9 +310,45 @@ def load_flow_field() -> dict:
     return {k: z[k] for k in z.files}
 
 
+# --------------------------------------------------------------------------- #
+# Validity-weighted bilinear: interpolate only over in-state (and finite) grid
+# corners so a border pin is never dragged toward out-of-Jharkhand fallback
+# cells, and NaN corners (e.g. fit_r2 on DEM cells) never poison the result.
+# --------------------------------------------------------------------------- #
+def _bilinear_weights(tx: float, ty: float) -> np.ndarray:
+    return np.array([(1 - tx) * (1 - ty), tx * (1 - ty),
+                     (1 - tx) * ty, tx * ty])
+
+
+def _corner_vals(A, i: int, j: int) -> np.ndarray:
+    return np.array([A[j, i], A[j, i + 1], A[j + 1, i], A[j + 1, i + 1]],
+                    dtype=float)
+
+
+def _valid_bilinear(vals: np.ndarray, w: np.ndarray, valid: np.ndarray,
+                    *, fallback: bool = True) -> float:
+    """Weighted mean of the 4 corners using w * valid * isfinite. Falls back to
+    a plain finite-corner bilinear when no valid corner exists (fallback=True),
+    else returns NaN (used for depth-to-water, which is legitimately absent)."""
+    fin = np.isfinite(vals)
+    m = w * valid * fin
+    s = m.sum()
+    if s > 1e-12:
+        return float(np.sum(np.where(fin, vals, 0.0) * m) / s)
+    if not fallback:
+        return float("nan")
+    mf = w * fin
+    return (float(np.sum(np.where(fin, vals, 0.0) * mf) / mf.sum())
+            if mf.sum() > 1e-12 else float("nan"))
+
+
 def flow_at(lon: float, lat: float) -> dict:
-    """Bilinear-sampled flow (azimuth, gradient, seasonal amp) at a pin. Azimuth
-    is derived from interpolated unit vectors (never from averaging degrees)."""
+    """Validity-weighted bilinear flow at a pin. Azimuth comes from interpolated
+    unit vectors (never averaged degrees) and is None near a water divide, where
+    the four corner arrows disagree (low resultant coherence) -> no preferred
+    direction (the geometry is radial there anyway). `seasonal_amp_effective`
+    widens the gradient-uncertainty channel for low-quality (poor plane-fit or
+    DEM-fallback) cells. Depth-to-water is None where stations are too sparse."""
     ff = load_flow_field()
     lon_c, lat_c = ff["lon_c"], ff["lat_c"]
     lon = float(np.clip(lon, lon_c[0], lon_c[-1]))
@@ -288,19 +357,40 @@ def flow_at(lon: float, lat: float) -> dict:
     j = int(np.clip(np.searchsorted(lat_c, lat) - 1, 0, len(lat_c) - 2))
     tx = (lon - lon_c[i]) / (lon_c[i + 1] - lon_c[i])
     ty = (lat - lat_c[j]) / (lat_c[j + 1] - lat_c[j])
+    w = _bilinear_weights(tx, ty)
+    valid = (_corner_vals(ff["in_jh"].astype(float), i, j) > 0.5).astype(float)
 
-    def bilin(A):
-        return ((A[j, i] * (1 - tx) + A[j, i + 1] * tx) * (1 - ty)
-                + (A[j + 1, i] * (1 - tx) + A[j + 1, i + 1] * tx) * ty)
+    fe = _valid_bilinear(_corner_vals(ff["flow_e"], i, j), w, valid)
+    fn = _valid_bilinear(_corner_vals(ff["flow_n"], i, j), w, valid)
+    coherence = float(np.hypot(fe, fn))          # |resultant of unit vectors|
+    near_divide = coherence < COHERENCE_MIN
+    az = (np.degrees(np.arctan2(fe, fn)) % 360.0) if coherence > 1e-6 else None
 
-    fe, fn = bilin(ff["flow_e"]), bilin(ff["flow_n"])
-    az = (np.degrees(np.arctan2(fe, fn)) % 360.0) if np.hypot(fe, fn) > 1e-6 else None
-    src = int(round(bilin(ff["source"].astype(float))))
+    grad = _valid_bilinear(_corner_vals(ff["gradient_i"], i, j), w, valid)
+    amp = _valid_bilinear(_corner_vals(ff["seasonal_amp"], i, j), w, valid)
+    src_frac = _valid_bilinear(_corner_vals(ff["source"].astype(float), i, j), w, valid)
+    fit_raw = _valid_bilinear(_corner_vals(ff["fit_r2"], i, j), w, valid)   # NaN on DEM cells
+    fit = fit_raw if np.isfinite(fit_raw) else 0.0
+    # combined gradient uncertainty: seasonal swing + poor-fit penalty (station
+    # cells) + DEM-fallback penalty. Clipped to the trained amp envelope.
+    amp_eff = float(min(_AMP_HI, amp + AMP_KAPPA * (1.0 - fit) * src_frac
+                        + AMP_DEM_BUMP * (1.0 - src_frac)))
+
+    dtw_mean = _valid_bilinear(_corner_vals(ff["dtw_mean"], i, j), w, valid, fallback=False)
+    dtw_shallow = _valid_bilinear(_corner_vals(ff["dtw_shallow"], i, j), w, valid, fallback=False)
+
     return {
-        "azimuth_deg": None if az is None else round(float(az), 1),
-        "gradient_i": round(float(bilin(ff["gradient_i"])), 5),
-        "seasonal_amp": round(float(bilin(ff["seasonal_amp"])), 3),
-        "source": "stations" if src >= 1 else "dem",
+        "azimuth_deg": None if (az is None or near_divide) else round(float(az), 1),
+        "near_divide": bool(near_divide),
+        "flow_coherence": round(coherence, 3),
+        "gradient_i": round(float(grad), 5),
+        "seasonal_amp": round(float(amp), 3),
+        "seasonal_amp_effective": round(float(amp_eff), 3),
+        "fit_r2": (round(float(fit_raw), 3) if np.isfinite(fit_raw) else None),
+        "depth_to_water_m": (round(float(dtw_mean), 2) if np.isfinite(dtw_mean) else None),
+        "depth_to_water_shallow_m": (round(float(dtw_shallow), 2)
+                                     if np.isfinite(dtw_shallow) else None),
+        "source": "stations" if src_frac >= 0.5 else "dem",
     }
 
 

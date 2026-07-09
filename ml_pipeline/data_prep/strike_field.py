@@ -191,10 +191,19 @@ def strike_at(lon: float, lat: float) -> dict:
     j = int(np.clip(np.searchsorted(lat_c, lat) - 1, 0, len(lat_c) - 2))
     tx = (lon - lon_c[i]) / (lon_c[i + 1] - lon_c[i])
     ty = (lat - lat_c[j]) / (lat_c[j + 1] - lat_c[j])
+    w = np.array([(1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty])
+
+    def corners(A):
+        return np.array([A[j, i], A[j, i + 1], A[j + 1, i], A[j + 1, i + 1]], dtype=float)
+
+    # validity-weighted: don't drag a border pin toward out-of-Jharkhand cells
+    valid = (corners(sf["in_jh"].astype(float)) > 0.5).astype(float)
 
     def bilin(A):
-        return ((A[j, i] * (1 - tx) + A[j, i + 1] * tx) * (1 - ty)
-                + (A[j + 1, i] * (1 - tx) + A[j + 1, i + 1] * tx) * ty)
+        vals = corners(A)
+        m = w * valid
+        s = m.sum()
+        return float(np.sum(vals * m) / s) if s > 1e-12 else float(np.sum(vals * w) / w.sum())
 
     rx, ry = bilin(sf["res_x"]), bilin(sf["res_y"])
     R = float(np.hypot(rx, ry))
