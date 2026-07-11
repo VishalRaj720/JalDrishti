@@ -58,16 +58,57 @@ RADIUS_KM = 30.0          # lineaments are sparse -> wider search than the flow 
 MIN_SEGMENTS = 20
 SIGMA_KM = 15.0
 
-# V -> transverse anisotropy ratio (alpha_T/alpha_L) mapping for E1. Aligned
-# (V~0) -> strong channeling (0.02, current fractured value); dispersed (V~1) ->
-# near-radial (0.5). Documented convenience; E1 owns the final coupling.
-_ANISO_ALIGNED, _ANISO_DISPERSED = 0.02, 0.50
+# V -> transverse anisotropy ratio (alpha_T/alpha_L), FRACTURED regime. Re-anchored
+# (Stage D) so the FIELD-MEDIAN V reproduces the current fractured value 0.02 and V
+# only PERTURBS around it -- anchoring to the theoretical V=0/1 extremes mapped the
+# real field (V in [0.36,0.78]) to 0.19-0.39 and would have fattened every fractured
+# plume 10-20x. Multiplicative/log form stays positive; clipped to a physical band.
+# [Gelhar et al. 1992: aT/aL ~ 0.01-0.1]
+ANISO_BASE = 0.02          # aT/aL at the field-median V
+ANISO_V_MED = 0.63         # field-median circular variance
+ANISO_V_SCALE = 0.20       # e-fold of V-deviation
+ANISO_CLIP = (0.01, 0.10)  # aligned floor .. dispersed ceiling
 
 
 def anisotropy_from_variance(v: float) -> float:
-    """alpha_T/alpha_L from orientation dispersion V in [0,1] (E1 helper)."""
+    """alpha_T/alpha_L (FRACTURED) from orientation dispersion V. Median V -> 0.02;
+    aligned (low V) -> more channeled; dispersed (high V) -> rounder (<= porous)."""
     v = float(np.clip(v, 0.0, 1.0))
-    return _ANISO_ALIGNED + v * (_ANISO_DISPERSED - _ANISO_ALIGNED)
+    aniso = ANISO_BASE * np.exp((v - ANISO_V_MED) / ANISO_V_SCALE)
+    return float(np.clip(aniso, *ANISO_CLIP))
+
+
+# Flux-rotation permeability anisotropy lambda(V)=K_strike/K_across, FRACTURED only,
+# for the DISPLAY-ONLY tensor rotation of the plume azimuth toward strike.
+LAMBDA_K = 5.0             # lambda = 1 + LAMBDA_K*(1-V)
+LAMBDA_CLIP = (1.0, 6.0)
+
+
+def anisotropy_lambda(v: float, fractured: bool = True) -> float:
+    """Permeability anisotropy K_parallel/K_across from dispersion V (fractured)."""
+    if not fractured:
+        return 1.0
+    v = float(np.clip(v, 0.0, 1.0))
+    return float(np.clip(1.0 + LAMBDA_K * (1.0 - v), *LAMBDA_CLIP))
+
+
+def flux_azimuth(flow_az_deg: float, strike_deg: float, v: float,
+                 fractured: bool = True) -> float:
+    """DISPLAY-only tensor rotation: in anisotropic fractured rock the Darcy flux
+    deviates from -grad(h) TOWARD the high-K fracture strike. Returns the rotated
+    plume-travel bearing (deg). Vector form (singularity-free, undirected-strike-
+    safe): shrink the across-strike component of the flow unit vector by 1/lambda.
+    Labels are UNCHANGED (the solve stays flow-aligned) -- this only orients the map."""
+    lam = anisotropy_lambda(v, fractured)
+    if lam <= 1.0 + 1e-9:
+        return float(flow_az_deg % 360.0)
+    ts = np.radians(strike_deg)
+    es = np.array([np.sin(ts), np.cos(ts)])            # along strike (E, N)
+    ep = np.array([np.cos(ts), -np.sin(ts)])           # across strike
+    tf = np.radians(flow_az_deg)
+    f = np.array([np.sin(tf), np.cos(tf)])
+    fp = f.dot(es) * es + (f.dot(ep) / lam) * ep
+    return float(np.degrees(np.arctan2(fp[0], fp[1])) % 360.0)
 
 
 # --------------------------------------------------------------------------- #

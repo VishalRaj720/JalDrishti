@@ -380,6 +380,15 @@ FARFIELD_DRAINAGE_MEDIAN_KM = 6.0
 FARFIELD_DRAINAGE_P90_KM = 13.0
 
 # ---------------------------------------------------------------------------
+# E1 radial/anisotropic plume geometry (Phase 2, Stage E; see E1_geometry_design.md).
+# MASTER SWITCH for the leach-zone DISC in the served + generated plume. Default
+# OFF so the analytical engine and the deployed ML artifacts stay consistent; the
+# generator (M1) turns it on for training and the serve path flips it at the
+# atomic cutover (Stage H), together with the retrained artifacts. The disc-free
+# path is byte-identical to the pre-E1 geometry.
+E1_ENABLED = False
+
+# ---------------------------------------------------------------------------
 # 7. Ore-body masking (Module 2). ISR leaches uranium only where uranium ore
 #    exists; elsewhere the lixiviant perturbs non-radiological chemistry only.
 #    The 3-tier source-term policy for the URANIUM species:

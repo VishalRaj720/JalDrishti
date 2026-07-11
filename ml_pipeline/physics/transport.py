@@ -175,6 +175,10 @@ class TransportParams:
     t_days: float
     Xc_clean: float | None = None   # clean-water replacement front (restoration)
     C_res: float = 0.0              # residual source conc after restoration
+    # E1 leach-zone disc (Stage E). radius 0 => OFF => pre-E1 geometry, unchanged.
+    disc_radius_m: float = 0.0      # = W_eff/2 (throughput-widened footprint)
+    disc_center_x_m: float = 0.0    # wellfield centre in solver frame (= -W/2)
+    disc_conc: float = 0.0          # C0 (operations) or C_res (post-restoration)
 
 
 def _long_factor(X: np.ndarray, Xc: float, aL: float) -> np.ndarray:
@@ -204,6 +208,12 @@ def concentration_field(X: np.ndarray, Y: np.ndarray, p: TransportParams) -> np.
         # The clean front uses the RETARDED kinematics only (no Tang boost):
         # matrix back-diffusion makes clean-up slow -- conservative.
         C = C - (p.C0 - p.C_res) * _long_factor(X, p.Xc_clean, p.aL) * A_tran
+    # E1: leach-zone disc -- the well-field footprint is contaminated by
+    # construction. Conservative union so contained/low-drift plumes no longer
+    # report ~zero area (the source zone itself). Off when disc_radius_m <= 0.
+    if p.disc_radius_m > 0.0 and p.disc_conc > 0.0:
+        inside = (X - p.disc_center_x_m) ** 2 + Y ** 2 <= p.disc_radius_m ** 2
+        C = np.where(inside, np.maximum(C, p.disc_conc), C)
     return np.clip(C, 0.0, p.C0)
 
 
@@ -347,12 +357,26 @@ class PlumeResult:
     metrics: dict
 
 
-def _auto_grid(reach_m: float, aL: float, source_width: float, n: int = 220):
-    """Build a meshgrid sized to comfortably contain the plume."""
+def _auto_grid(reach_m: float, aL: float, source_width: float, n: int = 220,
+               disc_radius: float = 0.0, disc_center_x: float = 0.0, aT: float = 0.0):
+    """Build a meshgrid sized to comfortably contain the plume. With an E1 disc
+    (disc_radius > 0) the domain extends up-gradient to cover the disc and the
+    transverse span is sized to the PLUME (not a fixed fraction of reach, which
+    starved narrow long-reach plumes to a few cells -> MC-label quantization)."""
     reach = reach_m + 4.0 * np.sqrt(max(aL, 1e-3) * max(reach_m, 1.0)) + source_width
     reach = max(reach, source_width * 2.0, 50.0)
-    x = np.linspace(-0.25 * reach, reach, n)
-    y = np.linspace(-0.6 * reach, 0.6 * reach, n)
+    if disc_radius > 0.0:
+        x_lo = min(-0.25 * reach, disc_center_x - disc_radius - 0.1 * reach)
+        aT_eff = aT if aT > 0.0 else 0.1 * aL
+        y_half = (disc_radius
+                  + 4.0 * np.sqrt(max(aT_eff, 1e-4) * max(reach_m, source_width, 1.0))
+                  + 0.15 * source_width)
+        y_half = max(y_half, 0.6 * source_width)
+        x = np.linspace(x_lo, reach, n)
+        y = np.linspace(-y_half, y_half, n)
+    else:
+        x = np.linspace(-0.25 * reach, reach, n)          # pre-E1: unchanged
+        y = np.linspace(-0.6 * reach, 0.6 * reach, n)
     X, Y = np.meshgrid(x, y)
     return X, Y
 
@@ -418,11 +442,21 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
                                   restoration_days, beta_k)
         C_res = float(residual_fraction) * species_C0
 
+    # E1 leach-zone disc (Stage E): OFF unless P.E1_ENABLED, so the served path
+    # stays byte-identical to the deployed-ML geometry until the atomic cutover.
+    disc_r = disc_cx = disc_c = 0.0
+    if P.E1_ENABLED:
+        W = feat["wellfield_width_m"]
+        W_eff = feat.get("_source_width_m", W)
+        disc_r = W_eff / 2.0
+        disc_cx = -W / 2.0
+        disc_c = C_res if (Xc_clean is not None and C_res > 0.0) else species_C0
     return TransportParams(C0=species_C0, aL=feat["alpha_L"], aT=feat["alpha_T"],
                            source_width_m=feat.get("_source_width_m",
                                                    feat["wellfield_width_m"]),
                            Xc=Xc, Xw=Xw, sigma=sigma, t_days=t_days,
-                           Xc_clean=Xc_clean, C_res=C_res)
+                           Xc_clean=Xc_clean, C_res=C_res,
+                           disc_radius_m=disc_r, disc_center_x_m=disc_cx, disc_conc=disc_c)
 
 
 def solve_plume(params: TransportParams, *, threshold: float, background: float,
@@ -438,7 +472,9 @@ def solve_plume(params: TransportParams, *, threshold: float, background: float,
                                             level=tang_level))
     off_scale = reach_true > MAX_GRID_REACH_M
     X, Y = _auto_grid(min(reach_true, MAX_GRID_REACH_M), params.aL,
-                      params.source_width_m, n=grid_n)
+                      params.source_width_m, n=grid_n,
+                      disc_radius=params.disc_radius_m,
+                      disc_center_x=params.disc_center_x_m, aT=params.aT)
     C = concentration_field(X, Y, params)
 
     dx = X[0, 1] - X[0, 0]
@@ -487,7 +523,8 @@ def simulate_plume(feat: dict, *, species_C0: float, background: float,
 # broadcast pass per reach-bucket -- ~50-100x faster than per-draw grids.
 # --------------------------------------------------------------------------- #
 def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
-                 Xc_clean, C_res) -> np.ndarray:
+                 Xc_clean, C_res, disc_radius=None, disc_center_x=None,
+                 disc_conc=None) -> np.ndarray:
     """concentration_field broadcast over draws: X3/Y3 are (ny,nx,1) grids,
     parameter arrays are (nd,). Returns C of shape (ny, nx, nd)."""
     Xc = np.maximum(Xc, 1e-3)
@@ -509,6 +546,10 @@ def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
         Xcc = np.maximum(Xc_clean, 1e-3)
         A_c = 0.5 * erfc((X3 - Xcc) / (2.0 * np.sqrt(aL * Xcc)))
         C = C - np.where(active, C0 - C_res, 0.0) * A_c * A_tran
+    # E1 leach-zone disc, broadcast over draws (radius/centre/conc are (nd,))
+    if disc_radius is not None and bool(np.any(disc_radius > 0.0)):
+        inside = (X3 - disc_center_x) ** 2 + Y3 ** 2 <= disc_radius ** 2
+        C = np.where(inside, np.maximum(C, disc_conc), C)
     return np.clip(C, 0.0, C0)
 
 
@@ -539,7 +580,11 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
         reach_b = min(float(reaches[bucket].max()), MAX_GRID_REACH_M)
         aL_b = max(plist[i].aL for i in bucket)
         W_b = max(plist[i].source_width_m for i in bucket)
-        X, Y = _auto_grid(reach_b, aL_b, W_b, n=grid_n)
+        aT_b = max(plist[i].aT for i in bucket)
+        disc_r_b = max(plist[i].disc_radius_m for i in bucket)
+        disc_cx_b = min(plist[i].disc_center_x_m for i in bucket)   # most up-gradient
+        X, Y = _auto_grid(reach_b, aL_b, W_b, n=grid_n,
+                          disc_radius=disc_r_b, disc_center_x=disc_cx_b, aT=aT_b)
         X3, Y3 = X[:, :, None], Y[:, :, None]
         C = _stack_field(
             X3, Y3,
@@ -548,7 +593,10 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
             Xw=arr(lambda p: p.Xw), sigma=arr(lambda p: p.sigma),
             t_days=plist[bucket[0]].t_days,
             Xc_clean=arr(lambda p: p.Xc_clean if p.Xc_clean is not None else 0.0),
-            C_res=arr(lambda p: p.C_res))
+            C_res=arr(lambda p: p.C_res),
+            disc_radius=arr(lambda p: p.disc_radius_m),
+            disc_center_x=arr(lambda p: p.disc_center_x_m),
+            disc_conc=arr(lambda p: p.disc_conc))
         mask = C >= thr_inc
         cell = float(abs((X[0, 1] - X[0, 0]) * (Y[1, 0] - Y[0, 0])))
         area[bucket] = mask.sum(axis=(0, 1)) * cell / 1e4

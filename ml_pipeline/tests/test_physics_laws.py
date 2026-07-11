@@ -419,3 +419,53 @@ def test_mc_field_matches_single_solve():
     assert m2["area_ha"][0] == pytest.approx(m1["affected_area_ha"], rel=1e-6)
     assert m2["max_dist_m"][0] == pytest.approx(m1["max_migration_distance_m"], rel=1e-6)
     assert m2["compliance_plume"][0] + 2.0 == pytest.approx(m1["compliance_conc"], rel=1e-6)
+
+
+def _e1_area(C0, e1_on):
+    """Affected area for a contained fractured scenario with E1 disc on/off."""
+    from ml_pipeline.physics.transport import simulate_plume
+    P.E1_ENABLED = e1_on
+    feat = build_feature_row(
+        domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+        operation_days=8 * 365.0, wellfield_width_m=300.0,
+        source_conc_C0=C0, background_conc_Cb=2.0, eval_time_days=5 * 365.0,
+        **FRACTURED)
+    return simulate_plume(feat, species_C0=C0, background=2.0, threshold=U_THR,
+                          t_days=5 * 365.0, operation_days=8 * 365.0).metrics["affected_area_ha"]
+
+
+def test_e1_disc_adds_footprint_and_gates_on_threshold():
+    """E1 (Stage E): the leach-zone disc adds the well-field source footprint to
+    the affected area for a REAL source, but a sub-threshold (clamped non-ore)
+    source contributes NOTHING (threshold gate -> no ghost disc). Flag isolated."""
+    try:
+        off = _e1_area(13272.0, False)
+        on = _e1_area(13272.0, True)
+        trace = _e1_area(5.0, True)          # C0 < incremental BIS threshold
+        assert on > off + 3.0                # disc ~ pi*(W_eff/2)^2 added
+        assert trace == pytest.approx(0.0, abs=1e-6)
+    finally:
+        P.E1_ENABLED = False                 # never leak the flag to other tests
+
+
+def test_e1_mc_matches_single_solve_with_disc():
+    """solve_plume and the vectorized MC evaluator must still agree once the disc
+    is active (both paths carry it)."""
+    from ml_pipeline.physics.transport import (params_from_features, solve_plume,
+                                               mc_field_metrics)
+    try:
+        P.E1_ENABLED = True
+        feat = build_feature_row(
+            domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+            operation_days=8 * 365.0, wellfield_width_m=300.0,
+            source_conc_C0=15000.0, background_conc_Cb=2.0,
+            eval_time_days=5 * 365.0, **FRACTURED)
+        p = params_from_features(feat, species_C0=15000.0, t_days=5 * 365.0,
+                                 operation_days=8 * 365.0)
+        assert p.disc_radius_m > 0.0         # disc actually on
+        m1 = solve_plume(p, threshold=U_THR, background=2.0, grid_n=100).metrics
+        m2 = mc_field_metrics([p], threshold=U_THR, background=2.0, grid_n=100)
+        assert m2["area_ha"][0] == pytest.approx(m1["affected_area_ha"], rel=1e-6)
+        assert m2["max_dist_m"][0] == pytest.approx(m1["max_migration_distance_m"], rel=1e-6)
+    finally:
+        P.E1_ENABLED = False
