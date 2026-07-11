@@ -143,6 +143,8 @@ def pin_info(lon: float, lat: float) -> dict:
         "baseline": {k: (None if (b[k] != b[k]) else round(float(b[k]), 2))
                      for k in SPECIES if k in b},
         "data_confidence": _data_confidence(h, b),
+        # D1 (Stage C): flow defaults so the UI can prefill azimuth/gradient at pin drop
+        "flow": flow_at(lon, lat),
     }
 
 

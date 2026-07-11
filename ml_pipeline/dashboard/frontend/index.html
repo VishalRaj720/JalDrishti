@@ -47,7 +47,7 @@
         <input type="range" id="bleed" min="0" max="8" step="0.1" value="2.0"></div>
       <div class="slider"><label>Operation duration <span class="u">yr</span><b id="v-op">8</b></label>
         <input type="range" id="op" min="1" max="20" step="0.5" value="8"></div>
-      <div class="slider"><label>Hydraulic gradient <span class="u">i</span><b id="v-grad">0.005</b></label>
+      <div class="slider"><label>Hydraulic gradient <span class="u">i</span><span id="src-grad" class="src muted"></span><b id="v-grad">0.005</b></label>
         <input type="range" id="grad" min="0.0005" max="0.02" step="0.0005" value="0.005"></div>
       <div class="slider"><label>Evaluation time <span class="u">yr</span><b id="v-time">10</b></label>
         <input type="range" id="time" min="0" max="20" step="0.5" value="10"></div>
@@ -55,7 +55,7 @@
         <input type="range" id="width" min="100" max="800" step="10" value="300"></div>
       <div class="slider"><label>Restoration sweep <span class="u">yr</span><b id="v-rest">0</b></label>
         <input type="range" id="rest" min="0" max="10" step="0.5" value="0"></div>
-      <div class="slider azimuth"><label>Fracture strike azimuth <span class="u">°</span><b id="v-az">45</b></label>
+      <div class="slider azimuth"><label>Plume travel azimuth <span class="u">°</span><span id="src-az" class="src muted"></span><b id="v-az">45</b></label>
         <input type="range" id="az" min="0" max="360" step="5" value="45"></div>
     </section>
 
@@ -67,6 +67,7 @@
       </div>
       <div id="ml-status" class="muted small"></div>
       <div id="warn-banner" class="banner hidden"></div>
+      <div id="far-note" class="banner info hidden"></div>
       <div id="drift-badge"></div>
     </section>
 

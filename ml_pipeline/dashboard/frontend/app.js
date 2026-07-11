@@ -9,6 +9,33 @@ const state = {
   pin: null, species: "uranium_ppb", regime: "", mode: "ml", last: null,
 };
 
+/* azimuth & gradient are DATA-DERIVED (D1 flow field) by default; a slider drag
+   flips that factor to a manual override. `auto` tracks which is still data-driven. */
+const auto = { az: true, grad: true };
+function setSrc(id, txt) {
+  const e = document.getElementById(id);
+  if (e) e.textContent = txt ? " · " + txt : "";
+}
+function setSliderVal(id, labId, sliderVal, labelText) {
+  document.getElementById(id).value = sliderVal;          // snaps thumb to step
+  document.getElementById(labId).textContent = labelText;  // exact data value
+}
+function applyFlowDefaults(flow) {
+  if (!flow) return;
+  if (auto.grad && flow.gradient_i != null) {
+    setSliderVal("grad", "v-grad", flow.gradient_i, (+flow.gradient_i).toFixed(4));
+    setSrc("src-grad", `auto · flow (${flow.source})`);
+  }
+  if (auto.az) {
+    if (flow.azimuth_deg != null && !flow.near_divide) {
+      setSliderVal("az", "v-az", flow.azimuth_deg, flow.azimuth_deg + "°");
+      setSrc("src-az", "auto · flow");
+    } else {
+      setSrc("src-az", "radial (near divide)");
+    }
+  }
+}
+
 /* ---------------- map ---------------- */
 const map = L.map("map", { zoomControl: true }).setView([23.6, 85.3], 7);
 
@@ -64,6 +91,97 @@ let pinMarker = null;
 const toLatLng = (c) => [c[1], c[0]];
 const ll = (arr) => arr.map(toLatLng);
 
+/* ---------------- toggleable data-layer overlays (Stage C) ----------------
+   Each data-derived field is its OWN layer so the user can see the factors
+   separately. Note (important): these are NOT summed into one vector —
+   groundwater FLOW (D1) sets the plume's travel DIRECTION; fracture STRIKE (D2)
+   is an undirected fabric that sets the plume's ELONGATION, not its heading. */
+const overlays = {
+  aquifer: L.layerGroup(), ore: L.layerGroup(),
+  rivers: L.layerGroup(), flow: L.layerGroup(), strike: L.layerGroup(),
+};
+const overlayLoaded = {};
+
+// small-distance destination point from (lat,lon) along a bearing (deg from N)
+function destPoint(lat, lon, azDeg, lenDeg) {
+  const a = azDeg * Math.PI / 180;
+  return [lat + lenDeg * Math.cos(a),
+          lon + lenDeg * Math.sin(a) / Math.cos(lat * Math.PI / 180)];
+}
+function drawArrow(group, lat, lon, azDeg, color, lenDeg, weight = 1.3) {
+  const tip = destPoint(lat, lon, azDeg, lenDeg);
+  const b1 = destPoint(tip[0], tip[1], azDeg + 150, lenDeg * 0.42);
+  const b2 = destPoint(tip[0], tip[1], azDeg - 150, lenDeg * 0.42);
+  L.polyline([[lat, lon], tip], { color, weight, opacity: .85 }).addTo(group);
+  L.polyline([b1, tip, b2], { color, weight, opacity: .85 }).addTo(group);
+}
+function drawTick(group, lat, lon, strikeDeg, color, lenDeg) {
+  L.polyline([destPoint(lat, lon, strikeDeg, lenDeg),
+              destPoint(lat, lon, strikeDeg + 180, lenDeg)],
+             { color, weight: 1.4, opacity: .8 }).addTo(group);
+}
+
+const overlayLoaders = {
+  rivers() {
+    fetch(`${API}/api/rivers`).then(r => r.json()).then(gj => {
+      L.geoJSON(gj, {
+        style: { color: "#3aa0ff", weight: 1.1, opacity: .65 },
+        onEachFeature: (f, l) => l.bindTooltip(
+          `perennial river · ${(+f.properties.DIS_AV_CMS).toFixed(1)} m³/s`,
+          { className: "aq-tip", sticky: true }),
+      }).addTo(overlays.rivers);
+    }).catch(() => {});
+  },
+  flow() {
+    fetch(`${API}/api/flow_field`).then(r => r.json()).then(gj => {
+      gj.features.forEach(f => {
+        const [lon, lat] = f.geometry.coordinates, p = f.properties;
+        drawArrow(overlays.flow, lat, lon, p.azimuth_deg,
+                  p.source === "stations" ? "#37d39b" : "#7f8a99", 0.020);
+      });
+    }).catch(() => {});
+  },
+  strike() {
+    fetch(`${API}/api/strike_field`).then(r => r.json()).then(gj => {
+      gj.features.forEach(f => {
+        const [lon, lat] = f.geometry.coordinates, V = f.properties.circular_variance;
+        const col = V < 0.4 ? "#ffcf6f" : (V > 0.65 ? "#9b7bff" : "#c79bff");
+        drawTick(overlays.strike, lat, lon, f.properties.strike_deg, col, 0.017);
+      });
+    }).catch(() => {});
+  },
+};
+
+function toggleOverlay(k, on) {
+  if (on) {
+    if (overlayLoaders[k] && !overlayLoaded[k]) { overlayLoaders[k](); overlayLoaded[k] = true; }
+    map.addLayer(overlays[k]);
+  } else {
+    map.removeLayer(overlays[k]);
+  }
+}
+
+const LayersControl = L.Control.extend({
+  options: { position: "topright" },
+  onAdd() {
+    const div = L.DomUtil.create("div", "layers-ctl");
+    const row = (k, label, on) =>
+      `<label class="lc-row"><input type="checkbox" data-k="${k}" ${on ? "checked" : ""}>${label}</label>`;
+    div.innerHTML = `<div class="lc-title">Data layers</div>`
+      + row("aquifer", '<span class="lc-sw aq"></span> Aquifers', true)
+      + row("ore", '<span class="lc-sw ore"></span> Ore deposits', true)
+      + row("rivers", '<span class="lc-sw riv"></span> Perennial rivers', false)
+      + row("flow", '<span class="lc-sw flow"></span> Groundwater flow →', false)
+      + row("strike", '<span class="lc-sw strike"></span> Fracture strike ⇔', false);
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    div.querySelectorAll("input").forEach(cb =>
+      cb.addEventListener("change", () => toggleOverlay(cb.dataset.k, cb.checked)));
+    return div;
+  },
+});
+map.addControl(new LayersControl());
+
 /* ---------------- aquifer overlay ---------------- */
 fetch(`${API}/api/aquifers`).then(r => r.json()).then(gj => {
   L.geoJSON(gj, {
@@ -77,8 +195,9 @@ fetch(`${API}/api/aquifers`).then(r => r.json()).then(gj => {
         `<b>${p.lithology}</b> · ${p.regime}<br>K≈${(+p.K_m_day).toFixed(2)} m/day · φ=${(+p.eff_porosity).toFixed(3)}`,
         { className: "aq-tip", sticky: true });
     },
-  }).addTo(map);
+  }).addTo(overlays.aquifer);
 }).catch(() => {});
+map.addLayer(overlays.aquifer);   // default on
 
 /* ---------------- Module 1: state boundary (mask + client-side reject) ------ */
 let JH_RINGS = null;   // [[ [lon,lat], ... ], ...] exterior rings for point-in-poly
@@ -122,8 +241,9 @@ fetch(`${API}/api/ore`).then(r => r.json()).then(gj => {
     onEachFeature: (f, layer) => layer.bindTooltip(
       `${f.properties.tier === "deposit" ? "Uranium deposit" : "Prospective belt"}: <b>${f.properties.name}</b>`,
       { className: "aq-tip", sticky: true }),
-  }).addTo(map);
+  }).addTo(overlays.ore);
 }).catch(() => {});
+map.addLayer(overlays.ore);   // default on
 
 /* ---------------- pin drop ---------------- */
 map.on("click", e => {
@@ -137,6 +257,7 @@ map.on("click", e => {
 
 function setPin(lon, lat) {
   state.pin = { lon, lat };
+  auto.az = true; auto.grad = true;    // a fresh pin reverts to data-derived flow
   if (pinMarker) map.removeLayer(pinMarker);
   pinMarker = L.circleMarker([lat, lon], {
     radius: 7, color: "#fff", weight: 2, fillColor: "#ff2d2d", fillOpacity: 1,
@@ -155,6 +276,7 @@ function setPin(lon, lat) {
       `<span class="muted small">Baseline ${SPECIES_NAME[state.species]}: ` +
       `${bv == null ? "n/a" : bv + " " + SPECIES_UNIT[state.species]}</span>`;
     renderConfidence(info.data_confidence);
+    applyFlowDefaults(info.flow);        // prefill azimuth/gradient from D1 flow
     runPredict();
   }).catch(err => {
     // out-of-bounds (422) or resolve failure: reject cleanly, no stale plume
@@ -189,6 +311,8 @@ sliders.forEach(([id, lab, fmt]) => {
   const el = document.getElementById(id);
   el.addEventListener("input", () => {
     document.getElementById(lab).textContent = fmt(el.value);
+    if (id === "az") { auto.az = false; setSrc("src-az", "manual"); }
+    if (id === "grad") { auto.grad = false; setSrc("src-grad", "manual"); }
     debouncedPredict();
   });
 });
@@ -212,10 +336,12 @@ function payload() {
     lon: state.pin.lon, lat: state.pin.lat,
     species: state.species, regime: state.regime || null,
     injection_rate_m3_day: +val("inj"), bleed_percent: +val("bleed"),
-    operation_years: +val("op"), gradient_i: +val("grad"),
+    operation_years: +val("op"),
+    // null when still data-derived -> server fills from the D1 flow field
+    gradient_i: auto.grad ? null : +val("grad"),
     time_years: +val("time"), wellfield_width_m: +val("width"),
     restoration_years: +val("rest"),
-    azimuth_deg: +val("az"), mode: "both",
+    azimuth_deg: auto.az ? null : +val("az"), mode: "both",
     ore_depth_m: +val("oredepth"), ore_thickness_m: +val("orethick"),
   };
 }
@@ -284,9 +410,29 @@ function render() {
     });
   }
 
+  // keep the data-derived azimuth/gradient in sync (only while still auto)
+  applyFlowDefaults(r.hydro && r.hydro.flow);
+
+  // plume travel-direction arrow at the pin (or a radial marker near a divide)
+  if (r.azimuth_source === "indeterminate_divide") {
+    L.circleMarker([r.pin.lat, r.pin.lon], {
+      radius: 15, color: "#6fd1ff", weight: 1.6, dashArray: "3 4", fill: false,
+    }).addTo(plumeLayer).bindTooltip("Flow direction indeterminate near a water divide — radial spread");
+  } else {
+    drawArrow(plumeLayer, r.pin.lat, r.pin.lon, r.azimuth_deg, "#6fd1ff", 0.03, 2.4);
+  }
+
   renderMetrics(r);
   renderNotice(r.notice);
+  renderFarField(r.far_field_note, r.nearest_river_km);
   renderVertical(r.vertical);
+}
+
+function renderFarField(note, riverKm) {
+  const el = document.getElementById("far-note");
+  if (!el) return;
+  el.textContent = note || "";
+  el.classList.toggle("hidden", !note);
 }
 
 /* ---------------- Module 2: ore-zone notice ---------------- */
@@ -335,16 +481,26 @@ function renderDepth(v) {
      + `stroke="${riskCol}" stroke-width="2" stroke-dasharray="3 3" marker-end="url(#ah)"/>`;
   s += `<defs><marker id="ah" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">`
      + `<path d="M0,0 L6,3 L0,6 Z" fill="${riskCol}"/></marker></defs>`;
-  // water-table hatch at top
-  s += `<line x1="${x0}" y1="${y(0) + 1}" x2="${x1}" y2="${y(0) + 1}" stroke="#6fd1ff" stroke-width="1.2"/>`;
+  // real (post-monsoon) water table from the D1 CGWB field, if resolved
+  if (v.water_table_m != null) {
+    const yw = y(v.water_table_m);
+    s += `<line x1="${x0}" y1="${yw}" x2="${x1}" y2="${yw}" stroke="#6fd1ff" stroke-width="1.4" stroke-dasharray="2 2"/>`;
+    s += `<text x="${x1 + 4}" y="${yw + 3}" fill="#6fd1ff" font-size="8">WT ${v.water_table_m}m</text>`;
+  } else {
+    s += `<line x1="${x0}" y1="${y(0) + 1}" x2="${x1}" y2="${y(0) + 1}" stroke="#6fd1ff" stroke-width="1.2"/>`;
+  }
   // depth labels
   const lab = (d, t) => `<text x="${x1 + 4}" y="${y(d) + 3}" fill="#8b97a7" font-size="8">${t}</text>`;
   s += lab(0, "0 m") + lab(v.layer1_base_m, v.layer1_base_m + " m")
      + lab(v.ore_depth_m, v.ore_depth_m + " m");
   svg.innerHTML = s;
   if (leg) leg.innerHTML =
-    `<b style="color:#6fd1ff">Layer 1</b> shallow wells (0–${v.layer1_base_m} m)<br>`
-    + `<b style="color:#8b97a7">Layer 2</b> fractured bedrock<br>`
+    `<b style="color:#6fd1ff">Layer 1</b> shallow wells (0–${v.layer1_base_m} m)`
+    + (v.water_table_m != null
+        ? ` · <span style="color:#6fd1ff">water table ${v.water_table_m} m`
+          + (v.saturated_shallow_thickness_m != null
+              ? `, saturated ${v.saturated_shallow_thickness_m} m` : "") + `</span>` : "")
+    + `<br><b style="color:#8b97a7">Layer 2</b> fractured bedrock<br>`
     + `<b style="color:#ff5a5a">Layer 3</b> ore / ISR zone (${v.ore_depth_m} m)<br>`
     + `<span style="color:${riskCol}">▲ upward pathway → ${(v.shallow_impact_probability * 100).toFixed(0)}%</span>`;
 }

@@ -179,6 +179,61 @@ def api_rivers():
     return JSONResponse(rivers_geojson())
 
 
+@app.get("/api/flow_field")
+def api_flow_field(step: int = 2):
+    """D1 groundwater-flow vectors (down-gradient azimuth per cell) for the map
+    overlay -- the plume's TRAVEL direction. Decimated to keep the payload light."""
+    import numpy as np
+    from ml_pipeline.data_prep.flow_field import load_flow_field
+    ff = load_flow_field()
+    lon_c, lat_c, fe, fn = ff["lon_c"], ff["lat_c"], ff["flow_e"], ff["flow_n"]
+    grad, src, injh = ff["gradient_i"], ff["source"], ff["in_jh"]
+    st = max(1, int(step))
+    feats = []
+    for j in range(0, injh.shape[0], st):
+        for i in range(0, injh.shape[1], st):
+            if not injh[j, i]:
+                continue
+            e, n = float(fe[j, i]), float(fn[j, i])
+            if e * e + n * n < 1e-9:
+                continue
+            az = float(np.degrees(np.arctan2(e, n)) % 360.0)
+            feats.append({"type": "Feature",
+                          "geometry": {"type": "Point",
+                                       "coordinates": [float(lon_c[i]), float(lat_c[j])]},
+                          "properties": {"azimuth_deg": round(az, 1),
+                                         "gradient_i": round(float(grad[j, i]), 5),
+                                         "source": "stations" if src[j, i] == 1 else "dem"}})
+    return JSONResponse({"type": "FeatureCollection", "features": feats})
+
+
+@app.get("/api/strike_field")
+def api_strike_field(step: int = 2):
+    """D2 fracture-strike orientation (axial, undirected) per cell for the map
+    overlay. This is the fabric that ELONGATES the plume (E1), NOT its travel
+    direction -- rendered as a double-headed tick, coloured by dispersion V."""
+    import numpy as np
+    from ml_pipeline.data_prep.strike_field import load_strike_field
+    sf = load_strike_field()
+    lon_c, lat_c, rx, ry, injh = (sf["lon_c"], sf["lat_c"], sf["res_x"],
+                                  sf["res_y"], sf["in_jh"])
+    st = max(1, int(step))
+    feats = []
+    for j in range(0, injh.shape[0], st):
+        for i in range(0, injh.shape[1], st):
+            if not injh[j, i]:
+                continue
+            x, y = float(rx[j, i]), float(ry[j, i])
+            strike = float((np.degrees(np.arctan2(y, x)) / 2.0) % 180.0)
+            V = float(max(0.0, min(1.0, 1.0 - np.hypot(x, y))))
+            feats.append({"type": "Feature",
+                          "geometry": {"type": "Point",
+                                       "coordinates": [float(lon_c[i]), float(lat_c[j])]},
+                          "properties": {"strike_deg": round(strike, 1),
+                                         "circular_variance": round(V, 3)}})
+    return JSONResponse({"type": "FeatureCollection", "features": feats})
+
+
 @app.get("/api/aquifers")
 def api_aquifers():
     """Regime-coloured aquifer polygons (simplified) for the map overlay."""
