@@ -377,7 +377,10 @@ def test_porous_override_is_alive():
     from ml_pipeline.ml.predict import features_from_inputs
     xc = {}
     for sp in ("uranium_ppb", "tds_mg_l"):
-        inputs, _ = resolve_inputs(dict(lon=86.2, lat=22.8, species=sp, regime="porous"))
+        # pin the gradient so this probes the regime-OVERRIDE physics, not the
+        # (Stage B) data-derived flow default, which is pin-specific and lower.
+        inputs, _ = resolve_inputs(dict(lon=86.2, lat=22.8, species=sp,
+                                        regime="porous", gradient_i=0.005))
         _, feat, Xc = features_from_inputs(**inputs)
         xc[sp] = Xc
     assert xc["uranium_ppb"] > 2.0, "U front frozen at source (chimera not fixed)"

@@ -1,0 +1,14 @@
+{
+  "grid_km": 5.0,
+  "perennial_dis_cms": 1.0,
+  "perennial_reaches": 4577,
+  "grid_shape": [
+    82,
+    97
+  ],
+  "distance_km_pctiles": [
+    0.63,
+    3.74,
+    45.1
+  ]
+}

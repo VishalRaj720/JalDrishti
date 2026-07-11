@@ -249,7 +249,8 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                              ore_thickness_m: float, layer1_base_m: float,
                              K_m_day: float, phi_confining: float,
                              Kv_Kh_ratio: float, upward_gradient: float,
-                             t_days: float, wellbore_failure_prob: float) -> dict:
+                             t_days: float, wellbore_failure_prob: float,
+                             water_table_m: float | None = None) -> dict:
     """SCREENING estimate of how much the deep plume could impact the Layer-1
     (shallow drinking-water) aquifer. Three independent pathways OR-combined:
 
@@ -303,9 +304,22 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
     p_shallow = 1.0 - (1.0 - p_disp) * (1.0 - p_adv) * (1.0 - p_well)
     pathways = {"dispersive": p_disp, "advective_leakage": p_adv, "wellbore": p_well}
     dominant = (max(pathways, key=pathways.get) if p_shallow >= 0.05 else "contained")
+    # D1 (Stage B): real depth-to-water CONTEXT. The risk barrier stays at
+    # layer1_base_m (the aquifer BASE -- where the up-rising plume first enters
+    # the resource, the conservative receptor). The water table (aquifer TOP)
+    # only sets how much saturated drinking water actually sits above the barrier;
+    # it does NOT shorten the separation (that would be anti-conservative here).
+    water_table = None
+    saturated_shallow_thickness_m = None
+    if water_table_m is not None and water_table_m == water_table_m:
+        water_table = round(float(water_table_m), 1)
+        saturated_shallow_thickness_m = round(max(float(layer1_base_m)
+                                                  - float(water_table_m), 0.0), 1)
     return {
         "separation_m": round(dz_adv, 1),   # intact confining rock: ore-top -> shallow base
         "layer1_base_m": round(float(layer1_base_m), 1),
+        "water_table_m": water_table,
+        "saturated_shallow_thickness_m": saturated_shallow_thickness_m,
         "ore_depth_m": round(float(ore_depth_m), 1),
         "ore_thickness_m": round(float(ore_thickness_m), 1),
         "conc_reaching_shallow": round(conc_shallow, 3),

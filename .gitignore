@@ -88,3 +88,5 @@ Datasets/jharkhand_glo30_dem.tif
 # 109 MB of CGWB NAQUIM source PDFs (reference material)
 Datasets/naquim_reference/Jharkhand_NAQUIM_Reports/
 newdataset/
+# Raw Asia HydroRIVERS shapefile (207MB) -- clipped to Datasets/jharkhand_rivers.geojson
+Datasets/HydroRIVERS_v10_as_shp/

@@ -369,6 +369,16 @@ FALLBACK_SOURCE_CONC = {
 # Geographic bounds of Jharkhand (for validating dropped pins / dashboard map).
 JHARKHAND_BOUNDS = {"lon_min": 83.3, "lon_max": 88.0, "lat_min": 21.9, "lat_max": 25.5}
 
+# Far-field drainage context (Stage B). GLO-30 flow-accumulation analysis
+# (data_prep.drainage) found perennial drainage (>=120 km2 contributing area) is
+# typically within ~6 km (median) / ~13 km (P90) across Jharkhand's dissected
+# terrain. A predicted plume reach beyond this scale is physically overstated by
+# the unbounded down-gradient geometry -- the plume would meet a stream and
+# discharge. Used for a QUALITATIVE note only (per-pin channel placement from the
+# coarse DEM is unreliable -- see data_prep.drainage), never to cap a label.
+FARFIELD_DRAINAGE_MEDIAN_KM = 6.0
+FARFIELD_DRAINAGE_P90_KM = 13.0
+
 # ---------------------------------------------------------------------------
 # 7. Ore-body masking (Module 2). ISR leaches uranium only where uranium ore
 #    exists; elsewhere the lixiviant perturbs non-radiological chemistry only.

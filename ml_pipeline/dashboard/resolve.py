@@ -22,6 +22,7 @@ from ml_pipeline.data_prep.jharkhand_loader import (
 )
 from ml_pipeline.data_prep.texas_loader import texas_source_signature
 from ml_pipeline.data_prep.ore_loader import ore_zone_at
+from ml_pipeline.data_prep.flow_field import flow_at
 from ml_pipeline.ml.dataset import ARTIFACT_DIR
 
 SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
@@ -159,6 +160,9 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     species = payload.get("species", "uranium_ppb")
     h = aquifer_at_point(lon, lat, aq)
     b = baseline_at_point(lon, lat, wq)
+    # D1 (Stage B/E2): data-derived flow -> default azimuth / gradient / seasonal
+    # amplitude for the pin (overridden by explicit slider values below).
+    flow = flow_at(lon, lat)
 
     lithology = h["lithology"]
     natural_regime = h["regime"]
@@ -224,7 +228,7 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     inputs = dict(
         regime=regime,
         K_m_day=_override(payload, "K_m_day", h["K_m_day"]),
-        gradient_i=_override(payload, "gradient_i", 0.005),
+        gradient_i=_override(payload, "gradient_i", flow["gradient_i"]),
         phi_mobile=_override(payload, "phi_mobile", phi_default),
         n_total=float(n_total),
         grain_density=float(grain_density),
@@ -241,7 +245,10 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         time_years=_override(payload, "time_years", 10.0),
         restoration_years=_override(payload, "restoration_years", 0.0),
         downtime_fraction=_override(payload, "downtime_fraction", 0.0),
-        gradient_seasonal_amp=_override(payload, "gradient_seasonal_amp", 0.0),
+        # D1: effective seasonal amplitude folds in plane-fit / DEM-fallback
+        # uncertainty -> wider ML bands on low-confidence cells.
+        gradient_seasonal_amp=_override(payload, "gradient_seasonal_amp",
+                                        flow["seasonal_amp_effective"]),
     )
     # retardation (asymptotic) so the UI can SHOW why a plume is slow (P2)
     from ml_pipeline.data_prep.feature_engineering import retardation_factor
@@ -269,5 +276,8 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         "u_suppressed": u_suppressed,
         # D4: deposit ore grade (%U) used to scale the uranium C0, if applicable
         "ore_grade_pct_u": ore_grade_pct,
+        # D1 (Stage B): data-derived flow at the pin -- default azimuth/gradient,
+        # divide flag, fit provenance, and depth-to-water for the map + screening.
+        "flow": flow,
     }
     return inputs, hydro

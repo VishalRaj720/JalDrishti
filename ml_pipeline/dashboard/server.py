@@ -84,14 +84,16 @@ class PredictRequest(BaseModel):
                                  le=_OR["bleed_fraction"][1] * 100)
     operation_years: float = Field(8, ge=_OR["operation_years"][0],
                                    le=_OR["operation_years"][1])
-    gradient_i: float = Field(0.005, ge=_OR["hydraulic_gradient"][0],
-                              le=_OR["hydraulic_gradient"][1])
+    # None -> data-derived default from the D1 flow field at the pin (Stage B).
+    gradient_i: float | None = Field(None, ge=_OR["hydraulic_gradient"][0],
+                                     le=_OR["hydraulic_gradient"][1])
     time_years: float = Field(10, ge=_OR["horizon_years"][0],
                               le=_OR["horizon_years"][1])
     wellfield_width_m: float = Field(300, ge=_OR["wellfield_width_m"][0],
                                      le=_OR["wellfield_width_m"][1])
     restoration_years: float = Field(0, ge=0, le=_OR["restoration_years"][1])
-    azimuth_deg: float = Field(45, ge=0, le=360)
+    # None -> down-gradient bearing from the D1 flow field (radial near a divide).
+    azimuth_deg: float | None = Field(None, ge=0, le=360)
     # Module 5A (2.5D): depth of the ore/ISR target zone + its vertical extent
     ore_depth_m: float = Field(P.VERTICAL["ore_depth_default_m"],
                                ge=P.VERTICAL["ore_depth_range_m"][0],
@@ -167,6 +169,16 @@ def api_ore():
     return JSONResponse(ore_geojson())
 
 
+@app.get("/api/rivers")
+def api_rivers():
+    """Perennial river polylines (HydroRIVERS, DIS>=1 m3/s) for the map overlay,
+    so users see where a plume would discharge to surface water (Stage B2)."""
+    from ml_pipeline.data_prep.rivers import rivers_geojson, RIVER_NPZ
+    if not RIVER_NPZ.exists():
+        return JSONResponse({"type": "FeatureCollection", "features": []})
+    return JSONResponse(rivers_geojson())
+
+
 @app.get("/api/aquifers")
 def api_aquifers():
     """Regime-coloured aquifer polygons (simplified) for the map overlay."""
@@ -191,16 +203,27 @@ def api_predict(req: PredictRequest):
     extrapolation = envelope_violations(inputs)
     half_w = inputs["wellfield_width_m"] / 2.0        # source plane offset from pin
 
+    # Effective display azimuth (Stage B/E2): explicit user override wins; else the
+    # D1 down-gradient bearing; else (near a water divide, no preferred direction)
+    # fall back to North -- E1 will render this radial. Flags the provenance.
+    flow = hydro.get("flow", {})
+    if req.azimuth_deg is not None:
+        azimuth, azimuth_source = float(req.azimuth_deg), "user"
+    elif flow.get("azimuth_deg") is not None:
+        azimuth, azimuth_source = float(flow["azimuth_deg"]), "flow_field"
+    else:
+        azimuth, azimuth_source = 0.0, "indeterminate_divide"
+
     # --- analytical (always: provides the plume geometry) ---
     a = predict_analytical(**inputs)
     field = a.pop("_field")
     fm = field.metrics
     contours = field_to_contours(field, lon0=req.lon, lat0=req.lat,
-                                 azimuth_deg=req.azimuth_deg, threshold=threshold,
+                                 azimuth_deg=azimuth, threshold=threshold,
                                  background=inputs["background_conc_Cb"],
                                  x_offset_m=half_w)
     ring_radius = half_w + P.COMPLIANCE_BUFFER_M      # from the centre pin
-    ring = compliance_ring(req.lon, req.lat, req.azimuth_deg, ring_radius)
+    ring = compliance_ring(req.lon, req.lat, azimuth, ring_radius)
     aspect = fm["max_downgradient_m"] / max(fm["plume_halfwidth_m"], 1.0)
 
     # --- ML surrogate (bands), if artifacts present ---
@@ -222,7 +245,7 @@ def api_predict(req: PredictRequest):
                 "off_scale": bool(m.get("off_scale", False)),
             }
             envelope = ml_envelope_ellipses(
-                req.lon, req.lat, req.azimuth_deg,
+                req.lon, req.lat, azimuth,
                 {k: m["migration_m"][k] for k in ("p10", "p50", "p90")}, aspect,
                 x_offset_m=half_w)
         except Exception as e:
@@ -258,7 +281,9 @@ def api_predict(req: PredictRequest):
         Kv_Kh_ratio=P.VERTICAL["Kv_Kh_by_regime"].get(inputs["regime"], 0.01),
         upward_gradient=P.VERTICAL["upward_gradient"],
         t_days=req.time_years * 365.0,
-        wellbore_failure_prob=P.VERTICAL["wellbore_failure_prob"])
+        wellbore_failure_prob=P.VERTICAL["wellbore_failure_prob"],
+        # D1: real post-monsoon (shallowest) water table as receptor context
+        water_table_m=flow.get("depth_to_water_shallow_m"))
     # D3: attach per-district provenance for the shallow-aquifer base
     vertical["district"] = vparams["district"]
     vertical["layer1_base_source"] = vparams["source"]
@@ -266,6 +291,32 @@ def api_predict(req: PredictRequest):
     if vparams["fracture_min_m"] is not None:
         vertical["fractured_aquifer_range_m"] = [vparams["fracture_min_m"],
                                                  vparams["fracture_max_m"]]
+
+    # Far-field reach note (Stage B2): the analytical plume advects down-gradient
+    # UNBOUNDED, but a real plume discharges once it meets a perennial (gaining)
+    # stream. B2 uses the HydroRIVERS-derived per-pin distance to the nearest
+    # perennial river (data_prep.rivers); falls back to the statewide drainage-
+    # density statistic if that artifact is absent. QUALITATIVE context only --
+    # never caps a metric.
+    from ml_pipeline.data_prep.rivers import river_distance_at
+    reach_km = a["migration_m"]["p50"] / 1000.0
+    nearest_river_km = river_distance_at(req.lon, req.lat)
+    far_field_note = None
+    if nearest_river_km is not None:
+        if reach_km > nearest_river_km:
+            far_field_note = (
+                f"Far-field limit: predicted reach ~{reach_km:.1f} km exceeds the "
+                f"~{nearest_river_km:.1f} km to the nearest perennial river, so the "
+                f"plume would likely intercept perennial drainage and discharge to "
+                f"surface water — real down-gradient migration is shorter than the "
+                f"unbounded model shows.")
+    elif reach_km > P.FARFIELD_DRAINAGE_P90_KM:          # no river artifact -> fallback
+        far_field_note = (
+            f"Far-field limit: predicted reach ~{reach_km:.0f} km assumes unbounded "
+            f"down-gradient flow. Jharkhand's terrain is dissected by perennial "
+            f"drainage (typically within ~{P.FARFIELD_DRAINAGE_MEDIAN_KM:.0f} km), so "
+            f"at this scale the plume would intersect and discharge to surface water "
+            f"— actual down-gradient migration is shorter than modelled.")
 
     # Module 2: user-facing ore-zone notice (uranium only)
     ore = hydro.get("ore_zone", {})
@@ -284,9 +335,12 @@ def api_predict(req: PredictRequest):
         "hydro": hydro,
         "species": species,
         "threshold": threshold,
-        "azimuth_deg": req.azimuth_deg,
+        "azimuth_deg": round(azimuth, 1),
+        "azimuth_source": azimuth_source,
         "mode": req.mode,
         "notice": notice,
+        "far_field_note": far_field_note,
+        "nearest_river_km": nearest_river_km,
         "ore_zone": ore,
         "vertical": vertical,
         # inputs outside the deployed model's training envelope (ML bands
