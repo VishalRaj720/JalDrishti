@@ -53,6 +53,8 @@ from ml_pipeline.data_prep.feature_engineering import (
 from ml_pipeline.data_prep.jharkhand_loader import (
     load_jharkhand_aquifers, load_jharkhand_water_quality,
 )
+from ml_pipeline.data_prep.flow_field import flow_at
+from ml_pipeline.data_prep.strike_field import strike_at, anisotropy_from_variance
 from ml_pipeline.data_prep.texas_loader import (
     texas_source_signature, texas_restoration_residual,
 )
@@ -70,6 +72,13 @@ BAND_TARGETS = ("affected_area_ha", "max_migration_distance_m", "compliance_conc
 # the dominant uncertainty in crystalline rock. sigma_lnK = 0.45 (~x1.6 at 1s).
 MC_LNK_SIGMA = 0.45
 MC_K_CLIP = (1.0 / 3.0, 3.0)
+
+# E1 v3 field-informed sampling: fraction of scenarios whose gradient / seasonal
+# amplitude / fracture-dispersion V are drawn from the REAL field at the jittered
+# pin (the rest uniform-envelope for support). The plain uniform sampler sat 2-3x
+# steeper than the field-median gradient -> coverage was on an unseen distribution.
+FIELD_MIX_FRAC = 0.60
+V_SAMPLE_RANGE = (0.35, 0.80)    # observed field circular-variance span
 
 
 # --------------------------------------------------------------------------- #
@@ -89,7 +98,7 @@ def _jittered_point(geom, rng: np.random.Generator, max_tries: int = 200):
 
 
 def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
-                    rest_residual: dict) -> dict:
+                    rest_residual: dict, field_mix: float = FIELD_MIX_FRAC) -> dict:
     """Draw one physically-consistent scenario from a real aquifer polygon."""
     aq_idx = int(rng.integers(len(aquifers)))
     arow = aquifers.iloc[aq_idx]
@@ -110,6 +119,15 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     polygon_id = arow.get("objectid")
     polygon_id = int(polygon_id) if polygon_id == polygon_id else aq_idx
 
+    # E1 v3: sample gradient / seasonal amp / fracture-dispersion V from the REAL
+    # field at this pin FIELD_MIX_FRAC of the time, uniform-envelope otherwise.
+    fl, sk = flow_at(lon, lat), strike_at(lon, lat)
+
+    def _mix(field_val, lo, hi):
+        if field_val is not None and rng.uniform() < field_mix:
+            return float(np.clip(field_val, lo, hi))
+        return float(rng.uniform(lo, hi))
+
     # Operational envelope -- Q_in and Q_net sampled INDEPENDENTLY (decoupled)
     OR = P.OPERATIONAL_RANGES
     Q_in = float(rng.uniform(*OR["injection_rate_m3_day"]))
@@ -117,7 +135,7 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     Q_net = min(Q_net, 0.10 * Q_in)              # keep bleed physical (<=10%)
     bleed = Q_net / Q_in
     op_years = float(rng.uniform(*OR["operation_years"]))
-    gradient = float(rng.uniform(*OR["hydraulic_gradient"]))
+    gradient = _mix(fl["gradient_i"], *OR["hydraulic_gradient"])
     width = float(rng.uniform(*OR["wellfield_width_m"]))
 
     # operational irregularities
@@ -125,7 +143,10 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     lam = rng.uniform(*IR["downtime_episodes_per_year"])
     dur = rng.uniform(*IR["downtime_days_per_episode"])
     downtime = float(min(lam * dur / 365.0, IR["downtime_fraction_max"]))
-    seasonal_amp = float(rng.uniform(*IR["gradient_seasonal_amp"]))
+    seasonal_amp = _mix(fl["seasonal_amp_effective"], *IR["gradient_seasonal_amp"])
+    # orientation dispersion V -> transverse anisotropy (fractured only)
+    V = _mix(sk["circular_variance"], *V_SAMPLE_RANGE)
+    aniso_ratio = anisotropy_from_variance(V) if regime == "fractured" else None
 
     # restoration phase (residuals from the real Texas post-restoration data)
     if rng.uniform() < IR["restoration_prob"]:
@@ -166,7 +187,7 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
                 op_years=op_years, gradient=gradient, width=width, beta=beta,
                 downtime=downtime, seasonal_amp=seasonal_amp,
                 rest_years=rest_years, residual=residual,
-                C0=C0, Cb=Cb, Kd=Kd)
+                C0=C0, Cb=Cb, Kd=Kd, V=V, aniso_ratio=aniso_ratio)
 
 
 # --------------------------------------------------------------------------- #
@@ -231,15 +252,24 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     Xw = front_position(v, eta, t_days, op_days, rest_days, 0.0) if fractured else Xc
     aL, aT = dispersivities(max(Xc, scn["width"]), scn["regime"])
     aL *= disp_mult
+    if fractured and P.E1_ENABLED:           # E1: V-derived transverse anisotropy
+        aT = aL * scn["aniso_ratio"]
 
     Xc_clean, C_res = None, 0.0
     if rest_days > 0.0 and t_days > op_days + rest_days:
         Xc_clean = front_position(v_base, 1.0, t_days, op_days, rest_days, beta_k)
         C_res = residual_fraction * scn["C0"][species]
 
+    # E1 leach-zone disc, gated by P.E1_ENABLED like the served path (OFF -> pre-E1
+    # labels, so the non-generator callers/tests are unchanged).
+    disc_r = disc_cx = disc_c = 0.0
+    if P.E1_ENABLED:
+        disc_c = C_res if (Xc_clean is not None and C_res > 0.0) else scn["C0"][species]
+        disc_r, disc_cx = w_eff / 2.0, -scn["width"] / 2.0
     return TransportParams(C0=scn["C0"][species], aL=aL, aT=aT,
                            source_width_m=w_eff, Xc=Xc, Xw=Xw, sigma=sigma,
-                           t_days=t_days, Xc_clean=Xc_clean, C_res=C_res)
+                           t_days=t_days, Xc_clean=Xc_clean, C_res=C_res,
+                           disc_radius_m=disc_r, disc_center_x_m=disc_cx, disc_conc=disc_c)
 
 
 def _throughput_width(scn: dict, t_days: float, op_days: float) -> float:
@@ -322,6 +352,7 @@ def label_row(scn: dict, t_years: float, species: str,
         downtime_fraction=scn["downtime"],
         gradient_seasonal_amp=scn["seasonal_amp"],
         residual_fraction=scn["residual"][species],
+        aniso_ratio=scn["aniso_ratio"],          # E1: V-derived (None for porous)
     )
     # deterministic central run (reference + served analytical path)
     res = simulate_plume(feat, species_C0=scn["C0"][species],
@@ -366,7 +397,7 @@ def label_row(scn: dict, t_years: float, species: str,
 # --------------------------------------------------------------------------- #
 def generate(n_scenarios: int = 900, times_years=DEFAULT_TIMES_YEARS,
              n_mc: int = 48, seed: int = P.RANDOM_SEED,
-             out_csv: Path | None = None) -> pd.DataFrame:
+             out_csv: Path | None = None, field_mix: float = FIELD_MIX_FRAC) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     draws = mc_draws(n_mc, seed + 1)          # CRN: one matrix for the whole run
     aquifers = load_jharkhand_aquifers()
@@ -374,15 +405,24 @@ def generate(n_scenarios: int = 900, times_years=DEFAULT_TIMES_YEARS,
     source_sig = texas_source_signature()
     rest_residual = texas_restoration_residual()
 
-    rows = []
-    for s in range(n_scenarios):
-        scn = sample_scenario(rng, aquifers, wq, source_sig, rest_residual)
-        for t in times_years:
-            for sp in SPECIES:
-                rows.append(label_row(scn, t, sp, draws, scenario_id=s))
-        if (s + 1) % max(1, n_scenarios // 20) == 0:
-            print(f"  ...{s + 1}/{n_scenarios} scenarios ({len(rows)} rows)",
-                  flush=True)
+    # v3 is the E1 generator: the leach-zone disc must be ON for the central
+    # reference run (params_from_features is flag-gated); the MC draws set the disc
+    # explicitly. Restored in `finally` so generation never leaks the flag.
+    _e1_prev = P.E1_ENABLED
+    P.E1_ENABLED = True
+    try:
+        rows = []
+        for s in range(n_scenarios):
+            scn = sample_scenario(rng, aquifers, wq, source_sig, rest_residual,
+                                  field_mix=field_mix)
+            for t in times_years:
+                for sp in SPECIES:
+                    rows.append(label_row(scn, t, sp, draws, scenario_id=s))
+            if (s + 1) % max(1, n_scenarios // 20) == 0:
+                print(f"  ...{s + 1}/{n_scenarios} scenarios ({len(rows)} rows)",
+                      flush=True)
+    finally:
+        P.E1_ENABLED = _e1_prev
     df = pd.DataFrame(rows)
 
     default_csv = OUT_DIR / "synthetic_training.csv"
@@ -391,7 +431,8 @@ def generate(n_scenarios: int = 900, times_years=DEFAULT_TIMES_YEARS,
     df.to_csv(out_csv, index=False)
 
     meta = {
-        "version": 2, "n_scenarios": n_scenarios, "n_rows": len(df), "n_mc": n_mc,
+        "version": 3, "n_scenarios": n_scenarios, "n_rows": len(df), "n_mc": n_mc,
+        "e1_geometry": True, "field_mix_frac": field_mix,
         "times_years": list(times_years), "species": list(SPECIES),
         "feature_columns": FEATURE_COLUMNS,
         "band_targets": [f"{t}_{b}" for t in BAND_TARGETS

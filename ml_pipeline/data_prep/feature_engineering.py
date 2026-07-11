@@ -176,7 +176,8 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
                       restoration_days: float = 0.0,
                       downtime_fraction: float = 0.0,
                       gradient_seasonal_amp: float = 0.0,
-                      residual_fraction: float = 1.0) -> dict:
+                      residual_fraction: float = 1.0,
+                      aniso_ratio: float | None = None) -> dict:
     """Assemble one fully-featured, scale-independent training/inference row.
 
     eval_time_days: the time slice being evaluated. Throughput (PV/BV), the
@@ -221,6 +222,11 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
     # Dispersivity scale = how far the front has actually travelled (>= source).
     L_disp = max(Xc_eval, wellfield_width_m, 1.0)
     aL, aT = dispersivities(L_disp, regime)
+    # E1: transverse anisotropy from the fracture-strike dispersion V (fractured);
+    # None -> regime default (pre-E1 serve path + porous, unchanged). The FEATURE
+    # alpha_T must carry V so the surrogate can learn the elongation it produces.
+    if aniso_ratio is not None:
+        aT = aL * float(aniso_ratio)
     DL, DT = aL * v, aT * v
 
     tau = vc * t_eval / max(wellfield_width_m, 1.0)   # front-lengths per source width
