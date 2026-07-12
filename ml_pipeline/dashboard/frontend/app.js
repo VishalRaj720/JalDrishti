@@ -578,6 +578,11 @@ function renderHydro(h) {
   if (h.regime_overridden)
     note = `<span class="muted"> · regime overridden to <b>${h.regime}</b> `
          + `(natural: ${h.natural_regime}) — using representative ${h.regime} materials</span>`;
+  // D5: flag the Singhbhum shear-zone transmissivity correction
+  if (h.shear_zone)
+    note += `<span class="muted"> · K=<b>${h.shear_zone.K_m_day}</b> from Singhbhum `
+         + `shear-zone transmissivity (NAQUIM T≈${h.shear_zone.T_m2day} m²/day, `
+         + `vs schist ${h.shear_zone.polygon_K_m_day}) — leakier, larger plume</span>`;
   el.innerHTML = parts.join(" · ") + note;
 }
 

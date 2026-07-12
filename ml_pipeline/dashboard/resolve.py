@@ -231,9 +231,26 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
             c0 = max(float(cb) * P.NON_ORE_U_TRACE_MULT, P.NON_ORE_U_TRACE_FLOOR_PPB)
             u_suppressed = True
 
+    # D5: Singhbhum shear-zone transmissivity. At a fractured deposit/belt pin the
+    # aquifer is far more transmissive than the generic schist polygon (NAQUIM T
+    # 207-570 vs ~42) -> replace the served K + thickness with the measured
+    # shear-zone values (T and b together so seepage velocity stays physical).
+    # Explicit K override wins. K is a trained feature, so no retrain needed.
+    k_default = float(h["K_m_day"])
+    thickness_default = float(h["thickness_m"])
+    shear_zone = None
+    if (regime == "fractured" and ore_zone["zone"] in ("deposit", "belt")
+            and payload.get("K_m_day") is None):
+        k_default = P.SHEAR_ZONE_T_M2DAY / P.SHEAR_ZONE_THICKNESS_M
+        thickness_default = P.SHEAR_ZONE_THICKNESS_M
+        shear_zone = {"T_m2day": P.SHEAR_ZONE_T_M2DAY,
+                      "thickness_m": P.SHEAR_ZONE_THICKNESS_M,
+                      "K_m_day": round(k_default, 3),
+                      "polygon_K_m_day": round(float(h["K_m_day"]), 3)}
+
     inputs = dict(
         regime=regime,
-        K_m_day=_override(payload, "K_m_day", h["K_m_day"]),
+        K_m_day=_override(payload, "K_m_day", k_default),
         gradient_i=_override(payload, "gradient_i", flow["gradient_i"]),
         phi_mobile=_override(payload, "phi_mobile", phi_default),
         n_total=float(n_total),
@@ -244,7 +261,7 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         bleed_fraction=_override(payload, "bleed_percent", 2.0) / 100.0,
         operation_years=_override(payload, "operation_years", 8.0),
         wellfield_width_m=_override(payload, "wellfield_width_m", 300.0),
-        thickness_m=float(h["thickness_m"]),
+        thickness_m=thickness_default,
         source_conc_C0=c0,
         background_conc_Cb=float(cb),
         species=species,
@@ -291,5 +308,7 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         # D2/E1 (Stage H): fracture strike + dispersion (for the display-only
         # tensor rotation of the plume azimuth toward strike).
         "strike": strike,
+        # D5: Singhbhum shear-zone transmissivity correction applied (or None).
+        "shear_zone": shear_zone,
     }
     return inputs, hydro

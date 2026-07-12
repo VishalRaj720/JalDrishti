@@ -414,6 +414,22 @@ NON_ORE_U_TRACE_FLOOR_PPB = 5.0     # absolute floor for the trace term
 # U -> 0.05% U as the representative the C0 midpoint sits in (both sides %U).
 URANIUM_GRADE_REF_PCT = 0.05        # %U; deposit grade == this -> C0 unchanged
 
+# D5: Singhbhum Shear Zone transmissivity correction (serve-time, no retrain).
+# The ore-belt fractured aquifer is anomalously transmissive -- CGWB NAQUIM gives
+# T = 207-570 m2/day for East Singhbhum (Jaduguda belt), vs the generic schist
+# aquifer polygon's T ~ 42 (K = 1.12). The lithology K therefore under-states
+# leakiness ~5-14x EXACTLY where ISR uranium mining happens. At fractured
+# deposit/belt pins the served K + aquifer thickness are replaced with the
+# measured shear-zone values (T and b corrected jointly so seepage velocity stays
+# physical -- a high K in a thin layer would be unphysically fast). K is already a
+# model feature spanning ~0.04-10.6, so K = T/b ~ 2.5 is in-support -> no retrain.
+# Higher T -> lower containment eta ~ Q_net/(T*i*W) -> LARGER ore-belt plume
+# (safety-conservative). Applies only to the fractured Singhbhum shear zone; the
+# rest of the state keeps its lithology K (already within ~2x of district NAQUIM).
+SHEAR_ZONE_T_M2DAY = 370.0          # representative fractured T (E-Singhbhum central)
+SHEAR_ZONE_THICKNESS_M = 150.0      # productive fractured thickness (fractures 20-258 m)
+# K = T/b = 2.47 m/day (vs the schist polygon's 1.12)
+
 # ---------------------------------------------------------------------------
 # 8. Vertical stratification (Module 5A -- 2.5D). Hard-rock Jharkhand profile:
 #    Layer 1 (0-30 m)     weathered / saprolite PHREATIC aquifer -> village wells.
