@@ -194,8 +194,22 @@ def _tran_factor(X: np.ndarray, Y: np.ndarray, aT: float, W: float) -> np.ndarra
     return 0.5 * (erf((Y + W / 2.0) / tw) - erf((Y - W / 2.0) / tw))
 
 
-def concentration_field(X: np.ndarray, Y: np.ndarray, p: TransportParams) -> np.ndarray:
-    """Plume-attributable concentration (NO background) on meshgrids X, Y."""
+def _disc_mask(X: np.ndarray, Y: np.ndarray, p: TransportParams,
+               thr_inc: float = 0.0):
+    """Boolean grid inside the E1 leach-zone disc whose (uniform) conc clears the
+    incremental threshold. None if the disc is off / sub-threshold. The disc is
+    the SOURCE ZONE -> it counts toward affected AREA, never toward plume travel
+    (migration / compliance), which track the migrating front."""
+    if p.disc_radius_m <= 0.0 or p.disc_conc < max(thr_inc, 1e-12):
+        return None
+    return (X - p.disc_center_x_m) ** 2 + Y ** 2 <= p.disc_radius_m ** 2
+
+
+def concentration_field(X: np.ndarray, Y: np.ndarray, p: TransportParams,
+                        include_disc: bool = True) -> np.ndarray:
+    """Plume-attributable concentration (NO background) on meshgrids X, Y. The E1
+    source-zone disc is unioned in only when include_disc (display + area); the
+    plume-travel metrics pass include_disc=False."""
     A_tran = _tran_factor(X, Y, p.aT, p.source_width_m)
     A_long = _long_factor(X, p.Xc, p.aL)
     if p.sigma > 0.0 and p.Xw > p.Xc:
@@ -209,19 +223,23 @@ def concentration_field(X: np.ndarray, Y: np.ndarray, p: TransportParams) -> np.
         # matrix back-diffusion makes clean-up slow -- conservative.
         C = C - (p.C0 - p.C_res) * _long_factor(X, p.Xc_clean, p.aL) * A_tran
     # E1: leach-zone disc -- the well-field footprint is contaminated by
-    # construction. Conservative union so contained/low-drift plumes no longer
-    # report ~zero area (the source zone itself). Off when disc_radius_m <= 0.
-    if p.disc_radius_m > 0.0 and p.disc_conc > 0.0:
+    # construction. Unioned only for display + AREA (include_disc); the plume-
+    # travel metrics exclude it so a wide source footprint reaching the ring is
+    # not mistaken for a plume excursion.
+    if include_disc and p.disc_radius_m > 0.0 and p.disc_conc > 0.0:
         inside = (X - p.disc_center_x_m) ** 2 + Y ** 2 <= p.disc_radius_m ** 2
         C = np.where(inside, np.maximum(C, p.disc_conc), C)
     return np.clip(C, 0.0, p.C0)
 
 
-def concentration_point(x: float, y: float, p: TransportParams) -> float:
-    """Scalar evaluation (compliance ring / Monte Carlo) -- no grid needed."""
+def concentration_point(x: float, y: float, p: TransportParams,
+                        include_disc: bool = False) -> float:
+    """Scalar evaluation (compliance ring / Monte Carlo). Excludes the source-zone
+    disc by default -- compliance/excursion is a MIGRATING-plume concentration,
+    not the source footprint reaching the ring."""
     xa = np.array([[float(x)]])
     ya = np.array([[float(y)]])
-    return float(concentration_field(xa, ya, p)[0, 0])
+    return float(concentration_field(xa, ya, p, include_disc=include_disc)[0, 0])
 
 
 # --------------------------------------------------------------------------- #
@@ -382,15 +400,17 @@ def _auto_grid(reach_m: float, aL: float, source_width: float, n: int = 220,
 
 
 def plume_metrics(C_plume: np.ndarray, X: np.ndarray, Y: np.ndarray, *,
-                  threshold: float, background: float, cell_area_m2: float) -> dict:
-    """Decision metrics from a PLUME-ATTRIBUTABLE concentration field.
+                  threshold: float, background: float, cell_area_m2: float,
+                  disc_mask: np.ndarray | None = None) -> dict:
+    """Decision metrics from a PLUME-ATTRIBUTABLE (disc-free) concentration field.
 
     Exceedance is incremental: C_plume >= max(threshold - background,
-    INCREMENTAL_FLOOR*threshold). Reported concentrations are absolute.
+    INCREMENTAL_FLOOR*threshold). Reported concentrations are absolute. The E1
+    source-zone disc (disc_mask) is unioned into the AREA only -- migration /
+    downgradient / compliance track the migrating front, never the source zone.
     """
     thr_inc = max(threshold - background, P.INCREMENTAL_FLOOR * threshold)
     mask = C_plume >= thr_inc
-    area_m2 = float(mask.sum()) * cell_area_m2
     if mask.any():
         r = np.sqrt(X[mask] ** 2 + Y[mask] ** 2)
         max_dist = float(r.max())
@@ -398,6 +418,8 @@ def plume_metrics(C_plume: np.ndarray, X: np.ndarray, Y: np.ndarray, *,
         plume_halfwidth = float(np.abs(Y[mask]).max())
     else:
         max_dist = max_down = plume_halfwidth = 0.0
+    area_mask = mask if disc_mask is None else (mask | disc_mask)
+    area_m2 = float(area_mask.sum()) * cell_area_m2
     return {
         "affected_area_ha": area_m2 / 1e4,
         "affected_area_m2": area_m2,
@@ -475,20 +497,27 @@ def solve_plume(params: TransportParams, *, threshold: float, background: float,
                       params.source_width_m, n=grid_n,
                       disc_radius=params.disc_radius_m,
                       disc_center_x=params.disc_center_x_m, aT=params.aT)
-    C = concentration_field(X, Y, params)
+    C = concentration_field(X, Y, params, include_disc=False)     # plume (metrics base)
 
     dx = X[0, 1] - X[0, 0]
     dy = Y[1, 0] - Y[0, 0]
     cell_area = float(abs(dx * dy))
+    thr_inc = max(threshold - background, P.INCREMENTAL_FLOOR * threshold)
+    disc_mask = _disc_mask(X, Y, params, thr_inc)
     metrics = plume_metrics(C, X, Y, threshold=threshold, background=background,
-                            cell_area_m2=cell_area)
+                            cell_area_m2=cell_area, disc_mask=disc_mask)
     metrics["Xc_m"] = params.Xc
     metrics["off_scale"] = bool(off_scale)
 
     if compliance_x is not None:
-        c_comp = concentration_point(compliance_x, 0.0, params)   # true reach
+        c_comp = concentration_point(compliance_x, 0.0, params)   # plume-only, true reach
         metrics["compliance_conc"] = c_comp + background          # absolute
         metrics["breaches_at_compliance"] = bool(c_comp >= metrics["incremental_threshold"])
+
+    # display field: union the source-zone disc so the map shows it (metrics above
+    # already separated plume-travel from the disc footprint)
+    if disc_mask is not None:
+        C = np.where(disc_mask, np.maximum(C, params.disc_conc), C)
 
     return PlumeResult(C=C, X=X, Y=Y, Xc=params.Xc, cell_area_m2=cell_area,
                        metrics=metrics)
@@ -524,7 +553,7 @@ def simulate_plume(feat: dict, *, species_C0: float, background: float,
 # --------------------------------------------------------------------------- #
 def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
                  Xc_clean, C_res, disc_radius=None, disc_center_x=None,
-                 disc_conc=None) -> np.ndarray:
+                 disc_conc=None, include_disc=True) -> np.ndarray:
     """concentration_field broadcast over draws: X3/Y3 are (ny,nx,1) grids,
     parameter arrays are (nd,). Returns C of shape (ny, nx, nd)."""
     Xc = np.maximum(Xc, 1e-3)
@@ -546,8 +575,9 @@ def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
         Xcc = np.maximum(Xc_clean, 1e-3)
         A_c = 0.5 * erfc((X3 - Xcc) / (2.0 * np.sqrt(aL * Xcc)))
         C = C - np.where(active, C0 - C_res, 0.0) * A_c * A_tran
-    # E1 leach-zone disc, broadcast over draws (radius/centre/conc are (nd,))
-    if disc_radius is not None and bool(np.any(disc_radius > 0.0)):
+    # E1 leach-zone disc, broadcast over draws (display/area only; excluded from
+    # the plume-travel evaluation -- see mc_field_metrics)
+    if include_disc and disc_radius is not None and bool(np.any(disc_radius > 0.0)):
         inside = (X3 - disc_center_x) ** 2 + Y3 ** 2 <= disc_radius ** 2
         C = np.where(inside, np.maximum(C, disc_conc), C)
     return np.clip(C, 0.0, C0)
@@ -586,22 +616,28 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
         X, Y = _auto_grid(reach_b, aL_b, W_b, n=grid_n,
                           disc_radius=disc_r_b, disc_center_x=disc_cx_b, aT=aT_b)
         X3, Y3 = X[:, :, None], Y[:, :, None]
-        C = _stack_field(
+        dr = arr(lambda p: p.disc_radius_m)
+        dcx = arr(lambda p: p.disc_center_x_m)
+        dc = arr(lambda p: p.disc_conc)
+        C = _stack_field(                                    # PLUME only (no disc)
             X3, Y3,
             C0=arr(lambda p: p.C0), aL=arr(lambda p: p.aL), aT=arr(lambda p: p.aT),
             W=arr(lambda p: p.source_width_m), Xc=arr(lambda p: p.Xc),
             Xw=arr(lambda p: p.Xw), sigma=arr(lambda p: p.sigma),
             t_days=plist[bucket[0]].t_days,
             Xc_clean=arr(lambda p: p.Xc_clean if p.Xc_clean is not None else 0.0),
-            C_res=arr(lambda p: p.C_res),
-            disc_radius=arr(lambda p: p.disc_radius_m),
-            disc_center_x=arr(lambda p: p.disc_center_x_m),
-            disc_conc=arr(lambda p: p.disc_conc))
-        mask = C >= thr_inc
+            C_res=arr(lambda p: p.C_res), include_disc=False)
+        plume_mask = C >= thr_inc
         cell = float(abs((X[0, 1] - X[0, 0]) * (Y[1, 0] - Y[0, 0])))
-        area[bucket] = mask.sum(axis=(0, 1)) * cell / 1e4
+        # AREA also counts the source-zone disc; MIGRATION is the plume front only
+        if bool(np.any(dr > 0.0)):
+            disc3 = ((X3 - dcx) ** 2 + Y3 ** 2 <= dr ** 2) & (dc >= thr_inc)
+            area_mask = plume_mask | disc3
+        else:
+            area_mask = plume_mask
+        area[bucket] = area_mask.sum(axis=(0, 1)) * cell / 1e4
         R3 = np.sqrt(X ** 2 + Y ** 2)[:, :, None]
-        dist[bucket] = np.where(mask, R3, 0.0).max(axis=(0, 1))
+        dist[bucket] = np.where(plume_mask, R3, 0.0).max(axis=(0, 1))
 
     if compliance_x is not None:
         for i, p in enumerate(plist):

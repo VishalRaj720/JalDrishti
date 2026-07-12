@@ -1,5 +1,6 @@
 {
-  "version": 2,
+  "version": 3,
+  "e1_geometry": true,
   "features": [
     "regime_is_fractured",
     "K_m_day",
@@ -57,28 +58,28 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|sulfate_mg_l": 0.73162,
-      "fractured|tds_mg_l": 0.65713,
-      "fractured|uranium_ppb": 0.28233,
-      "porous|sulfate_mg_l": 0.51224,
-      "porous|tds_mg_l": 0.39086,
-      "porous|uranium_ppb": 0.23179
+      "fractured|sulfate_mg_l": 0.58957,
+      "fractured|tds_mg_l": 0.65764,
+      "fractured|uranium_ppb": 0.23195,
+      "porous|sulfate_mg_l": 0.50774,
+      "porous|tds_mg_l": 0.44522,
+      "porous|uranium_ppb": 0.16427
     },
     "max_migration_distance_m": {
-      "fractured|sulfate_mg_l": 0.90832,
-      "fractured|tds_mg_l": 0.49088,
-      "fractured|uranium_ppb": 0.2375,
-      "porous|sulfate_mg_l": 0.46606,
-      "porous|tds_mg_l": 0.32335,
-      "porous|uranium_ppb": 0.1709
+      "fractured|sulfate_mg_l": 0.85902,
+      "fractured|tds_mg_l": 0.68773,
+      "fractured|uranium_ppb": 0.18745,
+      "porous|sulfate_mg_l": 0.66923,
+      "porous|tds_mg_l": 0.44382,
+      "porous|uranium_ppb": 0.10551
     },
     "compliance_conc": {
-      "fractured|sulfate_mg_l": 0.80423,
-      "fractured|tds_mg_l": 0.43147,
-      "fractured|uranium_ppb": 1.89414,
-      "porous|sulfate_mg_l": 1.02042,
-      "porous|tds_mg_l": 0.52096,
-      "porous|uranium_ppb": 1.5024
+      "fractured|sulfate_mg_l": 0.69471,
+      "fractured|tds_mg_l": 0.3937,
+      "fractured|uranium_ppb": 1.83658,
+      "porous|sulfate_mg_l": 1.15624,
+      "porous|tds_mg_l": 0.65995,
+      "porous|uranium_ppb": 1.50479
     }
   },
   "monotone_maps": {
@@ -233,12 +234,12 @@
         0.025
       ],
       "retardation_Rd": [
-        3.039145838130258,
-        20.982605569268017
+        3.0332902259621517,
+        20.94662384107632
       ],
       "K_m_day": [
-        0.0602688216477164,
-        10.24752713473584
+        0.0464744912544682,
+        9.73048544857478
       ]
     },
     "porous": {
@@ -248,11 +249,11 @@
       ],
       "retardation_Rd": [
         1.0,
-        85.90178146777284
+        86.7591463916814
       ],
       "K_m_day": [
-        0.1065746033604583,
-        26.951572012084885
+        0.0984466416991108,
+        29.41283091450157
       ]
     }
   },
