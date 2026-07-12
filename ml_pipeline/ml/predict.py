@@ -63,7 +63,8 @@ def features_from_inputs(*, regime, K_m_day, gradient_i, phi_mobile, n_total,
                          source_conc_C0, background_conc_Cb, species,
                          time_years, restoration_years: float = 0.0,
                          downtime_fraction: float = 0.0,
-                         gradient_seasonal_amp: float = 0.0
+                         gradient_seasonal_amp: float = 0.0,
+                         aniso_ratio: float | None = None
                          ) -> tuple[pd.DataFrame, dict, float]:
     op_days = operation_years * 365.0
     t_days = time_years * 365.0
@@ -79,7 +80,7 @@ def features_from_inputs(*, regime, K_m_day, gradient_i, phi_mobile, n_total,
         eval_time_days=t_days, restoration_days=rest_days,
         downtime_fraction=downtime_fraction,
         gradient_seasonal_amp=gradient_seasonal_amp,
-        residual_fraction=residual)
+        residual_fraction=residual, aniso_ratio=aniso_ratio)
     Xc = feat["_Xc_eval_m"]                     # same kinematics as the labels
     row = {k: feat[k] for k in FEATURE_COLUMNS}
     row["Xc_m"] = Xc
@@ -178,6 +179,7 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
                thickness=inputs["thickness_m"],
                downtime=float(inputs.get("downtime_fraction", 0.0) or 0.0),
                seasonal_amp=float(inputs.get("gradient_seasonal_amp", 0.0) or 0.0),
+               aniso_ratio=inputs.get("aniso_ratio"),   # E1: V-derived (fractured)
                C0={species: inputs["source_conc_C0"]},
                Cb={species: inputs["background_conc_Cb"]})
     draws = mc_draws(n_mc, seed)

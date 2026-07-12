@@ -23,6 +23,7 @@ from ml_pipeline.data_prep.jharkhand_loader import (
 from ml_pipeline.data_prep.texas_loader import texas_source_signature
 from ml_pipeline.data_prep.ore_loader import ore_zone_at
 from ml_pipeline.data_prep.flow_field import flow_at
+from ml_pipeline.data_prep.strike_field import strike_at, anisotropy_from_variance
 from ml_pipeline.ml.dataset import ARTIFACT_DIR
 
 SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
@@ -165,6 +166,9 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     # D1 (Stage B/E2): data-derived flow -> default azimuth / gradient / seasonal
     # amplitude for the pin (overridden by explicit slider values below).
     flow = flow_at(lon, lat)
+    # D2 / E1 (Stage H): fracture-strike dispersion -> transverse anisotropy of the
+    # plume (fractured only) so the served alpha_T matches the E1-trained model.
+    strike = strike_at(lon, lat)
 
     lithology = h["lithology"]
     natural_regime = h["regime"]
@@ -251,6 +255,9 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         # uncertainty -> wider ML bands on low-confidence cells.
         gradient_seasonal_amp=_override(payload, "gradient_seasonal_amp",
                                         flow["seasonal_amp_effective"]),
+        # E1: V-derived transverse anisotropy (fractured); None -> regime default.
+        aniso_ratio=(anisotropy_from_variance(strike["circular_variance"])
+                     if regime == "fractured" else None),
     )
     # retardation (asymptotic) so the UI can SHOW why a plume is slow (P2)
     from ml_pipeline.data_prep.feature_engineering import retardation_factor
@@ -281,5 +288,8 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         # D1 (Stage B): data-derived flow at the pin -- default azimuth/gradient,
         # divide flag, fit provenance, and depth-to-water for the map + screening.
         "flow": flow,
+        # D2/E1 (Stage H): fracture strike + dispersion (for the display-only
+        # tensor rotation of the plume azimuth toward strike).
+        "strike": strike,
     }
     return inputs, hydro

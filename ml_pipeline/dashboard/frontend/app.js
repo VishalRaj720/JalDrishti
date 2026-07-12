@@ -537,6 +537,13 @@ function renderMetrics(r) {
   document.getElementById("m-peak").textContent = fmtC(r.plume.peak_conc, U);
   document.getElementById("env-legend").style.opacity = (state.mode === "ml") ? 1 : .35;
 
+  // E1: when the source-zone disc dominates (Λ<1) the "migration" number is the
+  // contaminated EXTENT of the leach zone, not down-gradient travel — say so.
+  if (r.plume.radial_dominated) {
+    const el = document.getElementById("m-dist-band");
+    el.textContent += " · radial (Λ<1): source-zone extent, not travel";
+  }
+
   // extrapolation / off-scale warnings
   const warns = [];
   const beyondML = useML && ((r.extrapolation && r.extrapolation.length > 0) || m.off_scale);

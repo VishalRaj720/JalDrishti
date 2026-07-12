@@ -252,8 +252,8 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     Xw = front_position(v, eta, t_days, op_days, rest_days, 0.0) if fractured else Xc
     aL, aT = dispersivities(max(Xc, scn["width"]), scn["regime"])
     aL *= disp_mult
-    if fractured and P.E1_ENABLED:           # E1: V-derived transverse anisotropy
-        aT = aL * scn["aniso_ratio"]
+    if fractured and P.E1_ENABLED and scn.get("aniso_ratio") is not None:
+        aT = aL * scn["aniso_ratio"]         # E1: V-derived transverse anisotropy
 
     Xc_clean, C_res = None, 0.0
     if rest_days > 0.0 and t_days > op_days + rest_days:

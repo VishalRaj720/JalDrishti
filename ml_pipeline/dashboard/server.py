@@ -262,10 +262,18 @@ def api_predict(req: PredictRequest):
     # D1 down-gradient bearing; else (near a water divide, no preferred direction)
     # fall back to North -- E1 will render this radial. Flags the provenance.
     flow = hydro.get("flow", {})
+    strike = hydro.get("strike", {})
     if req.azimuth_deg is not None:
         azimuth, azimuth_source = float(req.azimuth_deg), "user"
     elif flow.get("azimuth_deg") is not None:
         azimuth, azimuth_source = float(flow["azimuth_deg"]), "flow_field"
+        # E1 (Stage H): in fractured rock the Darcy flux rotates toward the high-K
+        # fracture strike -- rotate the DISPLAY azimuth (labels stay flow-aligned).
+        if inputs["regime"] == "fractured" and strike.get("mean_strike_deg") is not None:
+            from ml_pipeline.data_prep.strike_field import flux_azimuth
+            azimuth = round(flux_azimuth(azimuth, strike["mean_strike_deg"],
+                                         strike["circular_variance"]), 1)
+            azimuth_source = "flow_field+strike"
     else:
         azimuth, azimuth_source = 0.0, "indeterminate_divide"
 
@@ -408,6 +416,10 @@ def api_predict(req: PredictRequest):
             "off_scale": fm.get("off_scale", False),
             "Xc_m": round(fm["Xc_m"], 1),
             "aspect_ratio": round(aspect, 2),
+            # E1: radial vs drift diagnostic. Lambda<1 = the source-zone disc
+            # dominates -> "migration" reads as contaminated EXTENT, not travel.
+            "lambda_radial": round(fm["Xc_m"] / max(half_w, 1.0), 2),
+            "radial_dominated": bool(fm["Xc_m"] / max(half_w, 1.0) < 1.0),
         },
         "metrics": {
             "analytical": {
