@@ -58,12 +58,12 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|sulfate_mg_l": 0.58957,
-      "fractured|tds_mg_l": 0.65764,
-      "fractured|uranium_ppb": 0.23195,
-      "porous|sulfate_mg_l": 0.50774,
-      "porous|tds_mg_l": 0.44522,
-      "porous|uranium_ppb": 0.16427
+      "fractured|sulfate_mg_l": 0.62975,
+      "fractured|tds_mg_l": 0.61257,
+      "fractured|uranium_ppb": 0.2381,
+      "porous|sulfate_mg_l": 0.50402,
+      "porous|tds_mg_l": 0.41259,
+      "porous|uranium_ppb": 0.15843
     },
     "max_migration_distance_m": {
       "fractured|sulfate_mg_l": 0.85902,

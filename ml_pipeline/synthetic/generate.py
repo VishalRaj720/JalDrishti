@@ -60,7 +60,7 @@ from ml_pipeline.data_prep.texas_loader import (
 )
 from ml_pipeline.physics.transport import (
     simulate_plume, front_position, matrix_sigma, TransportParams,
-    concentration_point, mc_field_metrics,
+    concentration_point, mc_field_metrics, disc_flush_factor,
 )
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "outputs"
@@ -265,6 +265,7 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     disc_r = disc_cx = disc_c = 0.0
     if P.E1_ENABLED:
         disc_c = C_res if (Xc_clean is not None and C_res > 0.0) else scn["C0"][species]
+        disc_c *= disc_flush_factor(t_days, op_days)          # #4: post-closure decay
         disc_r, disc_cx = w_eff / 2.0, -scn["width"] / 2.0
     return TransportParams(C0=scn["C0"][species], aL=aL, aT=aT,
                            source_width_m=w_eff, Xc=Xc, Xw=Xw, sigma=sigma,

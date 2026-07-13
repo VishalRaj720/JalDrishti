@@ -194,6 +194,17 @@ def _tran_factor(X: np.ndarray, Y: np.ndarray, aT: float, W: float) -> np.ndarra
     return 0.5 * (erf((Y + W / 2.0) / tw) - erf((Y - W / 2.0) / tw))
 
 
+def disc_flush_factor(t_days: float, op_days: float,
+                      halflife_years: float = P.DISC_FLUSH_HALFLIFE_YEARS) -> float:
+    """E1 polish #4: the leach-zone disc depletes after injection stops (mobile
+    pore water flushed by regional flow + slow residual re-dissolution). Full
+    strength during operations; exponential decay with `halflife_years` after.
+    Returns a multiplier in (0, 1]. halflife_years <= 0 disables it (returns 1)."""
+    if halflife_years <= 0.0 or t_days <= op_days:
+        return 1.0
+    return float(0.5 ** ((t_days - op_days) / (halflife_years * 365.0)))
+
+
 def _disc_mask(X: np.ndarray, Y: np.ndarray, p: TransportParams,
                thr_inc: float = 0.0):
     """Boolean grid inside the E1 leach-zone disc whose (uniform) conc clears the
@@ -473,6 +484,7 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
         disc_r = W_eff / 2.0
         disc_cx = -W / 2.0
         disc_c = C_res if (Xc_clean is not None and C_res > 0.0) else species_C0
+        disc_c *= disc_flush_factor(t_days, operation_days)   # #4: post-closure decay
     return TransportParams(C0=species_C0, aL=feat["alpha_L"], aT=feat["alpha_T"],
                            source_width_m=feat.get("_source_width_m",
                                                    feat["wellfield_width_m"]),

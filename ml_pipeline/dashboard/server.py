@@ -361,11 +361,23 @@ def api_predict(req: PredictRequest):
     # perennial river (data_prep.rivers); falls back to the statewide drainage-
     # density statistic if that artifact is absent. QUALITATIVE context only --
     # never caps a metric.
-    from ml_pipeline.data_prep.rivers import river_distance_at
+    from ml_pipeline.data_prep.rivers import river_distance_at, plume_river_discharge
     reach_km = a["migration_m"]["p50"] / 1000.0
     nearest_river_km = river_distance_at(req.lon, req.lat)
+    # Polish #1: PRECISE test -- does the BIS-breach plume polygon actually cross a
+    # perennial river? (Stronger than reach>distance: works even when pinned on a
+    # river, and confirms a specific crossing.) The reach>distance heuristic is the
+    # fallback when the plume clears its threshold nowhere / crosses nothing.
+    bis_rings = [ring for cspec in contours if cspec.get("is_bis")
+                 for ring in cspec["polygons"]]
+    river_crossing = plume_river_discharge(bis_rings)
     far_field_note = None
-    if nearest_river_km is not None:
+    if river_crossing is not None:
+        far_field_note = (
+            f"Plume reaches a perennial river (~{river_crossing['max_discharge_cms']} "
+            f"m³/s) — contamination discharges to surface water, so down-gradient "
+            f"migration terminates there rather than continuing as modelled.")
+    elif nearest_river_km is not None:
         if reach_km > nearest_river_km:
             far_field_note = (
                 f"Far-field limit: predicted reach ~{reach_km:.1f} km exceeds the "
@@ -404,6 +416,7 @@ def api_predict(req: PredictRequest):
         "notice": notice,
         "far_field_note": far_field_note,
         "nearest_river_km": nearest_river_km,
+        "river_crossing": river_crossing,
         "ore_zone": ore,
         "vertical": vertical,
         # inputs outside the deployed model's training envelope (ML bands

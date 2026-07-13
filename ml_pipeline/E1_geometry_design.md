@@ -30,9 +30,11 @@ a disc and take the conservative union:
         C_src  = C_res  if (restoration_days>0 and t > t_op+t_rest) else C0
 
 * No advection of the disc: the leached ROCK is fixed; the dissolved front (its
-  down-gradient migration) is already carried by the Domenico term. Conservative
-  (no natural-flush decay of the source zone) — documented, a flush half-life is a
-  possible future refinement.
+  down-gradient migration) is already carried by the Domenico term. The source-zone
+  strength now decays post-closure (polish #4): `disc_flush_factor()` applies an
+  exponential decay with a 30 yr half-life (anchored to EPA's 30 yr post-restoration
+  monitoring horizon; see `parameters.DISC_FLUSH_HALFLIFE_YEARS`). During operations
+  the disc is held at full strength.
 * Threshold gate is automatic: area counts cells with C >= thr_inc, so a clamped
   non-ore uranium disc (C0 = trace < thr) contributes nothing — correct.
 * `max()` never double-counts; near x=0 both members are ~C0 (no seam). XGBoost is

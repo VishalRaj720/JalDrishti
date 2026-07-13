@@ -387,6 +387,34 @@ FARFIELD_DRAINAGE_P90_KM = 13.0
 # need the pre-E1 geometry set this False explicitly (try/finally).
 E1_ENABLED = True
 
+# Polish #4: the leach-zone disc (source-zone footprint) does not stay at full
+# strength forever -- once injection stops, regional flow flushes the mobile pore
+# water and the residual slowly re-dissolves. Model that net depletion as an
+# exponential decay of the disc concentration starting at end-of-operations.
+#
+# Half-life basis (real ISR-restoration literature, not a guess):
+#   * EPA's proposed 40 CFR 192 rule requires >=30 yr of post-restoration
+#     groundwater monitoring, shortenable only after 3 consecutive stable years --
+#     i.e. the regulator's own estimate of how long the source zone stays elevated.
+#   * The leached zone is genuinely hard to deplete: field restorations pumped
+#     >15-20 pore volumes and several parameters still did not reach background
+#     (WISE; IAEA-TECDOC-1239).
+#   * Uranium persists in the aquifer solids after ISR and concentrations can even
+#     REBOUND post-restoration as residual U re-oxidises/re-dissolves
+#     (Wyoming study, ScienceDirect S0883292715300342). So a *fast* flush is wrong.
+#   * Full natural attenuation runs "decades" (US EPA 600/F-17/342; World Nuclear).
+# A single exponential from closure is a screening simplification (it does not
+# resolve the faster active-restoration phase or the rebound), but a 30 yr
+# half-life anchors it to the regulatory 30 yr monitoring horizon: ~50% of source
+# strength gone by +30 yr, ~25% by +60 yr. Conservative-leaning. My earlier 20 yr
+# was an ungrounded pore-volume estimate and too fast; corrected to 30 (2026-07-13).
+# NOTE the exact value is deep in the label noise -- flush changes area for only
+# ~0.4% of scenarios (post-closure weak sources), all strong U-deposit sources stay
+# above threshold regardless -- so 30 vs 20 barely moves the trained model; it is
+# grounded here for defensibility, not sensitivity. Set 0 to disable (disc held at
+# C0/residual indefinitely, the pre-#4 behaviour).
+DISC_FLUSH_HALFLIFE_YEARS = 30.0
+
 # ---------------------------------------------------------------------------
 # 7. Ore-body masking (Module 2). ISR leaches uranium only where uranium ore
 #    exists; elsewhere the lixiviant perturbs non-radiological chemistry only.

@@ -277,6 +277,10 @@ function setPin(lon, lat) {
       `${bv == null ? "n/a" : bv + " " + SPECIES_UNIT[state.species]}</span>`;
     renderConfidence(info.data_confidence);
     applyFlowDefaults(info.flow);        // prefill azimuth/gradient from D1 flow
+    // Polish #2: seed the ore-depth slider from the deposit's representative depth
+    if (info.ore_depth_suggestion_m != null)
+      setSliderVal("oredepth", "v-oredepth", info.ore_depth_suggestion_m,
+                   info.ore_depth_suggestion_m + " m");
     runPredict();
   }).catch(err => {
     // out-of-bounds (422) or resolve failure: reject cleanly, no stale plume
@@ -475,6 +479,17 @@ function renderDepth(v) {
   let s = "";
   s += rect(y(0), l1, "#3f8cff", 0.35);                 // Layer 1 shallow aquifer
   s += rect(l1, oreTop, "#8b97a7", 0.16);               // Layer 2 fractured bedrock
+  // Polish #3: the district's real productive fracture band (NAQUIM) inside Layer 2
+  if (v.fractured_aquifer_range_m) {
+    const fmin = v.fractured_aquifer_range_m[0], fmax = v.fractured_aquifer_range_m[1];
+    const yf0 = y(Math.max(fmin, v.layer1_base_m)), yf1 = y(Math.min(fmax, maxD));
+    if (yf1 > yf0) {
+      s += `<rect x="${x0}" y="${yf0}" width="${x1 - x0}" height="${yf1 - yf0}" `
+         + `fill="#c79bff" fill-opacity="0.14" stroke="#c79bff" stroke-width="0.8" `
+         + `stroke-dasharray="2 2"/>`;
+      s += `<text x="${x0 + 2}" y="${yf0 + 8}" fill="#c79bff" font-size="7">fractures</text>`;
+    }
+  }
   s += rect(oreTop, oreBot, "#ff2d2d", 0.55);           // Layer 3 ore zone
   // upward pathway arrow, coloured by risk
   s += `<line x1="${(x0 + x1) / 2}" y1="${oreTop}" x2="${(x0 + x1) / 2}" y2="${l1}" `
@@ -500,7 +515,10 @@ function renderDepth(v) {
         ? ` · <span style="color:#6fd1ff">water table ${v.water_table_m} m`
           + (v.saturated_shallow_thickness_m != null
               ? `, saturated ${v.saturated_shallow_thickness_m} m` : "") + `</span>` : "")
-    + `<br><b style="color:#8b97a7">Layer 2</b> fractured bedrock<br>`
+    + `<br><b style="color:#8b97a7">Layer 2</b> fractured bedrock`
+    + (v.fractured_aquifer_range_m
+        ? ` · <span style="color:#c79bff">productive fractures ${v.fractured_aquifer_range_m[0]}–${v.fractured_aquifer_range_m[1]} m (NAQUIM)</span>` : "")
+    + `<br>`
     + `<b style="color:#ff5a5a">Layer 3</b> ore / ISR zone (${v.ore_depth_m} m)<br>`
     + `<span style="color:${riskCol}">▲ upward pathway → ${(v.shallow_impact_probability * 100).toFixed(0)}%</span>`;
 }

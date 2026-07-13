@@ -21,7 +21,7 @@ from ml_pipeline.data_prep.jharkhand_loader import (
     aquifer_at_point, baseline_at_point,
 )
 from ml_pipeline.data_prep.texas_loader import texas_source_signature
-from ml_pipeline.data_prep.ore_loader import ore_zone_at
+from ml_pipeline.data_prep.ore_loader import ore_zone_at, deposit_ore_depth
 from ml_pipeline.data_prep.flow_field import flow_at
 from ml_pipeline.data_prep.strike_field import strike_at, anisotropy_from_variance
 from ml_pipeline.ml.dataset import ARTIFACT_DIR
@@ -125,6 +125,12 @@ def envelope_violations(inputs: dict) -> list[str]:
     return out
 
 
+def _deposit_ore_depth_at(lon: float, lat: float) -> float | None:
+    """Representative ore-depth (m) if the pin is inside a surveyed deposit, else None."""
+    oz = ore_zone_at(lon, lat)
+    return deposit_ore_depth(oz.get("deposit_name")) if oz.get("zone") == "deposit" else None
+
+
 def pin_info(lon: float, lat: float) -> dict:
     """Hydrogeology + baseline at a pin (for the UI to show + set defaults)."""
     aq, wq, _ = _assets()
@@ -146,6 +152,8 @@ def pin_info(lon: float, lat: float) -> dict:
         "data_confidence": _data_confidence(h, b),
         # D1 (Stage C): flow defaults so the UI can prefill azimuth/gradient at pin drop
         "flow": flow_at(lon, lat),
+        # Polish #2: representative ore-depth for a deposit pin (seeds the slider)
+        "ore_depth_suggestion_m": _deposit_ore_depth_at(lon, lat),
     }
 
 

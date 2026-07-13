@@ -4,42 +4,42 @@
       "n": 13354,
       "n_censored": 146,
       "r2": {
-        "p10": 0.9167,
-        "p50": 0.9118,
-        "p90": 0.9176
+        "p10": 0.919,
+        "p50": 0.9144,
+        "p90": 0.9234
       },
       "mae": {
-        "p10": 4.2134,
-        "p50": 8.4817,
-        "p90": 12.3876
+        "p10": 4.1572,
+        "p50": 8.4841,
+        "p90": 12.2248
       },
       "r2_p50_per_fold": [
-        0.9667,
-        0.8807,
-        0.9376,
-        0.8025,
-        0.9237
+        0.9655,
+        0.8883,
+        0.9363,
+        0.8135,
+        0.9235
       ],
       "coverage": {
-        "rows_eval": 0.9274,
-        "scenarios_eval": 0.8107,
-        "tail_top5_rows": 0.7958,
+        "rows_eval": 0.9283,
+        "scenarios_eval": 0.8129,
+        "tail_top5_rows": 0.7868,
         "per_cell_rows": {
-          "fractured|sulfate_mg_l": 0.941,
-          "fractured|tds_mg_l": 0.929,
+          "fractured|sulfate_mg_l": 0.944,
+          "fractured|tds_mg_l": 0.93,
           "fractured|uranium_ppb": 0.941,
           "porous|sulfate_mg_l": 0.935,
-          "porous|tds_mg_l": 0.913,
-          "porous|uranium_ppb": 0.909
+          "porous|tds_mg_l": 0.915,
+          "porous|uranium_ppb": 0.908
         }
       },
       "deltas": {
-        "fractured|sulfate_mg_l": 0.58957,
-        "fractured|tds_mg_l": 0.65764,
-        "fractured|uranium_ppb": 0.23195,
-        "porous|sulfate_mg_l": 0.50774,
-        "porous|tds_mg_l": 0.44522,
-        "porous|uranium_ppb": 0.16427
+        "fractured|sulfate_mg_l": 0.62975,
+        "fractured|tds_mg_l": 0.61257,
+        "fractured|uranium_ppb": 0.2381,
+        "porous|sulfate_mg_l": 0.50402,
+        "porous|tds_mg_l": 0.41259,
+        "porous|uranium_ppb": 0.15843
       }
     },
     "max_migration_distance_m": {
@@ -129,8 +129,8 @@
   },
   "stress_polygon_cv": {
     "affected_area_ha": {
-      "r2_p50": 0.9044,
-      "mae_p50": 8.7826,
+      "r2_p50": 0.9175,
+      "mae_p50": 8.6303,
       "n_polygons": 23
     },
     "max_migration_distance_m": {
@@ -211,16 +211,16 @@
   },
   "monotonicity_on_manifold": {
     "area_p50_vs_Q_in_at_fixed_Qnet": [
-      30.43,
-      33.42,
-      34.15,
-      34.28
+      31.58,
+      34.3,
+      35.06,
+      35.19
     ],
     "area_p50_vs_bleed_at_fixed_Q_in": [
-      65.41,
-      33.26,
-      25.82,
-      25.78
+      64.03,
+      33.37,
+      26.18,
+      26.1
     ],
     "qin_law_holds": true,
     "bleed_law_holds": true

@@ -160,6 +160,45 @@ def rivers_geojson() -> dict:
     return json.loads(per.to_json())
 
 
+@functools.lru_cache(maxsize=1)
+def _perennial_wgs84():
+    """Perennial reaches (EPSG:4326) + their spatial index, cached."""
+    rivers = load_rivers()
+    return rivers[rivers["DIS_AV_CMS"] >= PERENNIAL_DIS_CMS].reset_index(drop=True)
+
+
+def plume_river_discharge(plume_rings_lonlat) -> dict | None:
+    """Precise geometric test: does the BIS-breach plume polygon actually CROSS a
+    perennial river? (Polish #1 -- replaces the coarse reach>distance heuristic
+    when it can.) `plume_rings_lonlat` = list of [[lon,lat], ...] rings. Returns
+    the crossing reach's discharge, or None if the plume reaches no river."""
+    if not RIVER_NPZ.exists() or not plume_rings_lonlat:
+        return None
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    polys = []
+    for r in plume_rings_lonlat:
+        if not r or len(r) < 4:
+            continue
+        try:                                   # buffer(0) heals marching-squares
+            p = Polygon(r).buffer(0)           # self-intersections into valid geometry
+        except Exception:
+            continue
+        if not p.is_empty:
+            polys.append(p)
+    if not polys:
+        return None
+    plume = unary_union(polys)
+    per = _perennial_wgs84()
+    idx = list(per.sindex.query(plume, predicate="intersects"))
+    if not idx:
+        return None
+    hit = per.iloc[idx]
+    return {"intersects": True,
+            "n_reaches": int(len(hit)),
+            "max_discharge_cms": round(float(hit["DIS_AV_CMS"].max()), 1)}
+
+
 if __name__ == "__main__":
     if not RIVERS_GEOJSON.exists():
         print("clipping Asia HydroRIVERS -> Jharkhand ...")

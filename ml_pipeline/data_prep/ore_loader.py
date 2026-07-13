@@ -35,6 +35,22 @@ ORE_CSV = REPO_ROOT / "Datasets" / "Jharkhand Ore" / "jharkhand_uranium_deposits
 
 _DEG_TO_KM = 111.0
 
+# Polish #2: representative ISR-target depth (m) per deposit -- so a deposit pin
+# defaults the ore-depth slider to that deposit's real mineralisation depth rather
+# than a flat 150 m. Grounded in mining type: Banduhurang is the country's first
+# open-PIT U mine (shallow); Mohuldih's ore is documented over ~250 m vertical;
+# the rest are deep underground mines in the E-Singhbhum fracture window (45-260 m).
+# User-overridable (it only seeds the slider). Off-deposit pins keep 150.
+DEPOSIT_ORE_DEPTH_M = {
+    "Jaduguda": 180.0, "Bhatin": 150.0, "Narwapahar": 150.0, "Turamdih": 140.0,
+    "Banduhurang": 60.0, "Mohuldih": 250.0, "Bagjata": 160.0,
+}
+
+
+def deposit_ore_depth(name: str | None) -> float | None:
+    """Representative ISR-target depth (m) for a surveyed deposit, or None."""
+    return DEPOSIT_ORE_DEPTH_M.get((name or "").strip())
+
 
 @functools.lru_cache(maxsize=1)
 def _ore():
