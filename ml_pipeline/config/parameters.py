@@ -299,14 +299,54 @@ REGIME_ARCHETYPE = {
 # 5d. Restoration (aquifer clean-up) phase. Texas practice: multi-pore-volume
 #     sweep with strong net extraction after mining stops. Modelled as:
 #     front HELD during restoration (active hydraulic control), source strength
-#     stepped down to residual_fraction * C0 at the end of restoration, and a
-#     clean-water replacement front launched from the source plane (Domenico
-#     superposition). residual_fraction is derived at runtime from the Texas
-#     'Final Post-restoration' / 'End of Mining' sheets; these are fallbacks.
+#     drawn down CONTINUOUSLY with sweep duration toward residual*C0 (see the
+#     drawdown law below), and a clean-water replacement front launched from the
+#     source plane (Domenico superposition). The endpoint residual is derived at
+#     runtime from the Texas 'Final Post-restoration' / 'End of Mining' sheets;
+#     RESTORATION_FALLBACK_RESIDUAL is used only when a sheet is too sparse.
+#
+#     2026-07-13 fix: the source draw-down is now a CONTINUOUS function of sweep
+#     duration, not a binary step gated on `eval_time > op + restoration`. That
+#     gate made the clean-up VANISH (source snapped back to full C0, front frozen)
+#     whenever restoration_years reached time_years - operation_years -- so
+#     dialing restoration UP past that point made the aquifer look dirtier and
+#     then flat. The drawdown law removes the discontinuity and makes a longer
+#     sweep monotonically cleaner (see realized_residual in physics.transport).
 # ---------------------------------------------------------------------------
 RESTORATION_FALLBACK_RESIDUAL = {
     "uranium_ppb": 0.30, "sulfate_mg_l": 0.50, "tds_mg_l": 0.50,
 }
+
+# Restoration source-drawdown law. The empirical Texas endpoint residual
+# (Final Post-restoration / End of Mining) is REACHED after a reference sweep of
+# RESTORATION_REF_YEARS; the source fraction follows an exponential pore-volume
+# drawdown  C_res/C0 = exp(-lambda * t_sweep),  lambda anchored so a sweep of
+# RESTORATION_REF_YEARS reproduces that endpoint. Shorter sweeps clean less;
+# longer sweeps approach RESTORATION_RESIDUAL_FLOOR (rebound / irreducible U).
+# Grounded in Datasets/.../Dataset 2/Restoration.csv: across the 13 Texas
+# production areas with a duration, the median active-restoration sweep is
+# 5.0 yr (IQR 3.8-6.5 yr), median 18.6 pore volumes extracted.
+RESTORATION_REF_YEARS = 5.0
+RESTORATION_RESIDUAL_FLOOR = 0.02   # matches the texas_restoration_residual clip floor
+
+# UI exploration ceiling for the restoration-sweep slider (dashboard + request
+# validation), DECOUPLED from the training envelope (OPERATIONAL_RANGES["restoration
+# _years"], currently 10 yr). Real active restoration is 1-6 yr, but the slider goes
+# to 50 so a user can watch a sweep play out past the 30 yr disc-flush half-life;
+# the analytical engine serves any value, and ML bands above the deployed model's
+# trained max are flagged as extrapolation (they are not silently trusted). Raising
+# the *training* range to match is a separate, deliberate retrain decision.
+RESTORATION_SLIDER_MAX_YEARS = 50.0
+
+# UI exploration ceiling for the EVALUATION-TIME slider, DECOUPLED from the trained
+# horizon (OPERATIONAL_RANGES["horizon_years"], currently 20 yr) exactly like the
+# restoration slider above. The 30 yr disc-flush half-life plays out over evaluation
+# time (t - operation_years), NOT over the restoration-sweep duration, so a 20 yr cap
+# cannot show even one half-life post-closure (op 8 yr + 20 = 12 yr of decay < 30).
+# 50 yr lets a user watch the residual source zone decay past the half-life. The
+# analytical engine serves any horizon; ML bands above the trained max are flagged as
+# extrapolation. Widening the training horizon to match is a separate retrain decision.
+HORIZON_SLIDER_MAX_YEARS = 50.0
 
 # ---------------------------------------------------------------------------
 # 6. Operational envelope for the synthetic loop (Phase 2) -- realistic ISR ranges,

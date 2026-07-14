@@ -87,11 +87,21 @@ class PredictRequest(BaseModel):
     # None -> data-derived default from the D1 flow field at the pin (Stage B).
     gradient_i: float | None = Field(None, ge=_OR["hydraulic_gradient"][0],
                                      le=_OR["hydraulic_gradient"][1])
+    # UI EXPLORATION bound (0-50 yr), DECOUPLED from the trained horizon like
+    # restoration_years: the 30 yr disc-flush half-life decays over evaluation time
+    # (t - operation_years), so the horizon must reach past ~op+30 to show it. The
+    # analytical engine serves any horizon; ML bands beyond the deployed model's
+    # trained max (model card, 20 yr) are flagged via `extrapolation`, not rejected.
     time_years: float = Field(10, ge=_OR["horizon_years"][0],
-                              le=_OR["horizon_years"][1])
+                              le=P.HORIZON_SLIDER_MAX_YEARS)
     wellfield_width_m: float = Field(300, ge=_OR["wellfield_width_m"][0],
                                      le=_OR["wellfield_width_m"][1])
-    restoration_years: float = Field(0, ge=0, le=_OR["restoration_years"][1])
+    # UI EXPLORATION bound (0-50 yr), deliberately DECOUPLED from the training
+    # envelope: the analytical engine serves any sweep length correctly, and the
+    # ML bands beyond the deployed model's trained max (model card, currently 10 yr)
+    # are flagged via `extrapolation`/the drift monitor rather than rejected. Lets a
+    # user view how a sweep plays out past the 30 yr disc-flush half-life.
+    restoration_years: float = Field(0, ge=0, le=P.RESTORATION_SLIDER_MAX_YEARS)
     # None -> down-gradient bearing from the D1 flow field (radial near a divide).
     azimuth_deg: float | None = Field(None, ge=0, le=360)
     # Module 5A (2.5D): depth of the ore/ISR target zone + its vertical extent
@@ -280,6 +290,7 @@ def api_predict(req: PredictRequest):
     # --- analytical (always: provides the plume geometry) ---
     a = predict_analytical(**inputs)
     field = a.pop("_field")
+    restoration = a.get("restoration")     # realized-residual diagnostic (or None)
     fm = field.metrics
     contours = field_to_contours(field, lon0=req.lon, lat0=req.lat,
                                  azimuth_deg=azimuth, threshold=threshold,
@@ -418,6 +429,7 @@ def api_predict(req: PredictRequest):
         "nearest_river_km": nearest_river_km,
         "river_crossing": river_crossing,
         "ore_zone": ore,
+        "restoration": restoration,
         "vertical": vertical,
         # inputs outside the deployed model's training envelope (ML bands
         # are extrapolating there; the conformal 80% guarantee is void)

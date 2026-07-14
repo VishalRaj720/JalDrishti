@@ -96,6 +96,50 @@ def retarded_clock(t_days: float, beta: float, omega: float) -> float:
     return t / (1.0 + beta) + math.log((1.0 + beta) - beta * math.exp(-a * t)) / (a * (1.0 + beta))
 
 
+def realized_residual(residual_ref: float, rest_days: float,
+                      ref_days: float = P.RESTORATION_REF_YEARS * 365.0,
+                      floor: float = P.RESTORATION_RESIDUAL_FLOOR) -> float:
+    """Source fraction C_res/C0 reached by a restoration sweep of `rest_days`.
+
+    Exponential pore-volume drawdown anchored to the empirical Texas endpoint:
+    a reference sweep of `ref_days` (Texas median ~5 yr) reaches `residual_ref`
+    (the Final-Post-restoration / End-of-Mining ratio); shorter sweeps clean less,
+    longer sweeps approach `floor` (rebound / irreducible residual).
+
+    CONTINUOUS by construction: rest_days -> 0 gives 1.0 (no clean-up), so the
+    restored and un-restored solutions agree at the boundary -- this is what
+    replaced the old binary `eval_time > op + restoration` gate that made the
+    clean-up snap on/off. `residual_ref >= 1` (the no-restoration sentinel) also
+    returns 1.0. `rest_days` is the sweep DURATION credited; callers evaluating a
+    field at time t must pass the ELAPSED sweep (see restoration_source_fraction),
+    not the planned one -- crediting the planned sweep mid-restoration violated
+    causality and produced the QA F-1 snap at rest = t - op (2026-07-13)."""
+    if rest_days <= 0.0 or residual_ref >= 1.0:
+        return 1.0
+    lam = -math.log(max(residual_ref, floor)) / max(ref_days, 1.0)
+    return float(min(1.0, max(floor, math.exp(-lam * max(rest_days, 0.0)))))
+
+
+def restoration_source_fraction(residual_ref: float, t_days: float,
+                                op_days: float, rest_days: float) -> float:
+    """Source fraction C_src/C0 at EVALUATION time t under a restoration sweep,
+    crediting only the ELAPSED sweep: elapsed = clip(t - op, 0, rest).
+
+    Causality: a planned-but-not-yet-executed sweep cannot have cleaned anything
+    (f = 1.0 at t <= op), a sweep in progress is credited for the years it has
+    actually run, and a completed sweep is credited in full (f = realized
+    endpoint, constant thereafter -- the deficit WAVE, not this fraction, models
+    the post-sweep downgradient clean-up). Continuous in t, op and rest, which
+    removes the QA F-1 discontinuity: the old planned-sweep credit + the
+    `Xc_clean > 0` wave gate made the upstream source-zone box snap between
+    C_res and full C0 as rest crossed t - op (area stepped ~3x in one 0.02-yr
+    increment, then froze)."""
+    if rest_days <= 0.0:
+        return 1.0
+    elapsed = min(max(t_days - op_days, 0.0), rest_days)
+    return realized_residual(residual_ref, elapsed)
+
+
 def front_position(v_base_m_day: float, eta: float, t_days: float,
                    op_days: float, rest_days: float = 0.0,
                    beta: float = 0.0,
@@ -228,10 +272,15 @@ def concentration_field(X: np.ndarray, Y: np.ndarray, p: TransportParams,
         # matrix-attenuated discrete-fracture solution (conservative max)
         A_long = np.maximum(A_long, tang_attenuation(X, p.t_days, p.Xw, p.sigma))
     C = p.C0 * A_long * A_tran
-    if p.Xc_clean is not None and p.Xc_clean > 0.0 and p.C_res < p.C0:
+    if p.Xc_clean is not None and p.C_res < p.C0:
         # restoration: clean-water replacement wave subtracts (C0 - C_res).
-        # The clean front uses the RETARDED kinematics only (no Tang boost):
-        # matrix back-diffusion makes clean-up slow -- conservative.
+        # Active whenever a sweep has credit (C_res < C0), INCLUDING mid-sweep
+        # (QA F-1): with Xc_clean = 0 the wave is a wall at the source plane
+        # (_long_factor clamps to 1e-3) wiping the upstream source-zone box --
+        # gating on Xc_clean > 0 made that box snap back to full C0 the moment
+        # the sweep was still running at eval time. The clean front uses the
+        # RETARDED kinematics only (no Tang boost): matrix back-diffusion makes
+        # clean-up slow -- conservative.
         C = C - (p.C0 - p.C_res) * _long_factor(X, p.Xc_clean, p.aL) * A_tran
     # E1: leach-zone disc -- the well-field footprint is contaminated by
     # construction. Unioned only for display + AREA (include_disc); the plume-
@@ -468,12 +517,22 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
     sigma = (matrix_sigma(feat["phi_total"], feat.get("_grain_density", 2700.0),
                           feat["Kd_L_kg"]) if fractured else 0.0)
 
+    # Restoration clean-up (2026-07-13, QA F-1 fix): source drawn down
+    # CONTINUOUSLY with the ELAPSED sweep (restoration_source_fraction), so a
+    # sweep in progress is credited progressively and a planned-but-future sweep
+    # not at all -- no completion gate, no snap at rest = t - op. The deficit
+    # wave (concentration_field) is active whenever C_res < C0: mid-sweep its
+    # front sits AT the source plane (Xc_clean = 0 -> a wall that wipes the
+    # upstream source-zone box to C_res), and it advances down-gradient only
+    # once regional drift resumes -- the ESCAPED plume keeps its history until
+    # clean water overtakes it (the "dark band migrates downgradient" signature).
     Xc_clean, C_res = None, 0.0
-    t_rest_end = operation_days + max(restoration_days, 0.0)
-    if restoration_days > 0.0 and t_days > t_rest_end:
+    if restoration_days > 0.0:
+        f_res = restoration_source_fraction(float(residual_fraction), t_days,
+                                            operation_days, restoration_days)
+        C_res = f_res * species_C0
         Xc_clean = front_position(v_base, 1.0, t_days, operation_days,
                                   restoration_days, beta_k)
-        C_res = float(residual_fraction) * species_C0
 
     # E1 leach-zone disc (Stage E): OFF unless P.E1_ENABLED, so the served path
     # stays byte-identical to the deployed-ML geometry until the atomic cutover.
@@ -564,10 +623,15 @@ def simulate_plume(feat: dict, *, species_C0: float, background: float,
 # broadcast pass per reach-bucket -- ~50-100x faster than per-draw grids.
 # --------------------------------------------------------------------------- #
 def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
-                 Xc_clean, C_res, disc_radius=None, disc_center_x=None,
-                 disc_conc=None, include_disc=True) -> np.ndarray:
+                 Xc_clean, C_res, rest_active=None, disc_radius=None,
+                 disc_center_x=None, disc_conc=None,
+                 include_disc=True) -> np.ndarray:
     """concentration_field broadcast over draws: X3/Y3 are (ny,nx,1) grids,
-    parameter arrays are (nd,). Returns C of shape (ny, nx, nd)."""
+    parameter arrays are (nd,). Returns C of shape (ny, nx, nd).
+
+    rest_active: (nd,) bool -- draws with a restoration sweep. Needed because a
+    MID-SWEEP draw has Xc_clean == 0.0 (wave wall at the source, QA F-1) which
+    the old `Xc_clean > 0` test cannot distinguish from no-restoration."""
     Xc = np.maximum(Xc, 1e-3)
     aL = np.maximum(aL, 1e-3)
     aT = np.maximum(aT, 1e-4)
@@ -582,9 +646,11 @@ def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
         A_t = np.where((X3 > 0.0) & (X3 <= Xw) & has_tang, erfc(arg), 0.0)
         A_long = np.maximum(A_long, A_t)
     C = C0 * A_long * A_tran
-    active = Xc_clean > 0.0
+    if rest_active is None:                       # legacy callers: infer
+        rest_active = Xc_clean > 0.0
+    active = rest_active & (C_res < C0)           # sweep exists AND has credit
     if bool(np.any(active)):
-        Xcc = np.maximum(Xc_clean, 1e-3)
+        Xcc = np.maximum(Xc_clean, 1e-3)          # 0 -> wall at the source plane
         A_c = 0.5 * erfc((X3 - Xcc) / (2.0 * np.sqrt(aL * Xcc)))
         C = C - np.where(active, C0 - C_res, 0.0) * A_c * A_tran
     # E1 leach-zone disc, broadcast over draws (display/area only; excluded from
@@ -638,7 +704,9 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
             Xw=arr(lambda p: p.Xw), sigma=arr(lambda p: p.sigma),
             t_days=plist[bucket[0]].t_days,
             Xc_clean=arr(lambda p: p.Xc_clean if p.Xc_clean is not None else 0.0),
-            C_res=arr(lambda p: p.C_res), include_disc=False)
+            C_res=arr(lambda p: p.C_res),
+            rest_active=np.array([plist[i].Xc_clean is not None for i in bucket]),
+            include_disc=False)
         plume_mask = C >= thr_inc
         cell = float(abs((X[0, 1] - X[0, 0]) * (Y[1, 0] - Y[0, 0])))
         # AREA also counts the source-zone disc; MIGRATION is the plume front only

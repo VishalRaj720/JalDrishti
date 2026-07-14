@@ -46,7 +46,7 @@ import numpy as np
 import pandas as pd
 
 from ml_pipeline.config import parameters as P
-from ml_pipeline.physics.transport import front_position
+from ml_pipeline.physics.transport import front_position, restoration_source_fraction
 
 # Canonical, ORDERED feature list. Phase 2 (synthetic) and Phase 3 (training)
 # must emit/consume exactly these columns so Texas and Jharkhand rows align.
@@ -206,9 +206,13 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
     beta_k = beta if fractured else 0.0
     Xc_eval = front_position(v_base, eta_eff, t_eval,
                              operation_days, restoration_days, beta_k)
-    # clean-water replacement front (post-restoration) -- model feature
+    # clean-water replacement front -- model feature. 2026-07-13: launched whenever
+    # a restoration sweep exists (no binary completion gate); front_position keeps
+    # it at ~0 until regional drift resumes, so it grows continuously rather than
+    # snapping on at eval_time == op + restoration. MUST mirror the physics
+    # (params_from_features / generate._draw_params) so train == serve.
     Xc_clean = 0.0
-    if restoration_days > 0.0 and t_eval > operation_days + restoration_days:
+    if restoration_days > 0.0:
         Xc_clean = front_position(v_base, 1.0, t_eval, operation_days,
                                   restoration_days, beta_k)
 
@@ -250,12 +254,20 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
         "downtime_fraction": f_down,
         "gradient_seasonal_amp": float(gradient_seasonal_amp),
         "restoration_years": restoration_days / 365.0,
-        "residual_fraction": float(residual_fraction),
+        # QA F-2 (2026-07-13): the MODEL FEATURE is the source fraction REALIZED
+        # at eval time (elapsed-sweep drawdown) -- continuous at rest -> 0+
+        # (-> 1.0, matching the no-restoration rows) and it distinguishes
+        # mid-sweep states. The raw Texas endpoint stays available to physics
+        # callers as _residual_endpoint (feeding the realized value back into
+        # the drawdown law would double-apply it).
+        "residual_fraction": float(restoration_source_fraction(
+            float(residual_fraction), t_eval, operation_days, restoration_days)),
         # carried for transport solver / labelling (not model features):
         "_L_ref_m": L_disp, "_thickness_m": thickness_m, "_regime": regime,
         "_source_width_m": W_eff, "_grain_density": grain_density,
         "_Xc_eval_m": Xc_eval, "_Xc_clean_m": Xc_clean, "_eta_eff": eta_eff,
         "_eval_time_days": t_eval, "_restoration_days": restoration_days,
+        "_residual_endpoint": float(residual_fraction),
     }
 
 

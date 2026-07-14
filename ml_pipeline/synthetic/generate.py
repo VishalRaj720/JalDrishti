@@ -61,6 +61,7 @@ from ml_pipeline.data_prep.texas_loader import (
 from ml_pipeline.physics.transport import (
     simulate_plume, front_position, matrix_sigma, TransportParams,
     concentration_point, mc_field_metrics, disc_flush_factor,
+    restoration_source_fraction,
 )
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "outputs"
@@ -148,9 +149,12 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     V = _mix(sk["circular_variance"], *V_SAMPLE_RANGE)
     aniso_ratio = anisotropy_from_variance(V) if regime == "fractured" else None
 
-    # restoration phase (residuals from the real Texas post-restoration data)
+    # restoration phase (residuals from the real Texas post-restoration data).
+    # QA F-2 (2026-07-13): sample down to 0.25 yr -- the old 1 yr floor left the
+    # served rest in (0, 1) with no training support, so the ML bands cliffed
+    # there (m_migr -46% for a 3-month sweep).
     if rng.uniform() < IR["restoration_prob"]:
-        rest_years = float(rng.uniform(1.0, OR["restoration_years"][1]))
+        rest_years = float(rng.uniform(0.25, OR["restoration_years"][1]))
         residual = {sp: float(np.clip(rest_residual[sp]
                                       * rng.uniform(*IR["residual_noise_mult"]),
                                       0.02, 1.0)) for sp in SPECIES}
@@ -255,10 +259,15 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     if fractured and P.E1_ENABLED and scn.get("aniso_ratio") is not None:
         aT = aL * scn["aniso_ratio"]         # E1: V-derived transverse anisotropy
 
+    # Restoration clean-up (2026-07-13, QA F-1): continuous source draw-down
+    # credited for the ELAPSED sweep only (restoration_source_fraction) -- MUST
+    # match physics.params_from_features so training labels and the served
+    # analytical engine stay identical.
     Xc_clean, C_res = None, 0.0
-    if rest_days > 0.0 and t_days > op_days + rest_days:
+    if rest_days > 0.0:
+        C_res = (restoration_source_fraction(residual_fraction, t_days, op_days,
+                                             rest_days) * scn["C0"][species])
         Xc_clean = front_position(v_base, 1.0, t_days, op_days, rest_days, beta_k)
-        C_res = residual_fraction * scn["C0"][species]
 
     # E1 leach-zone disc, gated by P.E1_ENABLED like the served path (OFF -> pre-E1
     # labels, so the non-generator callers/tests are unchanged).

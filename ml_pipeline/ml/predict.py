@@ -155,7 +155,10 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
     threshold = P.EXCURSION_THRESHOLDS[species]
     rest_years = float(inputs.get("restoration_years", 0.0) or 0.0)
     X, feat, Xc = features_from_inputs(**inputs)
-    residual = feat["residual_fraction"]
+    # QA F-2: feat["residual_fraction"] is now the REALIZED fraction (the ML
+    # feature); the physics needs the raw Texas endpoint ref -- passing the
+    # realized value into the drawdown law would double-apply it.
+    residual = feat.get("_residual_endpoint", feat["residual_fraction"])
     op_days = inputs["operation_years"] * 365.0
     t_days = inputs["time_years"] * 365.0
 
@@ -189,6 +192,24 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
 
     def pt(v):  # analytical central run is a point estimate -> degenerate band
         return {"p10": float(v), "p50": float(v), "p90": float(v)}
+    # restoration diagnostic (QA F-3 fix): credit the ELAPSED sweep, not the
+    # planned one -- mid-sweep the old diagnostic claimed the full-sweep clean-up
+    # while the served field showed none, contradicting itself.
+    from ml_pipeline.physics.transport import restoration_source_fraction
+    restoration = None
+    if rest_years > 0.0:
+        rest_days = rest_years * 365.0
+        elapsed_days = min(max(t_days - op_days, 0.0), rest_days)
+        f_now = restoration_source_fraction(residual, t_days, op_days, rest_days)
+        restoration = {
+            "restoration_years": round(rest_years, 2),
+            "sweep_elapsed_years": round(elapsed_days / 365.0, 2),
+            "sweep_complete": bool(t_days >= op_days + rest_days),
+            "residual_endpoint_fraction": round(float(residual), 4),  # Texas @ ref yr
+            "residual_realized_fraction": round(float(f_now), 4),     # after ELAPSED sweep
+            "source_conc_after_restoration": round(f_now * inputs["source_conc_C0"], 1),
+            "ref_years": P.RESTORATION_REF_YEARS,
+        }
     return {
         "area_ha": pt(m["affected_area_ha"]),
         "migration_m": pt(m["max_migration_distance_m"]),
@@ -197,6 +218,7 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
         "breach_probability": float(m["breaches_at_compliance"]),
         "off_scale": bool(m["off_scale"]),
         "Xc_m": float(m["Xc_m"]),
+        "restoration": restoration,
         "_field": res,   # full plume grid for the heatmap
     }
 
