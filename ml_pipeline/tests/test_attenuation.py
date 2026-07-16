@@ -140,3 +140,54 @@ def test_restoration_still_dominates_natural_flush():
     passive = label(t_years=15.0, rest_years=0.0)
     assert swept["peak_conc"] <= passive["peak_conc"] + 1e-6
     assert swept["affected_area_ha"] <= passive["affected_area_ha"] + 0.5
+
+
+# --------------------------------------------------------------------------- #
+# Hold-time decay (2026-07-16 fix): a plume held still by the restoration
+# sweep keeps reacting with the rock (EPA/540/S-02/500 point decay rate) --
+# a long sweep must never PRESERVE the escaped slug at full strength.
+# --------------------------------------------------------------------------- #
+def test_frozen_slug_paradox_is_fixed():
+    """op=20, t=50 (30-yr window): the old distance-only decay made the peak
+    DIP then RISE back near C0 as the sweep froze the slug (134 -> 12,596 ppb).
+    With hold-time decay, a full-window sweep must leave the slug far cleaner
+    than no restoration at all, and monotonically no-worse across the sweep."""
+    peaks = [label(op_years=20.0, t_years=50.0, rest_years=r,
+                   k_atten=0.2)["peak_conc"] for r in (0, 5, 10, 20, 30)]
+    # long sweeps must not resurrect the slug: every restored case cleaner
+    # than unrestored, and the full-window sweep must not be the worst of them
+    assert all(pk < peaks[0] for pk in peaks[1:]), peaks
+    assert peaks[-1] <= min(peaks[1:]) * 3.0, peaks   # no 90x resurrection
+    # and the full-window sweep leaves only trace levels (was ~0.95*C0)
+    assert peaks[-1] < 0.05 * 15000.0, peaks
+
+
+def test_hold_decay_identity_without_restoration():
+    """rest=0 -> no hold -> hold factor must not change anything."""
+    f = feat_row(t_years=30.0, k_atten=0.3)
+    p = params_from_features(f, species_C0=15000.0, t_days=30 * 365.0,
+                             operation_days=8 * 365.0)
+    assert p.atten_hold_factor == 1.0
+
+
+def test_hold_decay_law_and_saturation():
+    """Hold factor = exp(-k * elapsed_hold); elapsed caps at the window."""
+    f = feat_row(t_years=50.0, rest_years=30.0, k_atten=0.2)
+    p = params_from_features(f, species_C0=15000.0, t_days=50 * 365.0,
+                             operation_days=20 * 365.0,
+                             restoration_days=30 * 365.0, residual_fraction=0.066)
+    assert p.atten_hold_factor == pytest.approx(math.exp(-0.2 * 30.0), rel=1e-6)
+    # planned sweep beyond the window: elapsed (and the factor) saturate
+    f2 = feat_row(t_years=50.0, rest_years=45.0, k_atten=0.2)
+    p2 = params_from_features(f2, species_C0=15000.0, t_days=50 * 365.0,
+                              operation_days=20 * 365.0,
+                              restoration_days=45 * 365.0, residual_fraction=0.066)
+    assert p2.atten_hold_factor == pytest.approx(p.atten_hold_factor, rel=1e-9)
+
+
+def test_hold_decay_continuous_at_rest_zero():
+    a0 = label(op_years=20.0, t_years=50.0, rest_years=0.0,
+               k_atten=0.2)["affected_area_ha"]
+    a_eps = label(op_years=20.0, t_years=50.0, rest_years=0.05,
+                  k_atten=0.2)["affected_area_ha"]
+    assert abs(a_eps - a0) / max(a0, 1e-9) < 0.05, (a0, a_eps)

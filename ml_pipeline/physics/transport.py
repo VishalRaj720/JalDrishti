@@ -223,10 +223,17 @@ class TransportParams:
     disc_radius_m: float = 0.0      # = W_eff/2 (throughput-widened footprint)
     disc_center_x_m: float = 0.0    # wellfield centre in solver frame (= -W/2)
     disc_conc: float = 0.0          # C0 (operations) or C_res (post-restoration)
-    # First-order natural attenuation along travel (uranium redox trapping):
-    # exp(-atten_per_m * x) on the TRAVELING plume terms; never on the disc
-    # (the leach zone's reductants were consumed by the lixiviant). 0 = off.
-    atten_per_m: float = 0.0        # = (k_per_yr/365) / v_c   [1/m]
+    # First-order natural attenuation (uranium redox trapping) on the TRAVELING
+    # plume terms; never on the disc (the leach zone's reductants were consumed
+    # by the lixiviant). Two components of the parcel AGE (EPA/540/S-02/500
+    # distinguishes the conc-vs-DISTANCE bulk rate from the conc-vs-TIME point
+    # rate -- both are the same reaction, so both must act):
+    atten_per_m: float = 0.0        # travel-time part: (k_per_yr/365)/v_c [1/m]
+    # hold part: exp(-k * elapsed_hold) for the years the plume sat STILL under
+    # restoration hydraulic control -- a frozen slug keeps reacting with the
+    # rock (fixes the "long sweep preserves the slug at full strength" paradox,
+    # user-observed 2026-07-16). 1.0 = no hold / off.
+    atten_hold_factor: float = 1.0
 
 
 def _long_factor(X: np.ndarray, Xc: float, aL: float) -> np.ndarray:
@@ -284,17 +291,30 @@ def concentration_field(X: np.ndarray, Y: np.ndarray, p: TransportParams,
         # gating on Xc_clean > 0 made that box snap back to full C0 the moment
         # the sweep was still running at eval time. The clean front uses the
         # RETARDED kinematics only (no Tang boost): matrix back-diffusion makes
-        # clean-up slow -- conservative.
-        C = C - (p.C0 - p.C_res) * _long_factor(X, p.Xc_clean, p.aL) * A_tran
+        # clean-up slow -- conservative. The SOURCE ZONE (x <= 0) always takes
+        # the FULL deficit: its concentration is C_src by definition; the erfc
+        # profile applies downstream only (2026-07-16 -- with the front barely
+        # downstream, the erfc's upstream bleed left the box only ~90% wiped,
+        # a transient partial-C0 strip the user saw as 'the dark red center
+        # disc coming back').
+        F_c = _long_factor(X, p.Xc_clean, p.aL)
+        F_c = np.where(X <= 0.0, 1.0, F_c)
+        C = C - (p.C0 - p.C_res) * F_c * A_tran
     # First-order natural attenuation (uranium redox trapping): dissolved U(VI)
-    # reduces to immobile U(IV) along the flow path, so concentration decays
-    # with plug-flow travel time tau = x/v_c -> exp(-atten_per_m * x). Applied
-    # to the WHOLE traveling expression (base plume AND deficit wave share the
-    # factor -- else the wave could subtract more than exists at distance x),
-    # clipped at x=0 so the source plane / upstream box are untouched (their
-    # decline is the flush/restoration, not down-gradient redox).
-    if p.atten_per_m > 0.0:
-        C = C * np.exp(-p.atten_per_m * np.clip(X, 0.0, None))
+    # reduces to immobile U(IV) wherever it contacts reducing rock. The decay
+    # follows the parcel AGE = plug-flow travel time (x/v_c, the conc-vs-
+    # distance form) + the years the plume was HELD by restoration hydraulic
+    # control (the conc-vs-time form; the escaped plume was emitted during
+    # operations, so it sits through the sweep). Applied to the WHOLE traveling
+    # expression (base plume AND deficit wave share the factor -- else the wave
+    # could subtract more than exists at distance x), only for x > 0 so the
+    # source plane / upstream box are untouched (their decline is the
+    # flush/restoration, not down-gradient redox).
+    if p.atten_per_m > 0.0 or p.atten_hold_factor < 1.0:
+        decay = np.exp(-p.atten_per_m * np.clip(X, 0.0, None))
+        if p.atten_hold_factor < 1.0:
+            decay = decay * np.where(X > 0.0, p.atten_hold_factor, 1.0)
+        C = C * decay
     # E1: leach-zone disc -- the well-field footprint is contaminated by
     # construction. Unioned only for display + AREA (include_disc); the plume-
     # travel metrics exclude it so a wide source footprint reaching the ring is
@@ -562,13 +582,21 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
         disc_cx = -W / 2.0
         # C_res already folds restoration credit x post-closure flush
         disc_c = C_res if Xc_clean is not None else species_C0
+    # Hold-time decay: the escaped plume keeps reacting while hydraulic control
+    # holds it still during the sweep (elapsed hold = the elapsed sweep).
+    atten_hold = 1.0
+    k_yr = float(feat.get("u_attenuation_k", 0.0))
+    if k_yr > 0.0 and restoration_days > 0.0:
+        hold_days = min(max(t_days - operation_days, 0.0), restoration_days)
+        atten_hold = math.exp(-(k_yr / 365.0) * hold_days)
     return TransportParams(C0=species_C0, aL=feat["alpha_L"], aT=feat["alpha_T"],
                            source_width_m=feat.get("_source_width_m",
                                                    feat["wellfield_width_m"]),
                            Xc=Xc, Xw=Xw, sigma=sigma, t_days=t_days,
                            Xc_clean=Xc_clean, C_res=C_res,
                            disc_radius_m=disc_r, disc_center_x_m=disc_cx, disc_conc=disc_c,
-                           atten_per_m=float(feat.get("_atten_per_m", 0.0)))
+                           atten_per_m=float(feat.get("_atten_per_m", 0.0)),
+                           atten_hold_factor=atten_hold)
 
 
 def solve_plume(params: TransportParams, *, threshold: float, background: float,
@@ -643,8 +671,8 @@ def simulate_plume(feat: dict, *, species_C0: float, background: float,
 # --------------------------------------------------------------------------- #
 def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
                  Xc_clean, C_res, rest_active=None, atten_per_m=None,
-                 disc_radius=None, disc_center_x=None, disc_conc=None,
-                 include_disc=True) -> np.ndarray:
+                 atten_hold=None, disc_radius=None, disc_center_x=None,
+                 disc_conc=None, include_disc=True) -> np.ndarray:
     """concentration_field broadcast over draws: X3/Y3 are (ny,nx,1) grids,
     parameter arrays are (nd,). Returns C of shape (ny, nx, nd).
 
@@ -671,10 +699,18 @@ def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
     if bool(np.any(active)):
         Xcc = np.maximum(Xc_clean, 1e-3)          # 0 -> wall at the source plane
         A_c = 0.5 * erfc((X3 - Xcc) / (2.0 * np.sqrt(aL * Xcc)))
+        A_c = np.where(X3 <= 0.0, 1.0, A_c)       # source zone fully at C_res
         C = C - np.where(active, C0 - C_res, 0.0) * A_c * A_tran
-    # first-order U natural attenuation along travel (see concentration_field)
-    if atten_per_m is not None and bool(np.any(atten_per_m > 0.0)):
-        C = C * np.exp(-atten_per_m * np.clip(X3, 0.0, None))
+    # first-order U natural attenuation: travel-time + hold-time parts
+    # (see concentration_field)
+    has_dist = atten_per_m is not None and bool(np.any(atten_per_m > 0.0))
+    has_hold = atten_hold is not None and bool(np.any(atten_hold < 1.0))
+    if has_dist or has_hold:
+        decay = np.exp(-(atten_per_m if atten_per_m is not None else 0.0)
+                       * np.clip(X3, 0.0, None))
+        if has_hold:
+            decay = decay * np.where(X3 > 0.0, atten_hold, 1.0)
+        C = C * decay
     # E1 leach-zone disc, broadcast over draws (display/area only; excluded from
     # the plume-travel evaluation -- see mc_field_metrics)
     if include_disc and disc_radius is not None and bool(np.any(disc_radius > 0.0)):
@@ -729,6 +765,7 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
             C_res=arr(lambda p: p.C_res),
             rest_active=np.array([plist[i].Xc_clean is not None for i in bucket]),
             atten_per_m=arr(lambda p: p.atten_per_m),
+            atten_hold=arr(lambda p: p.atten_hold_factor),
             include_disc=False)
         plume_mask = C >= thr_inc
         cell = float(abs((X[0, 1] - X[0, 0]) * (Y[1, 0] - Y[0, 0])))

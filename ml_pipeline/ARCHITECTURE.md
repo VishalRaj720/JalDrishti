@@ -95,7 +95,7 @@ Key vocabulary, all of which appears in the code:
 | Phase | Real-world duration | Our slider range |
 |---|---|---|
 | Production, single wellfield | 1–3 yr (most U in first 6 months) | `operation_years` 1–20 (default 8 ≈ a multi-wellfield mine unit, not one wellfield) |
-| Active restoration | ~2 yr formal minimum; Texas median 5.0 yr (IQR 3.8–6.5), median 18.6 pore volumes | `restoration_years` 0–50 (values > 10 = ML extrapolation, flagged) |
+| Active restoration | ~2 yr formal minimum; Texas median 5.0 yr (IQR 3.8–6.5), median 18.6 pore volumes | `restoration_years` 0–30 (values > 10 = ML extrapolation, flagged) |
 | Post-closure monitoring | EPA ≥ 30 yr | `time_years` 0–50 (values > 20 = ML extrapolation, flagged) |
 
 ### Why Jharkhand?
@@ -499,8 +499,17 @@ where that capacity was intact. The screening representation (standard in
 BIOSCREEN-class models) is a first-order sink along the travel path:
 
 ```
-C(x) → C(x) · exp(−k · τ),   τ = x / v_c   (plug-flow travel time)
+C(x) → C(x) · exp(−k · age),   age = x / v_c  +  t_held
 ```
+
+The parcel **age** has two parts, matching the two first-order rate constants
+the EPA's MNA guidance (Newell et al. 2002, EPA/540/S-02/500) distinguishes:
+the **concentration-vs-distance** part (`x/v_c`, plug-flow travel time under
+steady drift) and the **concentration-vs-time** part (`t_held` = the elapsed
+years the restoration sweep held the plume still under hydraulic control — a
+stationary parcel keeps reacting with the rock; 2026-07-16 fix for the
+"frozen slug" paradox where a long sweep *preserved* the escaped plume at
+full strength instead of letting it decay).
 
 Consequence: the plume gains a **finite steady-state extent**. Behind the
 front, `C(x) = C0·e^(−k x/v_c)`, so the BIS contour freezes at

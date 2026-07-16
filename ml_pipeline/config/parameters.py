@@ -331,12 +331,13 @@ RESTORATION_RESIDUAL_FLOOR = 0.02   # matches the texas_restoration_residual cli
 
 # UI exploration ceiling for the restoration-sweep slider (dashboard + request
 # validation), DECOUPLED from the training envelope (OPERATIONAL_RANGES["restoration
-# _years"], currently 10 yr). Real active restoration is 1-6 yr, but the slider goes
-# to 50 so a user can watch a sweep play out past the 30 yr disc-flush half-life;
-# the analytical engine serves any value, and ML bands above the deployed model's
-# trained max are flagged as extrapolation (they are not silently trusted). Raising
-# the *training* range to match is a separate, deliberate retrain decision.
-RESTORATION_SLIDER_MAX_YEARS = 50.0
+# _years"], currently 10 yr). Real active restoration is 1-6 yr (Texas median 5.0);
+# the EPA post-restoration monitoring horizon is 30 yr, so 30 is already a generous
+# exploration ceiling -- lowered from 50 (2026-07-16, user review): sweeps beyond the
+# available post-closure window just saturate causally, so the extra range only
+# added dead slider travel. The analytical engine serves any value; ML bands above
+# the deployed model's trained max (10 yr) are flagged as extrapolation.
+RESTORATION_SLIDER_MAX_YEARS = 30.0
 
 # UI exploration ceiling for the EVALUATION-TIME slider, DECOUPLED from the trained
 # horizon (OPERATIONAL_RANGES["horizon_years"], currently 20 yr) exactly like the

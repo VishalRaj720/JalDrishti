@@ -59,28 +59,28 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|sulfate_mg_l": 0.67576,
-      "fractured|tds_mg_l": 0.50959,
-      "fractured|uranium_ppb": 0.24629,
-      "porous|sulfate_mg_l": 0.65578,
-      "porous|tds_mg_l": 0.55797,
-      "porous|uranium_ppb": 0.20731
+      "fractured|sulfate_mg_l": 0.72589,
+      "fractured|tds_mg_l": 0.5237,
+      "fractured|uranium_ppb": 0.22993,
+      "porous|sulfate_mg_l": 0.71849,
+      "porous|tds_mg_l": 0.51308,
+      "porous|uranium_ppb": 0.20331
     },
     "max_migration_distance_m": {
-      "fractured|sulfate_mg_l": 1.0283,
-      "fractured|tds_mg_l": 0.59297,
-      "fractured|uranium_ppb": 0.20992,
-      "porous|sulfate_mg_l": 0.81005,
-      "porous|tds_mg_l": 0.38948,
-      "porous|uranium_ppb": 0.13111
+      "fractured|sulfate_mg_l": 1.06535,
+      "fractured|tds_mg_l": 0.50062,
+      "fractured|uranium_ppb": 0.22429,
+      "porous|sulfate_mg_l": 0.73365,
+      "porous|tds_mg_l": 0.36124,
+      "porous|uranium_ppb": 0.15227
     },
     "compliance_conc": {
-      "fractured|sulfate_mg_l": 0.77269,
-      "fractured|tds_mg_l": 0.44135,
-      "fractured|uranium_ppb": 1.89057,
-      "porous|sulfate_mg_l": 1.55077,
-      "porous|tds_mg_l": 0.68995,
-      "porous|uranium_ppb": 1.8243
+      "fractured|sulfate_mg_l": 0.78462,
+      "fractured|tds_mg_l": 0.44844,
+      "fractured|uranium_ppb": 1.91003,
+      "porous|sulfate_mg_l": 1.54039,
+      "porous|tds_mg_l": 0.71593,
+      "porous|uranium_ppb": 1.72202
     }
   },
   "monotone_maps": {

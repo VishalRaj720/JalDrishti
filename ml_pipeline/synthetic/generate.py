@@ -283,13 +283,19 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     # First-order U natural attenuation (uranium only): scenario-level k with a
     # per-draw local-capacity multiplier; decay per meter over the draw's own
     # retarded contaminant velocity (slower water = more residence = stronger
-    # trapping per meter).
-    atten_per_m = 0.0
+    # trapping per meter), PLUS the hold-time part -- the plume keeps reacting
+    # for the years the restoration sweep holds it still (MUST match
+    # physics.params_from_features so training labels stay serve-identical).
+    atten_per_m, atten_hold = 0.0, 1.0
     if species == "uranium_ppb" and scn.get("atten_k", 0.0) > 0.0:
         m_lo, m_hi = P.U_ATTENUATION_MC_MULT
         mult = m_lo * (m_hi / m_lo) ** float(draws["u_att"][i])   # log-uniform
+        k_yr = scn["atten_k"] * mult
         v_c = v_base / (1.0 + beta_k) if beta_k > 0.0 else v_base
-        atten_per_m = (scn["atten_k"] * mult / 365.0) / max(v_c, 1e-9)
+        atten_per_m = (k_yr / 365.0) / max(v_c, 1e-9)
+        if rest_days > 0.0:
+            hold_days = min(max(t_days - op_days, 0.0), rest_days)
+            atten_hold = math.exp(-(k_yr / 365.0) * hold_days)
 
     # E1 leach-zone disc, gated by P.E1_ENABLED like the served path (OFF -> pre-E1
     # labels, so the non-generator callers/tests are unchanged).
@@ -302,7 +308,7 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
                            source_width_m=w_eff, Xc=Xc, Xw=Xw, sigma=sigma,
                            t_days=t_days, Xc_clean=Xc_clean, C_res=C_res,
                            disc_radius_m=disc_r, disc_center_x_m=disc_cx, disc_conc=disc_c,
-                           atten_per_m=atten_per_m)
+                           atten_per_m=atten_per_m, atten_hold_factor=atten_hold)
 
 
 def _throughput_width(scn: dict, t_days: float, op_days: float) -> float:
