@@ -74,6 +74,8 @@ FEATURE_COLUMNS = [
     "gradient_seasonal_amp",        # relative seasonal swing of i (MC widening)
     "restoration_years",            # post-mining clean-up sweep duration
     "residual_fraction",            # C_rest/C0 after restoration (1 = none)
+    # --- geochemistry (real-ISR upgrade 2026-07-13) -------------------------
+    "u_attenuation_k",              # first-order U redox-trapping rate [1/yr]; 0 = off
 ]
 
 
@@ -177,7 +179,8 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
                       downtime_fraction: float = 0.0,
                       gradient_seasonal_amp: float = 0.0,
                       residual_fraction: float = 1.0,
-                      aniso_ratio: float | None = None) -> dict:
+                      aniso_ratio: float | None = None,
+                      u_attenuation_k_per_yr: float = 0.0) -> dict:
     """Assemble one fully-featured, scale-independent training/inference row.
 
     eval_time_days: the time slice being evaluated. Throughput (PV/BV), the
@@ -262,12 +265,17 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
         # the drawdown law would double-apply it).
         "residual_fraction": float(restoration_source_fraction(
             float(residual_fraction), t_eval, operation_days, restoration_days)),
+        # first-order U natural-attenuation rate (0 for non-U species / off)
+        "u_attenuation_k": float(u_attenuation_k_per_yr),
         # carried for transport solver / labelling (not model features):
         "_L_ref_m": L_disp, "_thickness_m": thickness_m, "_regime": regime,
         "_source_width_m": W_eff, "_grain_density": grain_density,
         "_Xc_eval_m": Xc_eval, "_Xc_clean_m": Xc_clean, "_eta_eff": eta_eff,
         "_eval_time_days": t_eval, "_restoration_days": restoration_days,
         "_residual_endpoint": float(residual_fraction),
+        # decay per meter for the transport engine: k [1/yr] -> [1/day] over the
+        # retarded contaminant velocity (plug-flow travel-time form)
+        "_atten_per_m": (float(u_attenuation_k_per_yr) / 365.0) / max(vc, 1e-9),
     }
 
 

@@ -33,6 +33,7 @@
     "gradient_seasonal_amp",
     "restoration_years",
     "residual_fraction",
+    "u_attenuation_k",
     "Xc_m",
     "Xc_clean_m",
     "time_years",
@@ -58,28 +59,28 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|sulfate_mg_l": 0.50437,
-      "fractured|tds_mg_l": 0.43526,
-      "fractured|uranium_ppb": 0.25381,
-      "porous|sulfate_mg_l": 0.57043,
-      "porous|tds_mg_l": 0.50583,
-      "porous|uranium_ppb": 0.17217
+      "fractured|sulfate_mg_l": 0.67576,
+      "fractured|tds_mg_l": 0.50959,
+      "fractured|uranium_ppb": 0.24629,
+      "porous|sulfate_mg_l": 0.65578,
+      "porous|tds_mg_l": 0.55797,
+      "porous|uranium_ppb": 0.20731
     },
     "max_migration_distance_m": {
-      "fractured|sulfate_mg_l": 0.70263,
-      "fractured|tds_mg_l": 0.35167,
-      "fractured|uranium_ppb": 0.20516,
-      "porous|sulfate_mg_l": 0.75834,
-      "porous|tds_mg_l": 0.51324,
-      "porous|uranium_ppb": 0.10626
+      "fractured|sulfate_mg_l": 1.0283,
+      "fractured|tds_mg_l": 0.59297,
+      "fractured|uranium_ppb": 0.20992,
+      "porous|sulfate_mg_l": 0.81005,
+      "porous|tds_mg_l": 0.38948,
+      "porous|uranium_ppb": 0.13111
     },
     "compliance_conc": {
-      "fractured|sulfate_mg_l": 0.74952,
-      "fractured|tds_mg_l": 0.42221,
-      "fractured|uranium_ppb": 1.89673,
-      "porous|sulfate_mg_l": 1.25385,
-      "porous|tds_mg_l": 0.69479,
-      "porous|uranium_ppb": 1.61495
+      "fractured|sulfate_mg_l": 0.77269,
+      "fractured|tds_mg_l": 0.44135,
+      "fractured|uranium_ppb": 1.89057,
+      "porous|sulfate_mg_l": 1.55077,
+      "porous|tds_mg_l": 0.68995,
+      "porous|uranium_ppb": 1.8243
     }
   },
   "monotone_maps": {
@@ -91,9 +92,9 @@
       "contaminant_velocity_vc": 1,
       "Xc_m": 1,
       "Xc_clean_m": -1,
-      "time_years": 1,
-      "is_post_closure": 1,
-      "dimensionless_time_tau": 1,
+      "time_years": 0,
+      "is_post_closure": 0,
+      "dimensionless_time_tau": 0,
       "Q_in_m3_day": 1,
       "pore_volumes_PV": 1,
       "source_conc_C0": 1,
@@ -107,7 +108,8 @@
       "bleed_fraction": -1,
       "Q_net_m3_day": -1,
       "containment_eta": -1,
-      "restoration_years": -1
+      "restoration_years": -1,
+      "u_attenuation_k": -1
     },
     "max_migration_distance_m": {
       "K_m_day": 1,
@@ -117,9 +119,9 @@
       "contaminant_velocity_vc": 1,
       "Xc_m": 1,
       "Xc_clean_m": -1,
-      "time_years": 1,
-      "is_post_closure": 1,
-      "dimensionless_time_tau": 1,
+      "time_years": 0,
+      "is_post_closure": 0,
+      "dimensionless_time_tau": 0,
       "Q_in_m3_day": 1,
       "pore_volumes_PV": 1,
       "source_conc_C0": 1,
@@ -133,7 +135,8 @@
       "bleed_fraction": -1,
       "Q_net_m3_day": -1,
       "containment_eta": -1,
-      "restoration_years": -1
+      "restoration_years": -1,
+      "u_attenuation_k": -1
     },
     "compliance_conc": {
       "K_m_day": 1,
@@ -159,7 +162,8 @@
       "bleed_fraction": -1,
       "Q_net_m3_day": -1,
       "containment_eta": -1,
-      "restoration_years": -1
+      "restoration_years": -1,
+      "u_attenuation_k": -1
     },
     "excursion_probability": {
       "K_m_day": 1,
@@ -169,9 +173,9 @@
       "contaminant_velocity_vc": 1,
       "Xc_m": 1,
       "Xc_clean_m": -1,
-      "time_years": 1,
-      "is_post_closure": 1,
-      "dimensionless_time_tau": 1,
+      "time_years": 0,
+      "is_post_closure": 0,
+      "dimensionless_time_tau": 0,
       "Q_in_m3_day": 1,
       "pore_volumes_PV": 1,
       "source_conc_C0": 1,
@@ -185,7 +189,8 @@
       "bleed_fraction": -1,
       "Q_net_m3_day": -1,
       "containment_eta": -1,
-      "restoration_years": -1
+      "restoration_years": -1,
+      "u_attenuation_k": -1
     }
   },
   "constrained_bands": [
@@ -225,6 +230,10 @@
     "restoration_years": [
       0.0,
       10.0
+    ],
+    "u_attenuation_k_per_yr": [
+      0.0,
+      0.7
     ]
   },
   "hydro_support": {
@@ -234,12 +243,12 @@
         0.025
       ],
       "retardation_Rd": [
-        3.0332902259621517,
-        20.94662384107632
+        3.0767005578791835,
+        20.992110066110342
       ],
       "K_m_day": [
-        0.0464744912544682,
-        9.73048544857478
+        0.0406811845764557,
+        10.574080616183748
       ]
     },
     "porous": {
@@ -249,11 +258,11 @@
       ],
       "retardation_Rd": [
         1.0,
-        86.7591463916814
+        86.34066570218337
       ],
       "K_m_day": [
-        0.0984466416991108,
-        29.41283091450157
+        0.0960831485861693,
+        29.52199004935879
       ]
     }
   },

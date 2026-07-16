@@ -184,6 +184,13 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
         lo, _, hi = P.KD_RANGES[sp][regime]
         Kd[sp] = float(rng.uniform(lo, hi))
 
+    # First-order U natural-attenuation rate (real-ISR upgrade): log-triangular
+    # over the literature range so reducing-capacity uncertainty reaches the
+    # bands. Applied to URANIUM only (sulfate/TDS conservative, k = 0 at use).
+    a_lo, a_mode, a_hi = P.U_ATTENUATION_K_PER_YR
+    atten_k = float(10.0 ** _triangular(float(rng.uniform()), math.log10(a_lo),
+                                        math.log10(a_mode), math.log10(a_hi)))
+
     return dict(lithology=litho, regime=regime, polygon_id=polygon_id,
                 K=K, phi_mobile=phi_mobile,
                 n_total=n_total, grain_density=grain_density, thickness=thickness,
@@ -191,7 +198,8 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
                 op_years=op_years, gradient=gradient, width=width, beta=beta,
                 downtime=downtime, seasonal_amp=seasonal_amp,
                 rest_years=rest_years, residual=residual,
-                C0=C0, Cb=Cb, Kd=Kd, V=V, aniso_ratio=aniso_ratio)
+                C0=C0, Cb=Cb, Kd=Kd, V=V, aniso_ratio=aniso_ratio,
+                atten_k=atten_k)
 
 
 # --------------------------------------------------------------------------- #
@@ -208,6 +216,7 @@ def mc_draws(n_mc: int, seed: int) -> dict[str, np.ndarray]:
         "u_grad": rng.uniform(size=n_mc),
         "u_disp": rng.uniform(size=n_mc),
         "u_qnet": rng.uniform(size=n_mc),
+        "u_att": rng.uniform(size=n_mc),   # U-attenuation local-capacity mult
     }
 
 
@@ -259,27 +268,41 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     if fractured and P.E1_ENABLED and scn.get("aniso_ratio") is not None:
         aT = aL * scn["aniso_ratio"]         # E1: V-derived transverse anisotropy
 
-    # Restoration clean-up (2026-07-13, QA F-1): continuous source draw-down
-    # credited for the ELAPSED sweep only (restoration_source_fraction) -- MUST
-    # match physics.params_from_features so training labels and the served
-    # analytical engine stay identical.
+    # Source draw-down (QA F-1 fix + real-ISR upgrade): restoration credit for
+    # the ELAPSED sweep x natural post-closure flush -- MUST match
+    # physics.params_from_features so training labels and the served analytical
+    # engine stay identical.
+    f_src = (restoration_source_fraction(residual_fraction, t_days, op_days,
+                                         rest_days)
+             * disc_flush_factor(t_days, op_days))
     Xc_clean, C_res = None, 0.0
-    if rest_days > 0.0:
-        C_res = (restoration_source_fraction(residual_fraction, t_days, op_days,
-                                             rest_days) * scn["C0"][species])
+    if f_src < 1.0:
+        C_res = f_src * scn["C0"][species]
         Xc_clean = front_position(v_base, 1.0, t_days, op_days, rest_days, beta_k)
+
+    # First-order U natural attenuation (uranium only): scenario-level k with a
+    # per-draw local-capacity multiplier; decay per meter over the draw's own
+    # retarded contaminant velocity (slower water = more residence = stronger
+    # trapping per meter).
+    atten_per_m = 0.0
+    if species == "uranium_ppb" and scn.get("atten_k", 0.0) > 0.0:
+        m_lo, m_hi = P.U_ATTENUATION_MC_MULT
+        mult = m_lo * (m_hi / m_lo) ** float(draws["u_att"][i])   # log-uniform
+        v_c = v_base / (1.0 + beta_k) if beta_k > 0.0 else v_base
+        atten_per_m = (scn["atten_k"] * mult / 365.0) / max(v_c, 1e-9)
 
     # E1 leach-zone disc, gated by P.E1_ENABLED like the served path (OFF -> pre-E1
     # labels, so the non-generator callers/tests are unchanged).
     disc_r = disc_cx = disc_c = 0.0
     if P.E1_ENABLED:
-        disc_c = C_res if (Xc_clean is not None and C_res > 0.0) else scn["C0"][species]
-        disc_c *= disc_flush_factor(t_days, op_days)          # #4: post-closure decay
+        # C_res already folds restoration credit x post-closure flush
+        disc_c = C_res if Xc_clean is not None else scn["C0"][species]
         disc_r, disc_cx = w_eff / 2.0, -scn["width"] / 2.0
     return TransportParams(C0=scn["C0"][species], aL=aL, aT=aT,
                            source_width_m=w_eff, Xc=Xc, Xw=Xw, sigma=sigma,
                            t_days=t_days, Xc_clean=Xc_clean, C_res=C_res,
-                           disc_radius_m=disc_r, disc_center_x_m=disc_cx, disc_conc=disc_c)
+                           disc_radius_m=disc_r, disc_center_x_m=disc_cx, disc_conc=disc_c,
+                           atten_per_m=atten_per_m)
 
 
 def _throughput_width(scn: dict, t_days: float, op_days: float) -> float:
@@ -363,6 +386,9 @@ def label_row(scn: dict, t_years: float, species: str,
         gradient_seasonal_amp=scn["seasonal_amp"],
         residual_fraction=scn["residual"][species],
         aniso_ratio=scn["aniso_ratio"],          # E1: V-derived (None for porous)
+        # real-ISR upgrade: U redox-trapping rate (0 for conservative species)
+        u_attenuation_k_per_yr=(scn.get("atten_k", 0.0)
+                                if species == "uranium_ppb" else 0.0),
     )
     # deterministic central run (reference + served analytical path)
     res = simulate_plume(feat, species_C0=scn["C0"][species],

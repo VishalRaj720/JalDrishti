@@ -64,12 +64,18 @@ def features_from_inputs(*, regime, K_m_day, gradient_i, phi_mobile, n_total,
                          time_years, restoration_years: float = 0.0,
                          downtime_fraction: float = 0.0,
                          gradient_seasonal_amp: float = 0.0,
-                         aniso_ratio: float | None = None
+                         aniso_ratio: float | None = None,
+                         u_attenuation_k_per_yr: float | None = None
                          ) -> tuple[pd.DataFrame, dict, float]:
     op_days = operation_years * 365.0
     t_days = time_years * 365.0
     rest_days = max(float(restoration_years), 0.0) * 365.0
     residual = _restoration_residual().get(species, 1.0) if rest_days > 0 else 1.0
+    # real-ISR upgrade: U redox-trapping rate. None -> literature mode for
+    # uranium, 0 for conservative species; explicit value = expert override.
+    if u_attenuation_k_per_yr is None:
+        u_attenuation_k_per_yr = (P.U_ATTENUATION_K_PER_YR[1]
+                                  if species == "uranium_ppb" else 0.0)
     feat = build_feature_row(
         regime=regime, domain_is_texas=False, K_m_day=K_m_day, gradient_i=gradient_i,
         phi_mobile=phi_mobile, n_total=n_total, grain_density=grain_density,
@@ -80,7 +86,8 @@ def features_from_inputs(*, regime, K_m_day, gradient_i, phi_mobile, n_total,
         eval_time_days=t_days, restoration_days=rest_days,
         downtime_fraction=downtime_fraction,
         gradient_seasonal_amp=gradient_seasonal_amp,
-        residual_fraction=residual, aniso_ratio=aniso_ratio)
+        residual_fraction=residual, aniso_ratio=aniso_ratio,
+        u_attenuation_k_per_yr=float(u_attenuation_k_per_yr))
     Xc = feat["_Xc_eval_m"]                     # same kinematics as the labels
     row = {k: feat[k] for k in FEATURE_COLUMNS}
     row["Xc_m"] = Xc
@@ -183,6 +190,8 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
                downtime=float(inputs.get("downtime_fraction", 0.0) or 0.0),
                seasonal_amp=float(inputs.get("gradient_seasonal_amp", 0.0) or 0.0),
                aniso_ratio=inputs.get("aniso_ratio"),   # E1: V-derived (fractured)
+               # real-ISR upgrade: the SAME k the feature row used (0 unless U)
+               atten_k=float(feat["u_attenuation_k"]),
                C0={species: inputs["source_conc_C0"]},
                Cb={species: inputs["background_conc_Cb"]})
     draws = mc_draws(n_mc, seed)

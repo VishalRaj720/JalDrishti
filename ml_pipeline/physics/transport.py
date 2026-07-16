@@ -223,6 +223,10 @@ class TransportParams:
     disc_radius_m: float = 0.0      # = W_eff/2 (throughput-widened footprint)
     disc_center_x_m: float = 0.0    # wellfield centre in solver frame (= -W/2)
     disc_conc: float = 0.0          # C0 (operations) or C_res (post-restoration)
+    # First-order natural attenuation along travel (uranium redox trapping):
+    # exp(-atten_per_m * x) on the TRAVELING plume terms; never on the disc
+    # (the leach zone's reductants were consumed by the lixiviant). 0 = off.
+    atten_per_m: float = 0.0        # = (k_per_yr/365) / v_c   [1/m]
 
 
 def _long_factor(X: np.ndarray, Xc: float, aL: float) -> np.ndarray:
@@ -282,10 +286,20 @@ def concentration_field(X: np.ndarray, Y: np.ndarray, p: TransportParams,
         # RETARDED kinematics only (no Tang boost): matrix back-diffusion makes
         # clean-up slow -- conservative.
         C = C - (p.C0 - p.C_res) * _long_factor(X, p.Xc_clean, p.aL) * A_tran
+    # First-order natural attenuation (uranium redox trapping): dissolved U(VI)
+    # reduces to immobile U(IV) along the flow path, so concentration decays
+    # with plug-flow travel time tau = x/v_c -> exp(-atten_per_m * x). Applied
+    # to the WHOLE traveling expression (base plume AND deficit wave share the
+    # factor -- else the wave could subtract more than exists at distance x),
+    # clipped at x=0 so the source plane / upstream box are untouched (their
+    # decline is the flush/restoration, not down-gradient redox).
+    if p.atten_per_m > 0.0:
+        C = C * np.exp(-p.atten_per_m * np.clip(X, 0.0, None))
     # E1: leach-zone disc -- the well-field footprint is contaminated by
     # construction. Unioned only for display + AREA (include_disc); the plume-
     # travel metrics exclude it so a wide source footprint reaching the ring is
-    # not mistaken for a plume excursion.
+    # not mistaken for a plume excursion. NO attenuation on the disc: its
+    # reductants were deliberately oxidized by the lixiviant.
     if include_disc and p.disc_radius_m > 0.0 and p.disc_conc > 0.0:
         inside = (X - p.disc_center_x_m) ** 2 + Y ** 2 <= p.disc_radius_m ** 2
         C = np.where(inside, np.maximum(C, p.disc_conc), C)
@@ -517,20 +531,24 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
     sigma = (matrix_sigma(feat["phi_total"], feat.get("_grain_density", 2700.0),
                           feat["Kd_L_kg"]) if fractured else 0.0)
 
-    # Restoration clean-up (2026-07-13, QA F-1 fix): source drawn down
-    # CONTINUOUSLY with the ELAPSED sweep (restoration_source_fraction), so a
-    # sweep in progress is credited progressively and a planned-but-future sweep
-    # not at all -- no completion gate, no snap at rest = t - op. The deficit
-    # wave (concentration_field) is active whenever C_res < C0: mid-sweep its
-    # front sits AT the source plane (Xc_clean = 0 -> a wall that wipes the
-    # upstream source-zone box to C_res), and it advances down-gradient only
-    # once regional drift resumes -- the ESCAPED plume keeps its history until
-    # clean water overtakes it (the "dark band migrates downgradient" signature).
+    # Source draw-down (2026-07-13, QA F-1 fix + real-ISR upgrade): the source
+    # concentration at eval time is
+    #     C_src(t) = C0 x restoration credit x natural post-closure flush
+    # - restoration_source_fraction: ELAPSED-sweep credit (causal, continuous);
+    # - disc_flush_factor: after injection stops the source zone is passively
+    #   flushed by regional flow (30 yr half-life, EPA monitoring horizon) --
+    #   restoration is just the ACCELERATED version of this same process.
+    # The deficit wave (concentration_field) activates whenever C_src < C0:
+    # mid-sweep / early post-closure its front sits AT the source plane (a wall
+    # wiping the upstream source-zone box to C_res) and it advances with
+    # regional drift -- the ESCAPED plume keeps its history until clean water
+    # overtakes it (the "dark band migrates downgradient" signature).
+    f_src = (restoration_source_fraction(float(residual_fraction), t_days,
+                                         operation_days, restoration_days)
+             * disc_flush_factor(t_days, operation_days))
     Xc_clean, C_res = None, 0.0
-    if restoration_days > 0.0:
-        f_res = restoration_source_fraction(float(residual_fraction), t_days,
-                                            operation_days, restoration_days)
-        C_res = f_res * species_C0
+    if f_src < 1.0:
+        C_res = f_src * species_C0
         Xc_clean = front_position(v_base, 1.0, t_days, operation_days,
                                   restoration_days, beta_k)
 
@@ -542,14 +560,15 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
         W_eff = feat.get("_source_width_m", W)
         disc_r = W_eff / 2.0
         disc_cx = -W / 2.0
-        disc_c = C_res if (Xc_clean is not None and C_res > 0.0) else species_C0
-        disc_c *= disc_flush_factor(t_days, operation_days)   # #4: post-closure decay
+        # C_res already folds restoration credit x post-closure flush
+        disc_c = C_res if Xc_clean is not None else species_C0
     return TransportParams(C0=species_C0, aL=feat["alpha_L"], aT=feat["alpha_T"],
                            source_width_m=feat.get("_source_width_m",
                                                    feat["wellfield_width_m"]),
                            Xc=Xc, Xw=Xw, sigma=sigma, t_days=t_days,
                            Xc_clean=Xc_clean, C_res=C_res,
-                           disc_radius_m=disc_r, disc_center_x_m=disc_cx, disc_conc=disc_c)
+                           disc_radius_m=disc_r, disc_center_x_m=disc_cx, disc_conc=disc_c,
+                           atten_per_m=float(feat.get("_atten_per_m", 0.0)))
 
 
 def solve_plume(params: TransportParams, *, threshold: float, background: float,
@@ -623,8 +642,8 @@ def simulate_plume(feat: dict, *, species_C0: float, background: float,
 # broadcast pass per reach-bucket -- ~50-100x faster than per-draw grids.
 # --------------------------------------------------------------------------- #
 def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
-                 Xc_clean, C_res, rest_active=None, disc_radius=None,
-                 disc_center_x=None, disc_conc=None,
+                 Xc_clean, C_res, rest_active=None, atten_per_m=None,
+                 disc_radius=None, disc_center_x=None, disc_conc=None,
                  include_disc=True) -> np.ndarray:
     """concentration_field broadcast over draws: X3/Y3 are (ny,nx,1) grids,
     parameter arrays are (nd,). Returns C of shape (ny, nx, nd).
@@ -653,6 +672,9 @@ def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
         Xcc = np.maximum(Xc_clean, 1e-3)          # 0 -> wall at the source plane
         A_c = 0.5 * erfc((X3 - Xcc) / (2.0 * np.sqrt(aL * Xcc)))
         C = C - np.where(active, C0 - C_res, 0.0) * A_c * A_tran
+    # first-order U natural attenuation along travel (see concentration_field)
+    if atten_per_m is not None and bool(np.any(atten_per_m > 0.0)):
+        C = C * np.exp(-atten_per_m * np.clip(X3, 0.0, None))
     # E1 leach-zone disc, broadcast over draws (display/area only; excluded from
     # the plume-travel evaluation -- see mc_field_metrics)
     if include_disc and disc_radius is not None and bool(np.any(disc_radius > 0.0)):
@@ -706,6 +728,7 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
             Xc_clean=arr(lambda p: p.Xc_clean if p.Xc_clean is not None else 0.0),
             C_res=arr(lambda p: p.C_res),
             rest_active=np.array([plist[i].Xc_clean is not None for i in bucket]),
+            atten_per_m=arr(lambda p: p.atten_per_m),
             include_disc=False)
         plume_mask = C >= thr_inc
         cell = float(abs((X[0, 1] - X[0, 0]) * (Y[1, 0] - Y[0, 0])))

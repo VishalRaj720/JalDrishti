@@ -101,11 +101,34 @@ def test_rest_to_zero_continuity():
 # --------------------------------------------------------------------------- #
 def test_midsweep_is_credited():
     """A sweep that has run for years must show clean-up even if unfinished
-    (the bug held the source-zone box at full C0 until completion)."""
+    (the bug held the source-zone box at full C0 until completion). The
+    invariant is the SOURCE ZONE, not the global peak: with the natural
+    post-closure flush (real-ISR upgrade) the no-restoration baseline also
+    cleans up while its escaped slug drifts and dilutes, whereas mid-sweep the
+    held slug legitimately keeps a high local max near the wellfield."""
+    from ml_pipeline.data_prep.feature_engineering import build_feature_row
+    from ml_pipeline.physics.transport import (params_from_features,
+                                               concentration_point)
+
+    def src_cell(rest_years):
+        feat = build_feature_row(
+            domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+            operation_days=5 * 365.0, wellfield_width_m=300.0,
+            source_conc_C0=15000.0, background_conc_Cb=2.0,
+            eval_time_days=15 * 365.0, restoration_days=rest_years * 365.0,
+            residual_fraction=0.066, **FRACTURED)
+        p = params_from_features(feat, species_C0=15000.0, t_days=15 * 365.0,
+                                 operation_days=5 * 365.0,
+                                 restoration_days=rest_years * 365.0,
+                                 residual_fraction=0.066)
+        return concentration_point(-50.0, 0.0, p, include_disc=True)
+
     dirty = label(FRACTURED, rest_years=0.0)
     mid = label(FRACTURED, rest_years=12.0)     # still running at t=15 (op=5)
     assert mid["affected_area_ha"] < dirty["affected_area_ha"] * 0.9
-    assert mid["peak_conc"] < dirty["peak_conc"]
+    # 10 elapsed sweep years must have drawn the source zone down far below
+    # what passive flushing alone achieves
+    assert src_cell(12.0) < 0.25 * src_cell(0.0), (src_cell(12.0), src_cell(0.0))
 
 
 def test_midsweep_causality():

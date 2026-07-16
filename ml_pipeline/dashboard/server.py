@@ -119,6 +119,10 @@ class PredictRequest(BaseModel):
     phi_mobile: float | None = Field(None, gt=0, le=0.45)
     downtime_fraction: float | None = Field(None, ge=0, le=0.30)
     gradient_seasonal_amp: float | None = Field(None, ge=0, le=0.40)
+    # real-ISR upgrade: expert override for the U redox-trapping rate [1/yr].
+    # None -> literature mode (0.20) for uranium, 0 for sulfate/TDS. Values
+    # above the trained max (0.70) are served analytically + flagged.
+    u_attenuation_k_per_yr: float | None = Field(None, ge=0, le=2.0)
 
 
 def _bands(d: dict) -> dict:

@@ -269,7 +269,10 @@ def test_width_law_fixed_ring():
         rows = [label(hg, width=w, t_years=10.0) for w in (100.0, 300.0, 600.0, 800.0)]
         concs = [r["compliance_conc"] for r in rows]
         areas = [r["affected_area_ha"] for r in rows]
-        assert _nondecreasing(concs, tol=1e-6), f"{hg['regime']}: conc vs W {concs}"
+        # tol: the post-closure natural-flush wave (real-ISR upgrade) adds a
+        # sub-0.1% ripple to the ring conc at t > op; the width LAW itself is
+        # orders of magnitude larger (100 -> 300 m jumps the conc ~10x).
+        assert _nondecreasing(concs, tol=60.0), f"{hg['regime']}: conc vs W {concs}"
         assert _nondecreasing(areas, tol=1.0), f"{hg['regime']}: area vs W {areas}"
 
 

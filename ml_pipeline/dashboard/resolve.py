@@ -100,6 +100,7 @@ def envelope_violations(inputs: dict) -> list[str]:
         # are individually in range.
         "net_extraction_m3_day": inputs["Q_in_m3_day"] * inputs["bleed_fraction"],
         "restoration_years": inputs.get("restoration_years", 0.0),
+        "u_attenuation_k_per_yr": inputs.get("u_attenuation_k_per_yr", 0.0),
     }
     out = []
     for key, val in checks.items():
@@ -283,6 +284,11 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         # E1: V-derived transverse anisotropy (fractured); None -> regime default.
         aniso_ratio=(anisotropy_from_variance(strike["circular_variance"])
                      if regime == "fractured" else None),
+        # real-ISR upgrade: U redox-trapping rate. Explicit expert override wins;
+        # else the literature mode for uranium / 0 for conservative species.
+        u_attenuation_k_per_yr=_override(
+            payload, "u_attenuation_k_per_yr",
+            P.U_ATTENUATION_K_PER_YR[1] if species == "uranium_ppb" else 0.0),
     )
     # retardation (asymptotic) so the UI can SHOW why a plume is slow (P2)
     from ml_pipeline.data_prep.feature_engineering import retardation_factor

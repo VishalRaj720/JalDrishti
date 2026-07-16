@@ -58,6 +58,8 @@ MODEL_FEATURES = [
     # --- irregularities & restoration (Phase-2 v2) ---
     "downtime_fraction", "gradient_seasonal_amp",
     "restoration_years", "residual_fraction",
+    # --- geochemistry (real-ISR upgrade 2026-07-13) ---
+    "u_attenuation_k",
     # --- evaluation-time (analytic fronts + time) ---
     "Xc_m", "Xc_clean_m", "time_years", "is_post_closure",
     # --- species one-hot ---
@@ -76,9 +78,14 @@ _FOOTPRINT_MAP = {
     "contaminant_velocity_vc": +1,
     "Xc_m": +1,                    # farther front -> larger footprint
     "Xc_clean_m": -1,              # farther clean-up front -> smaller footprint
-    "time_years": +1,              # later time -> larger plume (no-restoration)
-    "is_post_closure": +1,         # drift phase -> migrates farther
-    "dimensionless_time_tau": +1,
+    # TIME IS UNCONSTRAINED (real-ISR upgrade 2026-07): with first-order U
+    # attenuation + the natural post-closure source flush, the footprint
+    # genuinely grows -> stabilizes -> RECEDES within the trained horizon for
+    # high-k scenarios. Forcing +1 made the P50 overshoot receding labels at
+    # late time slices (migration scenario-coverage fell to 0.78-0.79).
+    "time_years": 0,
+    "is_post_closure": 0,
+    "dimensionless_time_tau": 0,
     "Q_in_m3_day": +1,             # more throughput -> wider source (at fixed Q_net;
                                    #   verified label-level in the tests)
     "pore_volumes_PV": +1,         # time-consistent throughput -> wider source
@@ -94,6 +101,7 @@ _FOOTPRINT_MAP = {
     "Q_net_m3_day": -1,
     "containment_eta": -1,
     "restoration_years": -1,       # longer sweep -> front held longer + cleaner source
+    "u_attenuation_k": -1,         # stronger redox trapping -> smaller footprint
 }
 
 # Ring concentration: time signs are UNSAFE at fixed front features (Tang

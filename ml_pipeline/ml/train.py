@@ -49,8 +49,12 @@ CAL_SPLIT_SEED = 0
 # the 5 time slices) on the v3 training distribution's uniform-gradient tail
 # (~0.778 vs the 0.80 target); a modest inflation restores >=0.80 scenario
 # coverage. It only WIDENS bands (safer), and field-resampled/serving coverage is
-# already 0.91+. Set to 1.0 to disable.
-DELTA_INFLATE = 1.15
+# already 0.91+. Raised 1.15 -> 1.35 with the real-ISR attenuation upgrade: the
+# sampled U-attenuation k (plus its x0.5-2 per-draw local-capacity multiplier)
+# widens the true MC bands in ways the features cannot fully explain; migration
+# scenario coverage sat at 0.784/0.790/0.797 through 1.15/1.25 (+ the time-sign
+# unconstraining) and needs this margin to clear the 0.80 gate. Set 1.0 to disable.
+DELTA_INFLATE = 1.35
 COMMON = dict(n_estimators=450, max_depth=5, learning_rate=0.05,
               subsample=0.85, colsample_bytree=0.85, reg_lambda=1.5,
               tree_method="hist", random_state=42)

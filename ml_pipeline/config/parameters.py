@@ -349,6 +349,32 @@ RESTORATION_SLIDER_MAX_YEARS = 50.0
 HORIZON_SLIDER_MAX_YEARS = 50.0
 
 # ---------------------------------------------------------------------------
+# 5b. First-order natural attenuation of DISSOLVED URANIUM along travel
+#     (pseudo-reactive transport, 2026-07-13 real-ISR upgrade).
+# Down-gradient of an ISR wellfield, mobilized U(VI) is reduced to immobile
+# U(IV) by residual reductants (pyrite, organic carbon) -- the same redox
+# trapping that formed roll-front deposits. Screening form: the traveling-plume
+# concentration is multiplied by exp(-k * tau), tau = x / v_c (plug-flow travel
+# time at the retarded contaminant velocity). This gives the plume a FINITE
+# steady-state extent x* = (v_c/k) * ln(C0/thr) instead of unbounded growth.
+#
+# Rate grounding (Wyoming ISR cross-hole field test, Johnson et al. 2019,
+# ES&T 10.1021/acs.est.9b01572): ~50% of injected U(VI) reduced to U(IV) in
+# ~1 yr where reducing capacity was INTACT -> k_max ~ 0.7/yr. Two honesty
+# caveats bound the range DOWN: (1) that test conflates nothing with sorption
+# (we already model retardation separately -- calibrating to the 39%-recovered-
+# vs-chloride number would double-count Rd), and (2) reducing capacity is
+# FINITE and partially consumed near a real wellfield (the same study reports
+# the pathway's capacity nearly exhausted) -- first-order decay assumes an
+# infinite sink, so the central value must sit well below the intact-rock max.
+# k is SAMPLED per scenario (log-triangular over [lo, mode, hi]) so the
+# reducing-capacity uncertainty flows into the conformal P10-P90 bands; the MC
+# adds a per-draw x0.5-2 multiplier for local heterogeneity. Uranium only --
+# sulfate/TDS are conservative tracers (k = 0).
+U_ATTENUATION_K_PER_YR = (0.05, 0.20, 0.70)   # (lo, mode, hi), triangular in log10
+U_ATTENUATION_MC_MULT = (0.5, 2.0)            # per-draw log-uniform multiplier
+
+# ---------------------------------------------------------------------------
 # 6. Operational envelope for the synthetic loop (Phase 2) -- realistic ISR ranges,
 #    WIDENED (2026-07 review) to cover the dashboard sliders so served inputs
 #    stay inside training support. Q_in injection, bleed fraction
@@ -369,6 +395,9 @@ OPERATIONAL_RANGES = {
     "hydraulic_gradient":    (0.0005, 0.02),    # dimensionless i (dashboard slider)
     "wellfield_width_m":     (100.0, 800.0),    # source full-width
     "restoration_years":     (0.0, 10.0),       # post-mining clean-up sweep
+    # U natural-attenuation rate (recorded in the model card so serving can flag
+    # an expert k override outside the trained support; 0 = non-uranium rows)
+    "u_attenuation_k_per_yr": (0.0, 0.70),
 }
 
 # Operational irregularities (Phase-2 v2): industrial reality injected into the

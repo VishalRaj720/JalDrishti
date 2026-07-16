@@ -129,7 +129,7 @@ Five layers, each feeding the next:
 ┌──────────────────────────────────────────────────────────────────────┐
 │ 3. SYNTHETIC DATA FACTORY (synthetic/generate.py)                    │
 │    900 scenarios x 5 times x 3 species = 13,500 rows; each row =     │
-│    38 features + physics labels + Monte-Carlo P10/P50/P90 bands      │
+│    39 features + physics labels + Monte-Carlo P10/P50/P90 bands      │
 └──────────────────────────┬───────────────────────────────────────────┘
                            ▼
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -489,7 +489,54 @@ The separation uses **per-district NAQUIM/CGWB data** (real fracture-zone
 depths, e.g. East Singhbhum's productive fractures at 20–258 m) and the real
 post-monsoon water table from CGWB stations.
 
-### 4.12 Monte-Carlo uncertainty — where the bands come from
+### 4.12 First-order natural attenuation — the equilibrium plume (real-ISR upgrade)
+
+Down-gradient of the wellfield, dissolved U(VI) meets rock that is still
+*reducing* (pyrite, organic carbon) and precipitates as immobile U(IV) — the
+same redox trap that formed the ore deposit in the first place. A Wyoming ISR
+cross-hole field test measured ~50% of injected U(VI) immobilized in ~1 year
+where that capacity was intact. The screening representation (standard in
+BIOSCREEN-class models) is a first-order sink along the travel path:
+
+```
+C(x) → C(x) · exp(−k · τ),   τ = x / v_c   (plug-flow travel time)
+```
+
+Consequence: the plume gains a **finite steady-state extent**. Behind the
+front, `C(x) = C0·e^(−k x/v_c)`, so the BIS contour freezes at
+
+```
+x* = (v_c / k) · ln(C0 / threshold)
+```
+
+— growth, then equilibrium: exactly the real-world behavior (scenario 2).
+
+Honesty rules baked into the implementation:
+- **Uranium only** (k = 0 for sulfate/TDS — conservative tracers; their
+  real-world brake is river discharge, handled by the far-field note).
+- **k is uncertain and sampled**: log-triangular over [0.05, 0.20, 0.70]/yr
+  per scenario + a ×0.5–2 per-draw multiplier, so reducing-capacity ignorance
+  flows into the P10–P90 bands. The 0.70 ceiling is the intact-rock field
+  value; the mode sits well below it because (a) capacity near a real
+  wellfield is partially consumed and (b) first-order decay pretends the sink
+  is infinite (it is not — the same field test nearly exhausted its pathway).
+- **Never applied to the source disc** (its reductants were deliberately
+  oxidized by the lixiviant) and **shared by the deficit wave** (else the wave
+  could subtract more than exists at distance x).
+- Expert override: `u_attenuation_k_per_yr` in the API; values above the
+  trained 0.70 are served analytically and flagged as extrapolation.
+
+Paired with it, the **natural post-closure source flush**: the 30-yr-half-life
+flush (§4.8) now feeds the *whole* source term, not just the disc display —
+`C_src(t) = C0 × restoration credit × flush(t−op)` drives the same deficit
+wave restoration uses. Restoration is thereby the *accelerated* version of the
+natural process (5-yr-anchored sweep vs 30-yr passive flush), which is exactly
+how the real industry describes it. Net effect at a fixed pin (op = 8 yr,
+no restoration): area 22 → 39 ha by year 30, **stabilizes, then recedes** to
+~38 ha by year 50 while the peak flushes 13,270 → 5,030 ppb — versus the old
+unbounded 85 ha at a frozen peak.
+
+### 4.13 Monte-Carlo uncertainty — where the bands come from
 
 We do not know K, Kd, gradient, or dispersivity exactly. For every scenario the
 engine runs 48 draws: log-normal K heterogeneity, triangular Kd within the
@@ -547,7 +594,7 @@ with the physics on inputs it was trained on, something changed), and (3) the
 groundwork for learning from *field* data later, which no closed-form physics
 can absorb.
 
-### 6.2 The features (38)
+### 6.2 The features (39)
 
 Groups (full list in `ml/dataset.py::MODEL_FEATURES`):
 
@@ -618,10 +665,16 @@ to hold this stricter bar.
 - **Leave-aquifer-out**: hold out entire aquifer polygons to prove spatial
   generalization (reported next to scenario-CV in `metrics.json`).
 
-Current post-fix metrics (2026-07-13): area R² 0.931, migration 0.835,
-compliance 0.783, excursion 0.945; scenario coverage 0.819/0.805/0.842 — all
-above the 0.80 gate. (The restoration-continuity fix *improved* migration R²
-by +0.06: the old label discontinuity was unlearnable noise.)
+Current metrics (2026-07-16, post real-ISR attenuation upgrade): area R² 0.875,
+migration 0.788, compliance 0.763, excursion 0.944; scenario coverage
+0.832/0.806/0.860 — all above the 0.80 gate. R² is *deliberately* lower than
+the pre-attenuation model (0.931/0.835/0.783): the sampled attenuation rate k
+injects genuine physical uncertainty the features cannot fully explain, so the
+bands widened and the point predictions got harder — richer physics traded for
+raw fit, with the coverage guarantee intact. Time-monotone constraints were
+removed for the footprint targets (the plume now legitimately grows →
+stabilizes → recedes), and `DELTA_INFLATE` rose 1.15 → 1.35 to hold the
+scenario-coverage gate under the wider true bands.
 
 ### 6.6 The drift monitor
 
@@ -659,7 +712,7 @@ ml_pipeline/
 │
 ├── data_prep/
 │   ├── feature_engineering.py  build_feature_row(): raw operating point → the
-│   │                        38-feature row + private physics carry-throughs.
+│   │                        39-feature row + private physics carry-throughs.
 │   │                        Owns retardation_factor, containment_efficiency,
 │   │                        dispersivities, pore_volumes, effective_source_width.
 │   │                        USED BY BOTH generator and server (train == serve).
@@ -698,7 +751,7 @@ ml_pipeline/
 │                            outputs/synthetic_training.csv (13,500 rows).
 │
 ├── ml/
-│   ├── dataset.py           MODEL_FEATURES (38), monotone sign maps
+│   ├── dataset.py           MODEL_FEATURES (39), monotone sign maps
 │   │                        (physics-verified), CSV loading/validation.
 │   ├── train.py             XGBoost quantile heads + Mondrian split-CQR +
 │   │                        GroupKFold + leave-aquifer-out + coverage gates +
@@ -804,8 +857,8 @@ This section exists because the project's rule is *critique your own tool*.
 
 | Simplification | Consequence | Honest label |
 |---|---|---|
-| **No geochemical attenuation of the traveling plume** (no U reduction/re-precipitation down-gradient, no reactive transport) | The plume grows essentially unboundedly with time — at 50 yr the model shows ~1.7 km migration at full peak concentration. Real uranium plumes attenuate: field tests show ~50% of U(VI) immobilized within 1 year over tens of meters where reducing zones exist (that redox trapping is *why roll-front deposits exist*). Real ISR excursions are typically caught and reversed within/near the monitor ring. | The 50-yr plume is a **conservative no-attenuation envelope**, not a prediction. The river-crossing note is the only far-field brake. |
-| **Steady C0 source in the Domenico term** (source-zone flush applies to the disc; without restoration the escaped plume keeps emitting at C0) | Without restoration, post-closure peak never declines in-model. | Conservative; a "natural-flush" pseudo-sweep would fix it but changes labels ⇒ retrain. |
+| **First-order (infinite-sink) attenuation** for uranium redox trapping (§4.12) — real reducing capacity is finite and spatially variable | Very-long-horizon attenuation may be overstated where capacity is exhausted; understated where fresh. | Mitigated by sampling k over [0.05, 0.70]/yr into the bands and keeping the mode well below the intact-rock field value. Sulfate/TDS carry no decay at all (fully conservative). |
+| **Plug-flow travel-time decay** (τ = x/v_c) rather than the full decay-modified Domenico front | Slightly simplified front shape near the toe. | Standard screening approximation; error is second-order vs the k uncertainty itself. |
 | **Front held (v=0) during restoration** instead of reversed | Real groundwater sweep pulls near-field water *back* into the wellfield. | Conservative (model cleans slower than reality). |
 | **2-D single layer** + separate vertical screening | No true 3-D plume. | Standard for screening tools (BIOSCREEN class). |
 | **Homogeneous aquifer per polygon** (MC draws add heterogeneity statistically, not spatially) | No channeling along specific fractures/paleochannels. | Inherent to closed-form solutions. |
