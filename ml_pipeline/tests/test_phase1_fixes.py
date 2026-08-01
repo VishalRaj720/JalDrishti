@@ -220,6 +220,61 @@ def test_blend_disabled_restores_hard_lookup(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+# 3.6b -- ore-zone deposit->belt source taper
+# --------------------------------------------------------------------------- #
+def test_belt_c0_ramps_continuously_from_deposit_to_belt():
+    from ml_pipeline.dashboard.resolve import _belt_c0
+    base, env = 10000.0, (0.0, 10000.0)
+    flat = base * P.BELT_C0_FRACTION
+    at0 = _belt_c0(base, {"nearest_deposit_km": 0.0, "nearest_deposit": None}, env)
+    far = _belt_c0(base, {"nearest_deposit_km": P.ORE_TAPER_KM,
+                          "nearest_deposit": None}, env)
+    beyond = _belt_c0(base, {"nearest_deposit_km": 99.0, "nearest_deposit": None}, env)
+    assert at0 == pytest.approx(base)          # continuous with the deposit tier
+    assert far == pytest.approx(flat)          # continuous with the flat belt
+    assert beyond == pytest.approx(flat)       # and stays there
+    # monotone decreasing in between
+    vals = [_belt_c0(base, {"nearest_deposit_km": d, "nearest_deposit": None}, env)
+            for d in (0.0, 0.5, 1.0, 2.0, 3.0)]
+    assert all(a >= b for a, b in zip(vals, vals[1:])), vals
+
+
+def test_belt_never_out_sources_its_deposit():
+    """A halo pin must never resolve to a stronger source than the ore body it
+    is ramping down from -- the bug found in review when the taper was clipped
+    to the raw Texas envelope instead of the deposit's own grade-scaled C0."""
+    _, dep = resolve_inputs(dict(lon=86.347, lat=22.652, species="uranium_ppb"))
+    _, halo = resolve_inputs(dict(lon=86.335, lat=22.652, species="uranium_ppb"))
+    assert halo["ore_zone"]["zone"] == "belt"
+    assert halo["source_conc_C0"] <= dep["source_conc_C0"] + 1e-6
+
+
+def test_belt_taper_keeps_belt_weaker_than_trained_floor_is_allowed():
+    """The belt tier is deliberately a WEAKER hypothetical source; the taper
+    must not clip it UP to the trained envelope's lower edge."""
+    _, far_belt = resolve_inputs(dict(lon=86.239, lat=22.652, species="uranium_ppb"))
+    assert far_belt["ore_zone"]["zone"] == "belt"
+    from ml_pipeline.data_prep.texas_loader import texas_source_signature
+    env_lo = min(texas_source_signature()["uranium_ppb"])
+    assert far_belt["source_conc_C0"] < env_lo
+
+
+# --------------------------------------------------------------------------- #
+# 3.4 -- ungrounded fracture parameters must stay LABELLED as such
+# --------------------------------------------------------------------------- #
+def test_fracture_params_are_labelled_foreign_analogue():
+    """3.4 is knowingly unfixable from public data. The config must say so, so
+    nobody later mistakes these literature values for Singhbhum measurements."""
+    from pathlib import Path
+    cfg = (Path(__file__).resolve().parents[1] / "config" / "parameters.py"
+           ).read_text(encoding="utf-8")
+    for marker in ("FIDELITY FLAW 3.4", "FOREIGN-ANALOGUE", "Singhbhum"):
+        assert marker in cfg, marker
+    # both blocks that rest on it must carry the warning
+    assert cfg.count("FIDELITY FLAW 3.4") >= 2
+
+
+# --------------------------------------------------------------------------- #
 # 3.9 -- Radium-226 as an analytical-only species
 # --------------------------------------------------------------------------- #
 RADIUM = dict(lon=86.347, lat=22.652, species="radium_226_mbq_l")

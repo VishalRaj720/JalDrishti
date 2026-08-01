@@ -130,6 +130,42 @@ def envelope_violations(inputs: dict) -> list[str]:
     return out
 
 
+def _belt_c0(base_c0: float, ore_zone: dict, env: tuple,
+             apply_grade: bool = True) -> float:
+    """Fix 3.6b: source strength for a BELT pin, ramped linearly from the
+    NEAREST DEPOSIT's own C0 at its outline down to the flat belt value
+    ORE_TAPER_KM away -- so the deposit/belt tier boundary is continuous
+    instead of a ~3.3x step.
+
+    The ceiling is the deposit's grade-scaled, envelope-clipped C0 (NOT the raw
+    Texas envelope): clipping to the envelope instead let a belt pin 200 m from
+    Jaduguda resolve to 21,088 ppb against the deposit's own 13,272 -- the halo
+    out-sourcing the ore body. The floor is the unclipped belt fraction, because
+    the belt tier is deliberately a WEAKER hypothetical source than the trained
+    envelope's lower edge; clipping up to env_lo would erase that.
+    """
+    belt_flat = base_c0 * float(P.BELT_C0_FRACTION)
+    d_km = ore_zone.get("nearest_deposit_km")
+    taper = float(P.ORE_TAPER_KM)
+    if d_km is None or taper <= 0:
+        return belt_flat
+
+    # what the nearest deposit itself would serve (same rule as the deposit tier)
+    # apply_grade=False for radium: the UDEPO grade factor encodes URANIUM
+    # leachability, not radium supply, so the radium deposit tier passes through
+    # unscaled and its halo must ramp from that same unscaled value.
+    ceiling = base_c0
+    name = ore_zone.get("nearest_deposit")
+    if name and apply_grade:
+        from ml_pipeline.data_prep.ore_grades import grade_c0_factor
+        factor, _ = grade_c0_factor(name)
+        ceiling = float(np.clip(base_c0 * factor, env[0], env[1]))
+    ceiling = max(ceiling, belt_flat)          # never ramp downward-inverted
+
+    frac = min(max(float(d_km) / taper, 0.0), 1.0)
+    return float(belt_flat + (ceiling - belt_flat) * (1.0 - frac))
+
+
 def _deposit_ore_depth_at(lon: float, lat: float) -> float | None:
     """Representative ore-depth (m) if the pin is inside a surveyed deposit, else None."""
     oz = ore_zone_at(lon, lat)
@@ -248,7 +284,8 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
             env_lo, env_hi = min(source_sig[species]), max(source_sig[species])
             c0 = float(np.clip(c0 * factor, env_lo, env_hi))
         elif ore_zone["zone"] == "belt":
-            c0 = c0 * P.BELT_C0_FRACTION
+            c0 = _belt_c0(c0, ore_zone,
+                          (min(source_sig[species]), max(source_sig[species])))
         elif ore_zone["zone"] == "none":
             c0 = max(float(cb) * P.NON_ORE_U_TRACE_MULT, P.NON_ORE_U_TRACE_FLOOR_PPB)
             u_suppressed = True
@@ -259,7 +296,8 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         # deposit tier passes through unscaled (no UDEPO grade factor -- the
         # grade scaling encodes uranium leachability, not radium supply).
         if ore_zone["zone"] == "belt":
-            c0 = c0 * P.BELT_C0_FRACTION
+            # radium: ramp from its own measured (unscaled) deposit value
+            c0 = _belt_c0(c0, ore_zone, (0.0, c0), apply_grade=False)
         elif ore_zone["zone"] == "none":
             c0 = float(cb)          # background only -- zero incremental source
             u_suppressed = True

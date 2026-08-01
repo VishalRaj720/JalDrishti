@@ -2,8 +2,10 @@
 "use strict";
 
 const API = ""; // same origin; set to e.g. "http://localhost:8077" if served separately
-const SPECIES_UNIT = { uranium_ppb: "ppb", sulfate_mg_l: "mg/L", tds_mg_l: "mg/L" };
-const SPECIES_NAME = { uranium_ppb: "Uranium", sulfate_mg_l: "Sulfate", tds_mg_l: "TDS" };
+const SPECIES_UNIT = { uranium_ppb: "ppb", sulfate_mg_l: "mg/L", tds_mg_l: "mg/L",
+                       radium_226_mbq_l: "mBq/L" };
+const SPECIES_NAME = { uranium_ppb: "Uranium", sulfate_mg_l: "Sulfate", tds_mg_l: "TDS",
+                       radium_226_mbq_l: "Ra-226" };
 
 const state = {
   pin: null, species: "uranium_ppb", regime: "", mode: "ml", last: null,

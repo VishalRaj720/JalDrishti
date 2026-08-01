@@ -292,6 +292,15 @@ KD_RANGES = {  # L/kg
 #    R_app(t) = 1 + beta*(1 - exp(-omega*t*(1+beta)/beta)): the front travels
 #    unretarded at early time (matrix uptake immature) and approaches the
 #    asymptotic 1+beta at late time. [Goltz & Roberts 1986 first-order model]
+#
+# !! FIDELITY FLAW 3.4 -- beta AND omega ARE UNGROUNDED LOCALLY. !!
+# The capacity ratio beta (2-20) and the mass-transfer rate omega are generic
+# fractured-rock literature values, NOT Singhbhum measurements. beta sets the
+# apparent retardation of every fractured plume this tool draws (Rd ~ 1+beta,
+# which is where the UI's "Rd = 11" comes from), so it is one of the highest-
+# leverage numbers in the model AND one of the least locally supported. A single
+# local tracer test would anchor it. See the FRACTURE block above and
+# JHARKHAND_FIDELITY_MATRIX.md row 3.4.
 # ---------------------------------------------------------------------------
 DUAL_POROSITY = {
     "enabled_for": ("fractured",),
@@ -309,6 +318,22 @@ DUAL_POROSITY = {
 #     acts in fractured rock -- De effective matrix diffusion, b_half the
 #     fracture HALF-aperture). Small aperture => huge flow-wetted surface =>
 #     strong attenuation; open fractures => early far breakthrough.
+#
+# !! FIDELITY FLAW 3.4 -- FOREIGN-ANALOGUE VALUES, NOT LOCAL DATA. !!
+# The aperture and De below are GENERIC CRYSTALLINE-ROCK literature values
+# (Neretnieks 1980; Tang et al. 1981; Freeze & Cherry). NO packer test, tracer
+# test or measured fracture aperture has ever been published for the Singhbhum
+# Shear Zone -- verified by targeted search 2026-07-31 and 2026-08-01: the SSZ
+# literature is extensive but entirely structural/economic geology, not
+# hydrogeology. UCIL holds packer and mine-dewatering records institutionally
+# and has not published them. The nearest usable analogues are foreign
+# crystalline sites (SKB Aspo, Stripa, Nagra Grimsel) and NGRI Maheshwaram
+# (Indian granite, different province).
+# These values therefore carry the LOWEST confidence of any parameter in this
+# config, and the ENTIRE fractured-transport overlay (Tang attenuation + the
+# dual-porosity clock below) rests on them. Deliberately NOT replaced with a
+# local-sounding number: that would relabel an assumption as data. See
+# JHARKHAND_FIDELITY_MATRIX.md row 3.4.
 # ---------------------------------------------------------------------------
 FRACTURE = {
     # full hydraulic aperture 2b (m): (low, central, high). Crystalline-rock
@@ -697,6 +722,21 @@ DISC_FLUSH_HALFLIFE_YEARS = 30.0
 ORE_BELT_NAME = "Singhbhum Thrust Belt (regional envelope)"
 ORE_DEPOSIT_BUFFER_DEG = 0.0045      # ~500 m halo around each surveyed deposit
 BELT_C0_FRACTION = 0.30              # prospective-belt hypothetical source strength
+
+# Fix 3.6b (2026-08-01): taper the DEPOSIT -> BELT source-strength step.
+# The tiering above is categorical, so crossing a deposit outline stepped C0 by
+# 1/BELT_C0_FRACTION (~3.3x) in one pixel -- the same class of artefact as the
+# aquifer-polygon K seam (fix 3.6a), and just as distrust-inducing when a user
+# nudges the pin. Ore bodies do not end at a mapped line: grade decays outward
+# into the enclosing mineralised envelope. C0 is therefore ramped linearly from
+# the deposit value at the outline to the belt value ORE_TAPER_KM away:
+#     f(d) = BELT + (1 - BELT) * (1 - d/TAPER),  0 <= d <= TAPER
+# which equals 1.0 at d = 0 and BELT at d = TAPER, so it is continuous at both
+# ends. Beyond TAPER, and in the non-ore tier, nothing changes.
+# 3 km is the order of the mapped deposit spacing in the belt (Jaduguda-Bhatin
+# ~2 km, Narwapahar-Turamdih ~10 km), so the ramp stays inside the mineralised
+# corridor rather than smearing ore strength across the whole state.
+ORE_TAPER_KM = 3.0
 NON_ORE_U_TRACE_MULT = 3.0          # trace-leach uranium = 3 x ambient background
 NON_ORE_U_TRACE_FLOOR_PPB = 5.0     # absolute floor for the trace term
 
