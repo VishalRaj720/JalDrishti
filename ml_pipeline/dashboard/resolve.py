@@ -26,8 +26,12 @@ from ml_pipeline.data_prep.flow_field import flow_at
 from ml_pipeline.data_prep.strike_field import strike_at, anisotropy_from_variance
 from ml_pipeline.ml.dataset import ARTIFACT_DIR
 
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
-_BG_DEFAULT = {"uranium_ppb": 1.0, "sulfate_mg_l": 20.0, "tds_mg_l": 300.0}
+# radium_226_mbq_l (fix 3.9) is ANALYTICAL-ONLY: the deployed surrogate has a
+# 3-species one-hot, so the server bypasses the ML head for it.
+SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
+ML_SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
+_BG_DEFAULT = {"uranium_ppb": 1.0, "sulfate_mg_l": 20.0, "tds_mg_l": 300.0,
+               "radium_226_mbq_l": P.RADIUM_BACKGROUND_MBQ_L}
 
 # Data-confidence thresholds (Module 1). Beyond ~20 km the nearest water-quality
 # well is a weak proxy; outside all mapped aquifer polygons the K/phi are borrowed.
@@ -204,7 +208,9 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     # ranges already encode alkaline-ISR suppression; the ambient-alkalinity
     # helper is NOT applied to the near-field plume (the plume carries its own
     # lixiviant carbonate). Explicit slider overrides still win.
-    kd_lo, kd_central, kd_hi = P.KD_RANGES[species][regime]
+    # Radium sorbs orders of magnitude more strongly than alkaline uranium
+    # (divalent Ra2+ across the whole pH range), so it carries its own Kd table.
+    kd_lo, kd_central, kd_hi = P.kd_range_for(species, regime)
     kd = payload.get("kd_L_kg")
     if kd is None:
         kd = kd_central
@@ -213,11 +219,18 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         beta = (sum(P.DUAL_POROSITY["beta_range"]) / 3.0
                 if regime in P.DUAL_POROSITY["enabled_for"] else 0.0)
 
-    # source signature (Texas-derived) midpoint; background from nearest well
-    c0 = float(np.mean(source_sig[species]))
-    cb = b.get(species)
-    if cb is None or cb != cb:
-        cb = _BG_DEFAULT[species]
+    # source signature (Texas-derived) midpoint; background from nearest well.
+    # Radium has no Texas ISR series to transfer from and no radium column in
+    # the CGWB water-quality file, so BOTH ends come from the measured Jaduguda
+    # / BARC values instead (see parameters.py section 4b for citations).
+    if species == "radium_226_mbq_l":
+        c0 = float(P.RADIUM_SOURCE_MBQ_L[P.RADIUM_SOURCE_STATISTIC])
+        cb = float(P.RADIUM_BACKGROUND_MBQ_L)
+    else:
+        c0 = float(np.mean(source_sig[species]))
+        cb = b.get(species)
+        if cb is None or cb != cb:
+            cb = _BG_DEFAULT[species]
 
     # Module 2: ore-body mask. ISR leaches uranium only where uranium ore exists.
     # Clamp the URANIUM source term by zone; sulfate/TDS (lixiviant reagents)
@@ -238,6 +251,17 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
             c0 = c0 * P.BELT_C0_FRACTION
         elif ore_zone["zone"] == "none":
             c0 = max(float(cb) * P.NON_ORE_U_TRACE_MULT, P.NON_ORE_U_TRACE_FLOOR_PPB)
+            u_suppressed = True
+    elif species == "radium_226_mbq_l":
+        # Ra-226 is a decay product of the ore's uranium, so it is ore-zone
+        # gated exactly like uranium: no ore body, no radium source. The
+        # measured Jaduguda source term already represents a DEPOSIT, so the
+        # deposit tier passes through unscaled (no UDEPO grade factor -- the
+        # grade scaling encodes uranium leachability, not radium supply).
+        if ore_zone["zone"] == "belt":
+            c0 = c0 * P.BELT_C0_FRACTION
+        elif ore_zone["zone"] == "none":
+            c0 = float(cb)          # background only -- zero incremental source
             u_suppressed = True
 
     # D5: Singhbhum shear-zone transmissivity. At a fractured deposit/belt pin the
@@ -388,5 +412,23 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
                      "ore body and act as a lower bound, not a substitute."),
             "citation": P.JADUGUDA_SOURCE_CITATION,
         } if species == "uranium_ppb" else None),
+        # fix 3.9: radium provenance -- which measured statistic is being served,
+        # the full observed distribution, and the WHO level it is judged against.
+        "radium_context": ({
+            "served_C0_mbq_l": round(c0, 1),
+            "statistic_used": P.RADIUM_SOURCE_STATISTIC,
+            "measured_source_mbq_l": P.RADIUM_SOURCE_MBQ_L,
+            "background_mbq_l": P.RADIUM_BACKGROUND_MBQ_L,
+            "who_guidance_mbq_l": P.EXCURSION_THRESHOLDS["radium_226_mbq_l"],
+            "note": ("Source term is MEASURED Jaduguda mine water, not an ISR "
+                     "lixiviant (no ISR radium data exists for this ore). The "
+                     "geometric mean 371.3 mBq/L lies BELOW the WHO 1000 mBq/L "
+                     "level, so the observed maximum is served as the screening "
+                     "value; only <1% of ore radium leaches during processing, "
+                     "so radium supply is genuinely limited."),
+            "citation": P.JADUGUDA_SOURCE_CITATION,
+            "kd_citation": ("EPA 402-R-04-002C Vol III Table 5.28 "
+                            "(Thibault et al. 1990 compilation)"),
+        } if species == "radium_226_mbq_l" else None),
     }
     return inputs, hydro

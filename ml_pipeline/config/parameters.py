@@ -76,7 +76,85 @@ EXCURSION_THRESHOLDS = {
     "uranium_ppb": BIS_LIMITS["uranium_ppb"][1],
     "sulfate_mg_l": BIS_LIMITS["sulfate_mg_l"][1],
     "tds_mg_l": BIS_LIMITS["tds_mg_l"][1],
+    # Radium-226 (fix 3.9). BIS IS-10500 sets no Ra-226 limit; the applicable
+    # value is the WHO guidance level for naturally occurring Ra-226 in drinking
+    # water, 1 Bq/L = 1000 mBq/L. (India's AERB sets a radiological uranium
+    # guideline of 60 ug/L but defers to WHO for radium.)
+    "radium_226_mbq_l": 1000.0,
 }
+
+# ---------------------------------------------------------------------------
+# 4b. RADIUM-226 as a modelled species   [fix 3.9, 2026-08-01]
+# ---------------------------------------------------------------------------
+# Ra-226 is the standard co-regulated ISR licensing metric alongside uranium.
+# ANALYTICAL-ENGINE ONLY: the deployed ML surrogate was trained on a 3-species
+# one-hot, so a Ra request is served by the physics engine and the ML head is
+# bypassed with an explicit status (adding it to the surrogate is a deliberate
+# retrain, not a silent extension).
+#
+# SOURCE TERM -- measured, local, and the reason this fix was buildable at all:
+# Jaduguda untreated mine-water effluent Ra-226 = 40-1706 mBq/L, geometric mean
+# 371.3, GSD 2.6 (Sethy et al. 2013, Radiat. Prot. Environ. 36(1):32-37,
+# DOI 10.4103/0972-0464.121824; full text archived in Datasets/phase1_sources/).
+# Same caveat as the uranium C0 (see JADUGUDA_MINE_WATER_U_PPB): this is passive
+# mine water, not an engineered lixiviant, so it is a measured LOWER BOUND. It
+# is used directly as the Ra source term because -- unlike uranium -- there is
+# no Texas ISR radium series to transfer from, so the local measurement is the
+# best available anchor rather than merely a cross-check.
+RADIUM_SOURCE_MBQ_L = {"min": 40.0, "gm": 371.3, "max": 1706.0, "gsd": 2.6}
+# Which statistic to serve as C0. The GEOMETRIC MEAN (371.3) sits BELOW the WHO
+# 1000 mBq/L guidance level, so serving it makes every screening result exactly
+# zero -- a true statement about that particular sample statistic, but an
+# under-conservative and uninformative screen, because (a) the underlying data
+# is passive mine water rather than an engineered lixiviant, i.e. already a
+# lower bound, and (b) taking a central statistic of a lower bound compounds the
+# optimism. The MEASURED MAXIMUM (1706 mBq/L) is therefore the screening default:
+# it is still a real observed value at this ore body, and it does exceed the WHO
+# level, so the tool answers "where could this plausibly matter" rather than
+# always "nowhere". The full distribution is reported to the user either way.
+# Countervailing evidence kept in view: Sethy et al. note only <1% of the ore's
+# radium is leached during acid processing, so radium supply is genuinely poor
+# -- which is why the max is used rather than scaling up by a uranium-like
+# ISR factor.
+RADIUM_SOURCE_STATISTIC = "max"
+# Regional background: uranium-mine-area groundwater Ra-226 ~ 23 mBq/L, with
+# potable wells spanning <3.5-208 mBq/L (BARC, J. Environ. Radioactivity 99
+# (2008) 1245; Jaduguda ground-water ingestion-dose study).
+RADIUM_BACKGROUND_MBQ_L = 23.0
+
+# Kd (L/kg). EPA 402-R-04-002C Vol III Table 5.28 (Thibault et al. 1990
+# compilation), archived at Datasets/phase1_sources/EPA_Kd_VolIII_As_Ra.pdf:
+#     Sand 500 (range 57-21,000) | Silt 36,000 | Clay 9,100 | Organic 2,400
+# Ra exists only as the uncomplexed divalent Ra2+ over pH 3-10 (ibid. p.90) and
+# has the largest ionic radius / weakest hydration of the alkaline earths
+# (ibid. p.91), so it sorbs FAR more strongly than the uranyl-carbonate species
+# an alkaline lixiviant carries -- hence Kd three to four orders of magnitude
+# above the uranium values above.
+#   fractured -> quartz/silicate fracture-wall matrix, low CEC: sand-like.
+#   porous    -> weathered saprolite with clay + Fe/Mn oxides: clay/organic-like.
+# The upper ends are CAPPED well below the compilation maxima (21,000 / 530,000)
+# because at those values Ra is numerically immobile and the extra range buys no
+# screening information -- documented deliberately, not silently truncated.
+RADIUM_KD_RANGES = {
+    "fractured": (57.0, 500.0, 2000.0),
+    "porous":    (500.0, 2400.0, 9100.0),
+}
+
+# Radioactive decay: Ra-226 half-life 1600 yr. Over this tool's 0-50 yr horizon
+# that removes <3% of the activity, so decay is NOT modelled as a separate sink
+# -- omitting it is conservative (over-predicts) and avoids implying a precision
+# the rest of the model does not have. Recorded here so the omission is explicit.
+RADIUM_HALFLIFE_YEARS = 1600.0
+
+
+def kd_range_for(species: str, regime: str) -> tuple:
+    """(lo, central, hi) Kd [L/kg] for a species x regime. Single source of
+    truth so the serve path (resolve.py) and the Monte-Carlo draw
+    (synthetic.generate._draw_params) cannot diverge -- radium lives in its own
+    table because it sorbs orders of magnitude more strongly than alkaline U."""
+    if species == "radium_226_mbq_l":
+        return RADIUM_KD_RANGES[regime]
+    return KD_RANGES[species][regime]
 
 # Monitoring/compliance ring distance DOWNGRADIENT OF THE WELLFIELD EDGE.
 # The Domenico source plane sits at the downgradient edge (conservative areal-

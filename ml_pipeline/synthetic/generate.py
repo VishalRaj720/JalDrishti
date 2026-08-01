@@ -239,7 +239,7 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     the scenario's seasonal amplitude widening the gradient range and pump
     downtime degrading effective containment."""
     fractured = scn["regime"] == "fractured"
-    lo, mid, hi = P.KD_RANGES[species][scn["regime"]]
+    lo, mid, hi = P.kd_range_for(species, scn["regime"])
     kd = _triangular(float(draws["u_kd"][i]), lo, mid, hi)
     K = scn["K"] * float(np.clip(math.exp(MC_LNK_SIGMA * draws["z_K"][i]), *MC_K_CLIP))
     beta = scn["beta"] * (0.6 + 0.8 * float(draws["u_beta"][i])) if fractured else 0.0

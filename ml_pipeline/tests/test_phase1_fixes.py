@@ -220,6 +220,80 @@ def test_blend_disabled_restores_hard_lookup(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+# 3.9 -- Radium-226 as an analytical-only species
+# --------------------------------------------------------------------------- #
+RADIUM = dict(lon=86.347, lat=22.652, species="radium_226_mbq_l")
+
+
+def test_radium_uses_measured_local_source_and_who_threshold():
+    inp, h = resolve_inputs(dict(**RADIUM))
+    rc = h["radium_context"]
+    assert rc is not None
+    # served C0 must be one of the MEASURED statistics, not an invented number
+    assert rc["served_C0_mbq_l"] == pytest.approx(
+        P.RADIUM_SOURCE_MBQ_L[P.RADIUM_SOURCE_STATISTIC])
+    assert rc["measured_source_mbq_l"]["gm"] == pytest.approx(371.3)
+    assert "10.4103/0972-0464.121824" in rc["citation"]
+    # judged against the WHO guidance level, not a BIS limit (BIS has none)
+    assert P.EXCURSION_THRESHOLDS["radium_226_mbq_l"] == 1000.0
+    assert inp["background_conc_Cb"] == pytest.approx(P.RADIUM_BACKGROUND_MBQ_L)
+
+
+def test_radium_sorbs_far_more_strongly_than_alkaline_uranium():
+    """Ra2+ is a strongly sorbing divalent cation; alkaline U travels as weakly
+    sorbing uranyl-carbonate. Kd must differ by orders of magnitude, and in the
+    POROUS regime (where Rd is a direct function of Kd) that must collapse the
+    radium front relative to uranium."""
+    from ml_pipeline.ml.predict import features_from_inputs
+    xs = {}
+    for sp in ("uranium_ppb", "radium_226_mbq_l"):
+        inp, h = resolve_inputs(dict(lon=86.347, lat=22.652, species=sp,
+                                     regime="porous", gradient_i=0.01,
+                                     time_years=20.0))
+        _, _, Xc = features_from_inputs(**inp)
+        xs[sp] = (inp["kd_L_kg"], h["retardation_Rd"], Xc)
+    assert xs["radium_226_mbq_l"][0] > 100 * xs["uranium_ppb"][0]      # Kd
+    assert xs["radium_226_mbq_l"][1] > 100 * xs["uranium_ppb"][1]      # Rd
+    assert xs["radium_226_mbq_l"][2] < 0.1 * xs["uranium_ppb"][2]      # front
+    # matches the field observation (BARC 2008): radium does not migrate
+    assert xs["radium_226_mbq_l"][2] < 1.0
+
+
+def test_radium_kd_comes_from_the_shared_helper():
+    """Serve path and Monte-Carlo draw must read the SAME Kd table."""
+    for regime in ("fractured", "porous"):
+        assert P.kd_range_for("radium_226_mbq_l", regime) == P.RADIUM_KD_RANGES[regime]
+        assert P.kd_range_for("uranium_ppb", regime) == P.KD_RANGES["uranium_ppb"][regime]
+
+
+def test_radium_is_ore_zone_gated():
+    """Ra-226 is a uranium-decay product: no ore body, no radium source."""
+    _, dep = resolve_inputs(dict(**RADIUM))
+    _, belt = resolve_inputs(dict(lon=86.25, lat=22.63, species="radium_226_mbq_l"))
+    _, none = resolve_inputs(dict(lon=85.33, lat=23.36, species="radium_226_mbq_l"))
+    assert dep["source_conc_C0"] > belt["source_conc_C0"] > none["source_conc_C0"]
+    # off the ore, the source collapses to background -> zero incremental term
+    assert none["source_conc_C0"] == pytest.approx(none["background_conc_Cb"])
+    assert none["u_suppressed"] is True
+
+
+def test_radium_bypasses_the_ml_surrogate_explicitly():
+    """The deployed surrogate has a 3-species one-hot; radium must be served
+    analytically with a stated reason, never fed an all-zero species encoding."""
+    from fastapi.testclient import TestClient
+    from ml_pipeline.dashboard.server import app
+    c = TestClient(app)
+    j = c.post("/api/predict", json=dict(**RADIUM)).json()
+    assert j["metrics"]["ml"] is None
+    assert "analytical only" in j["ml_status"]
+    assert j["metrics"]["analytical"]["area_ha"] is not None   # physics still runs
+    # and the three trained species are unaffected
+    u = c.post("/api/predict", json={"lon": 86.347, "lat": 22.652,
+                                     "species": "uranium_ppb"}).json()
+    assert u["metrics"]["ml"] is not None and u["ml_status"] == "ok"
+
+
+# --------------------------------------------------------------------------- #
 # 3.1 -- UI reframing (static content check)
 # --------------------------------------------------------------------------- #
 def test_ui_is_framed_as_excursion_screening_not_feasibility():

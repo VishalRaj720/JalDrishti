@@ -41,7 +41,12 @@ from ml_pipeline.physics.transport import simulate_plume, MAX_GRID_REACH_M
 from ml_pipeline.ml.dataset import MODEL_FEATURES, ARTIFACT_DIR, BANDS, cell_key
 from ml_pipeline.config import parameters as P
 
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
+# Species the ANALYTICAL engine can solve. radium_226_mbq_l (fix 3.9) is served
+# analytically only -- the deployed surrogate's one-hot covers the first three,
+# so `MODEL_FEATURES` silently drops any extra flag and the server bypasses the
+# ML head for radium rather than feeding it an all-zero species encoding.
+SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
+ML_SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
 
 
 @functools.lru_cache(maxsize=1)

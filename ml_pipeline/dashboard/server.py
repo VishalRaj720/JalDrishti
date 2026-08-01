@@ -313,7 +313,16 @@ def api_predict(req: PredictRequest):
     # level (far outside the surrogate's training envelope), so bypass the ML
     # call entirely and let the analytical engine report the ~zero U plume.
     ml_metrics, envelope, ml_status, m = None, None, "ok", None
-    if hydro.get("u_suppressed"):
+    from ml_pipeline.ml.predict import ML_SPECIES
+    if species not in ML_SPECIES:
+        # fix 3.9: Ra-226 is served by the physics engine only. The deployed
+        # surrogate was trained on a 3-species one-hot, so it has no radium
+        # encoding; feeding it an all-zero species flag would silently return a
+        # uranium-ish answer. Extending the surrogate is a deliberate retrain.
+        ml_status = (f"analytical only for {species} — the ML surrogate is "
+                     f"trained on {', '.join(ML_SPECIES)} and would be "
+                     f"extrapolating on this species")
+    elif hydro.get("u_suppressed"):
         ml_status = "suppressed: non-ore zone (no radiological source term)"
     else:
         try:
