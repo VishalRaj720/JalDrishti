@@ -11,12 +11,24 @@ JADUGUDA = dict(lon=86.347, lat=22.652, species="uranium_ppb")   # fractured dep
 
 
 def test_shear_zone_applies_at_fractured_deposit():
+    """UPDATED 2026-08-01 (Phase-1 fix 3.3): the shear-zone K is still the
+    starting point, but the SERVED K is now that value after the depth decay
+    K(z) -- the shear-zone transmissivity is measured in the shallow tested
+    aquifer, while the ISR target sits far below it. The shear-zone block still
+    reports the undecayed value, so both are checked."""
     inp, h = resolve_inputs(dict(**JADUGUDA))
     assert h["shear_zone"] is not None
-    assert inp["K_m_day"] == pytest.approx(_K_SHEAR, rel=1e-6)
+    # the shear-zone correction itself is unchanged...
+    assert h["shear_zone"]["K_m_day"] == pytest.approx(_K_SHEAR, rel=1e-3)
     assert inp["thickness_m"] == pytest.approx(P.SHEAR_ZONE_THICKNESS_M)
-    # the correction must make the aquifer MORE transmissive than the polygon
+    # ...and it must still make the aquifer MORE transmissive than the polygon
     assert _K_SHEAR > h["shear_zone"]["polygon_K_m_day"]
+    # ...but the served K is the depth-decayed value, and it started from the shear K
+    kd = h["k_depth"]
+    assert kd is not None
+    assert kd["K_shallow_m_day"] == pytest.approx(_K_SHEAR, rel=1e-3)
+    assert inp["K_m_day"] == pytest.approx(_K_SHEAR * kd["decay_factor"], rel=1e-3)
+    assert inp["K_m_day"] < _K_SHEAR          # depth makes it tighter
 
 
 def test_shear_zone_off_the_belt_is_unchanged():

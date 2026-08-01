@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>JalDrishti — ISR Plume Surrogate</title>
+  <title>JalDrishti — ISR Contaminant Excursion Screening</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link rel="stylesheet" href="/static/styles.css" />
@@ -13,7 +13,10 @@
   <aside id="panel">
     <header class="brand">
       <h1>JalDrishti</h1>
-      <p>Alkaline-ISR plume surrogate · Jharkhand · <em>theoretical screening</em></p>
+      <p>Groundwater contaminant <em>excursion screening</em> · Jharkhand</p>
+      <p class="brand-scope">If ISR-strength contamination entered this aquifer,
+        where would it travel and who is downstream? <strong>Not a mining
+        feasibility tool.</strong></p>
     </header>
 
     <section class="card pin-card">
@@ -118,8 +121,14 @@
       <div class="legend-row"><span class="sw ore"></span> Uranium deposit (ore) · <span class="sw belt"></span> Singhbhum belt</div>
     </section>
 
-    <p class="disclaimer">⚠ Uncalibrated theoretical surrogate (porous-Texas → fractured-Jharkhand
-      domain transfer, no field calibration). For screening &amp; education only — not for permitting.</p>
+    <p class="disclaimer"><strong>⚠ Premise:</strong> commercial ISR operates only in porous
+      sandstone. Singhbhum uranium sits in dense fractured schist, where ISR has never been
+      practised. This tool therefore models <em>where contamination would go if it existed
+      here</em> — it does not claim such a mine is feasible.</p>
+    <p class="disclaimer">Uncalibrated screening surrogate (porous-Texas → fractured-Jharkhand
+      domain transfer; no ISR plume has ever been measured in Jharkhand, so no field calibration
+      is possible). Model scores measure fidelity to the physics engine, not agreement with a
+      real plume. For screening &amp; education only — not for permitting or site characterisation.</p>
   </aside>
 
   <main id="map"></main>

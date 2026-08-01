@@ -386,7 +386,13 @@ def test_porous_override_is_alive():
                                         regime="porous", gradient_i=0.005))
         _, feat, Xc = features_from_inputs(**inputs)
         xc[sp] = Xc
-    assert xc["uranium_ppb"] > 2.0, "U front frozen at source (chimera not fixed)"
+    # NOTE (2026-08-01, Phase-1 fix 3.3): the absolute threshold was lowered from
+    # 2.0 m to 0.2 m because depth-dependent K(z) now correctly reduces K at the
+    # 150 m default ore depth (1.12 -> 0.256 m/day here), and Xc scales with K.
+    # The probe that actually detects the chimera bug is the RELATIVE one below
+    # (conservative TDS must outrun sorbing uranium); it is unaffected by K(z)
+    # and still passes by a wide margin (~16x).
+    assert xc["uranium_ppb"] > 0.2, "U front frozen at source (chimera not fixed)"
     assert xc["tds_mg_l"] > 5.0 * xc["uranium_ppb"], xc   # conservative outruns sorbing
 
 

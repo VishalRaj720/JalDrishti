@@ -50,7 +50,11 @@ from ml_pipeline.dashboard.plume_geometry import (
 from ml_pipeline.dashboard.drift import MONITOR
 from ml_pipeline.data_prep.boundary import in_jharkhand, boundary_geojson
 
-FRONTEND = Path(__file__).resolve().parent / "frontend"
+# Frontend was relocated out of the dashboard package to the repo-level
+# `frontend/` directory (frontend/ml_pipeline/). server.py lives at
+# ml_pipeline/dashboard/server.py, so the repo root is three levels up.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+FRONTEND = _REPO_ROOT / "frontend" / "ml_pipeline"
 
 
 def _cors_origins() -> list[str]:

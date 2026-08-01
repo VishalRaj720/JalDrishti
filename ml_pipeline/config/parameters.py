@@ -375,6 +375,84 @@ HORIZON_SLIDER_MAX_YEARS = 50.0
 U_ATTENUATION_K_PER_YR = (0.05, 0.20, 0.70)   # (lo, mode, hi), triangular in log10
 U_ATTENUATION_MC_MULT = (0.5, 2.0)            # per-draw log-uniform multiplier
 
+# Phase-1 fix 3.5 (2026-08-01): mineralogy tilt of the attenuation mode.
+# The Singhbhum ore belt is a POLYMETALLIC SULPHIDE province -- uraninite occurs
+# with abundant chalcopyrite, pyrite and pyrrhotite (Econ. Geol. 108:1499 (2013);
+# J. Earth Syst. Sci. 120:475 (2011)) -- so the reducing capacity that immobilises
+# U(VI) is genuinely richer inside the belt than in the surrounding weathered,
+# oxidised granite-gneiss. The MODE of the sampled k is therefore shifted by
+# ore zone instead of using one statewide value. The (lo, hi) envelope is
+# UNCHANGED so every served k stays inside the trained support [0, 0.70]; only
+# the central value moves, and the MC spread still carries the uncertainty.
+U_ATTENUATION_MODE_BY_ZONE = {
+    "deposit": 0.35,   # sulphide-rich ore body: strongest documented reductant load
+    "belt":    0.28,   # Singhbhum shear-zone envelope: same province, less certain
+    "none":    0.12,   # weathered/oxidised country rock: weakest reducing capacity
+}
+
+# ---------------------------------------------------------------------------
+# 5d. DEPTH-DEPENDENT HYDRAULIC CONDUCTIVITY  K(z)   [Phase-1 fix 3.3, 2026-08-01]
+# ---------------------------------------------------------------------------
+# The CGWB aquifer polygons (and the NAQUIM transmissivities) characterise the
+# DRINKING-WATER aquifer -- the weathered mantle plus the upper productive
+# fracture zone, tens of metres deep. ISR ore sits at 140-600 m. In crystalline
+# rock, fracture aperture and connectivity close with depth under lithostatic
+# load, so applying a shallow K at ore depth over-states plume velocity and
+# reach -- flaw 3.3 of the fidelity audit.
+#
+# The decay is grounded in the district NAQUIM reports already on disk
+# (Datasets/naquim_reference/naquim_depth_evidence.md, auto-extracted 2026-07-31),
+# which state the effect in almost identical language across the state:
+#   "fractures generally die down with the depth and below 175 m"  (Deoghar p48)
+#   "...below 163 m"  (Godda p57)      "...below 184 m"  (Latehar p49)
+#   "none of the wells fractures have been encountered beyond 180 m" (W Singhbhum p43)
+#   "fractures are common within a depth of 45 m, less frequent [beyond]" (W Singhbhum p43)
+# and, for the ore belt specifically, a deeper-persisting fractured aquifer
+#   "fractured aquifer persists to ~258 m then massive rock" (E Singhbhum profile).
+#
+# Model:  K(z) = K_ref * exp(-(z - z_ref) / lambda),   z > z_ref
+#   z_ref  = depth the measured K represents = the "common fractures" zone that
+#            supplies most of the tested yield (45 m, W Singhbhum wording).
+#   lambda = calibrated per district so that K has fallen to
+#            K_DEPTH_RESIDUAL_AT_FRACTURE_BASE of K_ref at that district's own
+#            documented fracture-death depth (naquim_vertical.csv `fracture_max_m`,
+#            e.g. E Singhbhum 258 m, W Singhbhum 200 m, Ranchi 121 m).
+# The result is clamped into the deployed model's trained K support box, so this
+# is a SERVE-TIME correction that needs no retrain.
+K_DEPTH_DECAY_ENABLED = True
+K_DEPTH_REF_M = 45.0                       # "fractures common within 45 m"
+K_DEPTH_RESIDUAL_AT_FRACTURE_BASE = 0.05   # K/K_ref at the fracture-death depth
+K_DEPTH_FRACTURE_BASE_DEFAULT_M = 180.0    # districts with no NAQUIM fracture_max
+# 1.0 = the full physically-indicated correction (default; what the NAQUIM
+# evidence supports). Lower values damp it -- 0.5 applies the square root of the
+# factor -- for a deliberately conservative interim. Exposed because this single
+# number moves every depth-sensitive output.
+K_DEPTH_DECAY_STRENGTH = 1.0
+
+
+def depth_decay_factor(z_m: float, fracture_base_m: float | None = None,
+                       strength: float | None = None) -> float:
+    """K(z)/K_ref multiplier for crystalline rock. 1.0 at or above K_DEPTH_REF_M.
+
+    fracture_base_m: the district's documented fracture-death depth (NAQUIM
+    `fracture_max_m`); None -> K_DEPTH_FRACTURE_BASE_DEFAULT_M.
+    """
+    import math
+    if not K_DEPTH_DECAY_ENABLED:
+        return 1.0
+    z = float(z_m)
+    if z <= K_DEPTH_REF_M:
+        return 1.0
+    base = float(fracture_base_m or K_DEPTH_FRACTURE_BASE_DEFAULT_M)
+    # the base must sit below the reference zone for the calibration to mean
+    # anything; if a district reports a very shallow fracture base, keep a
+    # minimum span so lambda stays finite and positive.
+    span = max(base - K_DEPTH_REF_M, 20.0)
+    lam = span / math.log(1.0 / K_DEPTH_RESIDUAL_AT_FRACTURE_BASE)
+    f = math.exp(-(z - K_DEPTH_REF_M) / lam)
+    s = K_DEPTH_DECAY_STRENGTH if strength is None else float(strength)
+    return float(min(1.0, max(f ** s, 1e-6)))
+
 # ---------------------------------------------------------------------------
 # 6. Operational envelope for the synthetic loop (Phase 2) -- realistic ISR ranges,
 #    WIDENED (2026-07 review) to cover the dashboard sliders so served inputs
@@ -511,6 +589,30 @@ NON_ORE_U_TRACE_FLOOR_PPB = 5.0     # absolute floor for the trace term
 # grade relative to this. Texas roll-front ISR ore ~0.05-0.10% U3O8 = 0.04-0.08%
 # U -> 0.05% U as the representative the C0 midpoint sits in (both sides %U).
 URANIUM_GRADE_REF_PCT = 0.05        # %U; deposit grade == this -> C0 unchanged
+
+# Phase-1 fix 3.2 (2026-08-01): REAL Jaduguda source-term anchor.
+# Sethy, Jha, Sahoo, Ravi & Tripathi (2013), "Dissolved uranium, 226Ra in the
+# mine water effluent: A case study in Jaduguda", Radiation Protection and
+# Environment 36(1):32-37, DOI 10.4103/0972-0464.121824 (open access, CC-BY-NC-SA;
+# full text archived at Datasets/phase1_sources/Jaduguda_mine_water_RPE2013_fulltext.md).
+# Measured UNTREATED mine-water effluent at Jaduguda, 2011 sampling year:
+#     uranium    94 - 843.3 ug/L (= ppb), geometric mean 357.4, GSD 1.9
+#     Ra-226     40 - 1706 mBq/L,         geometric mean 371.3, GSD 2.6
+# The paper also confirms the average ore grade as 0.05% U3O8, which independently
+# validates URANIUM_GRADE_REF_PCT above.
+#
+# INTERPRETATION -- this is a LOWER BOUND, not a replacement for the ISR C0.
+# Mine water is ambient groundwater that has passively contacted broken ore in the
+# workings; an ISR lixiviant is an engineered oxidising carbonate solution designed
+# to dissolve uranium, so it necessarily mobilises far more. The served C0 therefore
+# stays Texas-ISR-derived (the only real ISR source chemistry that exists), and
+# these numbers are surfaced alongside it as the measured local reality check.
+# The gap between them is the honest size of the Texas->Singhbhum transplant
+# assumption (flaw 3.2) -- reported to the user rather than hidden.
+JADUGUDA_MINE_WATER_U_PPB = {"min": 94.0, "gm": 357.4, "max": 843.3, "gsd": 1.9}
+JADUGUDA_MINE_WATER_RA226_MBQL = {"min": 40.0, "gm": 371.3, "max": 1706.0, "gsd": 2.6}
+JADUGUDA_SOURCE_CITATION = ("Sethy et al. 2013, Radiat. Prot. Environ. 36(1):32-37, "
+                            "DOI 10.4103/0972-0464.121824")
 
 # D5: Singhbhum Shear Zone transmissivity correction (serve-time, no retrain).
 # The ore-belt fractured aquifer is anomalously transmissive -- CGWB NAQUIM gives

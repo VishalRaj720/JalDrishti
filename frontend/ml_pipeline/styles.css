@@ -16,6 +16,12 @@ html,body{margin:0;height:100%;font-family:-apple-system,Segoe UI,Roboto,Helveti
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .brand p{margin:2px 0 12px;color:var(--muted);font-size:11.5px}
 .brand em{color:var(--warn);font-style:normal}
+/* Phase-1 fix 3.1: scope line -- the tool answers the CONTAMINATION question,
+   not the mining-feasibility question. Kept visually quieter than the title but
+   above the fold so it is read before any number is trusted. */
+.brand p.brand-scope{margin:-8px 0 12px;font-size:10.5px;line-height:1.5;
+  color:var(--muted);border-left:2px solid var(--warn);padding-left:7px}
+.brand p.brand-scope strong{color:var(--warn)}
 
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:11px}
 .card-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:9px;text-transform:uppercase;letter-spacing:.4px}

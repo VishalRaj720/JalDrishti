@@ -90,3 +90,8 @@ Datasets/naquim_reference/Jharkhand_NAQUIM_Reports/
 newdataset/
 # Raw Asia HydroRIVERS shapefile (207MB) -- clipped to Datasets/jharkhand_rivers.geojson
 Datasets/HydroRIVERS_v10_as_shp/
+# Downloaded reference PDFs for Phase-1 fidelity fixes (EPA Kd volumes, IAEA
+# Tummalapalle doc) -- re-fetch from the public URLs cited in parameters.py /
+# JHARKHAND_FIDELITY_MATRIX.md. The curated fulltext extraction of the Jaduguda
+# mine-water paper (small, cited, human-readable) IS tracked, not ignored.
+Datasets/phase1_sources/*.pdf

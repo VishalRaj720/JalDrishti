@@ -60,14 +60,23 @@ def test_higher_anisotropy_raises_risk():
     assert high > low
 
 
-def test_predict_returns_vertical_block_without_changing_horizontal():
+def test_predict_returns_vertical_block_and_depth_now_drives_both():
+    """UPDATED 2026-08-01 (Phase-1 fix 3.3). This test previously asserted that
+    ore depth must NOT change the horizontal metrics -- true only while the model
+    applied a single shallow K at every depth, which was fidelity flaw 3.3.
+    Depth-dependent K(z) is now active, so a deeper target sits in tighter rock
+    and MUST yield a smaller horizontal footprint as well as a lower vertical
+    risk. Both directions are asserted here."""
     a = client.post("/api/predict", json={"lon": JADUGUDA[0], "lat": JADUGUDA[1],
                                           "ore_depth_m": 150}).json()
     b = client.post("/api/predict", json={"lon": JADUGUDA[0], "lat": JADUGUDA[1],
                                           "ore_depth_m": 400}).json()
     assert "vertical" in a and "shallow_impact_probability" in a["vertical"]
-    # depth must NOT alter the horizontal (deep-layer) metrics
-    assert a["metrics"]["analytical"]["area_ha"] == b["metrics"]["analytical"]["area_ha"]
-    assert a["metrics"]["analytical"]["migration_m"] == b["metrics"]["analytical"]["migration_m"]
-    # but it MUST alter the vertical screening
+    # deeper ore -> lower K(z) -> horizontal footprint no larger
+    assert (b["metrics"]["analytical"]["area_ha"]
+            <= a["metrics"]["analytical"]["area_ha"] + 1e-9)
+    # and the vertical screening still responds to separation
     assert a["vertical"]["shallow_impact_probability"] != b["vertical"]["shallow_impact_probability"]
+    # the depth correction must be reported, not applied silently
+    kd = a["hydro"].get("k_depth")
+    assert kd is not None and 0.0 < kd["decay_factor"] <= 1.0

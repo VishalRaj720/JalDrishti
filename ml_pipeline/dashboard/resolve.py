@@ -257,6 +257,43 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
                       "K_m_day": round(k_default, 3),
                       "polygon_K_m_day": round(float(h["K_m_day"]), 3)}
 
+    # Phase-1 fix 3.3: DEPTH-DEPENDENT K. The resolved K above characterises the
+    # shallow drinking-water aquifer; the ISR target sits far below it, where
+    # crystalline fractures close under load. Decay K from the shallow reference
+    # depth to the ore depth using the district's OWN documented fracture-death
+    # depth (NAQUIM), then clamp into the deployed model's trained K box so this
+    # stays a serve-time correction with no retrain. An explicit K override from
+    # the user wins outright (they are stating a measured value).
+    k_depth = None
+    if payload.get("K_m_day") is None and P.K_DEPTH_DECAY_ENABLED:
+        from ml_pipeline.data_prep.naquim_vertical import vertical_params_at
+        vp = vertical_params_at(lon, lat)
+        ore_depth = _override(payload, "ore_depth_m", P.VERTICAL["ore_depth_default_m"])
+        factor = P.depth_decay_factor(ore_depth, vp.get("fracture_max_m"))
+        k_shallow = k_default
+        k_dec = k_shallow * factor
+        # keep the served K inside the trained support so no extrapolation flag
+        # is raised by our own correction
+        support = _hydro_support().get(regime, {})
+        k_lo, k_hi = support.get("K_m_day", (None, None)) if support else (None, None)
+        clamped = False
+        if k_lo is not None and k_dec < k_lo:
+            k_dec, clamped = float(k_lo), True
+        k_default = k_dec
+        k_depth = {
+            "ore_depth_m": round(float(ore_depth), 1),
+            "reference_depth_m": P.K_DEPTH_REF_M,
+            "fracture_base_m": vp.get("fracture_max_m"),
+            "fracture_base_source": ("NAQUIM district report"
+                                     if vp.get("fracture_max_m") is not None
+                                     else "statewide default"),
+            "decay_factor": round(float(factor), 4),
+            "K_shallow_m_day": round(float(k_shallow), 4),
+            "K_at_depth_m_day": round(float(k_default), 4),
+            "clamped_to_trained_min": clamped,
+            "strength": P.K_DEPTH_DECAY_STRENGTH,
+        }
+
     inputs = dict(
         regime=regime,
         K_m_day=_override(payload, "K_m_day", k_default),
@@ -285,10 +322,13 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         aniso_ratio=(anisotropy_from_variance(strike["circular_variance"])
                      if regime == "fractured" else None),
         # real-ISR upgrade: U redox-trapping rate. Explicit expert override wins;
-        # else the literature mode for uranium / 0 for conservative species.
+        # else the ORE-ZONE mineralogy mode (Phase-1 fix 3.5) for uranium /
+        # 0 for the conservative species.
         u_attenuation_k_per_yr=_override(
             payload, "u_attenuation_k_per_yr",
-            P.U_ATTENUATION_K_PER_YR[1] if species == "uranium_ppb" else 0.0),
+            (P.U_ATTENUATION_MODE_BY_ZONE.get(ore_zone["zone"],
+                                              P.U_ATTENUATION_K_PER_YR[1])
+             if species == "uranium_ppb" else 0.0)),
     )
     # retardation (asymptotic) so the UI can SHOW why a plume is slow (P2)
     from ml_pipeline.data_prep.feature_engineering import retardation_factor
@@ -324,5 +364,29 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         "strike": strike,
         # D5: Singhbhum shear-zone transmissivity correction applied (or None).
         "shear_zone": shear_zone,
+        # Phase-1 fix 3.3: depth-decay of K from the shallow tested zone to the
+        # ore depth (None when the user supplied an explicit K, or if disabled).
+        "k_depth": k_depth,
+        # Phase-1 fix 3.5: which ore-zone mineralogy set the attenuation mode.
+        "u_attenuation_k_per_yr": inputs.get("u_attenuation_k_per_yr"),
+        "u_attenuation_basis": (
+            f"{ore_zone['zone']} zone mineralogy"
+            if species == "uranium_ppb" and payload.get("u_attenuation_k_per_yr") is None
+            else ("user override" if payload.get("u_attenuation_k_per_yr") is not None
+                  else "n/a (conservative species)")),
+        # Phase-1 fix 3.2: measured local source-term reality check. The served
+        # C0 is Texas-ISR-derived (active lixiviant); this is what passive mine
+        # water contacting the SAME ore body actually measures.
+        "source_term_context": ({
+            "model_C0_ppb": round(c0, 1),
+            "jaduguda_mine_water_ppb": P.JADUGUDA_MINE_WATER_U_PPB,
+            "ratio_model_to_measured_gm": round(
+                c0 / P.JADUGUDA_MINE_WATER_U_PPB["gm"], 1),
+            "note": ("Model C0 represents an engineered ISR lixiviant (Texas-derived, "
+                     "the only real ISR source chemistry available). The Jaduguda "
+                     "figures are MEASURED passive mine-water effluent from the same "
+                     "ore body and act as a lower bound, not a substitute."),
+            "citation": P.JADUGUDA_SOURCE_CITATION,
+        } if species == "uranium_ppb" else None),
     }
     return inputs, hydro
