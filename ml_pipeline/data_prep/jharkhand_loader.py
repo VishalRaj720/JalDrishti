@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ml_pipeline.config import parameters as P
 from ml_pipeline.config.parameters import (
     LITHOLOGY_REGIME, DEFAULT_EFFECTIVE_POROSITY, GRAIN_DENSITY,
     DEFAULT_GRAIN_DENSITY, EC_TO_TDS_FACTOR,
@@ -162,7 +163,67 @@ def aquifer_at_point(lon: float, lat: float, aquifers=None) -> dict | None:
     out = {k: row[k] for k in aquifers.columns if k != "geometry"}
     out["_pip_fallback"] = fallback
     out["_dist_deg"] = dist_deg
+
+    # Phase-2 fix 3.6: soften the categorical polygon edge. Near a mapped
+    # contact, blend K toward the neighbouring polygon so the served value is
+    # continuous across the line (see parameters.py section 5e for the weighting
+    # and why it is done in log space). Only K is blended -- regime, lithology
+    # and the confinement class are genuinely categorical and must not be
+    # averaged into a meaningless in-between.
+    out["_k_blend"] = None
+    if (not fallback) and P.K_BOUNDARY_BLEND_ENABLED \
+            and P.K_BOUNDARY_BLEND_HALFWIDTH_DEG > 0:
+        blend = _blend_K_at_boundary(pt, row, aquifers)
+        if blend is not None:
+            out["K_m_day"] = blend["K_blended"]
+            out["_k_blend"] = blend
     return out
+
+
+def _blend_K_at_boundary(pt, row, aquifers) -> dict | None:
+    """Distance-weighted log-space blend of K with the nearest neighbouring
+    polygon. Returns None when the pin is deeper than the blend half-width
+    inside its own polygon (i.e. nowhere near a contact) -- the common case."""
+    import math
+    L = float(P.K_BOUNDARY_BLEND_HALFWIDTH_DEG)
+    own_geom = row["geometry"]
+    # Perpendicular distance from the pin to its own polygon's edge. `.boundary`
+    # handles Polygon AND MultiPolygon (the CGWB layer has both) and already
+    # includes interior rings, so holes count as contacts too.
+    try:
+        d_in = float(pt.distance(own_geom.boundary))
+    except Exception:
+        return None
+    if d_in >= L:
+        return None                                  # far from any contact
+
+    others = aquifers.drop(index=row.name)
+    if len(others) == 0:
+        return None
+    # Degrees are fine here: this only RANKS candidate polygons and sets a blend
+    # weight at state scale, it is never reported as a length. (Same convention
+    # as the nearest-polygon fallback above.) Silence geopandas' geographic-CRS
+    # advisory so it does not spam every pin resolution.
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*geographic CRS.*")
+        dists = others.geometry.distance(pt)
+    idx = dists.idxmin()
+    K_own = float(row["K_m_day"])
+    K_other = float(others.loc[idx, "K_m_day"])
+    if not (K_own > 0 and K_other > 0):
+        return None
+
+    w_own = 0.5 + 0.5 * min(d_in / L, 1.0)           # 0.5 at the edge -> continuous
+    K_blend = math.exp(w_own * math.log(K_own) + (1.0 - w_own) * math.log(K_other))
+    return {
+        "K_polygon_m_day": round(K_own, 4),
+        "K_neighbour_m_day": round(K_other, 4),
+        "neighbour_lithology": str(others.loc[idx, "lithology"]),
+        "dist_to_contact_deg": round(d_in, 5),
+        "weight_own": round(w_own, 4),
+        "K_blended": K_blend,
+    }
 
 
 def baseline_at_point(lon: float, lat: float, wq: pd.DataFrame | None = None) -> dict:

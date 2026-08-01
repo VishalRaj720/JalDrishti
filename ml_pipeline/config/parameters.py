@@ -429,6 +429,44 @@ K_DEPTH_FRACTURE_BASE_DEFAULT_M = 180.0    # districts with no NAQUIM fracture_m
 # number moves every depth-sensitive output.
 K_DEPTH_DECAY_STRENGTH = 1.0
 
+# ---------------------------------------------------------------------------
+# 5e. AQUIFER-BOUNDARY K SMOOTHING   [Phase-2 fix 3.6, 2026-08-01]
+# ---------------------------------------------------------------------------
+# The CGWB aquifer polygons are a CATEGORICAL map: every pin inside a polygon
+# gets that polygon's single K. Crossing a mapped line therefore steps K
+# discontinuously, and a QA transect (Ranchi -> Jaduguda, 2026-07) measured the
+# consequence -- a ~16 ha jump in modelled plume area between two pins ~8 km
+# apart, present in BOTH engines, purely because a polygon edge lay between
+# them. Real lithological contacts are gradational at this scale, and a user
+# who nudges a pin across an invisible line and sees the answer double will
+# (rightly) stop trusting the tool.
+#
+# Fix: blend K across the contact instead of stepping it. For a pin at
+# perpendicular distance d_in inside its own polygon, with the nearest OTHER
+# polygon carrying K_other:
+#     w_own = 0.5 + 0.5 * min(d_in / L, 1)          (L = blend half-width)
+#     log K = w_own*log K_own + (1 - w_own)*log K_other
+# At the contact d_in = 0 -> w_own = 0.5 from BOTH sides, so the two one-sided
+# limits agree and K is continuous across every boundary. Deeper than L inside a
+# polygon the blend vanishes and the mapped value is returned unchanged, so this
+# only affects the immediate neighbourhood of a contact.
+# Blending is done in LOG space because K is log-normally distributed (spanning
+# orders of magnitude); a linear average would be dominated by the larger value.
+# Set L = 0 to disable and restore the hard categorical lookup.
+#
+# SCOPE -- measured, not assumed (2026-08-01): the Jharkhand CGWB layer is only
+# 23 polygons but they are long and interleaved, so a randomly sampled in-polygon
+# pin sits a MEDIAN of just ~1.4 km from a lithological contact. At L = 0.02 deg
+# about 60% of pins receive some blending. This is therefore closer to "replace a
+# categorical map with a smoothly varying field" than to "patch a few edges" --
+# which is the physically honest description anyway, since mapped contacts are
+# interpretive lines through gradational rock, not step changes in permeability.
+# The weight still reaches 1.0 (mapped value, untouched) at distance L, so the
+# perturbation tapers to zero rather than washing the map out; L is kept at ~2 km
+# so genuine lithological contrast at the 10 km+ scale survives intact.
+K_BOUNDARY_BLEND_ENABLED = True
+K_BOUNDARY_BLEND_HALFWIDTH_DEG = 0.02     # ~2.2 km at Jharkhand latitude
+
 
 def depth_decay_factor(z_m: float, fracture_base_m: float | None = None,
                        strength: float | None = None) -> float:

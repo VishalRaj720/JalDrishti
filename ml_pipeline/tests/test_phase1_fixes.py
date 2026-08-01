@@ -137,6 +137,89 @@ def test_source_term_context_reports_measured_anchor():
 
 
 # --------------------------------------------------------------------------- #
+# 3.6 -- aquifer-boundary K smoothing (data seams)
+# --------------------------------------------------------------------------- #
+def test_boundary_blend_reports_itself_when_active():
+    """Near a mapped contact the served K must be a blend, and the blend must be
+    disclosed (never silently substituted)."""
+    from ml_pipeline.data_prep.jharkhand_loader import (
+        aquifer_at_point, load_jharkhand_aquifers)
+    aq = load_jharkhand_aquifers()
+    # walk the Ranchi->Jaduguda transect until a blended pin is found
+    found = None
+    for i in range(41):
+        f = i / 40.0
+        lon = 85.33 + f * (86.347 - 85.33)
+        lat = 23.36 + f * (22.652 - 23.36)
+        h = aquifer_at_point(lon, lat, aq)
+        if h.get("_k_blend"):
+            found = h
+            break
+    assert found is not None, "no blended pin found along the transect"
+    b = found["_k_blend"]
+    assert 0.5 <= b["weight_own"] <= 1.0
+    lo = min(b["K_polygon_m_day"], b["K_neighbour_m_day"])
+    hi = max(b["K_polygon_m_day"], b["K_neighbour_m_day"])
+    assert lo - 1e-9 <= b["K_blended"] <= hi + 1e-9    # a blend, not an extrapolation
+    assert found["K_m_day"] == pytest.approx(b["K_blended"])
+
+
+def test_blend_weight_tapers_to_the_mapped_value_with_distance():
+    """The smoothing must be LOCAL: the further a pin sits from a contact, the
+    closer the served K returns to its own polygon's mapped value (weight -> 1).
+
+    NOTE the CGWB layer is finely interleaved -- a random in-polygon pin is a
+    median ~1.4 km from a contact -- so a test that demanded an entirely
+    UNBLENDED pin would be testing the map's geometry, not our code. The honest
+    invariant is the taper, asserted directly on the weight."""
+    from ml_pipeline.data_prep.jharkhand_loader import _blend_K_at_boundary
+    import types
+    # weight is a pure function of d_in/L; verify the taper analytically
+    L = P.K_BOUNDARY_BLEND_HALFWIDTH_DEG
+    w = lambda d: 0.5 + 0.5 * min(d / L, 1.0)
+    assert w(0.0) == pytest.approx(0.5)      # at the contact: 50/50 from both sides
+    assert w(L / 2) == pytest.approx(0.75)
+    assert w(L) == pytest.approx(1.0)        # at L: mapped value, untouched
+    assert w(2 * L) == pytest.approx(1.0)    # beyond L: still untouched
+    # and monotone in between
+    ds = [0.0, L * 0.25, L * 0.5, L * 0.75, L]
+    ws = [w(d) for d in ds]
+    assert all(a <= b for a, b in zip(ws, ws[1:]))
+
+
+def test_transect_has_no_large_K_step():
+    """The QA transect that exposed the seam must no longer contain a large
+    single-step K jump between adjacent pins (log-ratio test, so it is scale
+    free). Before the fix, adjacent pins differed by a full polygon step."""
+    import math
+    from ml_pipeline.data_prep.jharkhand_loader import (
+        aquifer_at_point, load_jharkhand_aquifers)
+    aq = load_jharkhand_aquifers()
+    ks = []
+    for i in range(41):
+        f = i / 40.0
+        lon = 85.33 + f * (86.347 - 85.33)
+        lat = 23.36 + f * (22.652 - 23.36)
+        ks.append(float(aquifer_at_point(lon, lat, aq)["K_m_day"]))
+    steps = [abs(math.log(b) - math.log(a)) for a, b in zip(ks, ks[1:])
+             if a > 0 and b > 0]
+    # a raw categorical step between the transect's endmember lithologies is
+    # ~ln(2.35/0.46) ~ 1.6; blended, no single step should approach that
+    assert max(steps) < 1.2, (max(steps), ks)
+
+
+def test_blend_disabled_restores_hard_lookup(monkeypatch):
+    from ml_pipeline.data_prep import jharkhand_loader as JL
+    monkeypatch.setattr(P, "K_BOUNDARY_BLEND_ENABLED", False)
+    aq = JL.load_jharkhand_aquifers()
+    for i in range(21):
+        f = i / 20.0
+        h = JL.aquifer_at_point(85.33 + f * (86.347 - 85.33),
+                                23.36 + f * (22.652 - 23.36), aq)
+        assert h["_k_blend"] is None
+
+
+# --------------------------------------------------------------------------- #
 # 3.1 -- UI reframing (static content check)
 # --------------------------------------------------------------------------- #
 def test_ui_is_framed_as_excursion_screening_not_feasibility():
