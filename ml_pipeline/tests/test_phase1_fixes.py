@@ -332,20 +332,38 @@ def test_radium_is_ore_zone_gated():
     assert none["u_suppressed"] is True
 
 
-def test_radium_bypasses_the_ml_surrogate_explicitly():
-    """The deployed surrogate has a 3-species one-hot; radium must be served
-    analytically with a stated reason, never fed an all-zero species encoding."""
+def test_radium_is_now_served_by_the_trained_surrogate():
+    """UPDATED 2026-08-02: radium was analytical-only when fix 3.9 landed
+    because the deployed surrogate had a 3-species one-hot. It has since been
+    retrained WITH radium, so it must now come back with real ML bands like any
+    other trained species -- and the other three must be unaffected."""
     from fastapi.testclient import TestClient
     from ml_pipeline.dashboard.server import app
     c = TestClient(app)
     j = c.post("/api/predict", json=dict(**RADIUM)).json()
-    assert j["metrics"]["ml"] is None
-    assert "analytical only" in j["ml_status"]
+    assert j["ml_status"] == "ok", j["ml_status"]
+    assert j["metrics"]["ml"] is not None
+    b = j["metrics"]["ml"]["area_ha"]
+    assert b["p10"] <= b["p50"] <= b["p90"]
     assert j["metrics"]["analytical"]["area_ha"] is not None   # physics still runs
-    # and the three trained species are unaffected
-    u = c.post("/api/predict", json={"lon": 86.347, "lat": 22.652,
-                                     "species": "uranium_ppb"}).json()
-    assert u["metrics"]["ml"] is not None and u["ml_status"] == "ok"
+    for sp in ("uranium_ppb", "sulfate_mg_l", "tds_mg_l"):
+        r = c.post("/api/predict", json={"lon": 86.347, "lat": 22.652,
+                                         "species": sp}).json()
+        assert r["metrics"]["ml"] is not None and r["ml_status"] == "ok", sp
+
+
+def test_ml_species_gate_still_guards_untrained_species():
+    """The SPECIES / ML_SPECIES split must remain a real gate, so a FUTURE
+    analytical-only species (e.g. Rn-222) still bypasses the surrogate rather
+    than being fed an unseen one-hot. Verified against the deployed model card
+    rather than the constant, so it cannot drift from the actual artifacts."""
+    import json
+    from ml_pipeline.ml.predict import ML_SPECIES
+    from ml_pipeline.ml.dataset import ARTIFACT_DIR
+    card = json.loads((ARTIFACT_DIR / "model_card.json").read_text())
+    trained = {f[3:] for f in card["features"] if f.startswith("is_")
+               and f != "is_post_closure"}
+    assert set(ML_SPECIES) == trained, (set(ML_SPECIES), trained)
 
 
 # --------------------------------------------------------------------------- #

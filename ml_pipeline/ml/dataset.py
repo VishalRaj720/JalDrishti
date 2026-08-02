@@ -32,8 +32,13 @@ TRAINING_CSV = OUT_DIR / "synthetic_training.csv"
 GROUP_COL = "scenario_id"
 POLYGON_COL = "polygon_id"
 
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
-SPECIES_ONEHOT = ["is_uranium_ppb", "is_sulfate_mg_l", "is_tds_mg_l"]
+# radium_226_mbq_l added 2026-08-02: folds Ra-226 into the trained surrogate
+# (previously served analytical-only, fix 3.9). MODEL_FEATURES/monotone tuples
+# below are order-independent w.r.t. which species are present -- the one-hot
+# list just needs to stay in sync with this tuple.
+SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
+SPECIES_ONEHOT = ["is_uranium_ppb", "is_sulfate_mg_l", "is_tds_mg_l",
+                  "is_radium_226_mbq_l"]
 
 # Ordered feature list. ORDER IS LOAD-BEARING: monotone tuples align to it.
 # `domain_is_texas` (constant 0) and `Q_out_m3_day` (collinear back-door) are
@@ -186,7 +191,8 @@ def Xy(df: pd.DataFrame, column: str, *, censor_offscale: bool = False):
 
 
 def mondrian_cells(df: pd.DataFrame) -> pd.Series:
-    """Conformal calibration cell per row: '{regime}|{species}' (6 cells)."""
+    """Conformal calibration cell per row: '{regime}|{species}' (2 regimes x
+    len(SPECIES) species; cell count derives from the data, not hardcoded)."""
     regime = np.where(df["regime_is_fractured"].astype(int) == 1,
                       "fractured", "porous")
     return pd.Series(regime, index=df.index).str.cat(df["species"], sep="|")

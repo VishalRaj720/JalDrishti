@@ -107,6 +107,30 @@ def train_band_target(df: pd.DataFrame, target: str, cfg: dict):
         band_metrics["r2"][b] = round(float(r2_score(y_raw, p_raw)), 4)
         band_metrics["mae"][b] = round(float(mean_absolute_error(y_raw, p_raw)), 4)
 
+    # PER-SPECIES metrics (added 2026-08-02). The pooled r2 above is computed on
+    # BACK-TRANSFORMED values across species with INCOMMENSURABLE UNITS -- ppb,
+    # mg/L and (since the radium retrain) mBq/L. Pooling those makes SSE dominated
+    # by whichever species has the largest absolute numbers while SST depends on
+    # the species MIX, so the pooled figure moves when the mix changes even if
+    # every species got better. That is exactly what happened when Ra-226 was
+    # added: pooled compliance_conc r2 fell 0.68 -> 0.22 while the log-space fit
+    # was 0.979 and EVERY species scored >= 0.956 individually. The pooled number
+    # is kept for continuity with older model cards, but these per-species values
+    # (and r2_log) are the ones that actually mean something.
+    y50_raw, p50_raw = np.expm1(yt["p50"]), np.clip(np.expm1(oof["p50"]), 0, None)
+    band_metrics["r2_log"] = round(float(r2_score(yt["p50"], oof["p50"])), 4)
+    band_metrics["r2_by_species"] = {}
+    band_metrics["r2_log_by_species"] = {}
+    sp_col = sub["species"].to_numpy()
+    for sp in np.unique(sp_col):
+        m_ = sp_col == sp
+        if m_.sum() < 10:
+            continue
+        band_metrics["r2_by_species"][str(sp)] = round(
+            float(r2_score(y50_raw[m_], p50_raw[m_])), 4)
+        band_metrics["r2_log_by_species"][str(sp)] = round(
+            float(r2_score(yt["p50"][m_], oof["p50"][m_])), 4)
+
     # --- honest Mondrian split-conformal (log space, scenario-level scores) ---
     E = np.maximum(lo - yt["p10"], yt["p90"] - hi)   # band-containment score
     edf = pd.DataFrame({"E": E, "cell": cells, "scen": groups})
@@ -162,7 +186,10 @@ def polygon_stress_cv(df: pd.DataFrame, target: str, cfg: dict) -> dict:
         m = _model(target)
         m.fit(X.iloc[tr], y[tr])
         oof[te] = m.predict(X.iloc[te])
+    # r2_log is the honest headline here for the same units reason as above --
+    # the back-transformed pooled r2 mixes ppb / mg/L / mBq/L.
     return {"r2_p50": round(float(r2_score(np.expm1(y), np.clip(np.expm1(oof), 0, None))), 4),
+            "r2_p50_log": round(float(r2_score(y, oof)), 4),
             "mae_p50": round(float(mean_absolute_error(np.expm1(y), np.clip(np.expm1(oof), 0, None))), 4),
             "n_polygons": int(len(np.unique(polys)))}
 
@@ -239,12 +266,17 @@ def train_all():
             joblib.dump(m, ARTIFACT_DIR / f"band_{target}_{b}.joblib")
         cov = mt["coverage"]
         print(f"[bands] {target:26s} R2(P50)={mt['r2']['p50']:.3f}  "
-              f"MAE(P50)={mt['mae']['p50']:.2f}  "
+              f"R2log={mt['r2_log']:.3f}  MAE(P50)={mt['mae']['p50']:.2f}  "
               f"coverage rows={cov['rows_eval']:.3f} scen={cov['scenarios_eval']:.3f} "
               f"tail={cov['tail_top5_rows']:.3f}")
+        # per-species, because the pooled R2 mixes ppb / mg/L / mBq/L
+        per_sp = "  ".join(f"{k.split('_')[0]}={v:.3f}"
+                           for k, v in mt["r2_log_by_species"].items())
+        print(f"        per-species R2log: {per_sp}")
         metrics["stress_polygon_cv"][target] = polygon_stress_cv(df, target, cfg)
-        print(f"        leave-aquifer-out R2(P50)={metrics['stress_polygon_cv'][target]['r2_p50']:.3f}"
-              f"  (vs scenario-CV {mt['r2']['p50']:.3f})")
+        st = metrics["stress_polygon_cv"][target]
+        print(f"        leave-aquifer-out R2(P50)={st['r2_p50']:.3f} "
+              f"(log {st['r2_p50_log']:.3f})  (vs scenario-CV {mt['r2']['p50']:.3f})")
 
     pex_model, metrics["pex"] = train_point_regressor(df)
     joblib.dump(pex_model, ARTIFACT_DIR / "pex_regressor.joblib")

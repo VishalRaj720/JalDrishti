@@ -65,7 +65,11 @@ from ml_pipeline.physics.transport import (
 )
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "outputs"
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
+# radium_226_mbq_l added 2026-08-02 to fold Ra-226 into the ML surrogate (it had
+# been served analytical-only since fix 3.9). Its C0/Cb sampling below is
+# special-cased -- it has no Texas source signature and no CGWB background
+# column, unlike the other three species.
+SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
 DEFAULT_TIMES_YEARS = (2.0, 5.0, 8.0, 12.0, 20.0)
 BAND_TARGETS = ("affected_area_ha", "max_migration_distance_m", "compliance_conc")
 
@@ -153,11 +157,15 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     # QA F-2 (2026-07-13): sample down to 0.25 yr -- the old 1 yr floor left the
     # served rest in (0, 1) with no training support, so the ML bands cliffed
     # there (m_migr -46% for a 3-month sweep).
+    # Radium has NO Texas post-restoration series, so its endpoint comes from
+    # the sorption-derived config value instead (see RADIUM_RESTORATION_RESIDUAL
+    # -- a hydraulic sweep barely removes strongly-sorbed radium).
     if rng.uniform() < IR["restoration_prob"]:
         rest_years = float(rng.uniform(0.25, OR["restoration_years"][1]))
-        residual = {sp: float(np.clip(rest_residual[sp]
-                                      * rng.uniform(*IR["residual_noise_mult"]),
-                                      0.02, 1.0)) for sp in SPECIES}
+        residual = {sp: float(np.clip(
+            (P.RADIUM_RESTORATION_RESIDUAL if sp == "radium_226_mbq_l"
+             else rest_residual[sp]) * rng.uniform(*IR["residual_noise_mult"]),
+            0.02, 1.0)) for sp in SPECIES}
     else:
         rest_years = 0.0
         residual = {sp: 1.0 for sp in SPECIES}
@@ -168,20 +176,31 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     else:
         beta = 0.0
 
-    # Source signature (Texas-derived) and background (nearest JH well to the pin)
-    C0 = {sp: float(rng.uniform(*source_sig[sp])) for sp in SPECIES}
+    # Source signature (Texas-derived) and background (nearest JH well to the pin).
+    # Radium has neither -- no Texas ISR radium data exists, and CGWB carries no
+    # radium column -- so it draws C0 from the measured-anchored training range
+    # (background floor to the measured Jaduguda maximum) and a fixed background,
+    # matching the SERVE path (resolve.py) exactly.
+    C0 = {sp: (float(rng.uniform(*P.RADIUM_C0_TRAINING_RANGE_MBQ_L))
+              if sp == "radium_226_mbq_l" else float(rng.uniform(*source_sig[sp])))
+          for sp in SPECIES}
     d2 = (wq["longitude"] - lon) ** 2 + (wq["latitude"] - lat) ** 2
     base = wq.loc[d2.idxmin()]
     Cb = {
         "uranium_ppb": float(base["uranium_ppb"]) if pd.notna(base["uranium_ppb"]) else 1.0,
         "sulfate_mg_l": float(base["sulfate_mg_l"]) if pd.notna(base["sulfate_mg_l"]) else 20.0,
         "tds_mg_l": float(base["tds_mg_l"]) if pd.notna(base["tds_mg_l"]) else 300.0,
+        "radium_226_mbq_l": P.RADIUM_BACKGROUND_MBQ_L,
     }
 
-    # Kd per species sampled from its regime range (low..high)
+    # Kd per species sampled from its regime range (low..high). Routed through
+    # the shared kd_range_for() helper (not P.KD_RANGES directly) so this site
+    # and the per-draw MC site in _draw_params() cannot diverge on radium's
+    # separate Kd table -- this exact duplication caused a KeyError the first
+    # time radium was added to a species loop here (2026-08-01).
     Kd = {}
     for sp in SPECIES:
-        lo, _, hi = P.KD_RANGES[sp][regime]
+        lo, _, hi = P.kd_range_for(sp, regime)
         Kd[sp] = float(rng.uniform(lo, hi))
 
     # First-order U natural-attenuation rate (real-ISR upgrade): log-triangular

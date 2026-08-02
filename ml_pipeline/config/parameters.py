@@ -146,6 +146,39 @@ RADIUM_KD_RANGES = {
 # the rest of the model does not have. Recorded here so the omission is explicit.
 RADIUM_HALFLIFE_YEARS = 1600.0
 
+# Training C0 range for the synthetic generator (2026-08-02 retrain). Radium has
+# no Texas ISR series to sample a source envelope from (see RADIUM_SOURCE_MBQ_L
+# above), so the generator draws C0 uniformly over the FULL range the SERVE path
+# can ever produce: background-only at a non-ore pin (23 mBq/L) up to the
+# measured Jaduguda maximum used as the deposit ceiling (1706 mBq/L). This makes
+# the trained feature support match the served input support exactly, rather
+# than the model ever extrapolating on its own training range.
+RADIUM_C0_TRAINING_RANGE_MBQ_L = (RADIUM_BACKGROUND_MBQ_L, RADIUM_SOURCE_MBQ_L["max"])
+
+# Restoration endpoint residual for radium (C_rest/C0 after a reference sweep).
+# There is NO Texas post-restoration radium series -- the sheets that give
+# uranium 0.066, sulfate 0.146 and TDS 0.367 carry no radium column -- so this
+# is DERIVED FROM THE SORPTION PHYSICS, not measured, and is flagged as such.
+#
+# Derivation: an aquifer sweep is a pore-volume flush, and removing a sorbed
+# solute takes on the order of Rd pore volumes, so the fraction remaining after
+# N pore volumes goes as exp(-N/Rd). Anchoring on uranium, whose measured
+# endpoint is 0.066:   N/Rd_U = ln(1/0.066) = 2.72.
+# Radium's Kd exceeds uranium's by ~500x (fractured: 500 vs 1.0) to ~960x
+# (porous: 2400 vs 2.5), and Rd scales with Kd, so the SAME sweep gives
+#     residual_Ra = exp(-2.72 / ~500..960) = 0.994 .. 0.997
+# i.e. a hydraulic sweep barely touches radium: it flushes mobile pore water,
+# while almost all the radium inventory is bound to the matrix and simply
+# re-equilibrates. Rounded to 0.99 (kept just below 1.0 so the restoration
+# machinery stays continuous rather than degenerate).
+#
+# CONSEQUENCE, stated plainly: the restoration slider will look nearly inert for
+# radium. That is the physically correct and decision-relevant answer -- radium
+# is not remediable by pumping -- not a broken control. (Surface treatment at
+# Jaduguda removes >95% of Ra via BaCl2 co-precipitation, but that is an
+# effluent-treatment plant, not aquifer restoration.)
+RADIUM_RESTORATION_RESIDUAL = 0.99
+
 
 def kd_range_for(species: str, regime: str) -> tuple:
     """(lo, central, hi) Kd [L/kg] for a species x regime. Single source of

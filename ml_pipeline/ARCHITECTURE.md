@@ -4,7 +4,9 @@
 Every formula is derived, every file is explained, every dataset is documented,
 and every limitation is stated honestly.*
 
-**Last updated:** 2026-07-13 (post QA sweep + restoration-continuity fix + final retrain)
+**Last updated:** 2026-08-02 (Phase-1 fidelity fixes: depth-dependent K(z), aquifer-boundary
+and ore-zone seam smoothing, mineralogy-graded attenuation; **Ra-226 added as a 4th species**
+and folded into the retrained surrogate)
 
 ---
 
@@ -128,8 +130,8 @@ Five layers, each feeding the next:
                            ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │ 3. SYNTHETIC DATA FACTORY (synthetic/generate.py)                    │
-│    900 scenarios x 5 times x 3 species = 13,500 rows; each row =     │
-│    39 features + physics labels + Monte-Carlo P10/P50/P90 bands      │
+│    900 scenarios x 5 times x 4 species = 18,000 rows; each row =     │
+│    40 features + physics labels + Monte-Carlo P10/P50/P90 bands      │
 └──────────────────────────┬───────────────────────────────────────────┘
                            ▼
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -617,7 +619,7 @@ Groups (full list in `ml/dataset.py::MODEL_FEATURES`):
 - **Irregularities & restoration**: downtime, seasonal amplitude,
   restoration years, *realized* residual fraction (elapsed-credited — QA F-2).
 - **Kinematics**: front positions X_c and X_clean, time, post-closure flag.
-- **Species one-hot** (uranium / sulfate / TDS).
+- **Species one-hot** (uranium / sulfate / TDS / radium-226).
 
 Note the deliberate redundancy (v is derivable from K·i/φ): trees can't do
 division, so we hand them the physically meaningful ratios pre-computed.
@@ -668,7 +670,7 @@ to hold this stricter bar.
 
 ### 6.5 Leak-proof validation
 
-- **GroupKFold by scenario**: all 15 rows of a scenario (5 times × 3 species)
+- **GroupKFold by scenario**: all 20 rows of a scenario (5 times × 4 species)
   stay in the same fold — otherwise the model "predicts" a scenario it partly
   saw, inflating R².
 - **Leave-aquifer-out**: hold out entire aquifer polygons to prove spatial
@@ -757,7 +759,7 @@ ml_pipeline/
 │                            real fields). _draw_params(): per-MC-draw
 │                            TransportParams (K heterogeneity, Kd triangles...).
 │                            mc_band_labels(): P10/50/90 labels. Writes
-│                            outputs/synthetic_training.csv (13,500 rows).
+│                            outputs/synthetic_training.csv (18,000 rows).
 │
 ├── ml/
 │   ├── dataset.py           MODEL_FEATURES (39), monotone sign maps

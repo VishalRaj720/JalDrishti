@@ -26,10 +26,11 @@ from ml_pipeline.data_prep.flow_field import flow_at
 from ml_pipeline.data_prep.strike_field import strike_at, anisotropy_from_variance
 from ml_pipeline.ml.dataset import ARTIFACT_DIR
 
-# radium_226_mbq_l (fix 3.9) is ANALYTICAL-ONLY: the deployed surrogate has a
-# 3-species one-hot, so the server bypasses the ML head for it.
+# radium_226_mbq_l (fix 3.9) is now IN the deployed surrogate (2026-08-02
+# retrain) -- ML_SPECIES kept distinct from SPECIES so a future analytical-only
+# addition (e.g. Rn-222) has the same safe bypass path radium used before this.
 SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
-ML_SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l")
+ML_SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
 _BG_DEFAULT = {"uranium_ppb": 1.0, "sulfate_mg_l": 20.0, "tds_mg_l": 300.0,
                "radium_226_mbq_l": P.RADIUM_BACKGROUND_MBQ_L}
 
