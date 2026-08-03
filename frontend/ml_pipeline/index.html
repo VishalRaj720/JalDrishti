@@ -53,8 +53,10 @@
         <input type="range" id="op" min="1" max="20" step="0.5" value="8"></div>
       <div class="slider"><label>Hydraulic gradient <span class="u">i</span><span id="src-grad" class="src muted"></span><b id="v-grad">0.005</b></label>
         <input type="range" id="grad" min="0.0005" max="0.02" step="0.0005" value="0.005"></div>
+      <!-- step = 1 month: the seasonal water-table signal aliases badly at the
+           old 0.5 yr step (2 samples/yr), so the timeline scrubs month-by-month -->
       <div class="slider"><label>Evaluation time <span class="u">yr</span><b id="v-time">10</b></label>
-        <input type="range" id="time" min="0" max="50" step="0.5" value="10"></div>
+        <input type="range" id="time" min="0" max="50" step="0.0833333" value="10"></div>
       <div class="slider"><label>Wellfield width <span class="u">m</span><b id="v-width">300</b></label>
         <input type="range" id="width" min="100" max="800" step="10" value="300"></div>
       <div class="slider"><label>Restoration sweep <span class="u">yr</span><b id="v-rest">0</b></label>
@@ -64,7 +66,32 @@
     </section>
 
     <section class="card">
-      <div class="card-title">④ Prediction engine</div>
+      <div class="card-title">④ Timeline &amp; ISR lifecycle</div>
+      <div class="tl-row">
+        <label class="lbl tl-lbl">ISR start date</label>
+        <input type="date" id="start-date" value="2026-01-01" class="tl-date">
+      </div>
+      <div class="tl-row tl-controls">
+        <button id="tl-play" class="tl-btn" title="Play / pause the lifecycle">▶ Play</button>
+        <button id="tl-reset" class="tl-btn ghost" title="Back to day zero">⟲</button>
+        <!-- max frame rate, not a speed multiplier: the server (~0.2 s/frame)
+             is the real limit, so "fast" only removes the added delay -->
+        <span id="tl-speed-wrap" class="muted small">pace
+          <select id="tl-speed" class="tl-sel">
+            <option value="2">slow</option>
+            <option value="5" selected>steady</option>
+            <option value="24">as fast as it renders</option>
+          </select></span>
+      </div>
+      <div id="tl-readout" class="tl-readout muted small">Set a start date and press Play…</div>
+      <div id="tl-phasebar" class="tl-phasebar"></div>
+      <p class="tl-note">⚠ <b>Hypothetical lifecycle.</b> No ISR operation has ever
+        existed in Jharkhand — the start date is a scenario anchor, not a record.
+        Seasonal state is a repeating CGWB climatology (2013–2021), not live data.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-title">⑤ Prediction engine</div>
       <div class="seg" id="mode-seg">
         <button data-v="ml" class="active">ML Surrogate (P10–P90)</button>
         <button data-v="analytical">Analytical engine</button>
@@ -76,7 +103,7 @@
     </section>
 
     <section class="card">
-      <div class="card-title">⑤ Depth &amp; vertical stratification</div>
+      <div class="card-title">⑥ Depth &amp; vertical stratification</div>
       <div class="slider"><label>Ore / ISR target depth <span class="u">m</span><b id="v-oredepth">150</b></label>
         <input type="range" id="oredepth" min="50" max="600" step="10" value="150"></div>
       <div class="slider"><label>Ore zone thickness <span class="u">m</span><b id="v-orethick">20</b></label>

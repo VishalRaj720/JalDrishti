@@ -169,3 +169,35 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .sb-tbl td { padding: 1px 4px 1px 0; }
 .sb-tbl tr.sb-lo td { color: #8b97a7; border-top: 1px solid rgba(139, 151, 167, .25); }
 .sb-caveat { margin-top: 5px; font-size: 9px; line-height: 1.35; color: #8b97a7; }
+
+/* 3.7b timeline & ISR lifecycle */
+.tl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.tl-lbl { margin: 0; flex: 0 0 auto; }
+.tl-date { flex: 1; background: #10161f; color: #dbe4ef; border: 1px solid #2a3646;
+  border-radius: 5px; padding: 4px 6px; font-size: 12px; font-family: inherit; }
+.tl-controls { gap: 6px; }
+.tl-btn { background: #1d6fd0; color: #fff; border: 0; border-radius: 5px;
+  padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.tl-btn.playing { background: #d0521d; }
+.tl-btn.ghost { background: #232d3b; padding: 5px 9px; }
+.tl-btn:hover { filter: brightness(1.14); }
+.tl-sel { background: #10161f; color: #dbe4ef; border: 1px solid #2a3646;
+  border-radius: 4px; font-size: 11px; padding: 2px 3px; font-family: inherit; }
+.tl-readout { margin-top: 4px; line-height: 1.5; }
+.tl-date-now { color: #dbe4ef; font-size: 13px; }
+.tl-season { padding: 1px 6px; border-radius: 8px; font-size: 10px; }
+.tl-monsoon { background: rgba(55,211,155,.18); color: #37d39b; }
+.tl-post-monsoon { background: rgba(111,209,255,.16); color: #6fd1ff; }
+.tl-winter { background: rgba(139,151,167,.18); color: #b7c2d0; }
+.tl-pre-monsoon { background: rgba(255,90,90,.16); color: #ff8a6a; }
+.tl-phasebar { position: relative; height: 8px; margin-top: 7px; border-radius: 4px;
+  overflow: hidden; background: #10161f; }
+.tl-phasebar .ph { position: absolute; top: 0; height: 100%; }
+.tl-phasebar .ph.op { background: rgba(255,90,90,.55); }
+.tl-phasebar .ph.rest { background: rgba(111,209,255,.55); }
+.tl-phasebar .ph.drift { background: rgba(139,151,167,.35); }
+.tl-phasebar .ph-now { position: absolute; top: -2px; width: 2px; height: 12px;
+  background: #fff; box-shadow: 0 0 4px #fff; }
+.tl-note { font-size: 9px; line-height: 1.4; color: #8b97a7; margin: 7px 0 0; }
+.sb-now { font-size: 10px; margin: 3px 0 5px; padding: 3px 5px; border-radius: 4px;
+  background: rgba(255,255,255,.06); color: #dbe4ef; }

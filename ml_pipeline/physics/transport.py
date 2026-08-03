@@ -392,7 +392,8 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                              t_days: float, wellbore_failure_prob: float,
                              water_table_m: float | None = None,
                              water_table_wet_m: float | None = None,
-                             water_table_dry_m: float | None = None) -> dict:
+                             water_table_dry_m: float | None = None,
+                             water_table_now_m: float | None = None) -> dict:
     """SCREENING estimate of how much the deep plume could impact the Layer-1
     (shallow drinking-water) aquifer. Three independent pathways OR-combined:
 
@@ -516,6 +517,17 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
             "deep_head_caveat": _SEA["deep_head_caveat"],
             "source_citation": _SEA["source_citation"],
         }
+        # TIMELINE: the state at the animation's CURRENT calendar month. Same
+        # two end members, evaluated at this month's interpolated water table
+        # instead of the seasonal extremes -- so the timeline reads out a point
+        # ON the band that the band itself already brackets, never outside it.
+        if water_table_now_m is not None:
+            now = float(water_table_now_m)
+            seasonal["water_table_now_m"] = round(now, 2)
+            seasonal["now"] = {
+                "static_deep_head": _state((now - wt_mean) / dz_adv),
+                "in_phase_deep_head": _state(0.0),
+            }
     # D1 (Stage B): real depth-to-water CONTEXT. The risk barrier stays at
     # layer1_base_m (the aquifer BASE -- where the up-rising plume first enters
     # the resource, the conservative receptor). The water table (aquifer TOP)

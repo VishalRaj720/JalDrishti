@@ -930,5 +930,65 @@ VERTICAL_SEASONAL = {
     ),
 }
 
+# ---------------------------------------------------------------------------
+# MONTHLY WATER-TABLE SHAPE (drives the timeline animation)
+#
+# The CGWB network samples FOUR campaigns a year, so four state-wide medians are
+# all the direct evidence there is [m bgl]:
+#       Jan 5.25    May 7.20 (deepest)    Aug 3.22 (shallowest)    Nov 3.78
+#
+# Those four points already encode the ASYMMETRY that matters -- a fast monsoon
+# recovery (May->Aug: -3.98 m in 3 months) and a slow dry-season recession
+# (Aug->Nov->Jan->May: +3.98 m over 9). Linear interpolation BETWEEN the
+# campaign months therefore reproduces the real shape; it does not invent one.
+# No rainfall series is used (none exists on disk) and none is needed: the
+# water-table response IS the integrated rainfall signal, measured directly.
+#
+# SPLIT OF EVIDENCE -- state SHAPE, per-pin AMPLITUDE:
+#   The normalised shape below is state-wide; the wet/dry ENDPOINTS come from
+#   the pin (flow_field dtw_shallow/dtw_deep). Justification: Jharkhand is ~200
+#   km across under a single monsoon system, so onset TIMING varies by days, not
+#   months, while amplitude genuinely varies pin to pin (measured swing p10 2.17
+#   -> p90 6.19 m). Storing a full per-cell monthly curve would need a flow-field
+#   rebuild with four extra arrays; that is the honest upgrade path if the
+#   timing assumption is ever challenged.
+# ---------------------------------------------------------------------------
+# month -> state-wide median depth to water [m bgl] at the CGWB campaigns
+WATER_TABLE_CAMPAIGNS_M = {1: 5.25, 5: 7.20, 8: 3.22, 11: 3.78}
+
+SEASON_LABELS = {12: "winter", 1: "winter", 2: "winter",
+                 3: "pre-monsoon", 4: "pre-monsoon", 5: "pre-monsoon",
+                 6: "monsoon", 7: "monsoon", 8: "monsoon", 9: "monsoon",
+                 10: "post-monsoon", 11: "post-monsoon"}
+
+
+def water_table_shape(month: int) -> float:
+    """Normalised depth-to-water for a calendar month: 0.0 = shallowest table of
+    the year (Aug, monsoon peak), 1.0 = deepest (May, pre-monsoon trough).
+
+    Cyclic piecewise-linear through the four CGWB campaign anchors. Returned as
+    a SHAPE so a pin's own measured wet/dry endpoints supply the amplitude --
+    see the block comment above for why timing is state-wide but amplitude is not.
+    """
+    lo = min(WATER_TABLE_CAMPAIGNS_M.values())
+    hi = max(WATER_TABLE_CAMPAIGNS_M.values())
+    anchors = sorted(WATER_TABLE_CAMPAIGNS_M)                  # [1, 5, 8, 11]
+    m = ((int(month) - 1) % 12) + 1
+    prev = max([a for a in anchors if a <= m], default=anchors[-1])
+    nxt = min([a for a in anchors if a >= m], default=anchors[0])
+    if prev == nxt:
+        depth = WATER_TABLE_CAMPAIGNS_M[m]
+    else:
+        span = (nxt - prev) % 12 or 12                          # wrap Nov -> Jan
+        step = (m - prev) % 12
+        d0, d1 = WATER_TABLE_CAMPAIGNS_M[prev], WATER_TABLE_CAMPAIGNS_M[nxt]
+        depth = d0 + (d1 - d0) * (step / span)
+    return float((depth - lo) / (hi - lo)) if hi > lo else 0.0
+
+
+def water_table_at_month(month: int, wet_m: float, dry_m: float) -> float:
+    """Depth to water [m bgl] for a month, scaled to a pin's own wet/dry pair."""
+    return float(wet_m + water_table_shape(month) * (dry_m - wet_m))
+
 # Reproducibility
 RANDOM_SEED = 42

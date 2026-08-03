@@ -29,6 +29,7 @@ Env:
 """
 from __future__ import annotations
 
+import datetime as _dt
 import json
 import os
 from pathlib import Path
@@ -116,6 +117,12 @@ class PredictRequest(BaseModel):
                                    ge=P.VERTICAL["ore_thickness_range_m"][0],
                                    le=P.VERTICAL["ore_thickness_range_m"][1])
     mode: str = "both"                             # analytical | ml | both
+    # TIMELINE (3.7b): ISR start date, ISO "YYYY-MM-DD". Purely a presentation
+    # anchor -- it converts `time_years` into a calendar date and selects the
+    # month whose water table drives the seasonal vertical state. It does NOT
+    # make the run historical: no ISR has ever operated in Jharkhand, so the
+    # date is a user-chosen hypothesis and is labelled as such in the response.
+    start_date: str | None = None
     # expert overrides (None -> resolved from the pin / literature)
     kd_L_kg: float | None = Field(None, ge=0, le=50)
     beta: float | None = Field(None, ge=0, le=50)
@@ -131,6 +138,52 @@ class PredictRequest(BaseModel):
 
 def _bands(d: dict) -> dict:
     return {"p10": round(d["p10"], 3), "p50": round(d["p50"], 3), "p90": round(d["p90"], 3)}
+
+
+def _timeline(start_date: str | None, t_years: float, op_years: float,
+              rest_years: float) -> dict | None:
+    """Map elapsed model time onto a calendar, for the timeline animation.
+
+    Returns the current date, its month/season (which selects the water table),
+    and which LIFECYCLE PHASE the run is in. The phase boundaries are exactly the
+    ones `front_position` already uses -- operation, restoration sweep, then
+    post-closure drift -- so the label can never disagree with the physics.
+    """
+    if not start_date:
+        return None
+    try:
+        t0 = _dt.date.fromisoformat(start_date.strip())
+    except (ValueError, AttributeError):
+        return None
+    # ROUND, don't truncate: date + timedelta drops the sub-day remainder, and at
+    # a monthly animation step that repeatedly lands one day short of the 1st --
+    # which made the animation repeat some months and skip others entirely
+    # (Jan/Aug/Oct twice, Feb/Sep/Nov never shown).
+    now = t0 + _dt.timedelta(days=round(float(t_years) * 365.25))
+    if t_years <= op_years:
+        phase, phase_label = "operation", "Operation (injection + capture)"
+    elif t_years <= op_years + rest_years:
+        phase, phase_label = "restoration", "Restoration sweep (front held)"
+    else:
+        phase, phase_label = "drift", "Post-closure drift"
+    return {
+        "start_date": t0.isoformat(),
+        "current_date": now.isoformat(),
+        "elapsed_years": round(float(t_years), 2),
+        "month": now.month,
+        "season": P.SEASON_LABELS[now.month],
+        "phase": phase,
+        "phase_label": phase_label,
+        "operation_ends": (t0 + _dt.timedelta(days=op_years * 365.25)).isoformat(),
+        "restoration_ends": (t0 + _dt.timedelta(
+            days=(op_years + rest_years) * 365.25)).isoformat(),
+        # Non-negotiable label: this is a scenario clock, not a record of events.
+        "hypothetical": True,
+        "disclaimer": ("Hypothetical lifecycle. No ISR operation has ever existed "
+                       "in Jharkhand; the start date is a user-chosen scenario "
+                       "anchor, not a historical record. Seasonal state is a "
+                       "repeating CGWB climatology (2013-2021), not live data."),
+    }
 
 
 # Module 1: strict boundary. The state bbox is a cheap pre-filter; the dissolved
@@ -348,6 +401,12 @@ def api_predict(req: PredictRequest):
         a, m, extrapolation=extrapolation,
         off_scale=bool(fm.get("off_scale", False)))
 
+    # TIMELINE (3.7b): calendar anchor for the animation. None unless the caller
+    # supplied a start date; everything downstream degrades to the un-dated
+    # behaviour in that case.
+    timeline = _timeline(req.start_date, req.time_years,
+                         req.operation_years, req.restoration_years)
+
     # Module 5A (2.5D): screening estimate of shallow (Layer-1) aquifer impact.
     # Uses the deep plume's front reach + source term; the horizontal metrics are
     # untouched. alpha_L is recomputed from the same scale-dependent law the
@@ -379,7 +438,18 @@ def api_predict(req: PredictRequest):
         # present for a per-pin band; otherwise the screening falls back to the
         # state-wide CGWB campaign medians (flagged in `seasonal.water_table_source`).
         water_table_wet_m=flow.get("depth_to_water_shallow_m"),
-        water_table_dry_m=flow.get("depth_to_water_deep_m"))
+        water_table_dry_m=flow.get("depth_to_water_deep_m"),
+        # TIMELINE: this month's interpolated table (None unless a start date was
+        # given). Amplitude is the pin's own wet/dry pair; only the monsoon
+        # TIMING is state-wide -- see P.water_table_shape for why.
+        water_table_now_m=(
+            P.water_table_at_month(
+                timeline["month"],
+                flow.get("depth_to_water_shallow_m", P.VERTICAL_SEASONAL["water_table_wet_m"])
+                or P.VERTICAL_SEASONAL["water_table_wet_m"],
+                flow.get("depth_to_water_deep_m", P.VERTICAL_SEASONAL["water_table_dry_m"])
+                or P.VERTICAL_SEASONAL["water_table_dry_m"])
+            if timeline else None))
     # D3: attach per-district provenance for the shallow-aquifer base
     vertical["district"] = vparams["district"]
     vertical["layer1_base_source"] = vparams["source"]
@@ -453,6 +523,7 @@ def api_predict(req: PredictRequest):
         "ore_zone": ore,
         "restoration": restoration,
         "vertical": vertical,
+        "timeline": timeline,
         # inputs outside the deployed model's training envelope (ML bands
         # are extrapolating there; the conformal 80% guarantee is void)
         "extrapolation": extrapolation,

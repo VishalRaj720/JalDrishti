@@ -349,6 +349,7 @@ function payload() {
     restoration_years: +val("rest"),
     azimuth_deg: auto.az ? null : +val("az"), mode: "both",
     ore_depth_m: +val("oredepth"), ore_thickness_m: +val("orethick"),
+    start_date: val("start-date") || null,
   };
 }
 const val = id => document.getElementById(id).value;
@@ -357,14 +358,103 @@ let timer = null;
 function debouncedPredict() { clearTimeout(timer); timer = setTimeout(runPredict, 260); }
 
 function runPredict() {
-  if (!state.pin) return;
+  if (!state.pin) return Promise.resolve();
   spinner(true);
-  fetch(`${API}/api/predict`, {
+  return fetch(`${API}/api/predict`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload()),
   }).then(r => r.json()).then(resp => {
     state.last = resp; render(); spinner(false);
   }).catch(err => { spinner(false); console.error(err); });
+}
+
+/* ---------------- timeline animation (3.7b) --------------------------------
+   Self-paced: each frame AWAITS its own response before scheduling the next, so
+   the loop throttles to whatever the server can actually deliver and requests
+   can never pile up. Steps one MONTH at a time -- the seasonal water-table
+   signal aliases to nothing at the old 0.5 yr slider step.
+   What genuinely animates: the plume grows on the operational clock and fades
+   during restoration; the water table and the shallow-well risk pulse annually.
+   What deliberately does NOT: the deep plume does not visibly breathe with the
+   monsoon -- measured horizontal gradient swing is ~5%, and faking more would
+   be inventing physics. */
+const MONTH = 1 / 12;
+state.playing = false;
+
+function tlStop() {
+  state.playing = false;
+  const b = document.getElementById("tl-play");
+  if (b) { b.textContent = "▶ Play"; b.classList.remove("playing"); }
+}
+
+function tlSetTime(t) {
+  const el = document.getElementById("time");
+  const tt = Math.min(Math.max(t, +el.min), +el.max);
+  el.value = tt;
+  document.getElementById("v-time").textContent = (+el.value).toFixed(1);
+  return +el.value;
+}
+
+async function tlLoop() {
+  while (state.playing) {
+    const el = document.getElementById("time");
+    const next = +el.value + MONTH;
+    // one full lifecycle, then stop at the end rather than silently looping --
+    // a wrap-around would look like the plume "resetting", which it never does
+    if (next > +el.max) { tlStop(); break; }
+    tlSetTime(next);
+    await runPredict();
+    const fps = +document.getElementById("tl-speed").value;
+    await new Promise(r => setTimeout(r, 1000 / fps));
+  }
+}
+
+function wireTimeline() {
+  const play = document.getElementById("tl-play");
+  if (!play) return;
+  play.addEventListener("click", () => {
+    if (!state.pin) { toast("Drop a pin on the map first."); return; }
+    if (state.playing) { tlStop(); return; }
+    state.playing = true;
+    play.textContent = "❚❚ Pause";
+    play.classList.add("playing");
+    tlLoop();
+  });
+  document.getElementById("tl-reset").addEventListener("click", () => {
+    tlStop(); tlSetTime(0); runPredict();
+  });
+  document.getElementById("start-date").addEventListener("change", debouncedPredict);
+  // any manual scrub takes over from the animation
+  document.getElementById("time").addEventListener("pointerdown", tlStop);
+}
+wireTimeline();
+
+function renderTimeline(t) {
+  const out = document.getElementById("tl-readout");
+  const bar = document.getElementById("tl-phasebar");
+  if (!out) return;
+  if (!t) {
+    out.textContent = "Set a start date to place this run on a calendar.";
+    if (bar) bar.innerHTML = "";
+    return;
+  }
+  const PH = { operation: "#ff5a5a", restoration: "#6fd1ff", drift: "#8b97a7" };
+  const d = new Date(t.current_date + "T00:00:00");
+  const nice = d.toLocaleDateString(undefined, { year: "numeric", month: "short" });
+  out.innerHTML = `<b class="tl-date-now">${nice}</b> · year ${t.elapsed_years}`
+    + ` · <span style="color:${PH[t.phase]}">${t.phase_label}</span>`
+    + ` · <span class="tl-season tl-${t.season}">${t.season}</span>`;
+  // lifecycle bar: operation | restoration | drift, with a now-marker
+  const maxT = +document.getElementById("time").max;
+  const op = +val("op"), rest = +val("rest");
+  const pct = x => Math.max(0, Math.min(100, (x / maxT) * 100));
+  if (bar) {
+    bar.innerHTML =
+        `<div class="ph op" style="left:0;width:${pct(op)}%"></div>`
+      + `<div class="ph rest" style="left:${pct(op)}%;width:${pct(op + rest) - pct(op)}%"></div>`
+      + `<div class="ph drift" style="left:${pct(op + rest)}%;width:${100 - pct(op + rest)}%"></div>`
+      + `<div class="ph-now" style="left:${pct(t.elapsed_years)}%"></div>`;
+  }
 }
 
 /* ---------------- render ---------------- */
@@ -432,6 +522,7 @@ function render() {
   renderNotice(r.notice);
   renderFarField(r.far_field_note, r.nearest_river_km);
   renderVertical(r.vertical);
+  renderTimeline(r.timeline);
 }
 
 function renderFarField(note, riverKm) {
@@ -484,6 +575,13 @@ function renderSeasonalBand(s) {
     + `<div class="sb-head">Monsoon band · water table ${s.water_table_wet_m}–`
     + `${s.water_table_dry_m} m (swing ${s.seasonal_swing_m} m, `
     + `${s.water_table_source === "pin" ? "this pin" : "state median"})</div>`;
+  // where the animation currently sits ON the band (never outside it)
+  if (s.now) {
+    const n = s.now.static_deep_head;
+    h += `<div class="sb-now">▶ this month: table <b>${s.water_table_now_m} m</b>`
+      + ` · i=${n.gradient} · breakthrough <b>${yr(n)}</b>`
+      + ` · <span style="color:${col(n.risk_band)}">${n.risk_band}</span></div>`;
+  }
   if (rng) {
     h += `<div class="sb-range"><b>Breakthrough ${rng[0]}–${rng[1]} yr</b>`
       + ` · risk <span style="color:${col(s.risk_band_range[0])}">${s.risk_band_range[0]}</span>`
@@ -548,6 +646,13 @@ function renderDepth(v) {
     s += `<line x1="${x0}" y1="${yDry}" x2="${x1}" y2="${yDry}" stroke="#6fd1ff" stroke-width="1.4" stroke-dasharray="2 2"/>`;
     s += `<text x="${x1 + 4}" y="${yWet + 3}" fill="#6fd1ff" font-size="7">Aug ${v.seasonal.water_table_wet_m}m</text>`;
     s += `<text x="${x1 + 4}" y="${yDry + 3}" fill="#6fd1ff" font-size="7">May ${v.seasonal.water_table_dry_m}m</text>`;
+    // the animation's CURRENT month, riding between the two seasonal extremes
+    if (v.seasonal.water_table_now_m != null) {
+      const yNow = y(v.seasonal.water_table_now_m);
+      s += `<line x1="${x0 - 3}" y1="${yNow}" x2="${x1 + 2}" y2="${yNow}" `
+         + `stroke="#ffffff" stroke-width="1.8"/>`;
+      s += `<circle cx="${x0 - 3}" cy="${yNow}" r="2.2" fill="#ffffff"/>`;
+    }
   } else if (v.water_table_m != null) {
     const yw = y(v.water_table_m);
     s += `<line x1="${x0}" y1="${yw}" x2="${x1}" y2="${yw}" stroke="#6fd1ff" stroke-width="1.4" stroke-dasharray="2 2"/>`;
