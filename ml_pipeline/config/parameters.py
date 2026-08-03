@@ -858,5 +858,77 @@ VERTICAL = {
     "ore_thickness_range_m": (2.0, 100.0),
 }
 
+# ---------------------------------------------------------------------------
+# FIDELITY FIX 3.7 -- SEASONAL (MONSOON) MODULATION OF THE VERTICAL PATHWAY
+#
+# WHAT THE DATA SHOWS (measured 2026-08-03 from Datasets/cgwb_waterlevel_
+# jharkhand.csv -- 9,583 valid readings, 398 stations, 2013-2021):
+#
+#   depth-to-water by CGWB campaign, state-wide median [m bgl]:
+#       Aug 3.22  (post-monsoon, table HIGHEST)   Nov 3.78
+#       Jan 5.25                                  May 7.20  (pre-monsoon, LOWEST)
+#   per-station seasonal swing: p10 2.17, p50 3.91, p90 6.19, max 9.98 m
+#
+# WHAT IT DOES *NOT* JUSTIFY -- the horizontal plume:
+#   Seasonal swing of the HORIZONTAL gradient is negligible: direction p50 2.5
+#   deg (p90 11, ZERO cells reverse), magnitude ratio p50 1.05 / p90 1.23. The
+#   monsoon lifts every head together, so it barely rotates or steepens the
+#   regional gradient. The MC already samples gradient over +/-30% MINIMUM, so
+#   an alternating two-season advective front would add structure entirely
+#   inside existing noise -- at the cost of a full 18k-row retrain. Deliberately
+#   NOT built; this comment is the record of why.
+#
+# WHAT IT DOES JUSTIFY -- the VERTICAL pathway (this block):
+#   A 3.91 m seasonal swing across the ~110 m ore-top -> Layer-1-base separation
+#   is a vertical-gradient change of 3.91/110 = 0.0355 -- SEVEN TIMES the
+#   injection-driven `VERTICAL["upward_gradient"]` = 0.005 the model pins. The
+#   shallow-impact index is violently sensitive to it (measured):
+#       i = 0.000 -> contained,  never
+#       i = 0.005 -> moderate,   30.1 yr to breakthrough   <- what we reported
+#       i = 0.010 -> high,       15.1 yr
+#       i = 0.020 -> high,        7.5 yr
+#   So the tool was reporting ONE number for a parameter whose seasonal range
+#   spans contained -> high. The monsoon does not push the plume sideways; it
+#   opens and closes the lid over the drinking-water aquifer.
+#
+# THE TWO END MEMBERS (why this is a BAND and not a curve):
+#   The perturbation depends on the DEEP head staying put while the shallow one
+#   swings. CGWB monitors shallow phreatic wells (median 3-7 m bgl) -- there is
+#   NO public piezometry for a 150 m confined fractured aquifer in Singhbhum
+#   (UCIL/AMD hold it, unpublished -- the same wall as fidelity row 3.4). So the
+#   honest output is the interval, not a point:
+#     STATIC_DEEP_HEAD  (upper bound) deep head seasonally flat -> the full
+#           0.0355 swing lands on the vertical gradient. Physically expected for
+#           a confined deep aquifer (seasonal signals damp sharply with depth),
+#           but NOT locally measured.
+#     IN_PHASE_DEEP_HEAD (lower bound) deep head swings synchronously with the
+#           shallow one -> the differential is unchanged -> today's behaviour.
+#   Truth lies between. The UI must show both; picking one and hiding the choice
+#   is exactly the failure mode this project keeps auditing itself for.
+# ---------------------------------------------------------------------------
+VERTICAL_SEASONAL = {
+    "enabled": True,
+    # State-wide CGWB campaign medians [m bgl] -- fallback when a pin has too
+    # few nearby stations for a per-cell value (flow_field returns None there).
+    "water_table_wet_m": 3.22,        # Aug, post-monsoon (table highest)
+    "water_table_dry_m": 7.20,        # May, pre-monsoon (table lowest)
+    "water_table_mean_m": 4.86,       # mean of the four campaign medians
+    "swing_percentiles_m": (2.17, 3.91, 6.19),   # p10 / p50 / p90 per station
+    # A net DOWNWARD gradient closes the upward advective pathway; it does not
+    # create a negative risk. The seasonal gradient is therefore floored at 0.
+    "clamp_gradient_at_zero": True,
+    "source_citation": (
+        "CGWB national monitoring network, Jharkhand (Datasets/"
+        "cgwb_waterlevel_jharkhand.csv): 9,583 readings, 398 stations, "
+        "2013-2021, four campaigns/yr (Jan/May/Aug/Nov)."
+    ),
+    "deep_head_caveat": (
+        "CGWB monitors SHALLOW phreatic wells (median 3-7 m bgl). No public "
+        "piezometry exists for the confined fractured aquifer at ore depth in "
+        "Singhbhum, so the deep-head seasonal response is UNMEASURED and the "
+        "result is reported as a two-end-member band, not a single value."
+    ),
+}
+
 # Reproducibility
 RANDOM_SEED = 42

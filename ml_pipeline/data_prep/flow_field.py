@@ -378,6 +378,12 @@ def flow_at(lon: float, lat: float) -> dict:
 
     dtw_mean = _valid_bilinear(_corner_vals(ff["dtw_mean"], i, j), w, valid, fallback=False)
     dtw_shallow = _valid_bilinear(_corner_vals(ff["dtw_shallow"], i, j), w, valid, fallback=False)
+    # 3.7: the DEEP (pre-monsoon, table lowest) season has always been built into
+    # the npz but was never surfaced. It is the other half of the seasonal band:
+    # shallow = wet/Aug (upward pathway suppressed), deep = dry/May (pathway open).
+    dtw_deep = _valid_bilinear(_corner_vals(ff["dtw_deep"], i, j), w, valid, fallback=False)
+    swing = (float(dtw_deep - dtw_shallow)
+             if np.isfinite(dtw_deep) and np.isfinite(dtw_shallow) else float("nan"))
 
     return {
         "azimuth_deg": None if (az is None or near_divide) else round(float(az), 1),
@@ -390,6 +396,9 @@ def flow_at(lon: float, lat: float) -> dict:
         "depth_to_water_m": (round(float(dtw_mean), 2) if np.isfinite(dtw_mean) else None),
         "depth_to_water_shallow_m": (round(float(dtw_shallow), 2)
                                      if np.isfinite(dtw_shallow) else None),
+        "depth_to_water_deep_m": (round(float(dtw_deep), 2)
+                                  if np.isfinite(dtw_deep) else None),
+        "water_table_seasonal_swing_m": (round(swing, 2) if np.isfinite(swing) else None),
         "source": "stations" if src_frac >= 0.5 else "dem",
     }
 

@@ -365,6 +365,24 @@ def _vertical_risk_band(p: float) -> str:
     return "high"
 
 
+def _advective_leakage(i_up: float, *, Kv: float, phi_confining: float,
+                       dz_adv: float, t_days: float, conc_factor: float) -> dict:
+    """Upward Darcy leakage through the confining zone at vertical gradient i_up.
+
+    Split out of shallow_impact_screening (3.7) so the SAME pathway can be
+    re-evaluated at the wet- and dry-season gradients without duplicating the
+    law. A non-positive gradient closes the pathway (no upward flow) -- it never
+    produces a negative risk, so i_up is floored at 0 by the caller."""
+    v_up = Kv * max(i_up, 0.0) / max(phi_confining, 1e-3)          # m/day
+    barrier = float(np.clip(v_up * max(t_days, 0.0) / dz_adv, 0.0, 1.0))
+    yrs = (dz_adv / v_up / 365.0) if v_up > 1e-9 else float("inf")
+    return {"gradient": round(float(i_up), 5),
+            "v_up_m_day": round(float(v_up), 6),
+            "barrier_crossed": round(barrier, 3),
+            "p_advective": round(barrier * conc_factor, 3),
+            "years_to_breakthrough": (None if not np.isfinite(yrs) else round(yrs, 1))}
+
+
 def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                              Xc_m: float, source_width_m: float, alpha_L: float,
                              alpha_V: float, ore_depth_m: float,
@@ -372,7 +390,9 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                              K_m_day: float, phi_confining: float,
                              Kv_Kh_ratio: float, upward_gradient: float,
                              t_days: float, wellbore_failure_prob: float,
-                             water_table_m: float | None = None) -> dict:
+                             water_table_m: float | None = None,
+                             water_table_wet_m: float | None = None,
+                             water_table_dry_m: float | None = None) -> dict:
     """SCREENING estimate of how much the deep plume could impact the Layer-1
     (shallow drinking-water) aquifer. Three independent pathways OR-combined:
 
@@ -413,11 +433,14 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
     # barrier-crossed fraction is hydraulic (over the ore-top-to-shallow gap);
     # scale by conc_factor so a weak source that crosses is not a threshold breach.
     Kv = max(K_m_day, 0.0) * max(Kv_Kh_ratio, 0.0)
-    v_up = Kv * max(upward_gradient, 0.0) / max(phi_confining, 1e-3)   # m/day
-    d_up = v_up * max(t_days, 0.0)
-    barrier_crossed = float(np.clip(d_up / dz_adv, 0.0, 1.0))
-    p_adv = barrier_crossed * conc_factor
-    yrs_break = (dz_adv / v_up / 365.0) if v_up > 1e-9 else float("inf")
+    _leak = lambda i: _advective_leakage(                              # noqa: E731
+        i, Kv=Kv, phi_confining=phi_confining, dz_adv=dz_adv,
+        t_days=t_days, conc_factor=conc_factor)
+    base = _leak(upward_gradient)
+    barrier_crossed = base["barrier_crossed"]
+    p_adv = base["p_advective"]
+    yrs_break = (float("inf") if base["years_to_breakthrough"] is None
+                 else base["years_to_breakthrough"])
 
     # (3) wellbore/legacy-borehole shortcut -- base rate, concentration-gated
     p_well = (float(wellbore_failure_prob) * conc_factor
@@ -426,6 +449,73 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
     p_shallow = 1.0 - (1.0 - p_disp) * (1.0 - p_adv) * (1.0 - p_well)
     pathways = {"dispersive": p_disp, "advective_leakage": p_adv, "wellbore": p_well}
     dominant = (max(pathways, key=pathways.get) if p_shallow >= 0.05 else "contained")
+
+    # ---- 3.7 SEASONAL BAND ------------------------------------------------- #
+    # The monsoon does not push the plume sideways (measured: horizontal gradient
+    # swings ~5%); it raises and lowers the shallow head that sits ON TOP of the
+    # confining zone, opening and closing the upward pathway. dtw is DEPTH to
+    # water, so a LARGER dtw (dry/May) = lower head = LESS downward push = the
+    # upward gradient is ENHANCED; a smaller dtw (wet/Aug) suppresses it.
+    # Reported as a two-end-member band because the DEEP head's seasonal response
+    # is unmeasured -- see P.VERTICAL_SEASONAL for the full derivation.
+    seasonal = None
+    _SEA = P.VERTICAL_SEASONAL
+    if _SEA.get("enabled", False):
+        wet = float(water_table_wet_m if water_table_wet_m is not None
+                    else _SEA["water_table_wet_m"])
+        dry = float(water_table_dry_m if water_table_dry_m is not None
+                    else _SEA["water_table_dry_m"])
+        per_pin = (water_table_wet_m is not None and water_table_dry_m is not None)
+        if dry < wet:                       # the dry-season table is the DEEPER one
+            wet, dry = dry, wet
+        wt_mean = 0.5 * (wet + dry)
+
+        def _combine(pa: float) -> float:
+            return 1.0 - (1.0 - p_disp) * (1.0 - pa) * (1.0 - p_well)
+
+        def _state(d_i: float) -> dict:
+            lk = _leak(upward_gradient + d_i)
+            ps = _combine(lk["p_advective"])
+            return {**lk, "shallow_impact_probability": round(ps, 3),
+                    "risk_band": _vertical_risk_band(ps)}
+
+        # UPPER BOUND -- deep head seasonally flat: the whole swing lands on i_v
+        static = {"wet_season": _state((wet - wt_mean) / dz_adv),
+                  "dry_season": _state((dry - wt_mean) / dz_adv)}
+        # LOWER BOUND -- deep head in phase: differential unchanged = today
+        in_phase = {"wet_season": _state(0.0), "dry_season": _state(0.0)}
+
+        states = [static["wet_season"], static["dry_season"], in_phase["wet_season"]]
+        yrs = [s["years_to_breakthrough"] for s in states
+               if s["years_to_breakthrough"] is not None]
+        bands = [s["risk_band"] for s in states]
+        _ORDER = ["contained", "low", "moderate", "high"]
+        seasonal = {
+            "water_table_wet_m": round(wet, 2),
+            "water_table_dry_m": round(dry, 2),
+            "seasonal_swing_m": round(dry - wet, 2),
+            "water_table_source": "pin" if per_pin else "state_median",
+            "separation_m": round(dz_adv, 1),
+            "baseline_gradient": round(float(upward_gradient), 5),
+            "gradient_swing": round((dry - wet) / dz_adv, 5),
+            "static_deep_head": static,
+            "in_phase_deep_head": in_phase,
+            # the honest headline: the interval, never a single number
+            "breakthrough_years_range": ([min(yrs), max(yrs)] if yrs else None),
+            "breakthrough_never_possible": len(yrs) < len(states),
+            "risk_band_range": [min(bands, key=_ORDER.index),
+                                max(bands, key=_ORDER.index)],
+            # Sensitivity must NOT be judged on the band label alone: a pin can
+            # stay "contained" in both seasons while breakthrough moves 5x (e.g.
+            # Jaduguda, 11.5 -> 56.8 yr). Either a band change OR a materially
+            # different arrival time makes the season decision-relevant.
+            "seasonally_sensitive": bool(
+                bands[0] != bands[1]
+                or len(yrs) < len(states)                    # one season never breaks
+                or (yrs and max(yrs) > 1.5 * min(yrs))),
+            "deep_head_caveat": _SEA["deep_head_caveat"],
+            "source_citation": _SEA["source_citation"],
+        }
     # D1 (Stage B): real depth-to-water CONTEXT. The risk barrier stays at
     # layer1_base_m (the aquifer BASE -- where the up-rising plume first enters
     # the resource, the conservative receptor). The water table (aquifer TOP)
@@ -453,6 +543,7 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
         "risk_band": _vertical_risk_band(p_shallow),
         "pathways": {k: round(v, 3) for k, v in pathways.items()},
         "dominant_pathway": dominant,
+        "seasonal": seasonal,
     }
 
 

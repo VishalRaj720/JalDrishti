@@ -374,7 +374,12 @@ def api_predict(req: PredictRequest):
         t_days=req.time_years * 365.0,
         wellbore_failure_prob=P.VERTICAL["wellbore_failure_prob"],
         # D1: real post-monsoon (shallowest) water table as receptor context
-        water_table_m=flow.get("depth_to_water_shallow_m"))
+        water_table_m=flow.get("depth_to_water_shallow_m"),
+        # 3.7: the wet/dry pair drives the seasonal vertical band. Both must be
+        # present for a per-pin band; otherwise the screening falls back to the
+        # state-wide CGWB campaign medians (flagged in `seasonal.water_table_source`).
+        water_table_wet_m=flow.get("depth_to_water_shallow_m"),
+        water_table_dry_m=flow.get("depth_to_water_deep_m"))
     # D3: attach per-district provenance for the shallow-aquifer base
     vertical["district"] = vparams["district"]
     vertical["layer1_base_source"] = vparams["source"]

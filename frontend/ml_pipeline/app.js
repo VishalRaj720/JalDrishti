@@ -458,10 +458,50 @@ function renderVertical(v) {
   badge.textContent = v.risk_band;
   badge.className = "badge " + v.risk_band;
   const yrs = v.years_to_vertical_breakthrough;
-  note.textContent = `${v.separation_m} m confining separation · dominant: `
+  note.innerHTML = `${v.separation_m} m confining separation · dominant: `
     + `${v.dominant_pathway.replace(/_/g, " ")}`
-    + (yrs != null ? ` · ~${yrs} yr to vertical breakthrough` : "");
+    + (yrs != null ? ` · ~${yrs} yr to vertical breakthrough` : "")
+    + renderSeasonalBand(v.seasonal);
   renderDepth(v);
+}
+
+/* --- 3.7: seasonal (monsoon) modulation of the UPWARD pathway --------------
+   The monsoon does not move the plume sideways (measured: ~5% gradient swing).
+   It raises the shallow head that presses down on the confining zone, so the
+   wet season CLOSES the upward pathway and the pre-monsoon dry season OPENS it.
+   Rendered as a two-end-member BAND because the deep head's seasonal response
+   has never been measured in Singhbhum -- showing a single number here would
+   hide that choice. */
+function renderSeasonalBand(s) {
+  if (!s) return "";
+  const rng = s.breakthrough_years_range;
+  const wet = s.static_deep_head.wet_season, dry = s.static_deep_head.dry_season;
+  const base = s.in_phase_deep_head.wet_season;
+  const col = b => ({ contained: "#37d39b", low: "#37d39b", moderate: "#ffb84d",
+                      high: "#ff5a5a" }[b] || "#8b97a7");
+  const yr = d => d.years_to_breakthrough == null ? "never" : d.years_to_breakthrough + " yr";
+  let h = `<div class="seasonal-band">`
+    + `<div class="sb-head">Monsoon band · water table ${s.water_table_wet_m}–`
+    + `${s.water_table_dry_m} m (swing ${s.seasonal_swing_m} m, `
+    + `${s.water_table_source === "pin" ? "this pin" : "state median"})</div>`;
+  if (rng) {
+    h += `<div class="sb-range"><b>Breakthrough ${rng[0]}–${rng[1]} yr</b>`
+      + ` · risk <span style="color:${col(s.risk_band_range[0])}">${s.risk_band_range[0]}</span>`
+      + ` ↔ <span style="color:${col(s.risk_band_range[1])}">${s.risk_band_range[1]}</span></div>`;
+  }
+  h += `<table class="sb-tbl"><tr><th></th><th>i_vertical</th><th>breakthrough</th><th>risk</th></tr>`
+    + `<tr><td>Aug (wet)</td><td>${wet.gradient}</td><td>${yr(wet)}</td>`
+    + `<td style="color:${col(wet.risk_band)}">${wet.risk_band}</td></tr>`
+    + `<tr><td>May (dry)</td><td>${dry.gradient}</td><td>${yr(dry)}</td>`
+    + `<td style="color:${col(dry.risk_band)}">${dry.risk_band}</td></tr>`
+    + `<tr class="sb-lo"><td>deep head in phase</td><td>${base.gradient}</td>`
+    + `<td>${yr(base)}</td><td style="color:${col(base.risk_band)}">${base.risk_band}</td></tr>`
+    + `</table>`
+    + `<div class="sb-caveat">⚠ Upper rows assume the deep head stays flat while the `
+    + `shallow one swings — physically expected for a confined 150 m aquifer but `
+    + `<b>never measured in Singhbhum</b>. Lower row is the no-effect bound. The `
+    + `truth lies between; the tool will not pick for you.</div></div>`;
+  return h;
 }
 
 function renderDepth(v) {
@@ -498,8 +538,17 @@ function renderDepth(v) {
      + `stroke="${riskCol}" stroke-width="2" stroke-dasharray="3 3" marker-end="url(#ah)"/>`;
   s += `<defs><marker id="ah" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">`
      + `<path d="M0,0 L6,3 L0,6 Z" fill="${riskCol}"/></marker></defs>`;
-  // real (post-monsoon) water table from the D1 CGWB field, if resolved
-  if (v.water_table_m != null) {
+  // 3.7: the water table is a seasonal BAND, not a line -- shade wet..dry and
+  // label both ends, so the swing that drives the vertical band is visible.
+  if (v.seasonal) {
+    const yWet = y(v.seasonal.water_table_wet_m), yDry = y(v.seasonal.water_table_dry_m);
+    s += `<rect x="${x0}" y="${yWet}" width="${x1 - x0}" height="${Math.max(yDry - yWet, 1)}" `
+       + `fill="#6fd1ff" fill-opacity="0.30"/>`;
+    s += `<line x1="${x0}" y1="${yWet}" x2="${x1}" y2="${yWet}" stroke="#6fd1ff" stroke-width="1.4"/>`;
+    s += `<line x1="${x0}" y1="${yDry}" x2="${x1}" y2="${yDry}" stroke="#6fd1ff" stroke-width="1.4" stroke-dasharray="2 2"/>`;
+    s += `<text x="${x1 + 4}" y="${yWet + 3}" fill="#6fd1ff" font-size="7">Aug ${v.seasonal.water_table_wet_m}m</text>`;
+    s += `<text x="${x1 + 4}" y="${yDry + 3}" fill="#6fd1ff" font-size="7">May ${v.seasonal.water_table_dry_m}m</text>`;
+  } else if (v.water_table_m != null) {
     const yw = y(v.water_table_m);
     s += `<line x1="${x0}" y1="${yw}" x2="${x1}" y2="${yw}" stroke="#6fd1ff" stroke-width="1.4" stroke-dasharray="2 2"/>`;
     s += `<text x="${x1 + 4}" y="${yw + 3}" fill="#6fd1ff" font-size="8">WT ${v.water_table_m}m</text>`;
