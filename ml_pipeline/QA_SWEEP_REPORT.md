@@ -92,9 +92,27 @@ gradient — `_auto_grid` resolution quantization. Cosmetic at screening scale.
 2. **`Q_in ↑` at fixed bleed% ⇒ flat/smaller plume.** The UI slider moves throughput *and*
    containment together (Q_net = Q_in·bleed%); the trained `+` law is at fixed Q_net. Verified
    correct at bleed=0.
-3. **Low-gradient fractured migration is gradient-insensitive** (422.76 m for i=0.0005..0.001 at
+3. ~~**Low-gradient fractured migration is gradient-insensitive** (422.76 m for i=0.0005..0.001 at
    Jaduguda): the conservative Tang early-arrival envelope ≈ 1 out to the water front, so migration
-   is transverse-dilution-limited. By design.
+   is transverse-dilution-limited. By design.~~
+
+   > **RETRACTED 2026-08-05 — this entry was wrong on both the mechanism and the verdict.**
+   > The 422.76 m was not physics of any kind: it was the radial distance to the **upstream corner
+   > of the Domenico artifact box**, at the edge of the auto-sized grid. It was gradient-insensitive
+   > because it was *grid*-determined, and it was identical (422.8 m) for uranium, sulfate, TDS and
+   > radium alike because C0 cancels out of the artifact. The Tang envelope explanation is
+   > quantitatively wrong too: at those inputs the Tang factor falls below the exceedance level
+   > within ~1.4 m of the source, not "≈ 1 out to the water front".
+   >
+   > The true down-gradient reach at that pin was 35.9 m — a number the sweep had in hand the whole
+   > time as `max_downgradient_m`, sitting next to the one it certified.
+   >
+   > This is the most instructive failure in the project's QA history: the sweep *observed* the
+   > artifact, noticed it was suspicious enough to investigate, and then explained it away with a
+   > plausible-sounding mechanism instead of checking where the argmax cell actually was. One
+   > `np.unravel_index` would have settled it. A "surprising-but-correct" list is exactly where a
+   > wrong explanation is most expensive, because entries on it are explicitly exempted from future
+   > scrutiny. See `review.md` finding #1.
 4. **λ radial↔directional crossing is smooth** (λ 0.70 → 1.28 across gradient 0.001 → 0.0015; area
    21.1 → 25.7 continuous). No E1 seam.
 5. **Restoration saturates at the 0.02 residual floor** (~rest ≥ 30 yr: no further change). Floor is

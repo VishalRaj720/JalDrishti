@@ -4,9 +4,16 @@
 Every formula is derived, every file is explained, every dataset is documented,
 and every limitation is stated honestly.*
 
-**Last updated:** 2026-08-02 (Phase-1 fidelity fixes: depth-dependent K(z), aquifer-boundary
-and ore-zone seam smoothing, mineralogy-graded attenuation; **Ra-226 added as a 4th species**
-and folded into the retrained surrogate)
+**Last updated:** 2026-08-05 (audit remediation — migration re-based to down-gradient travel and
+measured analytically; sorption-scaled dual-porosity capacity so the fractured front responds to Kd;
+fracture aperture sampled into the bands; district-λ and shear-zone seams smoothed; single species
+registry; **retrained**, 18,000 rows / 40 features / 4 species. Prior: 2026-08-02 Phase-1 fidelity
+fixes, Ra-226 added as a 4th species.)
+
+> **Numbers in §6.5 are copied from `ml/artifacts/metrics.json`. If the two ever disagree, the file
+> is right.** This section had drifted across a retrain and was quoting stale R² 0.875/0.788/0.763
+> against deployed artifacts that actually read 0.888/0.719/0.221 — which is how a document
+> promising "every limitation stated honestly" quietly stops being trustworthy.
 
 ---
 
@@ -391,6 +398,22 @@ and unioned into the **area** metric only; migration and compliance metrics
 track the *migrating front*, never the source footprint (else a wide wellfield
 reads as an "excursion").
 
+> ⚠️ **That sentence was false until 2026-08-05, and the failure is worth
+> keeping in view.** `max_migration_distance_m` was a radial max taken over the
+> *whole* solution grid, so it returned the distance to the upstream corner of
+> the Domenico artifact box (§10) — 422.8 m at Jaduguda for a plume whose true
+> down-gradient reach was 35.9 m, and identical for all four species because C0
+> cancels out of an artifact. The design intent recorded here was right; the
+> implementation never matched it, and the discrepancy survived a full QA sweep
+> that mistook the artifact for Tang physics.
+>
+> Migration is now the greatest down-gradient distance at which the incremental
+> threshold is exceeded, measured **analytically along the centreline** rather
+> than read off the grid — the grid is sized to hold the disc, so its 5–13 m
+> cells quantised short plumes to zero (29 of 60 sampled scenarios read exactly
+> 0.0 m while not being immobile at all). See `review.md` findings #1 and the
+> Gate-3 record in `REMEDIATION_GATE3_DECISION.md`.
+
 **Radial vs directional.** The diagnostic `λ = X_c / (W_eff/2)` says which
 regime you are in: λ < 1 means the source disc dominates the picture
 ("migration" is really *extent*), λ > 1 means a true directional plume.
@@ -605,7 +628,7 @@ with the physics on inputs it was trained on, something changed), and (3) the
 groundwork for learning from *field* data later, which no closed-form physics
 can absorb.
 
-### 6.2 The features (39)
+### 6.2 The features (40)
 
 Groups (full list in `ml/dataset.py::MODEL_FEATURES`):
 
@@ -676,16 +699,36 @@ to hold this stricter bar.
 - **Leave-aquifer-out**: hold out entire aquifer polygons to prove spatial
   generalization (reported next to scenario-CV in `metrics.json`).
 
-Current metrics (2026-07-16, post real-ISR attenuation upgrade): area R² 0.875,
-migration 0.788, compliance 0.763, excursion 0.944; scenario coverage
-0.832/0.806/0.860 — all above the 0.80 gate. R² is *deliberately* lower than
-the pre-attenuation model (0.931/0.835/0.783): the sampled attenuation rate k
-injects genuine physical uncertainty the features cannot fully explain, so the
-bands widened and the point predictions got harder — richer physics traded for
-raw fit, with the coverage guarantee intact. Time-monotone constraints were
-removed for the footprint targets (the plume now legitimately grows →
-stabilizes → recedes), and `DELTA_INFLATE` rose 1.15 → 1.35 to hold the
-scenario-coverage gate under the wider true bands.
+**Current metrics (2026-08-05 retrain, post-remediation).** These are copied from
+`ml/artifacts/metrics.json`; if they disagree with that file, the file is right.
+
+| target | R² (P50, back-transformed) | R² (log) | scenario coverage |
+|---|---|---|---|
+| `affected_area_ha` | 0.868 | 0.924 | 0.877 |
+| `max_migration_distance_m` | 0.896 | 0.969 | 0.896 |
+| `compliance_conc` | 0.738 | 0.968 | 0.867 |
+| `excursion_probability` | 0.949 | — | — |
+
+All three coverages clear the 0.80 gate, and every one of the 24 Mondrian cells
+(2 regimes × 4 species × 3 targets) covers ≥ 0.92.
+
+**Judge the per-species and log figures, not the pooled back-transformed R².**
+The pooled number mixes ppb, mg/L and mBq/L, so its denominator depends on the
+species *mix* rather than on model quality — that is why `compliance_conc` reads
+0.738 pooled against 0.968 in log space. Two per-species values are **exempt**:
+radium's migration and compliance targets are zero-variance (3 unique migration
+values in 4,500 rows; compliance std 1.5×10⁻⁶, pinned at the 23 mBq/L
+background), so R² divides by SST ≈ 0 and returns nonsense. Radium *is* immobile
+— that is the correct label, and the metric that remains defined there, conformal
+coverage, reads 0.932–0.952.
+
+Migration and compliance improved sharply over the previous model (0.719 → 0.896
+and 0.221 → 0.738). That is **not** a tuning gain: both heads had been fitting a
+grid artifact in the labels (see §4.8 and `review.md` finding #1), so they are now
+being scored against a target that means something.
+
+Time-monotone constraints are off for the footprint targets (the plume
+legitimately grows → stabilizes → recedes) and `DELTA_INFLATE` is 1.35.
 
 ### 6.6 The drift monitor
 
@@ -723,7 +766,7 @@ ml_pipeline/
 │
 ├── data_prep/
 │   ├── feature_engineering.py  build_feature_row(): raw operating point → the
-│   │                        39-feature row + private physics carry-throughs.
+│   │                        40-feature row + private physics carry-throughs.
 │   │                        Owns retardation_factor, containment_efficiency,
 │   │                        dispersivities, pore_volumes, effective_source_width.
 │   │                        USED BY BOTH generator and server (train == serve).
@@ -846,7 +889,7 @@ What happens when you drop a pin at Jaduguda and press *Run*:
 | `test_naquim_vertical.py` / `test_vertical.py` | Per-district profiles, screening ordering. |
 | `test_rivers.py` / `test_boundary.py` | River field, state boundary. |
 
-107 tests; all green as of the final retrain.
+217 tests; all green as of the 2026-08-05 remediation retrain.
 
 ---
 
@@ -873,7 +916,10 @@ This section exists because the project's rule is *critique your own tool*.
 | **Front held (v=0) during restoration** instead of reversed | Real groundwater sweep pulls near-field water *back* into the wellfield. | Conservative (model cleans slower than reality). |
 | **2-D single layer** + separate vertical screening | No true 3-D plume. | Standard for screening tools (BIOSCREEN class). |
 | **Homogeneous aquifer per polygon** (MC draws add heterogeneity statistically, not spatially) | No channeling along specific fractures/paleochannels. | Inherent to closed-form solutions. |
-| **Domenico upstream half-plane at C0** (the dropped Ogata–Banks term) | The source-zone box is painted at C0; handled deliberately by the disc + deficit-wave design, but it is an artifact zone. | Documented; the QA F-1 fix made its behavior continuous. |
+| **Domenico upstream half-plane at C0** (the dropped Ogata–Banks term) | The source-zone box is painted at C0; handled deliberately by the disc + deficit-wave design, but it is an artifact zone. | Documented; the QA F-1 fix made its behaviour continuous, and since 2026-08-05 the box is **excluded** from every travel metric and from the plume's area contribution (the disc carries the source footprint instead). |
+| **Fixed matrix-transfer rate ω under a sorption-scaled capacity ratio** (§4.2) | β_eff = β·R_m makes the fractured front respond to Kd, but ω is held at 10⁻³/day. Physically ω should also fall as matrix retardation rises, so strongly sorbing species are still under-retarded at early time. | Partial correction, deliberately. Grounding ω needs the same unpublished SSZ tracer test as β itself (fidelity row 3.4). The `max()` union bounds the error: the exact Tang branch governs when the continuum branch over-retards. |
+| **Fracture aperture sampled, D_e not** | Aperture now varies per Monte-Carlo draw so its factor-5 literature range reaches the bands; D_e is still served at one value. | `P.FRACTURE` carries no defensible range for D_e and inventing one would relabel an assumption as data. State "aperture is propagated, D_e is not" — not "row 3.4 uncertainty is propagated". |
+| **Depth-decay K clamped into the per-regime trained-K box** | Two adjacent pins with the same physical K(z) can be served up to 2.2× apart across a regime contact, because the clamp floors differ by regime (0.0959 vs 0.0444 m/day). | Open. The lithological contact is real and regime cannot be blended (it selects a different equation), but an **ML training-support artefact should not set the size of a physical discontinuity**. See the fidelity-matrix correction note. |
 | **operation_years default 8** | A single wellfield runs 1–3 yr; 8+ yr represents a sequential multi-wellfield mine unit compressed onto one footprint. | Interpret long operations as mine-unit scale. |
 | **Texas→Jharkhand transfer** | Source chemistry and restoration behavior from porous Texas sandstone applied to fractured Indian shear-zone rock. | The headline caveat on the UI. No field calibration exists or is possible without an actual ISR test. |
 
