@@ -726,11 +726,19 @@ function renderMetrics(r) {
   document.getElementById("m-peak").textContent = fmtC(r.plume.peak_conc, U);
   document.getElementById("env-legend").style.opacity = (state.mode === "ml") ? 1 : .35;
 
-  // E1: when the source-zone disc dominates (Λ<1) the "migration" number is the
-  // contaminated EXTENT of the leach zone, not down-gradient travel — say so.
+  // E1 Λ<1: the leach-zone disc reaches farther than the migrating front, so the
+  // contaminated ground is dominated by the wellfield footprint itself.
+  // The migration number IS down-gradient travel (measured analytically on the
+  // centreline), so this note now says what the number means rather than
+  // re-labelling it. Before the 2026-08-05 remediation it claimed the figure was
+  // "source-zone extent" — which was wrong twice over: the figure was actually
+  // the upstream Domenico artifact box's grid corner, and the source zone's real
+  // radius is the disc's (~207 m at default width), not the ~423 m being shown.
   if (r.plume.radial_dominated) {
     const el = document.getElementById("m-dist-band");
-    el.textContent += " · radial (Λ<1): source-zone extent, not travel";
+    el.textContent += ` · Λ=${r.plume.lambda_radial}: the front has not cleared the`
+      + ` wellfield footprint — contaminated area is dominated by the leach zone,`
+      + ` not by travel`;
   }
 
   // extrapolation / off-scale warnings
