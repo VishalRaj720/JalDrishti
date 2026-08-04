@@ -695,6 +695,25 @@ K_DEPTH_DECAY_STRENGTH = 1.0
 K_BOUNDARY_BLEND_ENABLED = True
 K_BOUNDARY_BLEND_HALFWIDTH_DEG = 0.02     # ~2.2 km at Jharkhand latitude
 
+# ---------------------------------------------------------------------------
+# 5e-bis. DISTRICT-BOUNDARY BLEND for the K(z) decay length
+#         [remediation 2026-08-05, review.md finding #5]
+# ---------------------------------------------------------------------------
+# Fix 3.3 calibrates the depth-decay length per district from that district's own
+# NAQUIM fracture-death depth. Those are per-district CONSTANTS, so 3.3 quietly
+# introduced a SECOND categorical map on top of the aquifer polygons that 3.6 had
+# just finished smoothing -- and with it a fresh set of hard steps at every
+# district line. Measured on the Ranchi->Jaduguda transect: K stepped
+# 0.147 -> 0.256 m/day (1.74x) across ~130 m, inside one aquifer polygon and one
+# lithology, purely because fracture_max_m flips 200 -> 258 at the West/East
+# Singhbhum border. Row 3.6's "K is provably continuous across every boundary"
+# was therefore false in the deployed build.
+#
+# Same half-width and the same 0.5-at-the-border weighting as the aquifer blend,
+# so the two smoothings compose instead of fighting. Blended LINEARLY (depths,
+# not a log-normal conductivity). Set 0 to restore the hard district lookup.
+DISTRICT_BLEND_HALFWIDTH_DEG = 0.02       # ~2.2 km at Jharkhand latitude
+
 
 def depth_decay_factor(z_m: float, fracture_base_m: float | None = None,
                        strength: float | None = None) -> float:

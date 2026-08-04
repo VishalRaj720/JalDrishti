@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import functools
 import json
+import math
 import numpy as np
 
 from ml_pipeline.config import parameters as P
@@ -311,12 +312,37 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     shear_zone = None
     if (regime == "fractured" and ore_zone["zone"] in ("deposit", "belt")
             and payload.get("K_m_day") is None):
-        k_default = P.SHEAR_ZONE_T_M2DAY / P.SHEAR_ZONE_THICKNESS_M
-        thickness_default = P.SHEAR_ZONE_THICKNESS_M
+        # D5 shear-zone override, TAPERED at the belt's outer edge (remediation
+        # 2026-08-05, review.md finding #6). This used to be a hard toggle keyed
+        # on zone membership, so crossing the belt outline flipped K by 2.2x and
+        # thickness by 4x in a single step -- measured N of Jaduguda, sulfate
+        # (which is not ore-gated at all, so this is purely the hydraulic step)
+        # jumped 13.8 -> 19.0 ha and its excursion probability 0.10 -> 0.00 across
+        # 100 m. Worse, since commit 61b1260 that outline is no longer mapped
+        # geology: the belt is the CSV arc unioned with the deposits' convex hull
+        # and a taper buffer, so the step sat on a constructed line.
+        # The shear zone is a real physical feature that grades out, so ramp the
+        # correction to zero over ORE_TAPER_KM measured from the nearest deposit,
+        # using the same ramp shape as the C0 taper in _belt_c0.
+        k_shear = P.SHEAR_ZONE_T_M2DAY / P.SHEAR_ZONE_THICKNESS_M
+        d_km = ore_zone.get("nearest_deposit_km")
+        taper = float(P.ORE_TAPER_KM)
+        w = 1.0
+        if ore_zone["zone"] == "belt" and d_km is not None and taper > 0:
+            w = 1.0 - min(max(float(d_km) / taper, 0.0), 1.0)
+        # blend in LOG space for K (log-normal, like the aquifer blend) and
+        # linearly for thickness; w = 1 at a deposit, -> 0 at the taper distance,
+        # so both are continuous at the belt outline AND at the deposit edge.
+        k_polygon, b_polygon = float(h["K_m_day"]), float(h["thickness_m"])
+        k_default = math.exp(w * math.log(k_shear) + (1.0 - w) * math.log(max(k_polygon, 1e-9)))
+        thickness_default = w * P.SHEAR_ZONE_THICKNESS_M + (1.0 - w) * b_polygon
         shear_zone = {"T_m2day": P.SHEAR_ZONE_T_M2DAY,
-                      "thickness_m": P.SHEAR_ZONE_THICKNESS_M,
+                      "thickness_m": round(thickness_default, 1),
                       "K_m_day": round(k_default, 3),
-                      "polygon_K_m_day": round(float(h["K_m_day"]), 3)}
+                      "polygon_K_m_day": round(k_polygon, 3),
+                      "taper_weight": round(w, 4),
+                      "nearest_deposit_km": d_km,
+                      "full_strength_K_m_day": round(k_shear, 3)}
 
     # Phase-1 fix 3.3: DEPTH-DEPENDENT K. The resolved K above characterises the
     # shallow drinking-water aquifer; the ISR target sits far below it, where
@@ -327,10 +353,16 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     # the user wins outright (they are stating a measured value).
     k_depth = None
     if payload.get("K_m_day") is None and P.K_DEPTH_DECAY_ENABLED:
-        from ml_pipeline.data_prep.naquim_vertical import vertical_params_at
+        # Fracture-death depth BLENDED across district borders (remediation
+        # 2026-08-05): the per-district NAQUIM constant stepped K by 1.74x over
+        # ~130 m at every district line, inside a single aquifer polygon -- a
+        # second categorical map layered on top of the one fix 3.6 had smoothed.
+        from ml_pipeline.data_prep.naquim_vertical import (
+            vertical_params_at, fracture_base_at)
         vp = vertical_params_at(lon, lat)
+        fb = fracture_base_at(lon, lat)
         ore_depth = _override(payload, "ore_depth_m", P.VERTICAL["ore_depth_default_m"])
-        factor = P.depth_decay_factor(ore_depth, vp.get("fracture_max_m"))
+        factor = P.depth_decay_factor(ore_depth, fb["fracture_base_m"])
         k_shallow = k_default
         k_dec = k_shallow * factor
         # keep the served K inside the trained support so no extrapolation flag
@@ -344,10 +376,13 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         k_depth = {
             "ore_depth_m": round(float(ore_depth), 1),
             "reference_depth_m": P.K_DEPTH_REF_M,
-            "fracture_base_m": vp.get("fracture_max_m"),
+            "fracture_base_m": round(float(fb["fracture_base_m"]), 1),
+            "fracture_base_mapped_m": vp.get("fracture_max_m"),
             "fracture_base_source": ("NAQUIM district report"
                                      if vp.get("fracture_max_m") is not None
                                      else "statewide default"),
+            # disclosed, never silent -- same contract as the aquifer _k_blend
+            "fracture_base_blend": (fb if fb.get("blended") else None),
             "decay_factor": round(float(factor), 4),
             "K_shallow_m_day": round(float(k_shallow), 4),
             "K_at_depth_m_day": round(float(k_default), 4),
