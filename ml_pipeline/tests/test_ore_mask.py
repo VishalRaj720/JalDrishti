@@ -118,12 +118,30 @@ def test_far_pins_still_have_no_source_the_guard_is_intact():
         assert z["nearest_deposit_m"] > 20_000
 
 
-def test_radium_spreads_in_the_belt_but_not_outside_the_ore_system():
-    """The user-visible symptom: Ra-226 showed a bare square and no plume."""
+def test_radium_has_a_source_footprint_but_does_not_migrate():
+    """Ra-226 on the ore must show a contaminated SOURCE FOOTPRINT and yet be
+    essentially IMMOBILE -- the two facts are not in tension, and the tool has to
+    show both.
+
+    This test previously asserted `migration_m > 0` at Jaduguda, which enforced
+    the very defect the audit found (review.md finding #2): the fractured front
+    ignored Kd entirely, so radium (Kd 500 L/kg) travelled exactly as far as
+    sulfate. With the sorbing capacity ratio in place radium's front collapses,
+    which is what fidelity row 3.9 always claimed and what the BARC field
+    observation reports -- radium does not migrate from the Jaduguda tailings.
+    The original intent of the test (the user-visible "bare square, no plume"
+    symptom) is preserved by the AREA assertion: the leach-zone footprint is
+    still drawn.
+    """
     dep = _predict(*JADUGUDA, species="radium_226_mbq_l")
     assert dep["ore_zone"]["zone"] == "deposit"
-    assert dep["metrics"]["analytical"]["area_ha"] > 0
-    assert dep["metrics"]["analytical"]["migration_m"] > 0
+    assert dep["metrics"]["analytical"]["area_ha"] > 0        # footprint drawn
+    # immobile: no measurable down-gradient travel at screening resolution
+    assert dep["metrics"]["analytical"]["migration_m"] < 1.0
+    # ... and decisively less mobile than weakly-sorbing alkaline uranium
+    u = _predict(*JADUGUDA, species="uranium_ppb")
+    assert (dep["metrics"]["analytical"]["migration_m"]
+            < u["metrics"]["analytical"]["migration_m"] + 1e-9)
     far = _predict(*RANCHI, species="radium_226_mbq_l")
     assert far["ore_zone"]["zone"] == "none"
     assert far["metrics"]["analytical"]["area_ha"] == 0.0

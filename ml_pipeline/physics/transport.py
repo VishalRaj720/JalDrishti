@@ -88,12 +88,21 @@ def apparent_retardation(t_days: float, beta: float, omega: float) -> float:
 def retarded_clock(t_days: float, beta: float, omega: float) -> float:
     """Closed-form I(t) = int_0^t dt'/R_app(t')  [days]. A front moving at base
     velocity v with time-dependent retardation covers  x(t) = v * I(t).
-    I(t) ~ t early (unretarded), slope -> 1/(1+beta) late."""
+    I(t) ~ t early (unretarded), slope -> 1/(1+beta) late.
+
+    NUMERICS: the log term is written as log1p(-beta*expm1(-a*t)), which is the
+    algebraic identity of log((1+beta) - beta*exp(-a*t)) but exact for LARGE
+    beta. With the sorbing capacity ratio (effective_capacity_ratio below) beta
+    reaches ~1e6 for radium, where the naive difference (1+beta) - beta*exp(-a*t)
+    cancels catastrophically at small a*t."""
     t = max(t_days, 0.0)
     if beta <= 0.0 or omega <= 0.0:
         return t
     a = omega * (1.0 + beta) / beta
-    return t / (1.0 + beta) + math.log((1.0 + beta) - beta * math.exp(-a * t)) / (a * (1.0 + beta))
+    I = t / (1.0 + beta) + math.log1p(-beta * math.expm1(-a * t)) / (a * (1.0 + beta))
+    if not math.isfinite(I) or I < 0.0:                # unreachable by construction
+        raise ValueError(f"retarded_clock non-finite: t={t}, beta={beta}, omega={omega}")
+    return I
 
 
 def realized_residual(residual_ref: float, rest_days: float,
@@ -165,18 +174,88 @@ def front_position(v_base_m_day: float, eta: float, t_days: float,
 # --------------------------------------------------------------------------- #
 # Discrete-fracture matrix diffusion (Tang/Frind/Sudicky 1981; Neretnieks 1980)
 # --------------------------------------------------------------------------- #
+def matrix_retardation(phi_total: float, grain_density: float,
+                       kd_L_kg: float) -> float:
+    """MATRIX retardation R_m = 1 + rho_b*Kd/theta_m [-] -- sorption onto the
+    pore walls of the rock matrix between the fractures. This is the ONE place
+    Kd physically acts in fractured rock (bulk-density retardation of the
+    fracture water would be wrong: the solute contacts fracture walls, not the
+    whole rock volume).
+
+    Single source of truth for BOTH consumers, which must never drift apart:
+      * matrix_sigma()             -- the Tang diffusion group (attenuation);
+      * effective_capacity_ratio() -- the dual-porosity storage term (kinematics).
+    """
+    theta_m = float(np.clip(phi_total, 1e-3, 0.45))
+    rho_b = (1.0 - theta_m) * grain_density                    # kg/m3
+    return 1.0 + rho_b * (max(kd_L_kg, 0.0) * 1e-3) / theta_m  # Kd L/kg -> m3/kg
+
+
+def effective_capacity_ratio(beta: float, phi_total: float, grain_density: float,
+                             kd_L_kg: float,
+                             strength: float = None) -> float:
+    """SORBING dual-porosity capacity ratio  beta_eff = beta * R_m  [-].
+
+    beta = theta_immobile/theta_mobile is the capacity ratio for a CONSERVATIVE
+    tracer: how much dissolved mass the immobile (matrix) water can hold per unit
+    of mobile (fracture) water. A sorbing solute also loads the matrix GRAIN
+    surfaces, so the immobile zone's capacity is larger by exactly the matrix
+    retardation R_m [Goltz & Roberts 1986 mobile/immobile with sorption; the
+    same scaling every crystalline-repository safety case uses]:
+
+        beta_eff = (theta_im * R_im) / (theta_m * R_mobile) ~= beta * R_m
+
+    (R_mobile ~ 1: an open fracture has negligible sorptive surface per unit
+    water volume compared with the matrix.)
+
+    WHY THIS MATTERS: before this correction the fractured front was SPECIES-
+    BLIND -- Kd entered only the Tang term, which is unioned with `max()` and can
+    therefore only EXTEND the plume, never retard it. Radium (Kd 500 L/kg,
+    R_m ~ 4.4e4) travelled exactly as fast as sulfate. See review.md finding #2.
+
+    NOT double-counting the Tang kernel: Tang describes diffusive ATTENUATION of
+    the front into the matrix, this describes the front's RETARDATION by matrix
+    storage. They are two facets of the same process represented in the two
+    branches of the `max()` union, and both must respond to Kd or the union's
+    weaker branch silently governs.
+
+    RESIDUAL LIMITATION (deliberate, documented -- fidelity matrix row 3.4):
+    the first-order transfer rate omega (DUAL_POROSITY["mass_transfer_omega"]) is
+    held FIXED while beta_eff scales with sorption. Physically omega should also
+    fall as matrix retardation rises (slower diffusive equilibration), so this is
+    a PARTIAL correction that still under-retards strongly sorbing species at
+    early time. Grounding omega needs the same unpublished SSZ tracer test as
+    beta itself.
+
+    `strength` (default P.BETA_SORPTION_STRENGTH) damps the correction as
+    beta_eff = beta * R_m**strength; 1.0 = the full physically-indicated value,
+    0.0 = the pre-correction species-blind behaviour.
+    """
+    if beta <= 0.0:
+        return 0.0
+    s = P.BETA_SORPTION_STRENGTH if strength is None else float(strength)
+    Rm = matrix_retardation(phi_total, grain_density, kd_L_kg)
+    return float(beta * (Rm ** s))
+
+
 def matrix_sigma(phi_total: float, grain_density: float, kd_L_kg: float,
                  De_m2_day: float | None = None,
                  half_aperture_m: float | None = None) -> float:
     """Matrix-diffusion group sigma = theta_m * sqrt(R_m * De) / b_half
-    [1/sqrt(day)]. R_m = 1 + rho_b*Kd/theta_m is the MATRIX retardation --
-    the physical channel through which Kd acts in fractured rock."""
+    [1/sqrt(day)]. R_m is the MATRIX retardation (see matrix_retardation) --
+    the physical channel through which Kd acts in fractured rock.
+
+    half_aperture_m: the fracture HALF-aperture. None -> the central literature
+    value; the Monte-Carlo (synthetic.generate._draw_params) passes a SAMPLED
+    value drawn from P.FRACTURE["full_aperture_m"] so the aperture's factor-5
+    literature range reaches the P10-P90 bands instead of being served as a point
+    value (review.md finding #4). sigma ~ 1/b_half, so this is a first-order
+    control on the Tang envelope."""
     De = De_m2_day if De_m2_day is not None else P.FRACTURE["De_m2_day"]
     b_half = (half_aperture_m if half_aperture_m is not None
               else P.FRACTURE["full_aperture_m"][1] / 2.0)
     theta_m = float(np.clip(phi_total, 1e-3, 0.45))
-    rho_b = (1.0 - theta_m) * grain_density                    # kg/m3
-    Rm = 1.0 + rho_b * (max(kd_L_kg, 0.0) * 1e-3) / theta_m    # Kd L/kg -> m3/kg
+    Rm = matrix_retardation(phi_total, grain_density, kd_L_kg)
     return theta_m * math.sqrt(Rm * De) / max(b_half, 1e-6)
 
 
@@ -605,16 +684,47 @@ def plume_metrics(C_plume: np.ndarray, X: np.ndarray, Y: np.ndarray, *,
     INCREMENTAL_FLOOR*threshold). Reported concentrations are absolute. The E1
     source-zone disc (disc_mask) is unioned into the AREA only -- migration /
     downgradient / compliance track the migrating front, never the source zone.
+
+    MIGRATION IS DOWN-GRADIENT TRAVEL (remediation 2026-08-05, review.md #1)
+    -----------------------------------------------------------------------
+    `max_migration_distance_m` is the greatest DOWN-GRADIENT distance the
+    incremental-exceedance contour reaches (max x over the exceeding cells).
+    It replaces a radial max, sqrt(x^2 + y^2), taken over the WHOLE grid, which
+    was not a travel distance at all and failed in two independent ways:
+
+      1. The Domenico simplification drops the second Ogata-Banks term and so
+         paints the ENTIRE upstream half-plane at C0 (ARCHITECTURE section 10) --
+         a solution artifact, not a plume. The radial argmax therefore landed on
+         the artifact box's upstream CORNER, whose position is set by _auto_grid's
+         margins rather than by any physics. At Jaduguda defaults the argmax sat
+         at x = -387.8 m and "migration" read 422.8 m while the true down-gradient
+         reach was 35.9 m -- identical for every species, because C0 cancels.
+      2. Even restricted to x > 0, a radial max is dominated by the SOURCE
+         HALF-WIDTH whenever the plume is short and wide (the normal contained
+         case): measured on the attenuation fixture, radial 201.5 m against a
+         down-gradient reach of 5.0 m and a half-width of 201.4 m -- i.e. it was
+         reporting the wellfield's own transverse extent as travel, at a distance
+         where the attenuation factor is e^-94.
+
+    The transverse extent is still reported, separately and honestly, as
+    `plume_halfwidth_m`; `max_downgradient_m` is retained as an explicit alias so
+    existing callers keep working. Both are now scored on the SAME down-gradient
+    mask, so the aspect ratio derived from them describes the migrating plume.
+
+    The contaminated SOURCE FOOTPRINT keeps its own representation -- the E1
+    leach-zone disc (E1_geometry_design.md section 1), a deliberate member with a
+    physically-argued radius -- so restricting the plume mask to x > 0 removes the
+    artifact WITHOUT losing the source zone from the area, and stops the artifact
+    box and the disc double-counting the same ground.
     """
     thr_inc = max(threshold - background, P.INCREMENTAL_FLOOR * threshold)
-    mask = C_plume >= thr_inc
+    mask = (C_plume >= thr_inc) & (X > 0.0)      # migrating plume only
     if mask.any():
-        r = np.sqrt(X[mask] ** 2 + Y[mask] ** 2)
-        max_dist = float(r.max())
         max_down = float(X[mask].max())          # downgradient reach beyond edge
         plume_halfwidth = float(np.abs(Y[mask]).max())
     else:
-        max_dist = max_down = plume_halfwidth = 0.0
+        max_down = plume_halfwidth = 0.0
+    max_dist = max_down                          # migration == down-gradient travel
     area_mask = mask if disc_mask is None else (mask | disc_mask)
     area_m2 = float(area_mask.sum()) * cell_area_m2
     return {
@@ -647,7 +757,14 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
 
     fractured = (regime == "fractured")
     v_base = v if fractured else feat["contaminant_velocity_vc"]
-    beta_k = beta if fractured else 0.0
+    # SORBING capacity ratio: beta scaled by the matrix retardation, so the
+    # fractured front finally responds to Kd (review.md finding #2). Mirrored in
+    # generate._draw_params and feature_engineering.build_feature_row -- all
+    # three must agree or train != serve.
+    beta_k = (effective_capacity_ratio(beta, feat["phi_total"],
+                                       feat.get("_grain_density", 2700.0),
+                                       feat["Kd_L_kg"])
+              if fractured else 0.0)
 
     Xc = front_position(v_base, eta, t_days, operation_days, restoration_days, beta_k)
     Xw = front_position(v, eta, t_days, operation_days, restoration_days, 0.0) if fractured else Xc
@@ -870,7 +987,12 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
             atten_per_m=arr(lambda p: p.atten_per_m),
             atten_hold=arr(lambda p: p.atten_hold_factor),
             include_disc=False)
-        plume_mask = C >= thr_inc
+        # DOWN-GRADIENT ONLY -- must mirror plume_metrics exactly (see its
+        # docstring). THIS is the path that produces the ML training labels, so
+        # fixing only the scalar engine would have left the upstream-artifact
+        # migration baked into every trained band. test_physics_laws.py's
+        # central-vs-MC parity test pins the two implementations together.
+        plume_mask = (C >= thr_inc) & (X3 > 0.0)
         cell = float(abs((X[0, 1] - X[0, 0]) * (Y[1, 0] - Y[0, 0])))
         # AREA also counts the source-zone disc; MIGRATION is the plume front only
         if bool(np.any(dr > 0.0)):
@@ -879,8 +1001,9 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
         else:
             area_mask = plume_mask
         area[bucket] = area_mask.sum(axis=(0, 1)) * cell / 1e4
-        R3 = np.sqrt(X ** 2 + Y ** 2)[:, :, None]
-        dist[bucket] = np.where(plume_mask, R3, 0.0).max(axis=(0, 1))
+        # MIGRATION = greatest DOWN-GRADIENT reach, mirroring plume_metrics (a
+        # radial max measured the source half-width, not travel -- see there).
+        dist[bucket] = np.where(plume_mask, X3, 0.0).max(axis=(0, 1))
 
     if compliance_x is not None:
         for i, p in enumerate(plist):

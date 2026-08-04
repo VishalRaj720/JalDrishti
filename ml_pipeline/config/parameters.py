@@ -342,6 +342,29 @@ DUAL_POROSITY = {
 }
 
 # ---------------------------------------------------------------------------
+# 5a-bis. SORBING dual-porosity capacity  [remediation 2026-08-05, review.md #2]
+# ---------------------------------------------------------------------------
+# beta above is the capacity ratio for a CONSERVATIVE tracer. A sorbing solute
+# also loads the matrix grain surfaces, so the immobile zone holds R_m times more
+# mass and the effective capacity ratio is
+#       beta_eff = beta * R_m ** BETA_SORPTION_STRENGTH
+# (see physics.transport.effective_capacity_ratio for the derivation).
+#
+# WHY THIS EXISTS AS A KNOB: before the correction the fractured front was
+# species-blind -- Kd entered only the Tang term, which is unioned with max() and
+# so can only EXTEND a plume, never retard it. Radium travelled exactly as fast
+# as sulfate (review.md finding #2). Applying the full physically-indicated
+# R_m is 1.0 and is the default.
+#
+# The exponent is exposed (same pattern as K_DEPTH_DECAY_STRENGTH) because it
+# moves every fractured, sorbing result, and because omega is NOT co-scaled --
+# physically the transfer rate should also fall as R_m rises, so the full
+# correction is applied through an incompletely-parameterised kinetic model.
+# 0.0 restores the pre-correction behaviour exactly; use it to bisect a label
+# change, not as a way to soften an inconvenient answer.
+BETA_SORPTION_STRENGTH = 1.0
+
+# ---------------------------------------------------------------------------
 # 5b. Discrete-fracture matrix-diffusion kernel (fractured regime).
 #     Tang, Frind & Sudicky (1981) / Neretnieks (1980) zero-fracture-dispersion
 #     solution: C/C0 = erfc[ sigma * t_w / (2*sqrt(t - t_w)) ], with the
@@ -452,6 +475,26 @@ REGIME_ARCHETYPE = {
 RESTORATION_FALLBACK_RESIDUAL = {
     "uranium_ppb": 0.30, "sulfate_mg_l": 0.50, "tds_mg_l": 0.50,
 }
+
+
+def restoration_endpoint_for(species: str, texas_residuals: dict | None = None) -> float:
+    """Endpoint residual C_rest/C0 after a reference sweep, for ANY species.
+
+    Single source of truth so the serve path (ml.predict) and the training
+    generator (synthetic.generate) cannot disagree -- they did: radium has no
+    column in the Texas post-restoration sheets, so the serve path's
+    `texas_residuals.get(species, 1.0)` fell through to the no-restoration
+    sentinel 1.0 while the generator applied RADIUM_RESTORATION_RESIDUAL (0.99).
+    The served restoration machinery was therefore degenerate for radium (the
+    exact outcome the 0.99 was chosen to avoid) and the surrogate had been
+    trained on up to ~30% radium source clean-up the analytical engine denied.
+    See review.md finding #3.
+    """
+    if species == "radium_226_mbq_l":
+        return float(RADIUM_RESTORATION_RESIDUAL)
+    if texas_residuals and species in texas_residuals:
+        return float(texas_residuals[species])
+    return float(RESTORATION_FALLBACK_RESIDUAL.get(species, 1.0))
 
 # Restoration source-drawdown law. The empirical Texas endpoint residual
 # (Final Post-restoration / End of Mining) is REACHED after a reference sweep of

@@ -478,3 +478,141 @@ def test_e1_mc_matches_single_solve_with_disc():
         assert m2["max_dist_m"][0] == pytest.approx(m1["max_migration_distance_m"], rel=1e-6)
     finally:
         P.E1_ENABLED = False
+
+
+# --------------------------------------------------------------------------- #
+# 8. REMEDIATION 2026-08-05 (review.md findings #1, #2, #4)
+#    The invariants whose ABSENCE let the audit's two CRITICAL defects survive
+#    a full QA sweep. Each asserts a physical law, not a stored number.
+# --------------------------------------------------------------------------- #
+def test_migration_is_downgradient_travel_not_a_radial_max():
+    """`max_migration_distance_m` must be the DOWN-GRADIENT reach of the
+    exceedance contour.
+
+    It used to be a radial max over the whole grid, which measured two things
+    that are not travel: (a) the Domenico upstream artifact box's corner, whose
+    position is set by _auto_grid's margins -- 422.8 m reported at Jaduguda for a
+    35.9 m plume, identically for every species; and (b) once restricted to
+    x > 0, the SOURCE HALF-WIDTH of a short wide plume.
+
+    Guards both: migration must equal the down-gradient reach exactly, must never
+    exceed the grid's down-gradient extent, and must be unaffected by how wide the
+    source is when the front is short."""
+    for hg in (FRACTURED, POROUS):
+        m = label(hg, t_years=5.0)
+        assert m["max_migration_distance_m"] == pytest.approx(m["max_downgradient_m"])
+        # a wider wellfield must not inflate "travel" (the (b) failure mode)
+        narrow = label(hg, width=100.0, t_years=5.0)["max_migration_distance_m"]
+        wide = label(hg, width=800.0, t_years=5.0)["max_migration_distance_m"]
+        assert wide < narrow + 0.6 * (800.0 - 100.0), (
+            f"{hg['regime']}: migration tracks source width, not travel "
+            f"({narrow} -> {wide})")
+
+
+def test_contained_plume_reports_no_phantom_migration():
+    """With complete hydraulic capture during operations the front is held, so
+    down-gradient travel must be ~0. The old radial metric reported the upstream
+    box corner here -- hundreds of metres of 'migration' from a plume that by
+    construction had not moved."""
+    hg = FRACTURED
+    q = hg["K_m_day"] * hg["gradient_i"]
+    W, b = 300.0, hg["thickness_m"]
+    Q_regional = q * b * W
+    m = label(hg, Q_in=2500.0, bleed=(Q_regional * 1.5) / 2500.0, t_years=5.0)
+    assert m["max_migration_distance_m"] <= 30.0, m["max_migration_distance_m"]
+
+
+@pytest.mark.parametrize("regime_hg", [FRACTURED], ids=["fractured"])
+def test_fractured_front_is_non_increasing_in_kd(regime_hg):
+    """THE law the audit found missing: in fractured rock a more strongly sorbing
+    species must not travel FARTHER.
+
+    Before the sorbing capacity ratio (beta_eff = beta*R_m) the fractured front
+    was bit-identical for Kd 0 .. 2000 L/kg, because Kd reached the physics only
+    through the Tang term -- which is unioned with max() and can only extend a
+    plume. Radium (Kd 500) therefore travelled exactly as far as sulfate."""
+    fronts = []
+    for kd in (0.0, 1.0, 10.0, 100.0, 500.0, 2000.0):
+        hg = {**regime_hg, "kd_L_kg": kd}
+        fronts.append(label(hg, t_years=10.0)["Xc_m"])
+    assert _nonincreasing(fronts, tol=1e-9), f"front vs Kd: {fronts}"
+    # and the effect must be decisive, not cosmetic
+    assert fronts[-1] < 0.05 * fronts[0], fronts
+
+
+def test_tds_front_is_untouched_by_the_sorbing_capacity_ratio():
+    """ANCHOR: TDS is modelled as a perfect tracer (Kd = 0), so R_m = 1 and
+    beta_eff == beta identically. Its front must therefore be bit-identical to
+    the pre-remediation physics. If this moves, beta_eff is mis-wired -- it is
+    reaching rows it must not touch."""
+    from ml_pipeline.physics.transport import effective_capacity_ratio
+    hg = {**FRACTURED, "kd_L_kg": 0.0}
+    # (a) the scaling is exactly 1x for a tracer, so beta_eff IS beta
+    assert effective_capacity_ratio(hg["beta"], hg["n_total"],
+                                    hg["grain_density"], 0.0) == hg["beta"]
+    # (b) STRUCTURAL PROOF, not a magic number: recompute the front the
+    # pre-remediation way (raw beta straight into the clock) and require the
+    # served front to be bit-identical. This is self-verifying -- it cannot rot
+    # the way a pinned literal silently does when the fixture changes.
+    feat = build_feature_row(
+        domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+        operation_days=8 * 365.0, wellfield_width_m=300.0,
+        source_conc_C0=15000.0, background_conc_Cb=2.0,
+        eval_time_days=10 * 365.0, **hg)
+    pre_remediation = front_position(feat["seepage_velocity_v"], feat["_eta_eff"],
+                                     10 * 365.0, 8 * 365.0, 0.0, hg["beta"])
+    assert feat["_Xc_eval_m"] == pre_remediation      # bit-identical, not approx
+    # (c) and the value itself, as a coarse tripwire on the fixture
+    assert pre_remediation == pytest.approx(222.7806519824, rel=1e-9)
+
+
+def test_sorbing_capacity_ratio_matches_the_matrix_retardation():
+    """beta_eff = beta * R_m, with R_m the SAME matrix retardation the Tang
+    diffusion group uses -- one helper, so the kinematics and the attenuation
+    kernel can never drift apart on the sorption term."""
+    from ml_pipeline.physics.transport import (effective_capacity_ratio,
+                                               matrix_retardation, matrix_sigma)
+    phi, rho, kd = 0.03, 2750.0, 1.0
+    Rm = matrix_retardation(phi, rho, kd)
+    assert Rm == pytest.approx(1.0 + (1 - phi) * rho * kd * 1e-3 / phi)
+    assert effective_capacity_ratio(8.0, phi, rho, kd) == pytest.approx(8.0 * Rm)
+    # sigma must be built from the very same R_m
+    assert matrix_sigma(phi, rho, kd) == pytest.approx(
+        phi * math.sqrt(Rm * P.FRACTURE["De_m2_day"])
+        / (P.FRACTURE["full_aperture_m"][1] / 2.0))
+    # a conservative tracer leaves beta untouched
+    assert effective_capacity_ratio(8.0, phi, rho, 0.0) == 8.0
+    assert effective_capacity_ratio(0.0, phi, rho, 500.0) == 0.0
+
+
+def test_retarded_clock_is_stable_at_sorbing_capacity_ratios():
+    """beta_eff reaches ~1e6 for radium. The clock's log term is written as
+    log1p(-beta*expm1(-a t)) precisely so that regime stays exact; the naive
+    (1+beta) - beta*exp(-a t) cancels catastrophically there."""
+    omega = P.DUAL_POROSITY["mass_transfer_omega"]
+    for beta in (8.0, 7.2e2, 4.4e4, 3.6e5, 1e7):
+        for t in (0.0, 1.0, 365.0, 3650.0, 18250.0):
+            I = retarded_clock(t, beta, omega)
+            assert math.isfinite(I) and I >= 0.0, (beta, t, I)
+            assert I <= t + 1e-9                      # never faster than the water
+    # monotone in beta: more storage capacity => a slower clock
+    clocks = [retarded_clock(3650.0, b, omega) for b in (8.0, 720.0, 44000.0)]
+    assert _nonincreasing(clocks, tol=0.0), clocks
+
+
+def test_sampled_aperture_reaches_the_tang_kernel():
+    """review.md finding #4: the fracture aperture -- flagged in config as the
+    LOWEST-confidence parameter in the model -- was served AND trained at its
+    central value, contributing zero variance to the P10-P90 bands while the
+    fidelity matrix claimed the uncertainty was propagated. sigma ~ 1/b_half, so
+    the factor-5 literature range is a factor-5 range on the Tang envelope."""
+    from ml_pipeline.physics.transport import matrix_sigma
+    lo, mid, hi = P.FRACTURE["full_aperture_m"]
+    s_lo = matrix_sigma(0.03, 2750.0, 1.0, half_aperture_m=lo / 2.0)
+    s_hi = matrix_sigma(0.03, 2750.0, 1.0, half_aperture_m=hi / 2.0)
+    assert s_lo > s_hi                                  # tighter fracture => more attenuation
+    assert s_lo / s_hi == pytest.approx(hi / lo, rel=1e-9)
+    # the generator must actually draw it (not silently keep the default)
+    from ml_pipeline.synthetic.generate import mc_draws
+    d = mc_draws(16, 0)
+    assert "u_aper" in d and len(d["u_aper"]) == 16

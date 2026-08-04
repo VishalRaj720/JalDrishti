@@ -77,7 +77,11 @@ def features_from_inputs(*, regime, K_m_day, gradient_i, phi_mobile, n_total,
     op_days = operation_years * 365.0
     t_days = time_years * 365.0
     rest_days = max(float(restoration_years), 0.0) * 365.0
-    residual = _restoration_residual().get(species, 1.0) if rest_days > 0 else 1.0
+    # Endpoint residual via the shared registry, NOT a raw .get() on the Texas
+    # dict: radium has no Texas column, so the old fallthrough served 1.0 (no
+    # clean-up at all) while training used 0.99 (review.md finding #3).
+    residual = (P.restoration_endpoint_for(species, _restoration_residual())
+                if rest_days > 0 else 1.0)
     # real-ISR upgrade: U redox-trapping rate. None -> literature mode for
     # uranium, 0 for conservative species; explicit value = expert override.
     if u_attenuation_k_per_yr is None:

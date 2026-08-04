@@ -56,10 +56,24 @@ def label(*, op_years=8.0, t_years=10.0, rest_years=0.0, k_atten=0.0,
 # A -- the attenuation law itself
 # --------------------------------------------------------------------------- #
 def test_atten_feature_and_carry():
+    """The decay-per-metre carry-through uses the SAME retardation the front
+    does. In fractured rock that is the SORBING capacity ratio beta_eff = beta*R_m
+    (remediation 2026-08-05), NOT the conservative-tracer `contaminant_velocity_vc`
+    feature -- those two deliberately diverge here, because the MODEL FEATURES
+    keep their tracer definitions while the physics uses the sorbing one (the
+    corrected kinematics reach the surrogate through the Xc_m feature instead).
+    Before the fix this test pinned _atten_per_m to the tracer velocity, which
+    would have let attenuation and kinematics disagree by ~80x."""
+    from ml_pipeline.physics.transport import effective_capacity_ratio
     f = feat_row(k_atten=0.2)
     assert f["u_attenuation_k"] == pytest.approx(0.2)
-    vc = f["contaminant_velocity_vc"]
-    assert f["_atten_per_m"] == pytest.approx((0.2 / 365.0) / vc)
+    beta_eff = effective_capacity_ratio(FRACTURED["beta"], FRACTURED["n_total"],
+                                        FRACTURED["grain_density"],
+                                        FRACTURED["kd_L_kg"])
+    v_c = f["seepage_velocity_v"] / (1.0 + beta_eff)      # fractured: v_base = v
+    assert f["_atten_per_m"] == pytest.approx((0.2 / 365.0) / v_c)
+    # and it is genuinely stronger than the tracer-velocity version it replaced
+    assert f["_atten_per_m"] > (0.2 / 365.0) / f["contaminant_velocity_vc"]
     assert feat_row(k_atten=0.0)["_atten_per_m"] == 0.0
 
 
@@ -117,15 +131,25 @@ def test_natural_flush_cleans_source_zone_without_restoration():
     f = feat_row(t_years=30.0, k_atten=0.0)
     p = params_from_features(f, species_C0=15000.0, t_days=30 * 365.0,
                              operation_days=8 * 365.0)
-    c_near = concentration_point(10.0, 0.0, p)
     flush = 0.5 ** ((30.0 - 8.0) / P.DISC_FLUSH_HALFLIFE_YEARS)
-    # the wave wipes the wake toward C_res = flush*C0 (within a few %)
-    assert c_near == pytest.approx(15000.0 * flush, rel=0.05)
+    # (a) THE LAW ITSELF, independent of field geometry: the source term and the
+    # leach-zone disc are both drawn down by the flush factor. This is the claim
+    # the test is named for, so assert it directly rather than inferring it from
+    # a probe point whose validity depends on how far the front has run.
+    assert p.C_res == pytest.approx(15000.0 * flush, rel=1e-6)
+    assert p.disc_conc == pytest.approx(15000.0 * flush, rel=1e-6)
+    # (b) and the deficit wave really does wipe the source ZONE to C_res in the
+    # field. Probed at x = -50 m, well inside the source box: the old probe at
+    # x = +10 m was downstream, and with the sorbing capacity ratio (beta_eff =
+    # beta*R_m, remediation 2026-08-05) the fractured front is only ~13 m at 30 yr,
+    # so +10 m had drifted onto the front's erfc shoulder and was measuring the
+    # front's decay, not the source's flush.
+    assert concentration_point(-50.0, 0.0, p) == pytest.approx(15000.0 * flush, rel=0.02)
     # during operations: untouched (flush factor = 1, no wave)
     f_op = feat_row(t_years=5.0, k_atten=0.0)
     p_op = params_from_features(f_op, species_C0=15000.0, t_days=5 * 365.0,
                                 operation_days=8 * 365.0)
-    assert concentration_point(10.0, 0.0, p_op) == pytest.approx(15000.0, rel=0.02)
+    assert concentration_point(-50.0, 0.0, p_op) == pytest.approx(15000.0, rel=0.02)
 
 
 def test_flush_continuous_at_closure():

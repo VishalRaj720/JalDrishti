@@ -46,7 +46,9 @@ import numpy as np
 import pandas as pd
 
 from ml_pipeline.config import parameters as P
-from ml_pipeline.physics.transport import front_position, restoration_source_fraction
+from ml_pipeline.physics.transport import (
+    front_position, restoration_source_fraction, effective_capacity_ratio,
+)
 
 # Canonical, ORDERED feature list. Phase 2 (synthetic) and Phase 3 (training)
 # must emit/consume exactly these columns so Texas and Jharkhand rows align.
@@ -206,7 +208,19 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
     # use the downtime-degraded EFFECTIVE containment.
     fractured = (regime == "fractured")
     v_base = v if fractured else vc
-    beta_k = beta if fractured else 0.0
+    # SORBING dual-porosity capacity beta_eff = beta*R_m (remediation 2026-08-05,
+    # review.md finding #2): without it the fractured front ignores Kd entirely,
+    # because Kd reached the physics only through the Tang term -- which is
+    # unioned with max() and can therefore only EXTEND a plume, never retard it.
+    # MUST mirror physics.params_from_features and generate._draw_params.
+    # NOTE the MODEL FEATURES `dual_porosity_beta` and `retardation_Rd` below
+    # keep their conservative-tracer definitions (raw beta, 1+beta) -- the
+    # corrected kinematics reach the surrogate through `Xc_m`, which is itself a
+    # model feature recomputed by front_position at train AND serve time. That
+    # keeps the feature count, the monotone maps and the model card's
+    # hydro_support box untouched by this physics change.
+    beta_k = (effective_capacity_ratio(beta, n_total, grain_density, kd_L_kg)
+              if fractured else 0.0)
     Xc_eval = front_position(v_base, eta_eff, t_eval,
                              operation_days, restoration_days, beta_k)
     # clean-water replacement front -- model feature. 2026-07-13: launched whenever
@@ -274,8 +288,14 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
         "_eval_time_days": t_eval, "_restoration_days": restoration_days,
         "_residual_endpoint": float(residual_fraction),
         # decay per meter for the transport engine: k [1/yr] -> [1/day] over the
-        # retarded contaminant velocity (plug-flow travel-time form)
-        "_atten_per_m": (float(u_attenuation_k_per_yr) / 365.0) / max(vc, 1e-9),
+        # retarded contaminant velocity (plug-flow travel-time form). Uses the
+        # SAME retardation the front does (beta_eff in fractured rock), so
+        # attenuation and kinematics cannot disagree -- and identical to the
+        # expression in generate._draw_params, which is the MC's own site.
+        # (For porous, v_base is already vc and beta_k is 0, so this reduces to
+        # the previous vc exactly.)
+        "_atten_per_m": ((float(u_attenuation_k_per_yr) / 365.0)
+                         / max(v_base / (1.0 + beta_k), 1e-9)),
     }
 
 

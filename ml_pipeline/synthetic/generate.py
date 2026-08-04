@@ -61,7 +61,7 @@ from ml_pipeline.data_prep.texas_loader import (
 from ml_pipeline.physics.transport import (
     simulate_plume, front_position, matrix_sigma, TransportParams,
     concentration_point, mc_field_metrics, disc_flush_factor,
-    restoration_source_fraction,
+    restoration_source_fraction, effective_capacity_ratio,
 )
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "outputs"
@@ -163,8 +163,8 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     if rng.uniform() < IR["restoration_prob"]:
         rest_years = float(rng.uniform(0.25, OR["restoration_years"][1]))
         residual = {sp: float(np.clip(
-            (P.RADIUM_RESTORATION_RESIDUAL if sp == "radium_226_mbq_l"
-             else rest_residual[sp]) * rng.uniform(*IR["residual_noise_mult"]),
+            P.restoration_endpoint_for(sp, rest_residual)
+            * rng.uniform(*IR["residual_noise_mult"]),
             0.02, 1.0)) for sp in SPECIES}
     else:
         rest_years = 0.0
@@ -236,6 +236,11 @@ def mc_draws(n_mc: int, seed: int) -> dict[str, np.ndarray]:
         "u_disp": rng.uniform(size=n_mc),
         "u_qnet": rng.uniform(size=n_mc),
         "u_att": rng.uniform(size=n_mc),   # U-attenuation local-capacity mult
+        # fracture half-aperture (fractured only). APPENDED LAST on purpose: the
+        # draws above consume the rng stream in order, so adding a key at the end
+        # leaves every pre-existing draw bit-identical and this change alone
+        # cannot move a porous label.
+        "u_aper": rng.uniform(size=n_mc),
     }
 
 
@@ -274,8 +279,24 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     eta = containment_efficiency(q, scn["thickness"], scn["width"], Q_net)
     eta *= (1.0 - scn.get("downtime", 0.0))
     if fractured:
-        v_base, beta_k = v, beta
-        sigma = matrix_sigma(scn["n_total"], scn["grain_density"], kd)
+        # SORBING capacity ratio beta_eff = beta*R_m -- mirrors
+        # physics.params_from_features and feature_engineering.build_feature_row
+        # (review.md finding #2). The local v_c below picks it up automatically,
+        # keeping attenuation consistent with the kinematics.
+        v_base = v
+        beta_k = effective_capacity_ratio(beta, scn["n_total"],
+                                          scn["grain_density"], kd)
+        # SAMPLED fracture aperture (review.md finding #4): sigma ~ 1/b_half, so
+        # the factor-5 literature aperture range is a factor-5 range on the Tang
+        # envelope. It was previously served AND trained at the central value, so
+        # the config's own least-confident parameter contributed zero variance to
+        # the P10-P90 bands while the fidelity matrix claimed uncertainty was
+        # propagated. De stays fixed -- P.FRACTURE carries no defensible range
+        # for it, and inventing one would relabel an assumption as data.
+        aperture = _triangular(float(draws["u_aper"][i]),
+                               *P.FRACTURE["full_aperture_m"])
+        sigma = matrix_sigma(scn["n_total"], scn["grain_density"], kd,
+                             half_aperture_m=aperture / 2.0)
     else:
         Rd = retardation_factor(kd, scn["n_total"], scn["grain_density"], "porous", 0.0)
         v_base, beta_k, sigma = v / Rd, 0.0, 0.0

@@ -294,24 +294,41 @@ def test_radium_uses_measured_local_source_and_who_threshold():
     assert inp["background_conc_Cb"] == pytest.approx(P.RADIUM_BACKGROUND_MBQ_L)
 
 
-def test_radium_sorbs_far_more_strongly_than_alkaline_uranium():
+@pytest.mark.parametrize("regime", ["fractured", "porous"])
+def test_radium_sorbs_far_more_strongly_than_alkaline_uranium(regime):
     """Ra2+ is a strongly sorbing divalent cation; alkaline U travels as weakly
-    sorbing uranyl-carbonate. Kd must differ by orders of magnitude, and in the
-    POROUS regime (where Rd is a direct function of Kd) that must collapse the
-    radium front relative to uranium."""
+    sorbing uranyl-carbonate. Kd must differ by orders of magnitude, and the
+    radium front must collapse relative to uranium in BOTH regimes.
+
+    THE PARAMETRIZE IS THE POINT (remediation 2026-08-05). This test used to pin
+    regime="porous" only -- and porous is the regime NO deposit pin ever uses,
+    because every Singhbhum deposit resolves to fractured schist with the D5
+    shear-zone override. It therefore certified fidelity row 3.9's "essentially
+    immobile ... reproduces the BARC field finding" against a code path the tool
+    never serves, while the SERVED fractured answer gave radium a
+    sulfate-identical 423 m plume (review.md finding #2). A regime-cherry-picked
+    test is how that survived a full QA sweep."""
     from ml_pipeline.ml.predict import features_from_inputs
     xs = {}
     for sp in ("uranium_ppb", "radium_226_mbq_l"):
         inp, h = resolve_inputs(dict(lon=86.347, lat=22.652, species=sp,
-                                     regime="porous", gradient_i=0.01,
+                                     regime=regime, gradient_i=0.01,
                                      time_years=20.0))
         _, _, Xc = features_from_inputs(**inp)
         xs[sp] = (inp["kd_L_kg"], h["retardation_Rd"], Xc)
     assert xs["radium_226_mbq_l"][0] > 100 * xs["uranium_ppb"][0]      # Kd
-    assert xs["radium_226_mbq_l"][1] > 100 * xs["uranium_ppb"][1]      # Rd
     assert xs["radium_226_mbq_l"][2] < 0.1 * xs["uranium_ppb"][2]      # front
     # matches the field observation (BARC 2008): radium does not migrate
     assert xs["radium_226_mbq_l"][2] < 1.0
+    if regime == "porous":
+        # porous Rd is a DIRECT function of Kd, so the displayed Rd separates too
+        assert xs["radium_226_mbq_l"][1] > 100 * xs["uranium_ppb"][1]
+    else:
+        # fractured: the displayed Rd is the conservative-tracer 1+beta by design
+        # (Option A -- the sorbing capacity ratio lives in the physics, and the
+        # surrogate sees it through Xc_m). The FRONT is what must separate, and
+        # it does -- which is precisely what this test could not see before.
+        assert xs["radium_226_mbq_l"][1] == pytest.approx(xs["uranium_ppb"][1])
 
 
 def test_radium_kd_comes_from_the_shared_helper():
@@ -379,3 +396,51 @@ def test_ui_is_framed_as_excursion_screening_not_feasibility():
     assert "not a mining feasibility tool" in html
     # the premise mismatch must be stated, not buried
     assert "sandstone" in html and "schist" in html
+
+
+# --------------------------------------------------------------------------- #
+# REMEDIATION 2026-08-05 -- review.md finding #3
+# --------------------------------------------------------------------------- #
+def test_restoration_endpoint_is_identical_train_and_serve():
+    """The serve path and the training generator must agree on EVERY species'
+    restoration endpoint residual.
+
+    They did not: radium has no column in the Texas post-restoration sheets, so
+    ml.predict's `texas_residuals.get(species, 1.0)` fell through to the
+    NO-RESTORATION sentinel while synthetic.generate applied
+    RADIUM_RESTORATION_RESIDUAL = 0.99. The served restoration machinery was
+    therefore degenerate for radium -- exactly the outcome that 0.99 was chosen
+    to prevent -- and the surrogate had been trained on up to ~30% radium source
+    clean-up that the analytical engine refused to reproduce."""
+    from ml_pipeline.ml.predict import _restoration_residual
+    from ml_pipeline.ml.dataset import SPECIES as ML_SPECIES_LIST
+    texas = _restoration_residual()
+    for sp in ML_SPECIES_LIST:
+        serve = P.restoration_endpoint_for(sp, texas)
+        assert 0.0 < serve <= 1.0, (sp, serve)
+        # the generator reads the SAME helper, so parity is structural; assert
+        # the radium branch explicitly because that is the one that broke
+        if sp == "radium_226_mbq_l":
+            assert serve == pytest.approx(P.RADIUM_RESTORATION_RESIDUAL)
+            assert sp not in texas, "Texas sheets gained a radium column -- revisit"
+        else:
+            assert serve == pytest.approx(texas[sp])
+
+
+def test_radium_restoration_actually_draws_the_source_down():
+    """End-to-end consequence of the fix: a completed radium sweep must report a
+    residual BELOW 1.0 in the served diagnostic. Pre-fix it reported exactly
+    1.0 / source unchanged at 1706 mBq/L, contradicting the config's own comment
+    that 0.99 was 'kept just below 1.0 so the restoration machinery stays
+    continuous rather than degenerate'."""
+    from ml_pipeline.ml.predict import predict_analytical
+    inp, _ = resolve_inputs(dict(lon=86.347, lat=22.652,
+                                 species="radium_226_mbq_l",
+                                 operation_years=8.0, time_years=20.0,
+                                 restoration_years=5.0))
+    out = predict_analytical(**inp)
+    r = out["restoration"]
+    assert r is not None and r["sweep_complete"] is True
+    assert r["residual_endpoint_fraction"] == pytest.approx(P.RADIUM_RESTORATION_RESIDUAL)
+    assert r["residual_realized_fraction"] < 1.0
+    assert r["source_conc_after_restoration"] < inp["source_conc_C0"]
