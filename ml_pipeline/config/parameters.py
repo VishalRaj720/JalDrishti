@@ -180,6 +180,55 @@ RADIUM_C0_TRAINING_RANGE_MBQ_L = (RADIUM_BACKGROUND_MBQ_L, RADIUM_SOURCE_MBQ_L["
 RADIUM_RESTORATION_RESIDUAL = 0.99
 
 
+# ---------------------------------------------------------------------------
+# 1b. THE SPECIES REGISTRY -- one definition, imported everywhere
+#     [remediation 2026-08-05, review.md finding #9]
+# ---------------------------------------------------------------------------
+# The species tuple used to be re-declared in six places (ml/dataset.py,
+# ml/predict.py x2, dashboard/resolve.py x2, synthetic/generate.py) and the
+# per-species background defaults in two. That duplication is not cosmetic --
+# it is this project's recurring defect class, and it has caused real breakage
+# more than once: a KeyError the first time radium was added to a species loop,
+# and (found by the audit) the radium restoration endpoint diverging between the
+# training generator and the serve path because each held its own view of what a
+# species is. dashboard/resolve.py even carried an ML_SPECIES copy that nothing
+# imported, free to drift from the one the server actually gated on.
+#
+# SPECIES     -- every species the ANALYTICAL engine can solve.
+# ML_SPECIES  -- the subset the DEPLOYED surrogate was trained on. Kept as a
+#                separate name (not an alias) so a future analytical-only
+#                species, e.g. Rn-222, has the same safe bypass path radium used
+#                before its retrain: the server checks membership and reports an
+#                explicit status rather than feeding an unknown one-hot.
+#                Currently equal; test_phase1_fixes pins this against the card.
+SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
+ML_SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
+
+# One-hot column names, DERIVED from SPECIES so the two can never disagree.
+SPECIES_ONEHOT = [f"is_{sp}" for sp in SPECIES]
+
+# Fallback ambient background when the nearest CGWB well has no value for a
+# species. Radium has no CGWB column at all, so it always takes its measured
+# BARC regional value.
+BACKGROUND_DEFAULTS = {
+    "uranium_ppb": 1.0,
+    "sulfate_mg_l": 20.0,
+    "tds_mg_l": 300.0,
+    "radium_226_mbq_l": RADIUM_BACKGROUND_MBQ_L,
+}
+
+# Display units, so the API/frontend cannot invent a different one per surface.
+SPECIES_UNITS = {
+    "uranium_ppb": "ppb", "sulfate_mg_l": "mg/L",
+    "tds_mg_l": "mg/L", "radium_226_mbq_l": "mBq/L",
+}
+
+
+def background_default_for(species: str) -> float:
+    """Ambient background to use when the nearest well carries no measurement."""
+    return float(BACKGROUND_DEFAULTS[species])
+
+
 def kd_range_for(species: str, regime: str) -> tuple:
     """(lo, central, hi) Kd [L/kg] for a species x regime. Single source of
     truth so the serve path (resolve.py) and the Monte-Carlo draw

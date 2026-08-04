@@ -26,13 +26,11 @@ from ml_pipeline.data_prep.flow_field import flow_at
 from ml_pipeline.data_prep.strike_field import strike_at, anisotropy_from_variance
 from ml_pipeline.ml.dataset import ARTIFACT_DIR
 
-# radium_226_mbq_l (fix 3.9) is now IN the deployed surrogate (2026-08-02
-# retrain) -- ML_SPECIES kept distinct from SPECIES so a future analytical-only
-# addition (e.g. Rn-222) has the same safe bypass path radium used before this.
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
-ML_SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
-_BG_DEFAULT = {"uranium_ppb": 1.0, "sulfate_mg_l": 20.0, "tds_mg_l": 300.0,
-               "radium_226_mbq_l": P.RADIUM_BACKGROUND_MBQ_L}
+# Species + background defaults come from the config registry (remediation
+# 2026-08-05, review.md finding #9). This module previously declared its OWN
+# ML_SPECIES that nothing imported -- the server gates on ml.predict.ML_SPECIES --
+# so the dead copy was free to drift from the live one indefinitely.
+from ml_pipeline.config.parameters import SPECIES  # noqa: F401
 
 # Data-confidence thresholds (Module 1). Beyond ~20 km the nearest water-quality
 # well is a weak proxy; outside all mapped aquifer polygons the K/phi are borrowed.
@@ -267,7 +265,7 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         c0 = float(np.mean(source_sig[species]))
         cb = b.get(species)
         if cb is None or cb != cb:
-            cb = _BG_DEFAULT[species]
+            cb = P.background_default_for(species)
 
     # Module 2: ore-body mask. ISR leaches uranium only where uranium ore exists.
     # Clamp the URANIUM source term by zone; sulfate/TDS (lixiviant reagents)

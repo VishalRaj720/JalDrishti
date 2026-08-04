@@ -34,7 +34,7 @@ PINS = [
     ("belt_edge_inside", 86.347, 22.6939),
     ("belt_edge_outside", 86.347, 22.6948),
 ]
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
+from ml_pipeline.config.parameters import SPECIES
 TIMES_YEARS = (2.0, 10.0, 20.0)
 
 

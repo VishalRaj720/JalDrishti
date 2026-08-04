@@ -32,13 +32,12 @@ TRAINING_CSV = OUT_DIR / "synthetic_training.csv"
 GROUP_COL = "scenario_id"
 POLYGON_COL = "polygon_id"
 
-# radium_226_mbq_l added 2026-08-02: folds Ra-226 into the trained surrogate
-# (previously served analytical-only, fix 3.9). MODEL_FEATURES/monotone tuples
-# below are order-independent w.r.t. which species are present -- the one-hot
-# list just needs to stay in sync with this tuple.
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
-SPECIES_ONEHOT = ["is_uranium_ppb", "is_sulfate_mg_l", "is_tds_mg_l",
-                  "is_radium_226_mbq_l"]
+# Species + one-hot column names come from the config registry (remediation
+# 2026-08-05): they were re-declared in six modules, which is how the radium
+# restoration endpoint silently diverged between training and serving.
+# MODEL_FEATURES/monotone tuples below are order-independent w.r.t. which species
+# are present -- the one-hot list is derived from SPECIES, so it cannot drift.
+from ml_pipeline.config.parameters import SPECIES, SPECIES_ONEHOT  # noqa: F401
 
 # Ordered feature list. ORDER IS LOAD-BEARING: monotone tuples align to it.
 # `domain_is_texas` (constant 0) and `Q_out_m3_day` (collinear back-door) are

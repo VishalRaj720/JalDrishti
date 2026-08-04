@@ -42,13 +42,10 @@ from ml_pipeline.ml.dataset import MODEL_FEATURES, ARTIFACT_DIR, BANDS, cell_key
 from ml_pipeline.config import parameters as P
 
 # Species the ANALYTICAL engine can solve, and (separately) which of those the
-# DEPLOYED ML surrogate was actually trained on. As of the 2026-08-02 retrain
-# these are equal (radium_226_mbq_l, fix 3.9, is now in both) -- kept as two
-# names rather than one so a FUTURE analytical-only species (e.g. Rn-222) can
-# be added the same safe way radium was, without the server ever feeding an
-# untrained species into the surrogate's one-hot.
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
-ML_SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
+# DEPLOYED ML surrogate was trained on. Re-exported from the config registry
+# (remediation 2026-08-05) rather than re-declared here -- see parameters.py
+# section 1b for why six private copies was a live defect, not a style issue.
+from ml_pipeline.config.parameters import SPECIES, ML_SPECIES  # noqa: E402,F401
 
 
 @functools.lru_cache(maxsize=1)

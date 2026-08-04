@@ -65,11 +65,10 @@ from ml_pipeline.physics.transport import (
 )
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "outputs"
-# radium_226_mbq_l added 2026-08-02 to fold Ra-226 into the ML surrogate (it had
-# been served analytical-only since fix 3.9). Its C0/Cb sampling below is
-# special-cased -- it has no Texas source signature and no CGWB background
-# column, unlike the other three species.
-SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
+# Species from the config registry (remediation 2026-08-05). Radium's C0/Cb
+# sampling below is still special-cased -- it has no Texas source signature and
+# no CGWB background column, unlike the other three species.
+from ml_pipeline.config.parameters import SPECIES  # noqa: E402
 DEFAULT_TIMES_YEARS = (2.0, 5.0, 8.0, 12.0, 20.0)
 BAND_TARGETS = ("affected_area_ha", "max_migration_distance_m", "compliance_conc")
 
@@ -186,12 +185,13 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
           for sp in SPECIES}
     d2 = (wq["longitude"] - lon) ** 2 + (wq["latitude"] - lat) ** 2
     base = wq.loc[d2.idxmin()]
-    Cb = {
-        "uranium_ppb": float(base["uranium_ppb"]) if pd.notna(base["uranium_ppb"]) else 1.0,
-        "sulfate_mg_l": float(base["sulfate_mg_l"]) if pd.notna(base["sulfate_mg_l"]) else 20.0,
-        "tds_mg_l": float(base["tds_mg_l"]) if pd.notna(base["tds_mg_l"]) else 300.0,
-        "radium_226_mbq_l": P.RADIUM_BACKGROUND_MBQ_L,
-    }
+    # Backgrounds via the shared registry so the generator and the serve path
+    # (resolve.resolve_inputs) cannot disagree about what "no measurement here"
+    # means -- these were two independent literal tables until 2026-08-05.
+    # Radium has no CGWB column at all, so it always takes its registry value.
+    Cb = {sp: (float(base[sp]) if sp in base.index and pd.notna(base[sp])
+               else P.background_default_for(sp))
+          for sp in SPECIES}
 
     # Kd per species sampled from its regime range (low..high). Routed through
     # the shared kd_range_for() helper (not P.KD_RANGES directly) so this site

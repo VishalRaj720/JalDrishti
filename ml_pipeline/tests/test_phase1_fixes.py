@@ -383,6 +383,36 @@ def test_ml_species_gate_still_guards_untrained_species():
     assert set(ML_SPECIES) == trained, (set(ML_SPECIES), trained)
 
 
+def test_every_module_shares_one_species_registry():
+    """EVERY module's view of the species list must be the SAME object as the
+    config registry -- not merely equal to it.
+
+    The previous guard checked only ml.predict.ML_SPECIES against the model card,
+    so the other five private copies (ml.dataset, dashboard.resolve x2,
+    synthetic.generate, and the snapshot harness) could drift unchecked. One of
+    them already had: dashboard.resolve carried a dead ML_SPECIES nothing
+    imported. `is` rather than `==` is deliberate: equal-but-separate tuples are
+    exactly the state that rots."""
+    from ml_pipeline.config import parameters as P
+    from ml_pipeline.ml import dataset as ds
+    from ml_pipeline.ml import predict as pr
+    from ml_pipeline.dashboard import resolve as rs
+    from ml_pipeline.synthetic import generate as gen
+    for mod in (ds, pr, rs, gen):
+        assert mod.SPECIES is P.SPECIES, f"{mod.__name__} has its own SPECIES"
+    assert pr.ML_SPECIES is P.ML_SPECIES
+    # the dead duplicate must stay deleted
+    assert not hasattr(rs, "ML_SPECIES"), "resolve.ML_SPECIES came back"
+    assert not hasattr(rs, "_BG_DEFAULT"), "resolve._BG_DEFAULT came back"
+    # one-hot names are DERIVED, so they cannot disagree with the tuple
+    assert ds.SPECIES_ONEHOT == [f"is_{s}" for s in P.SPECIES]
+    # and every species is completely specified by the registry
+    for sp in P.SPECIES:
+        assert sp in P.EXCURSION_THRESHOLDS and sp in P.BACKGROUND_DEFAULTS
+        assert sp in P.SPECIES_UNITS
+        assert P.kd_range_for(sp, "fractured") and P.kd_range_for(sp, "porous")
+
+
 # --------------------------------------------------------------------------- #
 # 3.1 -- UI reframing (static content check)
 # --------------------------------------------------------------------------- #
