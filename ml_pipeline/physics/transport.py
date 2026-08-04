@@ -675,6 +675,49 @@ def _auto_grid(reach_m: float, aL: float, source_width: float, n: int = 220,
     return X, Y
 
 
+def _centreline_x_max(p: TransportParams) -> float:
+    """Generous upper bound for the centreline scan: the front (or the water
+    front, which bounds the Tang envelope) plus a dispersion margin."""
+    base = max(p.Xc, p.Xw, p.source_width_m, 1.0)
+    return float(min(base + 8.0 * math.sqrt(max(p.aL, 1e-3) * base) + 10.0,
+                     MAX_GRID_REACH_M))
+
+
+def centreline_reach(p: TransportParams, thr_inc: float, n: int = 4096) -> float:
+    """Greatest DOWN-GRADIENT distance at which the plume still exceeds the
+    incremental threshold, evaluated ANALYTICALLY along the centreline (y = 0).
+
+    WHY NOT READ IT OFF THE GRID (remediation 2026-08-05, Gate-3 finding)
+    --------------------------------------------------------------------
+    The 2-D grid is sized to contain the SOURCE DISC, so its cell size is set by
+    the wellfield width (dx ~ 5-13 m), not by the plume. That is fine for area --
+    measured stable at 9.06 ha across grid_n 200..6000 -- but it quantises travel
+    to nothing whenever the plume is short, which in fractured rock is the normal
+    case. Measured over 60 scenarios spanning the generator's envelope: 29 of 60
+    returned EXACTLY 0 m on the MC grid while the analytic extent was > 0.05 m,
+    and NONE were genuinely immobile. Surviving labels were biased low too
+    (2.93 m gridded vs 17.7 m analytic). This was invisible before the migration
+    metric was re-based, because the upstream-artifact reading (~420 m) is large
+    compared with a 6 m cell -- fixing finding #1 exposed a pre-existing defect.
+
+    Left uncorrected it would have poisoned the retrain: 75% of fractured uranium
+    and 99% of fractured radium migration labels were the single value 0.0.
+
+    y = 0 is the correct place to measure: the transverse factor is maximal on the
+    centreline, so the farthest exceeding cell anywhere is the farthest exceeding
+    point there. A SCAN rather than a bisection because C(x, 0) is not always
+    monotone -- once a restoration/flush deficit wave detaches, concentration can
+    rise with x (that is the 'dark band migrates down-gradient' signature).
+    The source disc is excluded: this is plume travel, not source extent."""
+    if p.C0 <= 0.0 or thr_inc <= 0.0:
+        return 0.0
+    x_max = _centreline_x_max(p)
+    xs = np.linspace(x_max / n, x_max, n)
+    C = concentration_field(xs[None, :], np.zeros((1, n)), p, include_disc=False)[0]
+    hit = np.nonzero(C >= thr_inc)[0]
+    return float(xs[hit[-1]]) if hit.size else 0.0
+
+
 def plume_metrics(C_plume: np.ndarray, X: np.ndarray, Y: np.ndarray, *,
                   threshold: float, background: float, cell_area_m2: float,
                   disc_mask: np.ndarray | None = None) -> dict:
@@ -844,6 +887,13 @@ def solve_plume(params: TransportParams, *, threshold: float, background: float,
     disc_mask = _disc_mask(X, Y, params, thr_inc)
     metrics = plume_metrics(C, X, Y, threshold=threshold, background=background,
                             cell_area_m2=cell_area, disc_mask=disc_mask)
+    # Travel is measured ANALYTICALLY on the centreline, not read off the grid
+    # (see centreline_reach): the grid's cell size is set by the source disc, so
+    # it quantises short plumes to zero and biases the rest low. Area keeps the
+    # gridded value -- it needs the 2-D integration and is grid-stable.
+    reach = centreline_reach(params, thr_inc)
+    metrics["max_migration_distance_m"] = reach
+    metrics["max_downgradient_m"] = reach
     metrics["Xc_m"] = params.Xc
     metrics["off_scale"] = bool(off_scale)
 
@@ -1001,9 +1051,39 @@ def mc_field_metrics(plist: list[TransportParams], *, threshold: float,
         else:
             area_mask = plume_mask
         area[bucket] = area_mask.sum(axis=(0, 1)) * cell / 1e4
-        # MIGRATION = greatest DOWN-GRADIENT reach, mirroring plume_metrics (a
-        # radial max measured the source half-width, not travel -- see there).
-        dist[bucket] = np.where(plume_mask, X3, 0.0).max(axis=(0, 1))
+        # MIGRATION: analytic centreline scan, NOT the grid (see centreline_reach).
+        # The 2-D cell size here is set by the source disc, so reading travel off
+        # it returned exactly 0.0 for 29 of 60 sampled scenarios that were not
+        # immobile at all -- 75% of fractured uranium training labels would have
+        # been the same degenerate value. Vectorised over draws: a 1-D centreline
+        # is cheap next to the 2-D field it replaces.
+        # PER-DRAW scan scale: each draw gets its own x_max (the same
+        # _centreline_x_max the scalar engine uses), so a small plume sharing a
+        # bucket with a large one keeps full resolution, and a single-draw bucket
+        # reproduces solve_plume EXACTLY rather than to within a scan step.
+        n1 = 4096
+        xm = arr(_centreline_x_max)                       # (nd,)
+        frac = np.linspace(1.0 / n1, 1.0, n1)             # (n1,)
+        x1m = (frac[:, None] * xm[None, :])[None, :, :]   # (1, n1, nd)
+        C1 = _stack_field(
+            x1m, np.zeros_like(x1m),
+            C0=arr(lambda p: p.C0), aL=arr(lambda p: p.aL), aT=arr(lambda p: p.aT),
+            W=arr(lambda p: p.source_width_m), Xc=arr(lambda p: p.Xc),
+            Xw=arr(lambda p: p.Xw), sigma=arr(lambda p: p.sigma),
+            t_days=plist[bucket[0]].t_days,
+            Xc_clean=arr(lambda p: p.Xc_clean if p.Xc_clean is not None else 0.0),
+            C_res=arr(lambda p: p.C_res),
+            rest_active=np.array([plist[i].Xc_clean is not None for i in bucket]),
+            atten_per_m=arr(lambda p: p.atten_per_m),
+            atten_hold=arr(lambda p: p.atten_hold_factor),
+            include_disc=False)[0]                       # (n1, nd)
+        over = C1 >= thr_inc                              # (n1, nd)
+        idx = np.where(over.any(axis=0),
+                       (over.shape[0] - 1) - np.argmax(over[::-1], axis=0), -1)
+        x1_2d = x1m[0]                                    # (n1, nd)
+        dist[bucket] = np.where(
+            idx >= 0,
+            x1_2d[np.clip(idx, 0, None), np.arange(len(bucket))], 0.0)
 
     if compliance_x is not None:
         for i, p in enumerate(plist):

@@ -616,3 +616,44 @@ def test_sampled_aperture_reaches_the_tang_kernel():
     from ml_pipeline.synthetic.generate import mc_draws
     d = mc_draws(16, 0)
     assert "u_aper" in d and len(d["u_aper"]) == 16
+
+
+def test_migration_is_not_quantised_by_the_grid():
+    """Travel must be grid-INDEPENDENT.
+
+    The 2-D grid is sized to hold the source disc, so its cells are ~5-13 m wide
+    regardless of how short the plume is. Reading travel off it returned exactly
+    0.0 m for 29 of 60 sampled fractured-uranium scenarios that were NOT immobile,
+    and biased the survivors low (2.93 m gridded vs 17.7 m analytic). That would
+    have made 75% of fractured uranium and 99% of fractured radium migration
+    labels the single value 0.0 -- a degenerate training target. Only visible
+    once the upstream-artifact reading (~420 m) stopped swamping the cell size."""
+    hg = FRACTURED
+    ref = label(hg, t_years=10.0, grid_n=100)["max_migration_distance_m"]
+    for gn in (140, 220, 400):
+        assert label(hg, t_years=10.0, grid_n=gn)["max_migration_distance_m"] == \
+            pytest.approx(ref, rel=1e-9), f"migration moved with grid_n={gn}"
+    # a strongly retarded species still resolves a small but non-zero reach
+    slow = label({**hg, "kd_L_kg": 3.0}, t_years=10.0, grid_n=100)
+    assert 0.0 < slow["max_migration_distance_m"] < ref
+
+
+def test_mc_and_scalar_engines_agree_on_travel():
+    """The scalar engine and the MC engine (which produces the training labels)
+    must return the SAME travel for the same parameters -- they are two
+    implementations of one metric, and a divergence would put the surrogate on
+    labels the analytical answer never reproduces."""
+    from ml_pipeline.physics.transport import (params_from_features, solve_plume,
+                                               mc_field_metrics)
+    for hg in (FRACTURED, POROUS):
+        feat = build_feature_row(
+            domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+            operation_days=8 * 365.0, wellfield_width_m=300.0,
+            source_conc_C0=15000.0, background_conc_Cb=2.0,
+            eval_time_days=12 * 365.0, **hg)
+        p = params_from_features(feat, species_C0=15000.0, t_days=12 * 365.0,
+                                 operation_days=8 * 365.0)
+        m1 = solve_plume(p, threshold=U_THR, background=2.0, grid_n=100).metrics
+        m2 = mc_field_metrics([p], threshold=U_THR, background=2.0, grid_n=100)
+        assert m2["max_dist_m"][0] == pytest.approx(
+            m1["max_migration_distance_m"], rel=1e-9)
