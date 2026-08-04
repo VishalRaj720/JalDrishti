@@ -109,6 +109,21 @@ def test_monthly_steps_visit_every_month_exactly_once():
     assert sorted(months) == list(range(1, 13)), f"skipped/repeated months: {months}"
 
 
+def test_only_the_four_cgwb_campaign_months_are_labelled_measured():
+    """CGWB samples 4 campaigns/yr. The animation shows 12 months, so 8 of them
+    are interpolated -- it must SAY which, not present all twelve as equally
+    evidenced."""
+    measured, interpolated = [], []
+    for m in range(12):
+        tl = _timeline("2026-01-01", 2 + m / 12, 8.0, 5.0)
+        (measured if tl["water_table_measured"] else interpolated).append(tl["month"])
+    assert sorted(measured) == sorted(P.WATER_TABLE_CAMPAIGNS_M) == [1, 5, 8, 11]
+    assert len(interpolated) == 8
+    assert "measured" in _timeline("2026-01-01", 2.0, 8.0, 5.0)["water_table_basis"]
+    assert "interpolated" in _timeline(
+        "2026-01-01", 2 + 1 / 12, 8.0, 5.0)["water_table_basis"]
+
+
 def test_phase_end_dates_are_ordered():
     tl = _timeline("2026-01-01", 1.0, 8.0, 5.0)
     d = dt.date.fromisoformat

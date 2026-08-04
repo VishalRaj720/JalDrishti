@@ -443,7 +443,10 @@ function renderTimeline(t) {
   const nice = d.toLocaleDateString(undefined, { year: "numeric", month: "short" });
   out.innerHTML = `<b class="tl-date-now">${nice}</b> · year ${t.elapsed_years}`
     + ` · <span style="color:${PH[t.phase]}">${t.phase_label}</span>`
-    + ` · <span class="tl-season tl-${t.season}">${t.season}</span>`;
+    + ` · <span class="tl-season tl-${t.season}">${t.season}</span>`
+    // CGWB samples 4 campaigns/yr; the other 8 months are interpolated. Say so.
+    + ` <span class="tl-basis ${t.water_table_measured ? "meas" : "interp"}"`
+    + ` title="${t.water_table_basis}">${t.water_table_measured ? "measured" : "interp."}</span>`;
   // lifecycle bar: operation | restoration | drift, with a now-marker
   const maxT = +document.getElementById("time").max;
   const op = +val("op"), rest = +val("rest");

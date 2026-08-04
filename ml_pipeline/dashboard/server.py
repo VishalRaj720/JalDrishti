@@ -172,6 +172,14 @@ def _timeline(start_date: str | None, t_years: float, op_years: float,
         "elapsed_years": round(float(t_years), 2),
         "month": now.month,
         "season": P.SEASON_LABELS[now.month],
+        # HONESTY: CGWB samples FOUR campaigns a year (Jan/May/Aug/Nov). Those
+        # months are MEASURED; the other eight are interpolated between them.
+        # The animation must say which it is showing rather than presenting all
+        # twelve as if they were equally evidenced.
+        "water_table_measured": now.month in P.WATER_TABLE_CAMPAIGNS_M,
+        "water_table_basis": ("CGWB campaign (measured)"
+                              if now.month in P.WATER_TABLE_CAMPAIGNS_M
+                              else "interpolated between CGWB campaigns"),
         "phase": phase,
         "phase_label": phase_label,
         "operation_ends": (t0 + _dt.timedelta(days=op_years * 365.25)).isoformat(),
