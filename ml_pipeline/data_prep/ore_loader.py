@@ -59,7 +59,7 @@ def _ore():
     deposits: list of (name, shapely_polygon_buffered, prepared).
     belt:     (polygon, prepared) for the regional envelope, or None.
     """
-    deposits, belt = [], None
+    deposits, belt, raw_deposits = [], None, []
     with ORE_CSV.open(encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
             geom = wkt.loads(row["geometry_wkt"]).buffer(0)
@@ -67,8 +67,51 @@ def _ore():
             if name == P.ORE_BELT_NAME:
                 belt = geom
             else:
+                raw_deposits.append(geom)
                 buffered = geom.buffer(P.ORE_DEPOSIT_BUFFER_DEG)
                 deposits.append((name, buffered, prep(buffered)))
+
+    # ------------------------------------------------------------------ #
+    # BELT REGISTRATION FIX (2026-08-04)
+    #
+    # The hand-drawn belt arc in the CSV describes itself as an "Approximate
+    # envelope enclosing the known deposit cluster ... that hosts all deposits
+    # above" -- but it does not. Measured: it contains only Jaduguda; the other
+    # SIX documented deposits fall 1.0-13.7 km OUTSIDE it, because the arc sits
+    # roughly 6 km south of the actual deposit chain. Consequences: pins between
+    # real deposits resolved to zone="none", which zeroed the uranium source term
+    # AND (because Ra-226 is ore-zone gated) made radium show no plume anywhere
+    # off a deposit -- the belt tier was effectively dead.
+    #
+    # Fix: union the CSV arc with the convex hull of the ACTUAL deposit polygons.
+    # Strictly ADDITIVE -- no pin that is currently "belt" loses that status --
+    # and derived entirely from deposit coordinates already in the dataset, so it
+    # invents no new geology. The hull alone is ~268 km2 versus the arc's ~264,
+    # i.e. this corrects the belt's POSITION rather than inflating its extent.
+    #
+    # The CSV row is deliberately left untouched: it is the record of what was
+    # originally drawn, and correcting here keeps the fix visible, tested, and
+    # immune to a silent re-import.
+    # ------------------------------------------------------------------ #
+    # A second, independent defect the hull alone does not cure: the 3.6b source
+    # taper ramps C0 from a deposit's own value down to the flat belt value over
+    # ORE_TAPER_KM, but `_belt_c0` only runs for zone == "belt". Where the belt
+    # does not extend that far around a deposit, the taper has nowhere to act and
+    # C0 falls off a cliff to background -- reintroducing exactly the hard step
+    # 3.6b was built to remove. Measured before this fix: a pin 12 m outside the
+    # Jaduguda halo was already "none". The belt must therefore cover at least
+    # the taper radius around every deposit for the taper to be reachable.
+    if raw_deposits:
+        merged = unary_union(raw_deposits)
+        # The taper measures distance from the BUFFERED deposit (raw + 500 m
+        # halo), so the belt must be buffered from the raw polygon by the halo
+        # PLUS the taper length -- otherwise the belt runs out ~500 m early and
+        # the ramp is truncated mid-slope (measured: it died at 2.5 km of 3.0,
+        # still at C0 918 of 1706, so the "continuous" taper ended in a cliff).
+        taper_deg = P.ORE_DEPOSIT_BUFFER_DEG + float(P.ORE_TAPER_KM) / _DEG_TO_KM
+        extra = [merged.convex_hull, merged.buffer(taper_deg)]
+        belt = unary_union(extra if belt is None else [belt, *extra])
+
     belt_pair = (belt, prep(belt)) if belt is not None else None
     return deposits, belt_pair
 
@@ -97,12 +140,21 @@ def ore_zone_at(lon: float, lat: float) -> dict:
     else:
         zone = "none"
 
+    # Distance is reported in BOTH km and whole metres. Rounding to 0.1 km alone
+    # displayed a pin 12 m outside Jaduguda as "0.0 km" while the zone read
+    # "none" -- a flatly contradictory readout ("you are on the deposit, there is
+    # no deposit"). Metres disambiguate the near-miss that the km rounding hides.
+    nearest_m = (None if nearest_deg == float("inf")
+                 else round(nearest_deg * _DEG_TO_KM * 1000.0))
     return {
         "zone": zone,
         "deposit_name": inside_deposit,
         "nearest_deposit": nearest_name,
         "nearest_deposit_km": (None if nearest_deg == float("inf")
-                               else round(nearest_deg * _DEG_TO_KM, 1)),
+                               else round(nearest_deg * _DEG_TO_KM, 2)),
+        "nearest_deposit_m": nearest_m,
+        # explicit so callers never infer "inside" from a rounded-to-zero distance
+        "inside_deposit": inside_deposit is not None,
     }
 
 

@@ -522,7 +522,7 @@ function render() {
   }
 
   renderMetrics(r);
-  renderNotice(r.notice);
+  renderNotice(r.notice, r.ore_zone);
   renderFarField(r.far_field_note, r.nearest_river_km);
   renderVertical(r.vertical);
   renderTimeline(r.timeline);
@@ -536,11 +536,23 @@ function renderFarField(note, riverKm) {
 }
 
 /* ---------------- Module 2: ore-zone notice ---------------- */
-function renderNotice(notice) {
+function renderNotice(notice, ore) {
   const el = document.getElementById("ore-notice");
   if (!el) return;
-  el.textContent = notice || "";
-  el.classList.toggle("hidden", !notice);
+  // Always state the ore-zone tier and the DISTANCE IN METRES. A pin 12 m outside
+  // a deposit used to read "0.0 km from Jaduguda" next to zone "none", which is
+  // self-contradictory; metres make the near-miss legible.
+  let tier = "";
+  if (ore && ore.zone) {
+    const d = ore.nearest_deposit_m;
+    const near = ore.nearest_deposit
+      ? ` · ${d != null && d < 1000 ? d + " m" : (ore.nearest_deposit_km + " km")}`
+        + ` ${ore.inside_deposit ? "inside" : "from"} ${ore.nearest_deposit}`
+      : "";
+    tier = `<span class="ore-tier t-${ore.zone}">${ore.zone}</span>${near}`;
+  }
+  el.innerHTML = tier + (notice ? (tier ? "<br>" : "") + notice : "");
+  el.classList.toggle("hidden", !tier && !notice);
 }
 
 /* ---------------- Module 5A: shallow-impact metric + depth schematic -------- */

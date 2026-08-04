@@ -204,3 +204,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .tl-basis { font-size: 9px; padding: 1px 5px; border-radius: 7px; }
 .tl-basis.meas { background: rgba(55,211,155,.16); color: #37d39b; }
 .tl-basis.interp { background: rgba(139,151,167,.18); color: #8b97a7; }
+.ore-tier { display: inline-block; font-size: 9px; text-transform: uppercase;
+  letter-spacing: .04em; padding: 1px 6px; border-radius: 7px; margin-right: 4px; }
+.ore-tier.t-deposit { background: rgba(255,45,45,.20); color: #ff7a7a; }
+.ore-tier.t-belt { background: rgba(255,184,77,.18); color: #ffb84d; }
+.ore-tier.t-none { background: rgba(139,151,167,.18); color: #8b97a7; }
