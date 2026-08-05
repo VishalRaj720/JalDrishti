@@ -1020,14 +1020,33 @@ def solve_plume(params: TransportParams, *, threshold: float, background: float,
     metrics["max_downgradient_m"] = reach
     metrics["Xc_m"] = params.Xc
     metrics["off_scale"] = bool(off_scale)
+    # Source-zone state, so the UI can EXPLAIN rather than just show a bare 0.
+    # The leach disc is uniform-concentration by construction, so when its single
+    # value crosses the incremental threshold the whole footprint leaves the
+    # exceedance area at once (radium at Jaduguda: 9.06 ha -> 0.00 ha between
+    # t = 32 and t = 33 yr, as the 30-yr flush takes disc_conc 979.8 -> 957.5
+    # against thr_inc 977). That is arithmetically correct for a uniform disc,
+    # but it reads as a fault unless the surface says what happened.
+    metrics["source_zone_conc"] = float(params.disc_conc)
+    metrics["source_zone_above_threshold"] = bool(params.disc_conc >= thr_inc)
+    metrics["source_zone_radius_m"] = float(params.disc_radius_m)
 
     if compliance_x is not None:
         c_comp = concentration_point(compliance_x, 0.0, params)   # plume-only, true reach
         metrics["compliance_conc"] = c_comp + background          # absolute
         metrics["breaches_at_compliance"] = bool(c_comp >= metrics["incremental_threshold"])
 
-    # display field: union the source-zone disc so the map shows it (metrics above
-    # already separated plume-travel from the disc footprint)
+    # ---- DISPLAY FIELD (metrics above are already final -- nothing here can
+    # change a label) ------------------------------------------------------
+    # DROP THE UPSTREAM ARTIFACT BOX FROM THE MAP (2026-08-05, user-reported).
+    # The Domenico simplification paints the whole upstream half-plane at C0
+    # (ARCHITECTURE section 10). The METRICS have excluded x <= 0 since the
+    # migration re-base, but the DISPLAY field still carried it, so the map drew
+    # a solid rectangle of "contamination" upstream of the wellfield -- 4.58 ha
+    # of it at t = 0 while the area metric correctly read 0.00 ha. Users saw a
+    # rectangle appear before injection started and double within a month.
+    # Display and metric must agree; the source footprint is the E1 disc's job.
+    C = np.where(X > 0.0, C, 0.0)
     if disc_mask is not None:
         C = np.where(disc_mask, np.maximum(C, params.disc_conc), C)
 

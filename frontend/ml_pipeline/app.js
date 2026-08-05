@@ -305,11 +305,22 @@ function renderConfidence(dc) {
   el.classList.remove("hidden");
 }
 
+/* The evaluation-time slider steps 1/12 yr so the timeline can walk month by
+   month, but it was rendering the raw float ("10.0833333"). Show years+months. */
+function fmtYearsMonths(v) {
+  const t = +v;
+  let y = Math.floor(t + 1e-9);
+  let mo = Math.round((t - y) * 12);
+  if (mo === 12) { y += 1; mo = 0; }          // rounding must not print "9 y 12 mo"
+  if (y === 0 && mo === 0) return "0";
+  return mo === 0 ? `${y}` : `${y} y ${mo} mo`;
+}
+
 /* ---------------- controls ---------------- */
 const sliders = [
   ["inj", "v-inj", v => v], ["bleed", "v-bleed", v => (+v).toFixed(1)],
   ["op", "v-op", v => v], ["grad", "v-grad", v => (+v).toFixed(4)],
-  ["time", "v-time", v => v], ["width", "v-width", v => v],
+  ["time", "v-time", fmtYearsMonths], ["width", "v-width", v => v],
   ["rest", "v-rest", v => v], ["az", "v-az", v => v],
   ["oredepth", "v-oredepth", v => v], ["orethick", "v-orethick", v => v],
 ];
@@ -398,7 +409,7 @@ function tlSetTime(t) {
   const el = document.getElementById("time");
   const tt = Math.min(Math.max(t, +el.min), +el.max);
   el.value = tt;
-  document.getElementById("v-time").textContent = (+el.value).toFixed(1);
+  document.getElementById("v-time").textContent = fmtYearsMonths(+el.value);
   return +el.value;
 }
 
@@ -754,6 +765,33 @@ function renderMetrics(r) {
     el.textContent += ` · Λ=${r.plume.lambda_radial}: the front has not cleared the`
       + ` wellfield footprint — contaminated area is dominated by the leach zone,`
       + ` not by travel`;
+  }
+
+  // A footprint that drops to zero is arithmetic, not a fault -- say which.
+  // The leach disc is uniform-concentration, so once the post-closure flush
+  // takes it under the limit the whole footprint leaves the exceedance area in
+  // one step. The SURROGATE cannot represent that step (it fits a smooth
+  // function), so in ML mode the card and this note would otherwise contradict
+  // each other -- name the analytical value explicitly instead.
+  const sz = r.plume.source_zone;
+  if (sz && !sz.above_threshold && sz.radius_m > 0) {
+    const ana = r.metrics.analytical.area_ha;
+    document.getElementById("m-area-band").textContent =
+      `leach zone has flushed below the limit (${sz.conc} < ${sz.threshold} ${U})`
+      + ` — analytical engine: ${ana.toFixed(2)} ha`
+      + (useML ? " · the ML surrogate cannot represent this step; trust the analytical value here"
+               : "");
+  }
+  // eta saturates at 1, and only holds the front while operating: say so rather
+  // than letting the bleed slider look broken.
+  const ct = r.containment;
+  if (ct) {
+    const el = document.getElementById("m-dist-band");
+    if (ct.saturated)
+      el.textContent += " · bleed at full capture (η=1) — more bleed cannot help";
+    if (ct.post_closure_years > 0)
+      el.textContent += ` · ${ct.post_closure_years} yr of the travel is post-closure drift,`
+        + " after containment stopped";
   }
 
   // the map cannot show a sub-metre envelope; an empty map is not a broken one

@@ -356,6 +356,10 @@ def api_predict(req: PredictRequest):
     else:
         azimuth, azimuth_source = 0.0, "indeterminate_divide"
 
+    # effective containment (after pump-downtime degradation) for the diagnostic
+    from ml_pipeline.ml.predict import features_from_inputs as _ffi
+    _feat_eta = _ffi(**inputs)[1]["_eta_eff"]
+
     # --- analytical (always: provides the plume geometry) ---
     a = predict_analytical(**inputs)
     field = a.pop("_field")
@@ -523,6 +527,18 @@ def api_predict(req: PredictRequest):
         "threshold": threshold,
         "azimuth_deg": round(azimuth, 1),
         "azimuth_source": azimuth_source,
+        # Containment diagnostic. eta = min(1, Q_net/(q*b*W)) SATURATES at 1, so
+        # past the bleed that first achieves full capture the slider does nothing
+        # -- measured at Jaduguda: migration flat from ~2.1% bleed upward. And
+        # eta only holds the front WHILE OPERATING, so at long evaluation times
+        # most travel happened after containment stopped mattering. Surfaced so
+        # the UI can say this instead of looking unresponsive.
+        "containment": {
+            "eta": round(float(_feat_eta), 4),
+            "saturated": bool(_feat_eta >= 0.999),
+            "operating_years": round(float(req.operation_years), 2),
+            "post_closure_years": round(max(req.time_years - req.operation_years, 0.0), 2),
+        },
         "mode": req.mode,
         "notice": notice,
         "far_field_note": far_field_note,
@@ -546,6 +562,16 @@ def api_predict(req: PredictRequest):
             # dominates -> "migration" reads as contaminated EXTENT, not travel.
             "lambda_radial": round(fm["Xc_m"] / max(half_w, 1.0), 2),
             "radial_dominated": bool(fm["Xc_m"] / max(half_w, 1.0) < 1.0),
+            # Source-zone state, so the UI can EXPLAIN a footprint that drops to
+            # zero rather than leaving the user to read it as a fault. The leach
+            # disc is uniform-concentration, so it leaves the exceedance area in
+            # one step when the post-closure flush takes it under the threshold.
+            "source_zone": {
+                "conc": round(float(fm.get("source_zone_conc", 0.0)), 2),
+                "threshold": round(float(fm["incremental_threshold"]), 2),
+                "above_threshold": bool(fm.get("source_zone_above_threshold", False)),
+                "radius_m": round(float(fm.get("source_zone_radius_m", 0.0)), 1),
+            },
         },
         "metrics": {
             "analytical": {
