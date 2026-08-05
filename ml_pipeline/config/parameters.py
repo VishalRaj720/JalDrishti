@@ -146,6 +146,36 @@ RADIUM_KD_RANGES = {
 # the rest of the model does not have. Recorded here so the omission is explicit.
 RADIUM_HALFLIFE_YEARS = 1600.0
 
+# ---------------------------------------------------------------------------
+# Ra-226 INGROWTH from deposited uranium -- DELIBERATELY NOT MODELLED
+# ---------------------------------------------------------------------------
+# Reasonable question (user, 2026-08-06): the engine immobilises migrating U(VI)
+# as U(IV) by redox trapping, and Ra-226 is a U-238 daughter -- so should radium
+# not appear wherever uranium was deposited, even where dissolved radium never
+# reached?
+#
+# In principle yes; on this tool's horizon, no, by three to four orders of
+# magnitude. The chain is
+#   U-238 -> Th-234 (24.1 d) -> Pa-234m (1.2 min) -> U-234 (245,500 yr)
+#         -> Th-230 (75,380 yr) -> Ra-226 (1,600 yr)
+# and freshly deposited natural uranium carries U-234 already near secular
+# equilibrium, so the rate-limiting step to Ra-226 is Th-230 at 75,380 yr.
+# Fraction of secular-equilibrium Ra-226 reached after deposition:
+#       1 yr  0.00092%      100 yr  0.0919%
+#      10 yr  0.0092%     1,000 yr  0.915%
+#      50 yr  0.0460%    10,000 yr  8.79%
+# So even if EVERY migrating uranium atom immobilised on day one, the radium it
+# generates by year 50 sits ~2,200x below the uranium activity that produced it,
+# and then has to partition into water against a Kd of 500-2,400 L/kg before it
+# could be measured. Modelling it would add machinery whose output is
+# indistinguishable from zero at every time this tool can display.
+#
+# It is NOT negligible on geological timescales, which is precisely why the
+# Singhbhum ore bodies carry Ra-226 in secular equilibrium today. If the horizon
+# is ever extended past ~1,000 yr, this omission must be revisited.
+RADIUM_INGROWTH_MODELLED = False
+TH230_HALFLIFE_YEARS = 75380.0   # the bottleneck, recorded for that revisit
+
 # Training C0 range for the synthetic generator (2026-08-02 retrain). Radium has
 # no Texas ISR series to sample a source envelope from (see RADIUM_SOURCE_MBQ_L
 # above), so the generator draws C0 uniformly over the FULL range the SERVE path
