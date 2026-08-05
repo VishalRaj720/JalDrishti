@@ -246,6 +246,64 @@ meaningless.** Every Monte-Carlo draw landed on the same grid artefact, so the
 band had ~zero width and the Mondrian conformal calibration was calibrating a
 constant. Relative band width is now 1.3–4.0.
 
+### Round 2 (2026-08-05) — the plume was far too small, and round 1 caused part of it
+
+A literature cross-check (prompted by the served answer looking implausibly
+contained) found the fractured uranium plume moving ~0.4 m in 20 years, against
+real ISR practice where excursions are routinely detected at 100–150 m monitoring
+rings. Three causes, one of them introduced by round 1:
+
+1. **Redox trapping was double-counted** (dominant). `exp(-k·age)` charged the
+   reduction rate over the **sorption-retarded** residence, `age = x/v_c` with
+   `v_c = v/(1+β·R_m)`. But retardation and redox trapping both remove uranium
+   from the advancing front — uranium held in the matrix by sorption is *already*
+   immobilised, which is precisely what the retardation term represents — so
+   charging it the reduction rate for that same residence removes the mass twice.
+   It also asserted ~900× more reduced uranium than the finite reducing capacity
+   this config already flags as unmodelled. Measured: **0.4699 decay per metre**,
+   i.e. the plume annihilated within 1 m, below the model's own grid resolution.
+   Now charged on the mobile residence: 0.00587/m, which back-checks against the
+   Wyoming test that calibrated k (100 m in 3.6 yr losing ~50%, vs ~50% in ~1 yr
+   observed). **This was a round-1 side-effect**: β_eff correctly retarded the
+   front and simultaneously, silently, inflated the attenuation by the same 82×.
+
+2. **The leach-zone disc existed before the mine did.** Drawn at full radius and
+   full C₀ from t = 0 — π·(150 m)² = **7.07 ha of "vulnerable area" at zero pore
+   volumes injected**. Radius now scales `√(min(1, PV))`, so area grows linearly
+   with throughput from nothing and saturates within weeks. Training times start
+   at t = 2 yr, so this changes the served early-time answer only.
+
+3. **Depth decay is real but secondary** — 4.08 m at 50 m ore depth against
+   0.44 m at 180 m, a ~9× effect, versus the attenuation's ~80×.
+
+**A fix that was implemented, measured and rejected** — recorded because the
+reasoning outlives the decision. Deriving ω from fracture geometry
+(ω = 3·D_e/(R_m·L²)) is self-defeating: β_eff·ω = 3·β·D_e/L², **R_m cancels**, so
+early-time retardation becomes species-blind — the exact defect β_eff exists to
+remove (radium's front rose to 9.50 m against uranium's 13.22 m). The deeper
+reason is that a first-order mobile/immobile model *cannot* represent early-time
+matrix diffusion: true uptake grows as √(R_m·D_e·t), so retardation scales as
+√R_m, and the first-order form can only deliver R_m or R_m⁰. The **Tang kernel
+already carries the correct √ scaling** and governs through the `max()` — fixing
+(1) is what let it win. `OMEGA_FROM_GEOMETRY` and the derivation of the √t clock
+that *would* fix the continuum branch are retained in config, default off.
+
+**Correction to a claim made during this work:** the fixed ω was described as
+"1000× to 10⁶× off". That used an *assumed* 0.1–10 m fracture spacing. The
+model's own aperture and mobile porosity imply L = b_half/φ_mobile ≈ **1.7 cm**,
+giving t_eq ≈ 14 yr for uranium against the pinned 2.7 yr — a **~5× error**.
+
+Served effect at Jaduguda (ore depth 180 m, t = 20 yr): uranium **0.44 → 7.11 m**,
+sulfate 20.00 m, TDS 77.12 m, radium 0.00 m; t = 0 area **7.07 → 0.00 ha**;
+maxed-out uranium **33 → 622.6 m**. Label diff over an identical 100-scenario
+pilot moved **only fractured uranium (×4.08)** and left all other regime×species
+cells bit-identical — the expected signature, since uranium is the only species
+with k > 0 and fractured the only regime with β_eff.
+
+**Still open after round 2:** `wellfield_width_m` is the *diameter of the circular
+well-pattern footprint*, not a width or a borehole size, and the UI label invites
+exactly that misreading.
+
 ---
 
 ## Bottom line
