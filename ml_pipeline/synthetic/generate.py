@@ -57,6 +57,7 @@ from ml_pipeline.data_prep.flow_field import flow_at
 from ml_pipeline.data_prep.strike_field import strike_at, anisotropy_from_variance
 from ml_pipeline.data_prep.texas_loader import (
     texas_source_signature, texas_restoration_residual,
+    texas_restoration_spread,
 )
 from ml_pipeline.physics.transport import (
     simulate_plume, front_position, matrix_sigma, TransportParams,
@@ -162,9 +163,15 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     # -- a hydraulic sweep barely removes strongly-sorbed radium).
     if rng.uniform() < IR["restoration_prob"]:
         rest_years = float(rng.uniform(0.25, OR["restoration_years"][1]))
+        # Sample the REAL between-site spread (review2.md V-3): the per-mine
+        # Texas ratios run 0.023-0.248 for uranium, an order of magnitude that
+        # the single served value hid. The old x0.7-1.5 jitter was arbitrary,
+        # species-independent, and NARROWER than the observed variability.
+        # Radium keeps the config jitter -- it has no Texas series at all.
+        _spread = texas_restoration_spread()
         residual = {sp: float(np.clip(
             P.restoration_endpoint_for(sp, rest_residual)
-            * rng.uniform(*IR["residual_noise_mult"]),
+            * rng.uniform(*_spread.get(sp, IR["residual_noise_mult"])),
             0.02, 1.0)) for sp in SPECIES}
     else:
         rest_years = 0.0
@@ -325,7 +332,7 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     Xc_clean, C_res = None, 0.0
     if f_src < 1.0:
         C_res = f_src * scn["C0"][species]
-        Xc_clean = front_position(v_base, 1.0, t_days, op_days, rest_days, beta_k,
+        Xc_clean = front_position(v_base, 1.0, t_days, op_days, 0.0, beta_k,
                                   omega=omega_k)
 
     # First-order U natural attenuation (uranium only): scenario-level k with a

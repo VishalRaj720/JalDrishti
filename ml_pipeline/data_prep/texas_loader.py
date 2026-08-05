@@ -263,25 +263,69 @@ def texas_source_signature() -> dict[str, tuple[float, float]]:
     return out
 
 
-def texas_restoration_residual() -> dict[str, float]:
-    """Per-species residual source fraction after restoration, derived from the
-    real sheets:  residual = median('Final Post-restoration') / median('End of
-    Mining').  This is the C_rest/C0 step applied by the transport engine's
-    restoration superposition. Clipped to [0.02, 1.0]; falls back to config
-    values when a sheet is too sparse.
+def _paired_residual_ratios() -> dict[str, list]:
+    """Per-MINE restoration ratios, paired between the two sheets.
+
+    The previous estimator was median(Final Post-restoration) / median(End of
+    Mining) -- a ratio of medians over UNPAIRED samples of very different size
+    (9 EOM rows vs 92 post rows, only 7 mines common). That does not estimate
+    per-site restoration efficiency; it conflates clean-up performance with
+    which mines happen to appear in which sheet. Corrected 2026-08-05
+    (review2.md V-3) to the median of per-mine ratios.
+
+    Numerically the two are close (uranium 0.0659 -> 0.0600), so this is not a
+    large shift in the central value -- the point is the SPREAD it exposes:
+    per-mine uranium ratios run 0.023 to 0.248, an order of magnitude, which the
+    single served value hid entirely.
     """
-    from ml_pipeline.config.parameters import RESTORATION_FALLBACK_RESIDUAL
     geo = load_texas_geochem()
     eom, post = geo["End of Mining"], geo["Final Post-restoration"]
+
+    def _label(d):
+        return "Mine" if "Mine" in d.columns else d.columns[1]
+
+    le, lp = _label(eom), _label(post)
+    me = eom[le].astype(str).str.strip()
+    mp = post[lp].astype(str).str.strip()
+    common = sorted(set(me) & set(mp))
     mapping = {"uranium_ppb": "Uranium", "sulfate_mg_l": "Sulfate", "tds_mg_l": "TDS"}
     out = {}
     for key, col in mapping.items():
-        e = pd.to_numeric(eom.get(col), errors="coerce").dropna() if col in eom else pd.Series(dtype=float)
-        p = pd.to_numeric(post.get(col), errors="coerce").dropna() if col in post else pd.Series(dtype=float)
-        if len(e) >= 2 and len(p) >= 2 and e.median() > 0:
-            out[key] = float(np.clip(p.median() / e.median(), 0.02, 1.0))
+        ratios = []
+        for m in common:
+            e = pd.to_numeric(eom.loc[me == m, col], errors="coerce").dropna()
+            q = pd.to_numeric(post.loc[mp == m, col], errors="coerce").dropna()
+            if len(e) and len(q) and e.median() > 0:
+                ratios.append(float(np.clip(q.median() / e.median(), 0.02, 1.0)))
+        out[key] = ratios
+    return out
+
+
+def texas_restoration_residual() -> dict[str, float]:
+    """Per-species residual source fraction C_rest/C0, as the PAIRED median of
+    per-mine ratios (see _paired_residual_ratios). Falls back to config when
+    fewer than 3 mines pair."""
+    from ml_pipeline.config.parameters import RESTORATION_FALLBACK_RESIDUAL
+    out = {}
+    for key, ratios in _paired_residual_ratios().items():
+        out[key] = (float(np.median(ratios)) if len(ratios) >= 3
+                    else RESTORATION_FALLBACK_RESIDUAL[key])
+    return out
+
+
+def texas_restoration_spread() -> dict[str, tuple[float, float]]:
+    """Observed (min, max) per-mine restoration ratio per species -- the REAL
+    between-site variability, for the Monte Carlo to sample instead of the
+    arbitrary x0.7-1.5 jitter that was narrower than reality and not derived
+    from it. Returns multiplicative bounds RELATIVE to the paired median."""
+    from ml_pipeline.config.parameters import RESTORATION_FALLBACK_RESIDUAL
+    out = {}
+    for key, ratios in _paired_residual_ratios().items():
+        if len(ratios) >= 3:
+            med = float(np.median(ratios))
+            out[key] = (float(min(ratios)) / med, float(max(ratios)) / med)
         else:
-            out[key] = RESTORATION_FALLBACK_RESIDUAL[key]
+            out[key] = (0.7, 1.5)
     return out
 
 

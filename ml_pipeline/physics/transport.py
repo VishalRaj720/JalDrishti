@@ -388,10 +388,38 @@ class TransportParams:
     atten_hold_factor: float = 1.0
 
 
+def _ogata_banks_second_term(X, Xc, aL):
+    """Second Ogata-Banks (1961) term. vt=Xc and D_L*t=aL*Xc, so v/D_L = 1/aL and
+    the term is 1/2 exp(x/aL) erfc[(x+Xc)/(2 sqrt(aL Xc))]. exp overflows long
+    before erfc underflows and inf*0 is NaN, so it is evaluated only where the
+    exponent is representable; beyond that the product is provably negligible.
+
+    Restored 2026-08-05: DOMENICO_ERROR_ENVELOPE.md measured the truncation
+    UNDER-predicting centreline concentration by a median 17-24% (max 42%; 23.6%
+    at the 100 m ring) against an exact convolution self-validated to 1.1e-16.
+    Asymptotically this term is a Gaussian bump centred on x = Xc, which is why
+    the deficit wave had to be re-launched with it (see params_from_features).
+    Upstream is unaffected: exp(x/aL) -> 0 for x < 0."""
+    expo = X / aL
+    # DOMAIN GATE: Ogata-Banks is derived for a SEMI-INFINITE domain x >= 0 with
+    # C(0,t) = C0. Upstream the second term is meaningless and drives the sum
+    # ABOVE 1 -- measured F_long = 1.18 at x = -9.9 m, i.e. concentration above
+    # the source, which then defeated the restoration deficit wave (the wave is
+    # pinned to full strength for x <= 0, so an unbounded base term left
+    # 2,207 ppb behind and made longer sweeps look dirtier). The truncated form
+    # was accidentally bounded (0.5*erfc <= 1), which is why this never showed
+    # before. The upstream half-plane remains the documented artifact zone,
+    # carried by the E1 disc.
+    safe = (expo < 700.0) & (X > 0.0)
+    arg2 = (X + Xc) / (2.0 * np.sqrt(aL * Xc))
+    return np.where(safe, 0.5 * np.exp(np.where(safe, expo, 0.0)) * erfc(arg2), 0.0)
+
+
 def _long_factor(X: np.ndarray, Xc: float, aL: float) -> np.ndarray:
     Xc = max(Xc, 1e-3)
     aL = max(aL, 1e-3)
-    return 0.5 * erfc((X - Xc) / (2.0 * np.sqrt(aL * Xc)))
+    return np.clip(0.5 * erfc((X - Xc) / (2.0 * np.sqrt(aL * Xc)))
+                   + _ogata_banks_second_term(X, Xc, aL), 0.0, 1.0)
 
 
 def _tran_factor(X: np.ndarray, Y: np.ndarray, aT: float, W: float) -> np.ndarray:
@@ -913,8 +941,20 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
     Xc_clean, C_res = None, 0.0
     if f_src < 1.0:
         C_res = f_src * species_C0
+        # DEFICIT WAVE LAUNCHED AT THE START OF THE SWEEP (2026-08-05).
+        # It used to be held for the sweep's whole duration (restoration_days
+        # passed here), so a LONGER sweep delayed the clean water further and
+        # left MORE contamination: peak conc rose 955 -> 2209 ppb across rest
+        # 10 -> 30 yr, violating MONOTONE_MAPS["restoration_years"] = -1, the
+        # very law the trainer enforces. Harmless while the longitudinal factor
+        # was truncated; exposed the moment the second Ogata-Banks term (a
+        # Gaussian bump at x = Xc) was restored to the BASE plume, because the
+        # wave's own bump sat at Xc_clean ~ 0 and could no longer cancel it.
+        # Clean water enters the source zone when the sweep BEGINS, so the
+        # replacement front is released at end-of-operations and drifts from
+        # there (rest_days = 0 in its own kinematics).
         Xc_clean = front_position(v_base, 1.0, t_days, operation_days,
-                                  restoration_days, beta_k)
+                                  0.0, beta_k)
 
     # E1 leach-zone disc (Stage E): OFF unless P.E1_ENABLED, so the served path
     # stays byte-identical to the deployed-ML geometry until the atomic cutover.
@@ -1036,7 +1076,8 @@ def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
     Xc = np.maximum(Xc, 1e-3)
     aL = np.maximum(aL, 1e-3)
     aT = np.maximum(aT, 1e-4)
-    A_long = 0.5 * erfc((X3 - Xc) / (2.0 * np.sqrt(aL * Xc)))
+    A_long = np.clip(0.5 * erfc((X3 - Xc) / (2.0 * np.sqrt(aL * Xc)))
+                     + _ogata_banks_second_term(X3, Xc, aL), 0.0, 1.0)
     Xpos = np.where(X3 > 0.1, X3, 0.1)
     tw = 2.0 * np.sqrt(aT * Xpos)
     A_tran = 0.5 * (erf((Y3 + W / 2.0) / tw) - erf((Y3 - W / 2.0) / tw))
@@ -1052,7 +1093,8 @@ def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
     active = rest_active & (C_res < C0)           # sweep exists AND has credit
     if bool(np.any(active)):
         Xcc = np.maximum(Xc_clean, 1e-3)          # 0 -> wall at the source plane
-        A_c = 0.5 * erfc((X3 - Xcc) / (2.0 * np.sqrt(aL * Xcc)))
+        A_c = np.clip(0.5 * erfc((X3 - Xcc) / (2.0 * np.sqrt(aL * Xcc)))
+                      + _ogata_banks_second_term(X3, Xcc, aL), 0.0, 1.0)
         A_c = np.where(X3 <= 0.0, 1.0, A_c)       # source zone fully at C_res
         C = C - np.where(active, C0 - C_res, 0.0) * A_c * A_tran
     # first-order U natural attenuation: travel-time + hold-time parts
