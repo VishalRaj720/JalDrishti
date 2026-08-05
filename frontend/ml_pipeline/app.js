@@ -381,6 +381,13 @@ function runPredict() {
 const MONTH = 1 / 12;
 state.playing = false;
 
+/* Below this the ML migration envelope is smaller than a map pixel at any
+   usable zoom, so it draws as nothing. Post-remediation that is a COMMON and
+   CORRECT outcome (a strongly sorbing species in fractured rock genuinely does
+   not migrate), which is exactly why it has to be stated rather than left as a
+   blank map under an "envelope" legend entry. */
+const ENVELOPE_VISIBLE_M = 10;
+
 function tlStop() {
   state.playing = false;
   const b = document.getElementById("tl-play");
@@ -507,6 +514,14 @@ function render() {
         fill: false, opacity: beyond ? 1 : .9,
       }).addTo(plumeLayer).bindTooltip(`ML migration ${q.toUpperCase()}${note}`);
     });
+    // A strongly retarded plume now yields a SUB-METRE envelope (radium at a
+    // deposit: P10-P90 spans 0.12-1.23 m), which draws as nothing at any usable
+    // zoom. Silently rendering an empty map under a legend that promises an
+    // envelope is indistinguishable from a broken layer, so say it outright.
+    // The ellipses are still drawn — this only adds the explanation.
+    state.envelopeTooSmall = mlm.migration_m.p90 < ENVELOPE_VISIBLE_M;
+  } else {
+    state.envelopeTooSmall = false;
   }
 
   // keep the data-derived azimuth/gradient in sync (only while still auto)
@@ -739,6 +754,12 @@ function renderMetrics(r) {
     el.textContent += ` · Λ=${r.plume.lambda_radial}: the front has not cleared the`
       + ` wellfield footprint — contaminated area is dominated by the leach zone,`
       + ` not by travel`;
+  }
+
+  // the map cannot show a sub-metre envelope; an empty map is not a broken one
+  if (state.envelopeTooSmall) {
+    document.getElementById("m-dist-band").textContent +=
+      " · envelope too small to plot at map scale (no measurable migration)";
   }
 
   // extrapolation / off-scale warnings
