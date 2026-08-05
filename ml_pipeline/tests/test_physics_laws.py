@@ -742,3 +742,36 @@ def test_geometry_derived_omega_stays_off_and_is_documented_why():
         assert (b_t * om_tracer) == pytest.approx(b_r * om_radium, rel=1e-9)
     finally:
         P.OMEGA_FROM_GEOMETRY = False
+
+
+def test_area_is_dominated_by_the_leach_disc_and_this_is_visible():
+    """MAKE THE DOMINANCE EXPLICIT (independent validation, 2026-08-05).
+
+    Since the plume mask was restricted to x > 0, `affected_area_ha` at a
+    contained fractured pin is overwhelmingly the E1 leach-zone DISC -- measured
+    76-97% of the reported area. That is defensible (when nothing migrates, the
+    contaminated ground IS the wellfield footprint) but it means "Total
+    Vulnerable Area" largely reports WELLFIELD SIZE, not transport, and it does
+    NOT respond to K, gradient, retardation or restoration the way a transport
+    metric would.
+
+    Two tests previously asserted that it did, and both passed only because a
+    config-state leak disabled the disc for them. Pin the real behaviour here so
+    the next person reads it as a documented property rather than rediscovering
+    it as a bug."""
+    from ml_pipeline.physics.transport import params_from_features
+    feat = build_feature_row(
+        domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+        operation_days=8 * 365.0, wellfield_width_m=300.0,
+        source_conc_C0=13000.0, background_conc_Cb=2.0,
+        eval_time_days=10 * 365.0, **FRACTURED)
+    p = params_from_features(feat, species_C0=13000.0, t_days=10 * 365.0,
+                             operation_days=8 * 365.0)
+    assert P.E1_ENABLED, "disc must be ON -- production default"
+    disc_ha = math.pi * p.disc_radius_m ** 2 / 1e4
+    total = label(FRACTURED, t_years=10.0)["affected_area_ha"]
+    share = disc_ha / max(total, 1e-9)
+    assert share > 0.5, (
+        f"disc is only {share:.0%} of area -- if this has genuinely fallen, the "
+        f"area metric now carries transport information and the two corrected "
+        f"tests above should be revisited")

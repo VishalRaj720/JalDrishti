@@ -125,7 +125,13 @@ def test_midsweep_is_credited():
 
     dirty = label(FRACTURED, rest_years=0.0)
     mid = label(FRACTURED, rest_years=12.0)     # still running at t=15 (op=5)
-    assert mid["affected_area_ha"] < dirty["affected_area_ha"] * 0.9
+    # Restoration cleans CONCENTRATION, not footprint: the leach zone stays
+    # contaminated (less so), so `affected_area_ha` -- now 76-97% disc -- barely
+    # moves, while peak concentration falls properly. Asserting a 10% area drop
+    # tested the disc, not the clean-up. Corrected 2026-08-05; it passed before
+    # only because of the E1_ENABLED state leak (see tests/conftest.py).
+    assert mid["peak_conc"] < dirty["peak_conc"] * 0.9
+    assert mid["affected_area_ha"] <= dirty["affected_area_ha"] + 1e-9
     # 10 elapsed sweep years must have drawn the source zone down far below
     # what passive flushing alone achieves
     assert src_cell(12.0) < 0.25 * src_cell(0.0), (src_cell(12.0), src_cell(0.0))

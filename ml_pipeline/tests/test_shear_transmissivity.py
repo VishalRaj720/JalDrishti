@@ -60,4 +60,14 @@ def test_shear_zone_enlarges_ore_belt_plume():
                 background_conc_Cb=2.0, species="uranium_ppb", time_years=10.0)
     shear = predict_analytical(**base, K_m_day=_K_SHEAR, thickness_m=P.SHEAR_ZONE_THICKNESS_M)
     poly = predict_analytical(**base, K_m_day=1.12, thickness_m=37.5)
-    assert shear["area_ha"]["p50"] > poly["area_ha"]["p50"]
+    # ASSERT ON TRAVEL, NOT AREA (corrected 2026-08-05, independent validation).
+    # The D5 claim is that a more transmissive shear zone gives a LARGER PLUME,
+    # and it does: migration 86.9 m vs 27.3 m at these settings. But `area_ha` is
+    # now 76-97% leach-zone DISC, and the disc shrinks with aquifer thickness
+    # (thicker b -> larger swept volume -> fewer bulk volumes -> less tanh source
+    # widening), so the shear case has the smaller AREA while having the much
+    # larger plume. Asserting on area tested the wellfield footprint, not
+    # transport. This test only ever passed because a config-state leak
+    # (E1_ENABLED reset to False instead of restored) disabled the disc for
+    # whichever tests ran after test_physics_laws.py -- see tests/conftest.py.
+    assert shear["migration_m"]["p50"] > poly["migration_m"]["p50"]
