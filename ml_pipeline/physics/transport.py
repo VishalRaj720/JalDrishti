@@ -238,6 +238,79 @@ def effective_capacity_ratio(beta: float, phi_total: float, grain_density: float
     return float(beta * (Rm ** s))
 
 
+def matrix_transfer_omega(phi_mobile: float, phi_total: float,
+                          grain_density: float, kd_L_kg: float,
+                          De_m2_day: float | None = None,
+                          half_aperture_m: float | None = None) -> float:
+    """First-order mobile/immobile transfer rate omega [1/day], DERIVED from the
+    fracture geometry the rest of the model already assumes.
+
+    WHY THIS IS NOT A CONSTANT (remediation 2026-08-05, round 2)
+    ------------------------------------------------------------
+    omega sets how fast the immobile (matrix) capacity is actually reached; the
+    retarded clock approaches its asymptotic 1+beta on a timescale 1/omega. It
+    was pinned at 1e-3/day -- about 2.7 years -- for EVERY species. But the time
+    to load a matrix block is t ~ L^2*R_m/De, which depends strongly on sorption,
+    so one constant is wrong in both directions at once. Using the model's own
+    aperture and mobile porosity (parallel-plate: phi_mobile = b_half/L, so
+    L = b_half/phi_mobile ~ 1.7 cm here):
+
+        species   R_m      t_eq          omega_physical vs the pinned 1e-3
+        TDS         1.0    0.2 yr        54x   FASTER  (model over-retarded it)
+        sulfate     5.4    0.8 yr        10x   faster
+        uranium    89.9   13.7 yr        0.6x  slower
+        radium   44459   6767   yr      826x   SLOWER  (model let it equilibrate
+                                                 in 2.7 yr when the physics needs
+                                                 millennia)
+
+    So the constant made conservative tracers look MORE retarded than they are
+    and strongly sorbing species reach a full matrix-equilibrated retardation
+    they cannot physically reach inside this tool's 0-50 year horizon.
+
+    Standard slab approximation to Fickian matrix diffusion [van Genuchten &
+    Wierenga 1976; Parker & Valocchi 1986]:  omega ~ 3*D_a/L^2, D_a = De/R_m.
+    Introduces NO new parameter -- L comes from the aperture and mobile porosity
+    already in the feature row.
+
+    HONEST LIMITATION: a first-order model cannot reproduce the sqrt(t)
+    early-time behaviour of true diffusion at all; it relaxes exponentially. The
+    Tang kernel (matrix_sigma / tang_attenuation) is the exact solution and is
+    unioned with this branch precisely so the exact one can govern. This makes
+    the approximate branch consistent with the geometry rather than correct.
+    """
+    De = De_m2_day if De_m2_day is not None else P.FRACTURE["De_m2_day"]
+    b_half = (half_aperture_m if half_aperture_m is not None
+              else P.FRACTURE["full_aperture_m"][1] / 2.0)
+    if not P.OMEGA_FROM_GEOMETRY:
+        return float(P.DUAL_POROSITY["mass_transfer_omega"])
+    Rm = matrix_retardation(phi_total, grain_density, kd_L_kg)
+    L = max(b_half / max(phi_mobile, 1e-4), 1e-4)      # matrix half-spacing [m]
+    Da = De / Rm
+    om = 3.0 * Da / (L * L)
+    # keep it inside a sane band: below the floor the clock never matures within
+    # the horizon (harmless but pointless), above the ceiling it matures
+    # instantly and the dual-porosity branch degenerates to a constant Rd.
+    return float(min(max(om, P.OMEGA_BOUNDS[0]), P.OMEGA_BOUNDS[1]))
+
+
+def disc_growth_factor(pore_volumes: float) -> float:
+    """Radius multiplier for the E1 leach-zone disc, from cumulative throughput.
+
+    The disc is "the rock the lixiviant deliberately swept". At t = 0 nothing has
+    been injected, so nothing has been swept -- yet the disc was drawn at FULL
+    radius and FULL C0 from the first instant, reporting 7.07 ha of "vulnerable
+    area" (pi*(W/2)^2 for W=300 m) at zero pore volumes injected. That is
+    contamination reported before the mine has operated for a single day.
+
+    AREA is what the user reads, so the AREA is scaled linearly with the pattern
+    pore volumes flushed, i.e. the radius by sqrt: f_r = sqrt(min(1, PV)).
+    Saturates at PV = 1 (the pattern's mobile pore water fully displaced once),
+    which at realistic ISR injection rates happens within weeks -- so this
+    changes the first moments of the run and nothing else.
+    """
+    return float(math.sqrt(min(max(pore_volumes, 0.0), 1.0)))
+
+
 def matrix_sigma(phi_total: float, grain_density: float, kd_L_kg: float,
                  De_m2_day: float | None = None,
                  half_aperture_m: float | None = None) -> float:
@@ -808,9 +881,17 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
                                        feat.get("_grain_density", 2700.0),
                                        feat["Kd_L_kg"])
               if fractured else 0.0)
+    # transfer rate derived from the fracture geometry, not a pinned constant --
+    # a single omega is 54x too slow for a tracer and 826x too fast for radium
+    om = (matrix_transfer_omega(feat["phi_mobile"], feat["phi_total"],
+                                feat.get("_grain_density", 2700.0),
+                                feat["Kd_L_kg"])
+          if fractured else P.DUAL_POROSITY["mass_transfer_omega"])
 
-    Xc = front_position(v_base, eta, t_days, operation_days, restoration_days, beta_k)
-    Xw = front_position(v, eta, t_days, operation_days, restoration_days, 0.0) if fractured else Xc
+    Xc = front_position(v_base, eta, t_days, operation_days, restoration_days,
+                        beta_k, omega=om)
+    Xw = (front_position(v, eta, t_days, operation_days, restoration_days, 0.0)
+          if fractured else Xc)
     sigma = (matrix_sigma(feat["phi_total"], feat.get("_grain_density", 2700.0),
                           feat["Kd_L_kg"]) if fractured else 0.0)
 
@@ -841,7 +922,10 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
     if P.E1_ENABLED:
         W = feat["wellfield_width_m"]
         W_eff = feat.get("_source_width_m", W)
-        disc_r = W_eff / 2.0
+        # the swept zone grows with what has actually been injected: at t = 0 the
+        # disc was drawn full-size at full C0, reporting ~7 ha contaminated
+        # before a single pore volume existed
+        disc_r = (W_eff / 2.0) * disc_growth_factor(feat.get("pore_volumes_PV", 1.0))
         disc_cx = -W / 2.0
         # C_res already folds restoration credit x post-closure flush
         disc_c = C_res if Xc_clean is not None else species_C0

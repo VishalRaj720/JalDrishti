@@ -1,0 +1,46 @@
+{
+  "model": "excursion_probability",
+  "method": "shap_mean_abs",
+  "top10": [
+    {
+      "feature": "Xc_m",
+      "importance": 0.30996
+    },
+    {
+      "feature": "source_conc_C0",
+      "importance": 0.04677
+    },
+    {
+      "feature": "D_T",
+      "importance": 0.04225
+    },
+    {
+      "feature": "Xc_clean_m",
+      "importance": 0.04054
+    },
+    {
+      "feature": "containment_eta",
+      "importance": 0.02551
+    },
+    {
+      "feature": "is_tds_mg_l",
+      "importance": 0.02018
+    },
+    {
+      "feature": "time_years",
+      "importance": 0.01834
+    },
+    {
+      "feature": "residual_fraction",
+      "importance": 0.01259
+    },
+    {
+      "feature": "background_conc_Cb",
+      "importance": 0.01171
+    },
+    {
+      "feature": "darcy_flux_q",
+      "importance": 0.01052
+    }
+  ]
+}

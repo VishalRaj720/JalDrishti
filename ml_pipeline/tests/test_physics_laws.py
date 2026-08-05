@@ -20,6 +20,7 @@ from ml_pipeline.data_prep.feature_engineering import (
     build_feature_row, containment_efficiency, effective_source_width,
 )
 from ml_pipeline.physics.transport import (
+    effective_capacity_ratio,
     simulate_plume, apparent_retardation, retarded_clock, front_position,
     matrix_sigma, tang_attenuation,
 )
@@ -657,3 +658,87 @@ def test_mc_and_scalar_engines_agree_on_travel():
         m2 = mc_field_metrics([p], threshold=U_THR, background=2.0, grid_n=100)
         assert m2["max_dist_m"][0] == pytest.approx(
             m1["max_migration_distance_m"], rel=1e-9)
+
+
+# --------------------------------------------------------------------------- #
+# 9. REMEDIATION ROUND 2 (2026-08-05) -- the three fixes from the literature
+#    cross-check: plume spread was far below what ISR field data supports.
+# --------------------------------------------------------------------------- #
+def test_disc_does_not_exist_before_anything_is_injected():
+    """THE t=0 BUG. The leach-zone disc is 'the rock the lixiviant deliberately
+    swept'. At t = 0 nothing has been injected, so nothing has been swept -- yet
+    the disc was drawn at FULL radius and FULL C0 from the first instant,
+    reporting pi*(150 m)^2 = 7.07 ha of 'vulnerable area' at zero pore volumes.
+    That is contamination reported before the mine has operated for a day."""
+    from ml_pipeline.physics.transport import disc_growth_factor
+    assert disc_growth_factor(0.0) == 0.0
+    assert disc_growth_factor(1.0) == 1.0
+    assert disc_growth_factor(50.0) == 1.0          # saturates, never exceeds
+    assert 0.0 < disc_growth_factor(0.25) < 1.0
+    # AREA scales linearly with throughput -> radius with sqrt
+    assert disc_growth_factor(0.25) == pytest.approx(0.5)
+    # and end-to-end: zero area at t=0, growing to the full footprint
+    areas = [label(FRACTURED, t_years=t)["affected_area_ha"]
+             for t in (0.0, 0.02, 0.1, 5.0)]
+    assert areas[0] == 0.0, f"contamination at t=0: {areas[0]} ha"
+    assert _nondecreasing(areas, tol=1e-9), areas
+    assert areas[-1] > 1.0
+
+
+def test_attenuation_is_charged_on_mobile_residence_only():
+    """Redox trapping must not be charged over the SORPTION-retarded residence.
+
+    Retardation and redox trapping both remove uranium from the advancing front;
+    uranium held in the matrix by sorption is already immobilised, so charging it
+    the reduction rate for that same residence removes the mass twice. Doing so
+    gave 0.47 decay per METRE at the default pin -- the plume was annihilated
+    inside one metre, below the model's own grid resolution, and implied ~900x
+    more reduced uranium than any measured reducing capacity supports."""
+    from ml_pipeline.physics.transport import effective_capacity_ratio
+    hg = FRACTURED
+    f = build_feature_row(
+        domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+        operation_days=8 * 365.0, wellfield_width_m=300.0,
+        source_conc_C0=15000.0, background_conc_Cb=2.0,
+        eval_time_days=10 * 365.0, u_attenuation_k_per_yr=0.2, **hg)
+    beta_eff = effective_capacity_ratio(hg["beta"], hg["n_total"],
+                                        hg["grain_density"], hg["kd_L_kg"])
+    v = f["seepage_velocity_v"]
+    assert f["_atten_per_m"] == pytest.approx((0.2 / 365.0) / (v / (1.0 + hg["beta"])))
+    # decisively weaker than the double-counted form
+    assert f["_atten_per_m"] < 0.02 * ((0.2 / 365.0) / (v / (1.0 + beta_eff)))
+    # a conservative species is never given a redox sink at all
+    assert build_feature_row(
+        domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+        operation_days=8 * 365.0, wellfield_width_m=300.0,
+        source_conc_C0=15000.0, background_conc_Cb=2.0,
+        eval_time_days=10 * 365.0, u_attenuation_k_per_yr=0.0,
+        **hg)["_atten_per_m"] == 0.0
+
+
+def test_geometry_derived_omega_stays_off_and_is_documented_why():
+    """Deriving omega from geometry is self-defeating and must stay disabled.
+
+    beta_eff*omega = (beta*R_m)*3*De/(R_m*L^2) -- R_m CANCELS, so the early-time
+    retardation becomes species-blind, which is the exact defect beta_eff exists
+    to remove (measured: radium's front rose to 9.50 m against uranium's 13.22 m).
+    A first-order mobile/immobile model cannot reproduce early-time matrix
+    diffusion at all: true uptake grows as sqrt(R_m*De*t), so retardation scales
+    as sqrt(R_m), and the first-order form can only give R_m or R_m^0. The Tang
+    kernel already carries the correct sqrt scaling and governs via the max()."""
+    from ml_pipeline.physics.transport import matrix_transfer_omega
+    assert P.OMEGA_FROM_GEOMETRY is False
+    # the helper is retained and correct, so the finding can be re-measured
+    om_tracer = matrix_transfer_omega(0.0075, 0.03, 2750.0, 0.0)
+    om_radium = matrix_transfer_omega(0.0075, 0.03, 2750.0, 500.0)
+    assert om_tracer == om_radium == P.DUAL_POROSITY["mass_transfer_omega"]
+    try:
+        P.OMEGA_FROM_GEOMETRY = True
+        om_tracer = matrix_transfer_omega(0.0075, 0.03, 2750.0, 0.0)
+        om_radium = matrix_transfer_omega(0.0075, 0.03, 2750.0, 500.0)
+        # the cancellation that makes it useless, asserted rather than asserted-about
+        b_t = effective_capacity_ratio(10.0, 0.03, 2750.0, 0.0)
+        b_r = effective_capacity_ratio(10.0, 0.03, 2750.0, 500.0)
+        assert (b_t * om_tracer) == pytest.approx(b_r * om_radium, rel=1e-9)
+    finally:
+        P.OMEGA_FROM_GEOMETRY = False

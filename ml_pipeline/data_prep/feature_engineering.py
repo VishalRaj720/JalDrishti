@@ -48,6 +48,7 @@ import pandas as pd
 from ml_pipeline.config import parameters as P
 from ml_pipeline.physics.transport import (
     front_position, restoration_source_fraction, effective_capacity_ratio,
+    matrix_transfer_omega,
 )
 
 # Canonical, ORDERED feature list. Phase 2 (synthetic) and Phase 3 (training)
@@ -221,8 +222,18 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
     # hydro_support box untouched by this physics change.
     beta_k = (effective_capacity_ratio(beta, n_total, grain_density, kd_L_kg)
               if fractured else 0.0)
+    # geometry-derived transfer rate (see physics.matrix_transfer_omega): one
+    # pinned omega is 54x too slow for a tracer and 826x too fast for radium
+    omega_k = (matrix_transfer_omega(phi_mobile, n_total, grain_density, kd_L_kg)
+               if fractured else P.DUAL_POROSITY["mass_transfer_omega"])
+    # TRACER-retarded velocity for the attenuation age: sorbed uranium is already
+    # immobilised by the retardation term, so charging it the redox rate for that
+    # same residence removes the mass twice (see P.ATTENUATION_USES_SORBED_RESIDENCE)
+    beta_atten = (beta_k if P.ATTENUATION_USES_SORBED_RESIDENCE
+                  else (beta if fractured else 0.0))
     Xc_eval = front_position(v_base, eta_eff, t_eval,
-                             operation_days, restoration_days, beta_k)
+                             operation_days, restoration_days, beta_k,
+                             omega=omega_k)
     # clean-water replacement front -- model feature. 2026-07-13: launched whenever
     # a restoration sweep exists (no binary completion gate); front_position keeps
     # it at ~0 until regional drift resumes, so it grows continuously rather than
@@ -231,7 +242,7 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
     Xc_clean = 0.0
     if restoration_days > 0.0:
         Xc_clean = front_position(v_base, 1.0, t_eval, operation_days,
-                                  restoration_days, beta_k)
+                                  restoration_days, beta_k, omega=omega_k)
 
     # Throughput accrued BY the evaluation time (pumping stops at t_op).
     pumping_days = min(t_eval, operation_days)
@@ -295,7 +306,7 @@ def build_feature_row(*, regime: str, domain_is_texas: bool,
         # (For porous, v_base is already vc and beta_k is 0, so this reduces to
         # the previous vc exactly.)
         "_atten_per_m": ((float(u_attenuation_k_per_yr) / 365.0)
-                         / max(v_base / (1.0 + beta_k), 1e-9)),
+                         / max(v_base / (1.0 + beta_atten), 1e-9)),
     }
 
 

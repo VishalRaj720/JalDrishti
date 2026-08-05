@@ -67,13 +67,22 @@ def test_atten_feature_and_carry():
     from ml_pipeline.physics.transport import effective_capacity_ratio
     f = feat_row(k_atten=0.2)
     assert f["u_attenuation_k"] == pytest.approx(0.2)
+    # TRACER-retarded velocity: the residence time charged to redox trapping is
+    # the time the solute spends as MOBILE dissolved U(VI). Uranium held in the
+    # matrix by sorption is already immobilised -- that is what the retardation
+    # term represents -- so charging it the reduction rate for that same
+    # residence removes the mass twice. Using the sorption-retarded velocity gave
+    # atten_per_m = 0.47/m at the default pin, annihilating the plume inside one
+    # metre (below the model's own grid resolution) and claiming ~900x more
+    # reduced uranium than any measured reducing capacity supports.
+    v_c = f["seepage_velocity_v"] / (1.0 + FRACTURED["beta"])
+    assert f["_atten_per_m"] == pytest.approx((0.2 / 365.0) / v_c)
+    # the sorbed-residence version it replaced was ~80x stronger
     beta_eff = effective_capacity_ratio(FRACTURED["beta"], FRACTURED["n_total"],
                                         FRACTURED["grain_density"],
                                         FRACTURED["kd_L_kg"])
-    v_c = f["seepage_velocity_v"] / (1.0 + beta_eff)      # fractured: v_base = v
-    assert f["_atten_per_m"] == pytest.approx((0.2 / 365.0) / v_c)
-    # and it is genuinely stronger than the tracer-velocity version it replaced
-    assert f["_atten_per_m"] > (0.2 / 365.0) / f["contaminant_velocity_vc"]
+    sorbed = (0.2 / 365.0) / (f["seepage_velocity_v"] / (1.0 + beta_eff))
+    assert sorbed > 50 * f["_atten_per_m"]
     assert feat_row(k_atten=0.0)["_atten_per_m"] == 0.0
 
 
@@ -108,18 +117,56 @@ def test_atten_monotone_footprint():
 # --------------------------------------------------------------------------- #
 # A -- scenario 2: the plume STABILIZES instead of growing unboundedly
 # --------------------------------------------------------------------------- #
-def test_plume_reaches_equilibrium_extent():
-    """With redox trapping the migration distance saturates: the late-time
-    growth rate collapses vs the early rate (was ~linear forever)."""
-    m10 = label(t_years=10.0, k_atten=0.2)["max_migration_distance_m"]
-    m30 = label(t_years=30.0, k_atten=0.2)["max_migration_distance_m"]
-    m50 = label(t_years=50.0, k_atten=0.2)["max_migration_distance_m"]
-    early = (m30 - m10) / 20.0            # m/yr
-    late = (m50 - m30) / 20.0
-    assert late < 0.35 * max(early, 1e-9), (m10, m30, m50)
-    # and against the k=0 counterfactual the 50-yr plume is much shorter
-    m50_free = label(t_years=50.0, k_atten=0.0)["max_migration_distance_m"]
-    assert m50 < 0.7 * m50_free, (m50, m50_free)
+def test_redox_trapping_decelerates_and_shortens_the_plume():
+    """Redox trapping must (a) shorten the plume at every time, (b) make the gap
+    against the no-trapping counterfactual GROW with time, and (c) decelerate
+    growth more than free drift does.
+
+    Asserted RELATIVE to the k=0 counterfactual rather than against an absolute
+    growth-ratio threshold. The old test required late growth < 0.35x early, a
+    bar calibrated when attenuation was applied over the SORPTION-retarded
+    residence -- 0.47/m, which annihilated the plume within a metre and made
+    'saturation' trivially true. With the double-count removed (see
+    P.ATTENUATION_USES_SORBED_RESIDENCE) the equilibrium extent
+    x* = (v_c/k)*ln(C0/thr) moves ~80x further out, to ~880 m for this fixture,
+    so a 50-year run legitimately never reaches it. Saturation is still real; it
+    is simply not visible inside the window, and a test must not demand that it
+    be."""
+    ks = [label(t_years=t, k_atten=0.2)["max_migration_distance_m"]
+          for t in (10.0, 30.0, 50.0)]
+    free = [label(t_years=t, k_atten=0.0)["max_migration_distance_m"]
+            for t in (10.0, 30.0, 50.0)]
+    # (a) shorter at every time
+    for a, b in zip(ks, free):
+        assert a <= b + 1e-9, (ks, free)
+    # (b) the deficit accumulates with travel time
+    assert (free[2] - ks[2]) > (free[0] - ks[0]), (ks, free)
+    # (c) trapping decelerates growth more than free drift alone
+    decel_k = (ks[2] - ks[1]) / max(ks[1] - ks[0], 1e-9)
+    decel_free = (free[2] - free[1]) / max(free[1] - free[0], 1e-9)
+    assert decel_k < decel_free, (decel_k, decel_free)
+
+
+def test_equilibrium_extent_law_holds_where_it_is_reachable():
+    """The finite steady-state extent x* = (v_c/k)*ln(C0/thr) is the whole point
+    of first-order trapping, so verify it where the run IS long enough to reach
+    it: a slow plume with a strong sink."""
+    slow = {**FRACTURED, "K_m_day": 0.05, "gradient_i": 0.001}
+
+    def reach(t_years):
+        feat = build_feature_row(
+            domain_is_texas=False, Q_in_m3_day=2500.0, bleed_fraction=0.02,
+            operation_days=8 * 365.0, wellfield_width_m=300.0,
+            source_conc_C0=15000.0, background_conc_Cb=2.0,
+            eval_time_days=t_years * 365.0, u_attenuation_k_per_yr=0.7, **slow)
+        return simulate_plume(feat, species_C0=15000.0, background=2.0,
+                              threshold=U_THR, t_days=t_years * 365.0,
+                              operation_days=8 * 365.0, grid_n=140,
+                              ).metrics["max_migration_distance_m"]
+
+    late = [reach(t) for t in (20.0, 35.0, 50.0)]
+    # growth has all but stopped -> the front has found its equilibrium
+    assert (late[2] - late[1]) <= 0.5 * max(late[1] - late[0], 1e-9), late
 
 
 # --------------------------------------------------------------------------- #

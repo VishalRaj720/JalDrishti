@@ -62,6 +62,7 @@ from ml_pipeline.physics.transport import (
     simulate_plume, front_position, matrix_sigma, TransportParams,
     concentration_point, mc_field_metrics, disc_flush_factor,
     restoration_source_fraction, effective_capacity_ratio,
+    matrix_transfer_omega, disc_growth_factor,
 )
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "outputs"
@@ -297,11 +298,17 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
                                *P.FRACTURE["full_aperture_m"])
         sigma = matrix_sigma(scn["n_total"], scn["grain_density"], kd,
                              half_aperture_m=aperture / 2.0)
+        # transfer rate from THIS draw's aperture, not a pinned constant
+        omega_k = matrix_transfer_omega(scn["phi_mobile"], scn["n_total"],
+                                        scn["grain_density"], kd,
+                                        half_aperture_m=aperture / 2.0)
     else:
         Rd = retardation_factor(kd, scn["n_total"], scn["grain_density"], "porous", 0.0)
         v_base, beta_k, sigma = v / Rd, 0.0, 0.0
+        omega_k = P.DUAL_POROSITY["mass_transfer_omega"]
 
-    Xc = front_position(v_base, eta, t_days, op_days, rest_days, beta_k)
+    Xc = front_position(v_base, eta, t_days, op_days, rest_days, beta_k,
+                        omega=omega_k)
     Xw = front_position(v, eta, t_days, op_days, rest_days, 0.0) if fractured else Xc
     aL, aT = dispersivities(max(Xc, scn["width"]), scn["regime"])
     aL *= disp_mult
@@ -318,7 +325,8 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     Xc_clean, C_res = None, 0.0
     if f_src < 1.0:
         C_res = f_src * scn["C0"][species]
-        Xc_clean = front_position(v_base, 1.0, t_days, op_days, rest_days, beta_k)
+        Xc_clean = front_position(v_base, 1.0, t_days, op_days, rest_days, beta_k,
+                                  omega=omega_k)
 
     # First-order U natural attenuation (uranium only): scenario-level k with a
     # per-draw local-capacity multiplier; decay per meter over the draw's own
@@ -331,7 +339,11 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
         m_lo, m_hi = P.U_ATTENUATION_MC_MULT
         mult = m_lo * (m_hi / m_lo) ** float(draws["u_att"][i])   # log-uniform
         k_yr = scn["atten_k"] * mult
-        v_c = v_base / (1.0 + beta_k) if beta_k > 0.0 else v_base
+        # tracer-retarded velocity: sorbed U is already immobilised by the
+        # retardation term, so charging it the redox rate again double-counts
+        beta_at = (beta_k if P.ATTENUATION_USES_SORBED_RESIDENCE
+                   else (beta if fractured else 0.0))
+        v_c = v_base / (1.0 + beta_at) if beta_at > 0.0 else v_base
         atten_per_m = (k_yr / 365.0) / max(v_c, 1e-9)
         if rest_days > 0.0:
             hold_days = min(max(t_days - op_days, 0.0), rest_days)
@@ -343,7 +355,11 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     if P.E1_ENABLED:
         # C_res already folds restoration credit x post-closure flush
         disc_c = C_res if Xc_clean is not None else scn["C0"][species]
-        disc_r, disc_cx = w_eff / 2.0, -scn["width"] / 2.0
+        swept_bulk = math.pi * (scn["width"] / 2.0) ** 2 * scn["thickness"]
+        pv = (scn["Q_in"] * min(t_days, op_days)
+              / max(scn["phi_mobile"] * swept_bulk, 1e-6))
+        disc_r = (w_eff / 2.0) * disc_growth_factor(pv)
+        disc_cx = -scn["width"] / 2.0
     return TransportParams(C0=scn["C0"][species], aL=aL, aT=aT,
                            source_width_m=w_eff, Xc=Xc, Xw=Xw, sigma=sigma,
                            t_days=t_days, Xc_clean=Xc_clean, C_res=C_res,

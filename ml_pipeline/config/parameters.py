@@ -414,6 +414,75 @@ DUAL_POROSITY = {
 BETA_SORPTION_STRENGTH = 1.0
 
 # ---------------------------------------------------------------------------
+# 5a-ter. GEOMETRY-DERIVED MATRIX TRANSFER RATE  [remediation 2026-08-05 r2]
+# ---------------------------------------------------------------------------
+# `mass_transfer_omega` above sets how fast the immobile matrix capacity is
+# actually reached (the retarded clock approaches 1+beta on a timescale
+# 1/omega). Pinning it at 1e-3/day -- 2.7 yr -- for every species is wrong in
+# BOTH directions: measured against the model's own fracture geometry it is 54x
+# too slow for a conservative tracer and 826x too fast for radium, which needs
+# millennia to load its matrix. physics.matrix_transfer_omega derives it from
+# the aperture and mobile porosity already in the feature row (no new parameter):
+#       omega = 3*De/(R_m * L^2),   L = b_half/phi_mobile
+# DEFAULT False -- IMPLEMENTED, MEASURED, AND REJECTED. Keep the code and this
+# note: the reasoning is worth more than the switch.
+#
+# Deriving omega from geometry is self-defeating, for an algebraic reason. Early
+# time expands the retarded clock as R_app ~ 1 + beta_eff*omega*t, and
+#       beta_eff * omega = (beta*R_m) * 3*De/(R_m*L^2) = 3*beta*De/L^2
+# R_m CANCELS. So a geometry-derived omega makes the early-time retardation
+# SPECIES-BLIND -- precisely the defect beta_eff was introduced to remove.
+# Measured with it on (Jaduguda, t=20 yr): radium's front rose to 9.50 m against
+# uranium's 13.22 m, i.e. radium became as mobile as uranium again.
+#
+# The deeper reason: a first-order mobile/immobile model CANNOT reproduce
+# early-time matrix diffusion at all. True diffusive uptake grows as
+# sqrt(R_m*De*t), so apparent retardation scales as sqrt(R_m); the first-order
+# form can only deliver R_m (pinned omega) or R_m^0 (geometry omega). Neither is
+# sqrt(R_m).
+#
+# What is used instead: the TANG kernel already IS the exact solution for this
+# geometry and already carries the correct sqrt(R_m * t) scaling through
+# sigma = theta_m*sqrt(R_m*De)/b_half. It is unioned with the continuum branch by
+# max(), so it governs wherever it is the less-retarded of the two -- which for
+# every sorbing species it is. Letting Tang govern (by removing the attenuation
+# inflation that was suppressing it, see ATTENUATION_USES_SORBED_RESIDENCE) is
+# the correct fix and needs no new parameter.
+#
+# The rigorous upgrade, if the continuum branch is ever made authoritative, is to
+# replace the Goltz-Roberts clock with the diffusive one:
+#       R_app(t) = 1 + (2/sqrt(pi))*sigma*sqrt(t)
+#       I(t) = (2/c)*sqrt(t) - (2/c^2)*ln(1 + c*sqrt(t)),   c = 2*sigma/sqrt(pi)
+# which reduces to I(t) -> t as sigma -> 0 and gives the classic sqrt(t) front.
+OMEGA_FROM_GEOMETRY = False
+# Numerical band. Below the floor the clock never matures inside a 50 yr horizon
+# (harmless, but the branch stops meaning anything); above the ceiling it matures
+# instantly and dual porosity degenerates to a constant retardation 1+beta.
+OMEGA_BOUNDS = (1e-8, 1.0)
+
+# ---------------------------------------------------------------------------
+# 5a-quater. ATTENUATION RESIDENCE TIME  [remediation 2026-08-05 r2]
+# ---------------------------------------------------------------------------
+# First-order U redox trapping is applied as exp(-k * age), age = x/v_c. Which
+# v_c? Using the SORPTION-retarded velocity v/(1+beta*R_m) makes the age ~900x
+# longer in fractured rock than the porous Wyoming test k was measured in, giving
+# a decay of ~8.6 per METRE -- the plume is annihilated inside 1 m, below the
+# tool's own grid resolution. Two things are wrong with that:
+#   (1) DOUBLE COUNTING. Retardation and redox trapping both remove uranium from
+#       the advancing front. Uranium held in the matrix by sorption is already
+#       immobilised -- that IS what the retardation term represents -- so also
+#       charging it the full reduction rate for that residence removes the same
+#       mass twice.
+#   (2) The measured k is a rate for dissolved U(VI) in MOBILE water contacting
+#       reductants, and first-order decay assumes an INFINITE sink (a caveat this
+#       config already records). Multiplying the residence time by ~900 claims
+#       ~900x more reduced uranium than any measured reducing capacity supports.
+# The age therefore uses the TRACER-retarded velocity (dual-porosity capacity
+# only, no sorption multiplier) -- the time the solute actually spends as mobile
+# dissolved U(VI). True = the previous behaviour.
+ATTENUATION_USES_SORBED_RESIDENCE = False
+
+# ---------------------------------------------------------------------------
 # 5b. Discrete-fracture matrix-diffusion kernel (fractured regime).
 #     Tang, Frind & Sudicky (1981) / Neretnieks (1980) zero-fracture-dispersion
 #     solution: C/C0 = erfc[ sigma * t_w / (2*sqrt(t - t_w)) ], with the
