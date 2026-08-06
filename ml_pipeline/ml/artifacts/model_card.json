@@ -60,34 +60,34 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|radium_226_mbq_l": 0.73026,
-      "fractured|sulfate_mg_l": 0.69267,
-      "fractured|tds_mg_l": 0.85929,
-      "fractured|uranium_ppb": 0.17818,
-      "porous|radium_226_mbq_l": 0.68812,
-      "porous|sulfate_mg_l": 0.79025,
-      "porous|tds_mg_l": 1.00418,
-      "porous|uranium_ppb": 0.28979
+      "fractured|radium_226_mbq_l": 0.63009,
+      "fractured|sulfate_mg_l": 0.71686,
+      "fractured|tds_mg_l": 0.87233,
+      "fractured|uranium_ppb": 0.18154,
+      "porous|radium_226_mbq_l": 0.86537,
+      "porous|sulfate_mg_l": 0.90702,
+      "porous|tds_mg_l": 0.96073,
+      "porous|uranium_ppb": 0.25212
     },
     "max_migration_distance_m": {
-      "fractured|radium_226_mbq_l": 0.06668,
-      "fractured|sulfate_mg_l": 0.82783,
-      "fractured|tds_mg_l": 1.16453,
-      "fractured|uranium_ppb": 0.89777,
-      "porous|radium_226_mbq_l": 0.15532,
-      "porous|sulfate_mg_l": 1.54808,
-      "porous|tds_mg_l": 1.59608,
-      "porous|uranium_ppb": 1.00191
+      "fractured|radium_226_mbq_l": 0.14404,
+      "fractured|sulfate_mg_l": 0.9696,
+      "fractured|tds_mg_l": 1.21619,
+      "fractured|uranium_ppb": 0.99876,
+      "porous|radium_226_mbq_l": 0.65837,
+      "porous|sulfate_mg_l": 1.47404,
+      "porous|tds_mg_l": 1.63237,
+      "porous|uranium_ppb": 0.94704
     },
     "compliance_conc": {
-      "fractured|radium_226_mbq_l": 0.042,
-      "fractured|sulfate_mg_l": 0.94881,
-      "fractured|tds_mg_l": 0.52485,
-      "fractured|uranium_ppb": 1.08592,
-      "porous|radium_226_mbq_l": 0.02072,
-      "porous|sulfate_mg_l": 1.43413,
-      "porous|tds_mg_l": 0.66955,
-      "porous|uranium_ppb": 1.93088
+      "fractured|radium_226_mbq_l": 0.04838,
+      "fractured|sulfate_mg_l": 0.97286,
+      "fractured|tds_mg_l": 0.54188,
+      "fractured|uranium_ppb": 1.25859,
+      "porous|radium_226_mbq_l": 0.04091,
+      "porous|sulfate_mg_l": 1.48103,
+      "porous|tds_mg_l": 0.73556,
+      "porous|uranium_ppb": 2.0859
     }
   },
   "monotone_maps": {
@@ -265,7 +265,7 @@
       ],
       "retardation_Rd": [
         1.0,
-        97760.40687445176
+        50534.9178224406
       ],
       "K_m_day": [
         0.0959191327647306,
