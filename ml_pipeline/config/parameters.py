@@ -136,8 +136,48 @@ RADIUM_BACKGROUND_MBQ_L = 23.0
 # because at those values Ra is numerically immobile and the extra range buys no
 # screening information -- documented deliberately, not silently truncated.
 RADIUM_KD_RANGES = {
-    "fractured": (57.0, 500.0, 2000.0),
-    "porous":    (500.0, 2400.0, 9100.0),
+    # (lo, mode, hi) L/kg -- REVISED 2026-08-06 after the served answer made
+    # radium absolutely immobile (front 0.003 m at 50 yr, retardation 444,594),
+    # a state no Monte-Carlo draw could escape because even the old LOWER bound
+    # of 57 L/kg still gives ~50,000x retardation. A model whose bands cannot
+    # express "radium moved" is asserting impossibility, not uncertainty.
+    #
+    # WHY THE OLD VALUES WERE WRONG FOR THIS PLUME. They came from the Thibault
+    # et al. (1990) SOIL compilation (EPA 402-R-04-002C Vol III Table 5.28).
+    # That same EPA document says of those numbers, p.96:
+    #   "The Kd values reported by Nathwani and Phillips (1979b) are unusually
+    #    large, and orders of magnitude greater than those reported by most
+    #    researchers."
+    # and this tool models a GROUNDWATER plume, not soil. Worse, it was applying
+    # a freshwater Kd to a plume it simultaneously simulates as carrying
+    # TDS 1,500-8,000 mg/L, while the same document states, p.90/p.94:
+    #   "The adsorption of radium is strongly dependent on ionic strength and
+    #    concentrations of other competing ions in that adsorption of radium
+    #    decreases with increasing ionic strength."
+    # with the alkaline-earth exchange affinity Ra2+ > Ba2+ > Sr2+ > Ca2+ > Mg2+,
+    # so an alkaline-ISR lixiviant's own carbonate/Ca load displaces Ra.
+    #
+    # THE NEW NUMBERS -- every one from the already-cited EPA document:
+    #   lo   6.7  L/kg  measured, radium on SANDY SEDIMENT IN GROUNDWATER, pH 6
+    #                   (p.95: "6.7, 12.6, 26.3, and 26.3 ml/g at pH values of
+    #                    6, 7, 8, and 9"). ml/g == L/kg.
+    #   mode 13.2 L/kg  the pH 8-9 measured value (26.3) halved, because p.95
+    #                   reports "Radium sorption in the high ionic strength
+    #                   groundwater experiment was less than 50 percent of the
+    #                   sorption measured in the lower ionic strength
+    #                   groundwater solution." Alkaline ISR is the high-ionic-
+    #                   strength case by construction.
+    #   hi   the retained Thibault soil values -- so the IMMOBILE end member
+    #                   stays inside the sampled range and the BARC (2008)
+    #                   observation that radium does not migrate from the
+    #                   Jaduguda tailings remains reachable by a draw.
+    #
+    # Net effect: the band now spans ~2.5 orders of magnitude and contains BOTH
+    # hypotheses -- mobile radium in a high-TDS lixiviant, and the immobile
+    # tailings-pond behaviour actually observed at Jaduguda. It no longer picks
+    # one and hides the choice.
+    "fractured": (6.7, 13.2, 2000.0),
+    "porous":    (6.7, 13.2, 9100.0),
 }
 
 # Radioactive decay: Ra-226 half-life 1600 yr. Over this tool's 0-50 yr horizon

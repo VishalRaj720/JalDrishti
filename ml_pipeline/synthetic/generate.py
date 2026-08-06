@@ -208,8 +208,12 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     # time radium was added to a species loop here (2026-08-01).
     Kd = {}
     for sp in SPECIES:
-        lo, _, hi = P.kd_range_for(sp, regime)
-        Kd[sp] = float(rng.uniform(lo, hi))
+        lo, mid, hi = P.kd_range_for(sp, regime)
+        if lo > 0.0 and hi / lo > 20.0:
+            # wide range -> log-scale draw (see _kd_sample); radium only today
+            Kd[sp] = _kd_sample(float(rng.uniform()), lo, mid, hi)
+        else:
+            Kd[sp] = float(rng.uniform(lo, hi))          # unchanged
 
     # First-order U natural-attenuation rate (real-ISR upgrade): log-triangular
     # over the literature range so reducing-capacity uncertainty reaches the
@@ -263,6 +267,30 @@ def _triangular(u: float, lo: float, mode: float, hi: float) -> float:
     return hi - math.sqrt((1.0 - u) * (hi - lo) * (hi - mode))
 
 
+def _kd_sample(u: float, lo: float, mode: float, hi: float) -> float:
+    """Draw a Kd from its (lo, mode, hi) range.
+
+    LOG-triangular when the range spans more than ~20x, linear otherwise.
+
+    WHY (2026-08-06). A triangular whose MODE sits near its LOWER bound puts
+    almost all mass in the upper tail: for radium's revised (6.7, 13.2, 2000)
+    range, Fc = (mode-lo)/(hi-lo) = 0.003, so 99.7% of draws land ABOVE the mode
+    and the MEDIAN draw is 593 L/kg -- 45x the intended central value. Widening
+    the range to admit mobile radium therefore changed nothing, because the
+    sampler put the mass straight back into the immobile end. Measured: pilot
+    medians did not move at all.
+    In log space the same range gives a median draw of 45 L/kg and a p10 of 12.5,
+    which is what the evidence supports. This is the treatment
+    U_ATTENUATION_K_PER_YR already uses, and for the same reason -- a positive
+    parameter spanning orders of magnitude is a log-scale quantity.
+    The 20x gate keeps narrow ranges (uranium 10x, sulfate) on their existing
+    linear draw, so this change moves radium and nothing else."""
+    if lo > 0.0 and hi / lo > 20.0:
+        return float(10.0 ** _triangular(u, math.log10(lo), math.log10(mode),
+                                         math.log10(hi)))
+    return float(_triangular(u, lo, mode, hi))
+
+
 def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
                  draws: dict, i: int, w_eff: float,
                  rest_days: float, residual_fraction: float) -> TransportParams:
@@ -272,7 +300,7 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     downtime degrading effective containment."""
     fractured = scn["regime"] == "fractured"
     lo, mid, hi = P.kd_range_for(species, scn["regime"])
-    kd = _triangular(float(draws["u_kd"][i]), lo, mid, hi)
+    kd = _kd_sample(float(draws["u_kd"][i]), lo, mid, hi)
     K = scn["K"] * float(np.clip(math.exp(MC_LNK_SIGMA * draws["z_K"][i]), *MC_K_CLIP))
     beta = scn["beta"] * (0.6 + 0.8 * float(draws["u_beta"][i])) if fractured else 0.0
     amp = scn.get("seasonal_amp", 0.0)

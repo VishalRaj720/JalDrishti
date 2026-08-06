@@ -316,13 +316,31 @@ def test_radium_sorbs_far_more_strongly_than_alkaline_uranium(regime):
                                      time_years=20.0))
         _, _, Xc = features_from_inputs(**inp)
         xs[sp] = (inp["kd_L_kg"], h["retardation_Rd"], Xc)
-    assert xs["radium_226_mbq_l"][0] > 100 * xs["uranium_ppb"][0]      # Kd
-    assert xs["radium_226_mbq_l"][2] < 0.1 * xs["uranium_ppb"][2]      # front
-    # matches the field observation (BARC 2008): radium does not migrate
-    assert xs["radium_226_mbq_l"][2] < 1.0
+    # Ra still sorbs an order of magnitude more strongly than alkaline uranium,
+    # but the margin is 10x, not 100x. The 100x bar encoded the Thibault SOIL
+    # compilation (Ra 500-2400 L/kg); those were replaced 2026-08-06 with the
+    # EPA compendium's own MEASURED groundwater values (6.7-26.3 L/kg), because
+    # the same document calls the soil numbers "orders of magnitude greater than
+    # those reported by most researchers" and this tool models groundwater.
+    assert xs["radium_226_mbq_l"][0] > 5 * xs["uranium_ppb"][0]        # Kd
+    assert xs["radium_226_mbq_l"][2] < 0.5 * xs["uranium_ppb"][2]      # front
+    # Still consistent with BARC (2008), but pinned to what that observation
+    # actually supports. BARC reports radium not migrating from the Jaduguda
+    # TAILINGS POND -- it is not a statement that radium is immobile in every
+    # water. The decision-relevant claim is that radium stays inside the
+    # wellfield footprint and never reaches the 100 m compliance ring, which is
+    # what a regulator screens on. The old literal < 1 m bar was a property of
+    # the soil-compilation Kd, not of the field observation, and rebasing it on
+    # the EPA measured groundwater values moved it to ~3 m at this test's
+    # deliberately steep gradient (0.01).
+    assert xs["radium_226_mbq_l"][2] < 10.0, "radium must stay wellfield-scale"
+    assert xs["radium_226_mbq_l"][2] < 0.2 * P.COMPLIANCE_BUFFER_M, (
+        "radium must not approach the compliance ring")
     if regime == "porous":
         # porous Rd is a DIRECT function of Kd, so the displayed Rd separates too
-        assert xs["radium_226_mbq_l"][1] > 100 * xs["uranium_ppb"][1]
+        # -- by ~5x on the EPA measured groundwater Kd values (Ra 82.6 vs U 16.5),
+        # not the 100x the Thibault soil compilation implied.
+        assert xs["radium_226_mbq_l"][1] > 3 * xs["uranium_ppb"][1]
     else:
         # fractured: the displayed Rd is the conservative-tracer 1+beta by design
         # (Option A -- the sorbing capacity ratio lives in the physics, and the
@@ -474,3 +492,27 @@ def test_radium_restoration_actually_draws_the_source_down():
     assert r["residual_endpoint_fraction"] == pytest.approx(P.RADIUM_RESTORATION_RESIDUAL)
     assert r["residual_realized_fraction"] < 1.0
     assert r["source_conc_after_restoration"] < inp["source_conc_C0"]
+
+
+def test_radium_kd_band_can_express_mobility():
+    """The Ra Kd band must contain BOTH hypotheses.
+
+    Before 2026-08-06 it could not: even the LOWER bound (57 L/kg) gave ~50,000x
+    retardation, so no Monte-Carlo draw could ever produce a radium plume that
+    moved. A band that cannot express an outcome is asserting impossibility, not
+    quantifying uncertainty -- and real ISR sites monitor Ra-226 as an excursion
+    indicator, so impossibility is the wrong claim.
+
+    Lower bound is the EPA compendium's measured groundwater value; upper bound
+    retains the soil-compilation figure so the immobile, BARC-consistent end
+    member stays reachable."""
+    from ml_pipeline.physics.transport import effective_capacity_ratio
+    for regime in ("fractured", "porous"):
+        lo, mode, hi = P.kd_range_for("radium_226_mbq_l", regime)
+        assert lo <= 6.7, f"{regime}: lower bound must reach the measured value"
+        assert hi >= 2000.0, f"{regime}: immobile end member must stay in range"
+        assert lo < mode < hi
+        # the band must span enough to change the answer, not just the number
+        r_lo = 1 + effective_capacity_ratio(10.0, 0.03, 2750.0, lo)
+        r_hi = 1 + effective_capacity_ratio(10.0, 0.03, 2750.0, hi)
+        assert r_hi / r_lo > 100, (regime, r_lo, r_hi)
