@@ -75,6 +75,65 @@ app.add_middleware(CORSMiddleware, allow_origins=_cors_origins(),
                    allow_methods=["GET", "POST"], allow_headers=["*"])
 
 
+# --------------------------------------------------------------------------- #
+# V-6: availability controls. Twelve endpoints previously had NO rate limiting
+# and NO caching. `POST /api/predict` runs a 200^2 grid solve plus a 48-draw
+# Monte Carlo per call, and the timeline animation issues one request per
+# simulated month BY DESIGN -- so sustained request rates are a normal traffic
+# pattern here, not an attack signature, and the limit must sit well above it.
+# Integrity was already sound (Pydantic bounds validate every numeric input, and
+# the previous audit could not construct a crashing payload); this closes the
+# availability gap.
+#
+# Deliberately dependency-free and in-process: a token bucket keyed on client
+# host. That is the right scope for a single-process screening dashboard. A
+# multi-worker or public deployment needs a shared store (Redis) or a reverse
+# proxy -- stated in the health endpoint rather than implied to be solved.
+# --------------------------------------------------------------------------- #
+RATE_LIMIT_PER_MIN = int(os.environ.get("ML_PIPELINE_RATE_LIMIT_PER_MIN", "240"))
+RATE_LIMIT_BURST = int(os.environ.get("ML_PIPELINE_RATE_LIMIT_BURST", "60"))
+_BUCKETS: dict[str, tuple[float, float]] = {}     # host -> (tokens, last_seen)
+
+
+@app.middleware("http")
+async def _rate_limit(request, call_next):
+    import time
+    if RATE_LIMIT_PER_MIN <= 0 or not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    host = (request.client.host if request.client else "unknown")
+    now = time.monotonic()
+    tokens, last = _BUCKETS.get(host, (float(RATE_LIMIT_BURST), now))
+    tokens = min(float(RATE_LIMIT_BURST),
+                 tokens + (now - last) * RATE_LIMIT_PER_MIN / 60.0)
+    if tokens < 1.0:
+        _BUCKETS[host] = (tokens, now)
+        return JSONResponse(
+            status_code=429,
+            content={"code": "RATE_LIMITED",
+                     "message": (f"More than {RATE_LIMIT_PER_MIN} requests/min "
+                                 f"from this client. Set "
+                                 f"ML_PIPELINE_RATE_LIMIT_PER_MIN to change.")},
+            headers={"Retry-After": "1"})
+    _BUCKETS[host] = (tokens - 1.0, now)
+    return await call_next(request)
+
+
+# The static overlay endpoints are deterministic functions of committed data
+# files, and /api/aquifers alone returns ~0.48 MB uncached on every call.
+_STATIC_CACHE_CONTROL = "public, max-age=86400"
+
+
+def _cached_geojson(payload: dict) -> JSONResponse:
+    """Deterministic overlay response with validators, so a browser (or proxy)
+    stops re-downloading unchanged geometry on every pin move."""
+    import hashlib
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    etag = '"' + hashlib.sha256(body.encode("utf-8")).hexdigest()[:32] + '"'
+    return JSONResponse(content=payload,
+                        headers={"Cache-Control": _STATIC_CACHE_CONTROL,
+                                 "ETag": etag})
+
+
 _OR = P.OPERATIONAL_RANGES
 
 
@@ -99,8 +158,24 @@ class PredictRequest(BaseModel):
     # trained max (model card, 20 yr) are flagged via `extrapolation`, not rejected.
     time_years: float = Field(10, ge=_OR["horizon_years"][0],
                               le=P.HORIZON_SLIDER_MAX_YEARS)
-    wellfield_width_m: float = Field(300, ge=_OR["wellfield_width_m"][0],
-                                     le=_OR["wellfield_width_m"][1])
+    # NAME KEPT, MEANING CLARIFIED (2026-08-10). This is the DIAMETER of the
+    # circular well-pattern footprint -- the full transverse extent of the
+    # wellfield, not a borehole width and not a spacing. The field name is a
+    # trained model feature so it cannot be renamed without a retrain; the
+    # response carries a `wellfield_geometry` block and the UI label says
+    # "well-pattern footprint diameter" instead.
+    wellfield_width_m: float = Field(
+        300, ge=_OR["wellfield_width_m"][0], le=_OR["wellfield_width_m"][1],
+        description=("Diameter of the circular well-pattern footprint (full "
+                     "transverse extent of the wellfield), in metres."))
+    # R-2: perimeter monitor-well ring distance from the wellfield EDGE.
+    # NUREG-1569 Sec. 5.7.8.3 p.139 records licensed rings at 75-180 m, with
+    # justification required beyond ~150 m. The trained surrogate's
+    # compliance_conc target was baked at P.COMPLIANCE_BUFFER_M, so moving the
+    # ring makes that ML head extrapolate -- reported, not silently served.
+    monitor_ring_m: float = Field(P.COMPLIANCE_BUFFER_M,
+                                  ge=P.MONITOR_RING_RANGE_M[0],
+                                  le=P.MONITOR_RING_RANGE_M[1])
     # UI EXPLORATION bound (0-50 yr), deliberately DECOUPLED from the training
     # envelope: the analytical engine serves any sweep length correctly, and the
     # ML bands beyond the deployed model's trained max (model card, currently 10 yr)
@@ -223,7 +298,42 @@ def health():
     return {"status": "ok", "ml_surrogate": ml_ok,
             "bis_thresholds": P.EXCURSION_THRESHOLDS,
             "compliance_buffer_m": P.COMPLIANCE_BUFFER_M,
-            "cors_origins": _cors_origins()}
+            "monitor_ring_range_m": list(P.MONITOR_RING_RANGE_M),
+            "cors_origins": _cors_origins(),
+            # V-6: state the availability posture explicitly, including its limit
+            "rate_limit_per_min": RATE_LIMIT_PER_MIN,
+            "rate_limit_burst": RATE_LIMIT_BURST,
+            "rate_limit_scope": ("in-process, per client host. A multi-worker or "
+                                 "public deployment needs a shared store or a "
+                                 "reverse proxy; this is not that."),
+            "auth": ("none — this API is unauthenticated by design for local "
+                     "screening use. Do not expose it publicly without an "
+                     "auth layer in front."),
+            "static_cache_control": _STATIC_CACHE_CONTROL}
+
+
+@app.get("/api/assumptions")
+def api_assumptions():
+    """Every constant this model rests on that is NOT measured or cited.
+
+    Exposed so a reader can see what the answer depends on without reading the
+    config. Backed by `P.UNGROUNDED_PARAMETERS` and pinned by
+    tests/test_assumptions_register.py, so an ungrounded value cannot be added
+    or silently changed without this list moving too."""
+    return _cached_geojson({
+        "scenario_assumptions": P.UNGROUNDED_PARAMETERS,
+        "note": ("Everything not listed here is either derived from a dataset "
+                 "in Datasets/ or carries an inline citation in "
+                 "ml_pipeline/config/parameters.py."),
+        "permanent_limitations": {
+            "no_field_validation": ("No ISR operation has ever existed in "
+                                    "Jharkhand, so the bands quantify PARAMETER "
+                                    "uncertainty, not structural model error."),
+            "premise": ("Commercial ISR is not physically plausible in "
+                        "schist-hosted ore. Read every output as 'IF ISR-strength "
+                        "lixiviant entered this aquifer', never as feasibility."),
+        },
+    })
 
 
 @app.get("/api/pin")
@@ -237,7 +347,7 @@ def api_pin(lon: float = Query(...), lat: float = Query(...)):
 def api_boundary():
     """Dissolved Jharkhand state boundary (lon/lat GeoJSON geometry) for the map
     outline + client-side inverse mask. Simplified to keep the payload light."""
-    return JSONResponse(boundary_geojson())
+    return _cached_geojson(boundary_geojson())
 
 
 @app.get("/api/ore")
@@ -245,7 +355,7 @@ def api_ore():
     """Uranium deposit polygons + Singhbhum belt envelope (Module 2 overlay), so
     users can see which zones carry a real / hypothetical / no uranium source."""
     from ml_pipeline.data_prep.ore_loader import ore_geojson
-    return JSONResponse(ore_geojson())
+    return _cached_geojson(ore_geojson())
 
 
 @app.get("/api/rivers")
@@ -254,8 +364,8 @@ def api_rivers():
     so users see where a plume would discharge to surface water (Stage B2)."""
     from ml_pipeline.data_prep.rivers import rivers_geojson, RIVER_NPZ
     if not RIVER_NPZ.exists():
-        return JSONResponse({"type": "FeatureCollection", "features": []})
-    return JSONResponse(rivers_geojson())
+        return _cached_geojson({"type": "FeatureCollection", "features": []})
+    return _cached_geojson(rivers_geojson())
 
 
 @app.get("/api/flow_field")
@@ -283,7 +393,7 @@ def api_flow_field(step: int = 2):
                           "properties": {"azimuth_deg": round(az, 1),
                                          "gradient_i": round(float(grad[j, i]), 5),
                                          "source": "stations" if src[j, i] == 1 else "dem"}})
-    return JSONResponse({"type": "FeatureCollection", "features": feats})
+    return _cached_geojson({"type": "FeatureCollection", "features": feats})
 
 
 @app.get("/api/strike_field")
@@ -310,7 +420,7 @@ def api_strike_field(step: int = 2):
                                        "coordinates": [float(lon_c[i]), float(lat_c[j])]},
                           "properties": {"strike_deg": round(strike, 1),
                                          "circular_variance": round(V, 3)}})
-    return JSONResponse({"type": "FeatureCollection", "features": feats})
+    return _cached_geojson({"type": "FeatureCollection", "features": feats})
 
 
 @app.get("/api/aquifers")
@@ -319,7 +429,7 @@ def api_aquifers():
     aq, _, _ = _assets()
     g = aq[["lithology", "regime", "K_m_day", "eff_porosity", "thickness_m", "geometry"]].copy()
     g["geometry"] = g["geometry"].simplify(0.004)        # lighten payload
-    return JSONResponse(json.loads(g.to_json()))
+    return _cached_geojson(json.loads(g.to_json()))
 
 
 @app.post("/api/predict")
@@ -361,7 +471,9 @@ def api_predict(req: PredictRequest):
     _feat_eta = _ffi(**inputs)[1]["_eta_eff"]
 
     # --- analytical (always: provides the plume geometry) ---
-    a = predict_analytical(**inputs)
+    # R-2: evaluate the compliance point at the ring the user actually asked for
+    # (and that the map draws), not at a hard-coded 100 m.
+    a = predict_analytical(compliance_x=float(req.monitor_ring_m), **inputs)
     field = a.pop("_field")
     restoration = a.get("restoration")     # realized-residual diagnostic (or None)
     fm = field.metrics
@@ -369,7 +481,13 @@ def api_predict(req: PredictRequest):
                                  azimuth_deg=azimuth, threshold=threshold,
                                  background=inputs["background_conc_Cb"],
                                  x_offset_m=half_w)
-    ring_radius = half_w + P.COMPLIANCE_BUFFER_M      # from the centre pin
+    # R-2: the ring is now an input. The ML `compliance_conc` head was trained at
+    # P.COMPLIANCE_BUFFER_M, so a moved ring puts that head out of support --
+    # flagged like any other envelope violation rather than served silently.
+    ring_offset = float(req.monitor_ring_m)
+    if abs(ring_offset - P.COMPLIANCE_BUFFER_M) > 1e-6:
+        extrapolation = list(extrapolation) + ["monitor_ring_m"]
+    ring_radius = half_w + ring_offset                # from the centre pin
     ring = compliance_ring(req.lon, req.lat, azimuth, ring_radius)
     aspect = fm["max_downgradient_m"] / max(fm["plume_halfwidth_m"], 1.0)
 
@@ -462,6 +580,27 @@ def api_predict(req: PredictRequest):
                 flow.get("depth_to_water_deep_m", P.VERTICAL_SEASONAL["water_table_dry_m"])
                 or P.VERTICAL_SEASONAL["water_table_dry_m"])
             if timeline else None))
+    # R-4: what a licensed programme would deploy to DETECT a vertical excursion,
+    # so the screening index sits next to the monitoring that would find it.
+    # NUREG/CR-6733 Sec. 4.3.3 (via NUREG-1569 p.139) also records that
+    # "significant risks for vertical excursions may exist if monitor wells are
+    # randomly located" at those densities -- which is the regulator's own basis
+    # for treating the vertical pathway as non-trivial.
+    _pattern_ha = (3.14159265 * (inputs["wellfield_width_m"] / 2.0) ** 2) / 1e4
+    vertical["monitoring"] = {
+        "pattern_area_ha": round(_pattern_ha, 2),
+        "overlying_wells_required": max(1, round(
+            _pattern_ha / P.VERTICAL["vertical_monitor_ha_per_well_overlying"])),
+        "underlying_wells_required": max(1, round(
+            _pattern_ha / P.VERTICAL["vertical_monitor_ha_per_well_underlying"])),
+        "ha_per_well_overlying": P.VERTICAL["vertical_monitor_ha_per_well_overlying"],
+        "ha_per_well_underlying": P.VERTICAL["vertical_monitor_ha_per_well_underlying"],
+        "citation": P.VERTICAL["vertical_monitor_citation"],
+        "note": ("Licensed vertical-excursion monitor-well density for a "
+                 "wellfield of this footprint. The shallow-impact index above is "
+                 "a screening estimate of the PATHWAY; this is the monitoring "
+                 "that would be required to detect it."),
+    }
     # D3: attach per-district provenance for the shallow-aquifer base
     vertical["district"] = vparams["district"]
     vertical["layer1_base_source"] = vparams["source"]
@@ -520,6 +659,50 @@ def api_predict(req: PredictRequest):
             notice = ("Prospective Belt (Singhbhum envelope): hypothetical "
                       "low-confidence ore assumed — uranium source term reduced.")
 
+    # R-1: the REGULATORY excursion test (NUREG-1569 2-of-N conservative
+    # indicators at the perimeter ring), reported ALONGSIDE the health-limit
+    # breach above rather than replacing it. They answer different questions and
+    # a real operation is judged on this one.
+    from ml_pipeline.dashboard.isr_excursion import isr_indicator_excursion
+    try:
+        isr_excursion = isr_indicator_excursion(payload, ring_m=ring_offset)
+    except Exception as e:                       # never break the main answer
+        isr_excursion = {"status": f"unavailable: {type(e).__name__} ({e})"}
+
+    # V-7: beta is the single most leveraged user-settable parameter (measured:
+    # migration 7.1 m -> 232.4 m and excursion probability 0.00 -> 0.98 between
+    # beta = 10 and beta = 0), and it is one of the values fidelity row 3.4 flags
+    # as having ZERO Singhbhum measurements behind it. Keeping the override is
+    # right -- expert use is legitimate -- but the user must be able to see what
+    # it cost. When beta is supplied, the default-beta answer is returned next to
+    # it. Deterministic only (no Monte-Carlo): this is a sensitivity readout.
+    beta_override = None
+    if payload.get("beta") is not None:
+        try:
+            default_payload = dict(payload)
+            default_payload["beta"] = None
+            d_inputs, d_hydro = resolve_inputs(default_payload)
+            d = predict_analytical(**d_inputs)
+            d.pop("_field", None)
+            beta_override = {
+                "user_beta": round(float(inputs["beta"]), 3),
+                "default_beta": round(float(d_inputs["beta"]), 3),
+                "with_user_beta": {
+                    "area_ha": round(a["area_ha"]["p50"], 3),
+                    "migration_m": round(a["migration_m"]["p50"], 1),
+                    "excursion_probability": round(a["excursion_probability"], 3)},
+                "with_default_beta": {
+                    "area_ha": round(d["area_ha"]["p50"], 3),
+                    "migration_m": round(d["migration_m"]["p50"], 1),
+                    "excursion_probability": round(d["excursion_probability"], 3)},
+                "note": ("beta (dual-porosity capacity ratio) has no Singhbhum "
+                         "measurement behind it — see fidelity row 3.4. Both "
+                         "answers are shown so the sensitivity of your override "
+                         "is visible rather than implicit."),
+            }
+        except Exception as e:
+            beta_override = {"status": f"unavailable: {type(e).__name__} ({e})"}
+
     return {
         "pin": {"lon": req.lon, "lat": req.lat},
         "hydro": hydro,
@@ -548,6 +731,25 @@ def api_predict(req: PredictRequest):
         "restoration": restoration,
         "vertical": vertical,
         "timeline": timeline,
+        # R-1: NUREG-1569 regulatory excursion test (conservative indicators)
+        "isr_excursion": isr_excursion,
+        # V-7: default-beta comparison when the user overrode beta
+        "beta_override": beta_override,
+        # wellfield_width_m is a well-PATTERN FOOTPRINT DIAMETER; the old label
+        # invited reading it as a borehole width or a well spacing.
+        "wellfield_geometry": {
+            "pattern_footprint_diameter_m": round(inputs["wellfield_width_m"], 1),
+            "pattern_footprint_radius_m": round(half_w, 1),
+            "monitor_ring_m": round(ring_offset, 1),
+            "monitor_ring_from_pin_m": round(ring_radius, 1),
+            "monitor_ring_licensed_range_m": list(P.MONITOR_RING_RANGE_M),
+            "monitor_ring_needs_justification": bool(
+                ring_offset > P.MONITOR_RING_JUSTIFY_BEYOND_M),
+            "monitor_ring_citation": P.MONITOR_RING_CITATION,
+            "note": ("`wellfield_width_m` is the DIAMETER of the circular "
+                     "well-pattern footprint (the full transverse extent of the "
+                     "wellfield) — not a borehole width and not a well spacing."),
+        },
         # inputs outside the deployed model's training envelope (ML bands
         # are extrapolating there; the conformal 80% guarantee is void)
         "extrapolation": extrapolation,

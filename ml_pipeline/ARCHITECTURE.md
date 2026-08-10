@@ -4,16 +4,17 @@
 Every formula is derived, every file is explained, every dataset is documented,
 and every limitation is stated honestly.*
 
-**Last updated:** 2026-08-05 (audit remediation — migration re-based to down-gradient travel and
-measured analytically; sorption-scaled dual-porosity capacity so the fractured front responds to Kd;
-fracture aperture sampled into the bands; district-λ and shear-zone seams smoothed; single species
-registry; **retrained**, 18,000 rows / 40 features / 4 species. Prior: 2026-08-02 Phase-1 fidelity
-fixes, Ra-226 added as a 4th species.)
+**Last updated:** 2026-08-10 (`review3.md` remediation — radium restoration residual re-derived from
+the live constants; post-restoration rebound floor; source envelope rebuilt from the full observed
+per-mine range; NUREG-1569 2-of-N excursion test; monitor ring grounded and configurable; depth-decay
+no longer extrapolated past its evidence; regime-contact K seam closed and the OOD guard that hid it
+repaired; **re-baked and retrained**, 18,000 rows / 40 features / 4 species. Prior: 2026-08-05 audit
+remediation; 2026-08-02 Phase-1 fidelity fixes.)
 
-> **Numbers in §6.5 are copied from `ml/artifacts/metrics.json`. If the two ever disagree, the file
-> is right.** This section had drifted across a retrain and was quoting stale R² 0.875/0.788/0.763
-> against deployed artifacts that actually read 0.888/0.719/0.221 — which is how a document
-> promising "every limitation stated honestly" quietly stops being trustworthy.
+> **§6.5 is GENERATED from `ml/artifacts/metrics.json`, not hand-written**, and
+> `tests/test_docs_in_sync.py` fails the suite if it goes stale. It drifted across three separate
+> retrains while it was prose — which is how a document promising "every limitation stated honestly"
+> quietly stops being trustworthy. Run `python -m ml_pipeline.tools.sync_docs` after every retrain.
 
 ---
 
@@ -699,33 +700,61 @@ to hold this stricter bar.
 - **Leave-aquifer-out**: hold out entire aquifer polygons to prove spatial
   generalization (reported next to scenario-CV in `metrics.json`).
 
-**Current metrics (2026-08-05 retrain, post-remediation).** These are copied from
-`ml/artifacts/metrics.json`; if they disagree with that file, the file is right.
+**Current metrics.** This block is **generated** from `ml/artifacts/metrics.json`
+and `model_card.json` by `python -m ml_pipeline.tools.sync_docs`, and
+`tests/test_docs_in_sync.py` fails the suite if it goes stale. It was hand-copied
+three times and drifted three times — on the last occasion the documented
+migration R² was almost double the deployed one, and the documented compliance R²
+was positive where the deployed value was strongly negative. Prose does not track
+artifacts by discipline; it has to be mechanical.
 
-| target | R² (P50, back-transformed) | R² (log) | scenario coverage |
+<!-- BEGIN GENERATED: metrics (ml_pipeline.tools.sync_docs) -->
+
+**These numbers are GENERATED from `ml/artifacts/metrics.json` by `python -m ml_pipeline.tools.sync_docs`. Do not hand-edit this block — edit the model, retrain, and re-run the generator.**
+
+Model card version 3 · 40 features · 3 band targets · species: radium_226_mbq_l, sulfate_mg_l, tds_mg_l, uranium_ppb
+
+| target | R² (P50, back-transformed) | R² (log) | scenario coverage | rows coverage |
+|---|---|---|---|---|
+| `affected_area_ha` | 0.7727 | 0.8923 | 0.8611 | 0.9534 |
+| `max_migration_distance_m` | 0.5433 | 0.9288 | 0.8822 | 0.9553 |
+| `compliance_conc` | -5.5828 | 0.9566 | 0.8606 | 0.9429 |
+| `excursion_probability` | 0.9155 | — | — | — |
+
+**Per-species R² (log space).** The pooled back-transformed figure mixes ppb, mg/L and mBq/L, so its denominator depends on the species *mix* rather than on model quality — judge on these.
+
+| target | radium_226_mbq_l | sulfate_mg_l | tds_mg_l | uranium_ppb |
+|---|---|---|---|---|
+| `affected_area_ha` | 0.890 | 0.785 | 0.824 | 0.945 |
+| `max_migration_distance_m` | **0.516** | 0.888 | 0.892 | 0.932 |
+| `compliance_conc` | **0.431** | 0.904 | 0.968 | 0.859 |
+
+**Acceptance gates.** Per-species R²(log) ≥ 0.60; scenario coverage ≥ 0.80.
+
+- Coverage: all targets pass.
+- Per-species R²(log): **FAILS on 2 cell(s)** — `max_migration_distance_m` / radium_226_mbq_l = 0.516; `compliance_conc` / radium_226_mbq_l = 0.431. Reported as a miss, not reframed. The conformal bands on those cells still cover (see the coverage columns), and the ANALYTICAL engine serves the authoritative central value, so the failure is in the surrogate's point estimate, not in the uncertainty guarantee.
+
+**Field-resampled coverage** (the serving-distribution gate mandated by `E1_geometry_design.md` §6 gate 5): 120 scenarios pinned to the real flow/strike field, held out from training.
+
+| target | scenario coverage | rows | verdict |
 |---|---|---|---|
-| `affected_area_ha` | 0.868 | 0.924 | 0.877 |
-| `max_migration_distance_m` | 0.896 | 0.969 | 0.896 |
-| `compliance_conc` | 0.738 | 0.968 | 0.867 |
-| `excursion_probability` | 0.949 | — | — |
+| `affected_area_ha` | 0.8646 | 0.9599 | PASS |
+| `max_migration_distance_m` | 0.9042 | 0.9645 | PASS |
+| `compliance_conc` | 0.9125 | 0.9642 | PASS |
 
-All three coverages clear the 0.80 gate, and every one of the 24 Mondrian cells
-(2 regimes × 4 species × 3 targets) covers ≥ 0.92.
+<!-- END GENERATED: metrics -->
 
 **Judge the per-species and log figures, not the pooled back-transformed R².**
 The pooled number mixes ppb, mg/L and mBq/L, so its denominator depends on the
-species *mix* rather than on model quality — that is why `compliance_conc` reads
-0.738 pooled against 0.968 in log space. Two per-species values are **exempt**:
-radium's migration and compliance targets are zero-variance (3 unique migration
-values in 4,500 rows; compliance std 1.5×10⁻⁶, pinned at the 23 mBq/L
-background), so R² divides by SST ≈ 0 and returns nonsense. Radium *is* immobile
-— that is the correct label, and the metric that remains defined there, conformal
-coverage, reads 0.932–0.952.
+species *mix* rather than on model quality.
 
-Migration and compliance improved sharply over the previous model (0.719 → 0.896
-and 0.221 → 0.738). That is **not** a tuning gain: both heads had been fitting a
-grid artifact in the labels (see §4.8 and `review.md` finding #1), so they are now
-being scored against a target that means something.
+**Radium is no longer exempt.** Until the 2026-08-06 Kd rebase, radium's
+migration and compliance targets were zero-variance (3 unique migration values in
+4,500 rows), so R² divided by SST ≈ 0 and this section excluded them. Giving
+radium a Kd band that can express mobility gave those targets real variance, and
+the metric is now defined — and *below* the project's own 0.60 bar. That is
+reported as a miss in the generated table above rather than carried as an
+exemption.
 
 Time-monotone constraints are off for the footprint targets (the plume
 legitimately grows → stabilizes → recedes) and `DELTA_INFLATE` is 1.35.
@@ -889,7 +918,11 @@ What happens when you drop a pin at Jaduguda and press *Run*:
 | `test_naquim_vertical.py` / `test_vertical.py` | Per-district profiles, screening ordering. |
 | `test_rivers.py` / `test_boundary.py` | River field, state boundary. |
 
-217 tests; all green as of the 2026-08-05 remediation retrain.
+| `test_review3_fixes.py` | The 2026-08-10 remediation: radium restoration residual re-derived from live constants, Ra-226 ingrowth chain, ω convention, effective-vs-tracer retardation, assumption register sync, t=0 consistency in both engines, rebound floor, depth-decay evidence bound, regime-contact continuity, scale-aware OOD guard, Texas parser/provenance, the NUREG 2-of-N excursion test, monitor-ring grounding, Rn-222 scope. |
+| `test_docs_in_sync.py` | ARCHITECTURE.md's metrics block matches `metrics.json` — the drift that recurred across three retrains is now a red suite instead of a stale claim. |
+
+Test count and status are reported in the generated metrics block in §6.5 and by
+`pytest ml_pipeline/tests/ -q`.
 
 ---
 
@@ -921,8 +954,12 @@ This section exists because the project's rule is *critique your own tool*.
 | **First-order redox trapping is charged on MOBILE residence only** (§4.12) | `exp(-k·age)` uses the tracer-retarded velocity, not the sorption-retarded one. Uranium already immobilised in the matrix is not also counted as reduced. | Prevents double-counting the same removal twice. Charging the sorbed residence gave 0.47 decay per metre — the plume annihilated inside 1 m — and implied ~900× more reduced uranium than the (unmodelled) finite reducing capacity supports. The mobile-residence form back-checks against the Wyoming calibration. |
 | **Leach-zone disc grows with injected throughput** (§4.8) | Disc radius scales `√(min(1, PV))`. | Before this, the disc was drawn at full radius and full C₀ from t = 0 — 7.07 ha of "vulnerable area" at zero pore volumes injected, i.e. contamination reported before the mine operated. Saturates within weeks at realistic injection rates, so only the earliest moments of a run change. |
 | **Fracture aperture sampled, D_e not** | Aperture now varies per Monte-Carlo draw so its factor-5 literature range reaches the bands; D_e is still served at one value. | `P.FRACTURE` carries no defensible range for D_e and inventing one would relabel an assumption as data. State "aperture is propagated, D_e is not" — not "row 3.4 uncertainty is propagated". |
-| **Depth-decay K clamped into the per-regime trained-K box** | Two adjacent pins with the same physical K(z) can be served up to 2.2× apart across a regime contact, because the clamp floors differ by regime (0.0959 vs 0.0444 m/day). | Open. The lithological contact is real and regime cannot be blended (it selects a different equation), but an **ML training-support artefact should not set the size of a physical discontinuity**. See the fidelity-matrix correction note. |
+| **Depth-decay K is held constant below the district fracture base** | The exponential K(z) law is calibrated only from 45 m to the district's NAQUIM fracture-death depth; below that it is held, not extrapolated. | **Fixed 2026-08-10.** Extrapolating it gave a 23,000× reduction at 300 m for a shallow-fracture district, against ~440× from the global crustal permeability-depth relation (Manning & Ingebritsen 1999) over the same interval — i.e. the extrapolation exceeded both the local evidence (which stops at the fracture base) and the global trend. |
+| **Depth-decay K is NO LONGER clamped into the trained-K box** | Below the surrogate's trained K support the served K is now the physical one, and `extrapolation` reports `hydro:K_m_day`. | **Fixed 2026-08-10.** The clamp existed so our own correction would not raise the OOD flag — it suppressed the signal the user needs, and because the per-regime floors differ (0.0959 vs 0.0444 m/day) it also made an **ML training artefact set the size of a physical discontinuity** (2.16× across a regime contact, now 1.07×). The guard that should have caught this was itself broken: a 2%-of-linear-span tolerance is ~5× the trained K minimum, so a K 500× below support raised nothing. Tolerances are ratio-based now for decade-spanning quantities. |
 | **operation_years default 8** | A single wellfield runs 1–3 yr; 8+ yr represents a sequential multi-wellfield mine unit compressed onto one footprint. | Interpret long operations as mine-unit scale. |
+| **ISR excursion panel is 2 indicators, not the regulatory 3+** | NUREG-1569 §5.7.8.3 p.137 requires a minimum of three excursion indicators; this model transports TDS (conductivity proxy) and sulfate. | Chloride and total alkalinity have no ISR source term in the available data. Reported as `panel_shortfall` in every response — the screen is weaker than a licensed monitoring programme, and says so. |
+| **Excursion UCL is a percentage-over-baseline rule** | NUREG-1569 p.138 permits "a simple percentage increase above baseline", which is what is used; its preferred statistical rules (mean + 5sd, ASTM D6312) need a per-well TEMPORAL baseline series. | The CGWB chemistry file holds 397 wells with ONE sample each from a single year — zero repeats, so there is no temporal variance to take 5sd of. Substituting the regional spatial spread was tested and rejected (sd(TDS) = 286.5 mg/L gives a UCL of 1,965 mg/L, near the BIS permissible limit itself). The percentage is registered as a scenario assumption. |
+| **Post-restoration source is held at the measured stable endpoint** | After a sweep, the passive flush may not carry the source below the Texas restoration endpoint. | The endpoint is measured on post-restoration **stability samples** ("composition achieved after restoration was complete"), so rebound is already inside it. Previously the credit and the flush compounded without bound, reaching 0.023×C0 at 50 yr against a measured 0.060 — claiming clean-up the data does not show. No rebound magnitude was invented. |
 | **Texas→Jharkhand transfer** | Source chemistry and restoration behavior from porous Texas sandstone applied to fractured Indian shear-zone rock. | The headline caveat on the UI. No field calibration exists or is possible without an actual ISR test. |
 
 ### Known ML seams (accepted, documented)

@@ -122,19 +122,33 @@ RADIUM_SOURCE_STATISTIC = "max"
 # (2008) 1245; Jaduguda ground-water ingestion-dose study).
 RADIUM_BACKGROUND_MBQ_L = 23.0
 
-# Kd (L/kg). EPA 402-R-04-002C Vol III Table 5.28 (Thibault et al. 1990
-# compilation), archived at Datasets/phase1_sources/EPA_Kd_VolIII_As_Ra.pdf:
-#     Sand 500 (range 57-21,000) | Silt 36,000 | Clay 9,100 | Organic 2,400
-# Ra exists only as the uncomplexed divalent Ra2+ over pH 3-10 (ibid. p.90) and
-# has the largest ionic radius / weakest hydration of the alkaline earths
-# (ibid. p.91), so it sorbs FAR more strongly than the uranyl-carbonate species
-# an alkaline lixiviant carries -- hence Kd three to four orders of magnitude
-# above the uranium values above.
+# Kd (L/kg). Source: EPA 402-R-04-002C Vol III, archived at
+# Datasets/phase1_sources/EPA_Kd_VolIII_As_Ra.pdf.
+#
+# WHICH NUMBERS IN THAT DOCUMENT -- this matters, and an earlier version of this
+# block got it wrong (see the revision note inside RADIUM_KD_RANGES below).
+# The document contains TWO very different radium datasets:
+#   (a) p.95  MEASURED Kd for radium on a SANDY SEDIMENT IN GROUNDWATER
+#             (6.7 / 12.6 / 26.3 / 26.3 mL/g at pH 6 / 7 / 8 / 9)  <-- USED HERE
+#   (b) Table 5.28, the Thibault et al. (1990) SOIL compilation
+#             (Sand 500, Silt 36,000, Clay 9,100, Organic 2,400)   <-- NOT the anchor
+# This tool models a GROUNDWATER plume, so (a) is the applicable medium. The
+# same EPA document warns of (b) at p.96 that those values "are unusually large,
+# and orders of magnitude greater than those reported by most researchers".
+# (b) is retained ONLY as the immobile upper end member of the sampled band, so
+# the BARC (2008) tailings-pond observation stays reachable by a Monte-Carlo draw.
+#
+# Chemistry that justifies radium sorbing more strongly than alkaline uranium at
+# all: Ra exists only as the uncomplexed divalent Ra2+ over pH 3-10 (ibid. p.90)
+# and has the largest ionic radius / weakest hydration of the alkaline earths
+# (ibid. p.91), whereas an alkaline lixiviant carries uranium as weakly-sorbing
+# uranyl-carbonate. In THIS plume the margin is ~5x (porous) to ~13x (fractured)
+# on the central values, NOT the three-to-four orders of magnitude the soil
+# compilation would imply -- because the same document (p.90/p.94/p.95) records
+# that radium sorption falls with ionic strength, and this plume carries
+# TDS 1,500-8,000 mg/L by construction.
 #   fractured -> quartz/silicate fracture-wall matrix, low CEC: sand-like.
 #   porous    -> weathered saprolite with clay + Fe/Mn oxides: clay/organic-like.
-# The upper ends are CAPPED well below the compilation maxima (21,000 / 530,000)
-# because at those values Ra is numerically immobile and the extra range buys no
-# screening information -- documented deliberately, not silently truncated.
 RADIUM_KD_RANGES = {
     # (lo, mode, hi) L/kg -- REVISED 2026-08-06 after the served answer made
     # radium absolutely immobile (front 0.003 m at 50 yr, retardation 444,594),
@@ -194,27 +208,75 @@ RADIUM_HALFLIFE_YEARS = 1600.0
 # not appear wherever uranium was deposited, even where dissolved radium never
 # reached?
 #
-# In principle yes; on this tool's horizon, no, by three to four orders of
-# magnitude. The chain is
+# In principle yes; on this tool's horizon, no, by FIVE orders of magnitude at
+# 50 years. The chain is
 #   U-238 -> Th-234 (24.1 d) -> Pa-234m (1.2 min) -> U-234 (245,500 yr)
 #         -> Th-230 (75,380 yr) -> Ra-226 (1,600 yr)
 # and freshly deposited natural uranium carries U-234 already near secular
-# equilibrium, so the rate-limiting step to Ra-226 is Th-230 at 75,380 yr.
-# Fraction of secular-equilibrium Ra-226 reached after deposition:
-#       1 yr  0.00092%      100 yr  0.0919%
-#      10 yr  0.0092%     1,000 yr  0.915%
-#      50 yr  0.0460%    10,000 yr  8.79%
+# equilibrium, so the chain from there is TWO sequential steps, not one:
+# Th-230 must itself grow in (rate-limited by its own 75,380 yr half-life)
+# BEFORE it can feed Ra-226. Solving the Bateman pair for a constant U-234
+# parent gives the fraction of secular-equilibrium Ra-226 activity:
+#
+#       A_Ra/A_U = 1 - [lambda_Ra*exp(-lambda_Th*t) - lambda_Th*exp(-lambda_Ra*t)]
+#                      / (lambda_Ra - lambda_Th)
+#
+#       1 yr  2.0e-7 %      100 yr  2.0e-3 %
+#      10 yr  2.0e-5 %    1,000 yr  0.173 %
+#      50 yr  4.9e-4 %   10,000 yr  6.84 %
+#
+# CORRECTION 2026-08-10: an earlier version of this block tabulated
+# 1 - exp(-lambda_Th230 * t) -- which is the ingrowth of Th-230, not of Ra-226 --
+# and so overstated the radium by up to 4,600x (93x at the 50 yr horizon). The
+# conclusion is unchanged and in fact STRENGTHENED, which is why the omission
+# stands; only the arithmetic justifying it needed repair.
+#
 # So even if EVERY migrating uranium atom immobilised on day one, the radium it
-# generates by year 50 sits ~2,200x below the uranium activity that produced it,
-# and then has to partition into water against a Kd of 500-2,400 L/kg before it
-# could be measured. Modelling it would add machinery whose output is
-# indistinguishable from zero at every time this tool can display.
+# generates by year 50 sits ~2e5 x below the uranium activity that produced it,
+# and then has to partition into water against a Kd of 6.7-2,000 L/kg (see
+# RADIUM_KD_RANGES) before it could be measured. Modelling it would add
+# machinery whose output is indistinguishable from zero at every time this tool
+# can display.
 #
 # It is NOT negligible on geological timescales, which is precisely why the
 # Singhbhum ore bodies carry Ra-226 in secular equilibrium today. If the horizon
 # is ever extended past ~1,000 yr, this omission must be revisited.
 RADIUM_INGROWTH_MODELLED = False
 TH230_HALFLIFE_YEARS = 75380.0   # the bottleneck, recorded for that revisit
+
+# ---------------------------------------------------------------------------
+# Rn-222 -- DELIBERATELY NOT MODELLED, and NOT because the physics zeroes it
+# ---------------------------------------------------------------------------
+# Radon-222 is a standard ISR licensing metric and fidelity row 3.9 has carried
+# it as an open item. Assessed properly 2026-08-10 rather than left open, and
+# the first hypothesis tested here was WRONG, so both results are recorded.
+#
+# HYPOTHESIS TESTED: "a 3.82-day half-life means radon cannot survive transport
+# to the compliance ring, so it is out of scope by physics." Measured against
+# this model's OWN velocity envelope (18,000 training rows, seepage velocity v):
+#       v p50  =  0.20 m/day -> 100 m in 507 d = 133 half-lives -> 1e-40 survives
+#       v p99  = 14.33 m/day -> 100 m in 7.0 d = 1.8 half-lives -> 0.28 survives
+#       v max  = 18.99 m/day -> 100 m in 5.3 d = 1.4 half-lives -> 0.38 survives
+#   4.3% of the envelope retains >1% of the radon at 100 m.
+# So the hypothesis holds for the MEDIAN case by forty orders of magnitude and
+# FAILS for the fastest fractured channels. Radon is not universally immobile
+# here, and claiming so would have been a convenient error.
+#
+# WHY IT IS STILL NOT MODELLED -- two blockers, both real:
+#   (1) NO SOURCE TERM. The one local measurement set for this ore body (Sethy
+#       et al. 2013, the same paper behind JADUGUDA_MINE_WATER_U_PPB and
+#       RADIUM_SOURCE_MBQ_L) reports dissolved uranium and Ra-226 only; it
+#       carries no Rn-222 column, and no Texas ISR radon series exists to
+#       transfer from. This is the same wall as fidelity row 3.8: sorption and
+#       decay behaviour are known, the ISR source strength is not.
+#   (2) WRONG PATHWAY. Radon's governing exposure route at an ISR facility is
+#       ATMOSPHERIC -- degassing at wellheads, header houses and the processing
+#       circuit -- which a saturated-zone groundwater transport model cannot
+#       represent at all. Adding a dissolved-radon plume would answer a question
+#       that is not the one radon is regulated on.
+# Recorded as a DATA + SCOPE limitation, not as a physics result.
+RADON_222_HALFLIFE_DAYS = 3.8235
+RADON_222_MODELLED = False
 
 # Training C0 range for the synthetic generator (2026-08-02 retrain). Radium has
 # no Texas ISR series to sample a source envelope from (see RADIUM_SOURCE_MBQ_L
@@ -232,22 +294,51 @@ RADIUM_C0_TRAINING_RANGE_MBQ_L = (RADIUM_BACKGROUND_MBQ_L, RADIUM_SOURCE_MBQ_L["
 #
 # Derivation: an aquifer sweep is a pore-volume flush, and removing a sorbed
 # solute takes on the order of Rd pore volumes, so the fraction remaining after
-# N pore volumes goes as exp(-N/Rd). Anchoring on uranium, whose measured
-# endpoint is 0.066:   N/Rd_U = ln(1/0.066) = 2.72.
-# Radium's Kd exceeds uranium's by ~500x (fractured: 500 vs 1.0) to ~960x
-# (porous: 2400 vs 2.5), and Rd scales with Kd, so the SAME sweep gives
-#     residual_Ra = exp(-2.72 / ~500..960) = 0.994 .. 0.997
-# i.e. a hydraulic sweep barely touches radium: it flushes mobile pore water,
-# while almost all the radium inventory is bound to the matrix and simply
-# re-equilibrates. Rounded to 0.99 (kept just below 1.0 so the restoration
-# machinery stays continuous rather than degenerate).
+# N pore volumes goes as exp(-N/Rd). Anchoring on uranium, whose PAIRED measured
+# endpoint is 0.0600 (texas_loader.texas_restoration_residual):
+#       N/Rd_U = ln(1/0.0600) = 2.813
+# Applying the SAME sweep to radium with retardation Rd = 1 + rho_b*Kd/n_total
+# (physics.transport.matrix_retardation, i.e. the same expression the transport
+# engine uses -- not the "Rd scales with Kd" shortcut the previous version took):
 #
-# CONSEQUENCE, stated plainly: the restoration slider will look nearly inert for
-# radium. That is the physically correct and decision-relevant answer -- radium
-# is not remediable by pumping -- not a broken control. (Surface treatment at
-# Jaduguda removes >95% of Ra via BaCl2 co-precipitation, but that is an
-# effluent-treatment plant, not aquifer restoration.)
-RADIUM_RESTORATION_RESIDUAL = 0.99
+#   regime      Kd_U   Kd_Ra   Rd_U     Rd_Ra     Rd_U/Rd_Ra   residual_Ra
+#   fractured   1.00   13.2     89.9    1174.7      0.0765        0.806
+#   porous      2.50   13.2     16.5      82.6      0.1992        0.571
+#
+# SERVED VALUE = 0.81, the FRACTURED result: every Singhbhum deposit pin resolves
+# to fractured schist, and it is also the higher (dirtier, safety-conservative)
+# of the two. A single scalar is consistent with how uranium/sulfate/TDS are
+# handled -- their Texas endpoints are likewise one number applied to both regimes.
+#
+# !! CORRECTED 2026-08-10 -- THIS CONSTANT HAD GONE STALE AND WAS A TRAINING LABEL. !!
+# It read 0.99, computed from Kd values this config no longer holds: the comment
+# named "fractured: 500 vs 1.0" and "porous: 2400 vs 2.5", i.e. the Thibault SOIL
+# compilation that the 2026-08-06 rebase (see RADIUM_KD_RANGES) replaced with
+# measured groundwater values. Re-running the SAME derivation on the CURRENT
+# constants gives 0.806/0.571, not 0.99 -- so the model was asserting that a
+# hydraulic sweep removes 1% of the radium source while its own stated physics
+# said 19-43%. The anchor was stale twice over: it also still used the
+# pre-V-3 unpaired uranium endpoint 0.066 instead of the paired 0.0600.
+# `restoration_endpoint_for()` feeds BOTH synthetic.generate and ml.predict, so
+# this value is baked into the training labels and correcting it forces a re-bake.
+#
+# HONEST LIMITATION -- N IS AN EFFECTIVE PARAMETER, NOT A PORE-VOLUME COUNT.
+# The uranium anchor implies N_eff = 2.813*Rd_U = 46 (porous) to 253 (fractured)
+# pore volumes, against the 18.6 PV median actually extracted across the 13 Texas
+# production areas. The gap is real and expected: commercial restoration is
+# groundwater sweep PLUS reverse-osmosis permeate reinjection and reductant
+# addition, which strips sorbed uranium chemically rather than by flushing alone.
+# So N is a fitted sweep STRENGTH anchored on the measured uranium endpoint, and
+# only the RATIO between species carries physical meaning here. Recorded rather
+# than hidden: this is a scenario assumption, not a measurement.
+#
+# CONSEQUENCE, stated plainly: the restoration slider stays weak for radium (19%
+# removal at the reference sweep, against 94% for uranium). That is the
+# decision-relevant answer -- radium is poorly remediable by pumping -- but it is
+# no longer the "essentially inert" control the stale 0.99 produced. (Surface
+# treatment at Jaduguda removes >95% of Ra via BaCl2 co-precipitation, but that
+# is an effluent-treatment plant, not aquifer restoration.)
+RADIUM_RESTORATION_RESIDUAL = 0.81
 
 
 # ---------------------------------------------------------------------------
@@ -313,14 +404,132 @@ def kd_range_for(species: str, regime: str) -> tuple:
 # source convention), so the ring is at x = COMPLIANCE_BUFFER_M in solver
 # coordinates and at (W/2 + COMPLIANCE_BUFFER_M) from the wellfield centre pin.
 # Single source of truth -- generate.py / predict.py / server.py import this.
+#
+# GROUNDED 2026-08-10 (was previously an uncited round number). US NRC
+# NUREG-1569, "Standard Review Plan for In Situ Leach Uranium Extraction License
+# Applications", Section 5.7.8.3, p.139:
+#   "Previously approved in situ leach excursion monitoring systems used monitor
+#    wells as far as 180 m [600 ft] and as near as 75 m [250 ft] from the well
+#    field edge (NRC, 2001, Table 4-6). The licensee should be afforded some
+#    discretion ... but should provide justification for distances greater than
+#    about 150 m [500 ft]."
+# 100 m therefore sits inside real licensed practice and below the threshold at
+# which a regulator demands extra justification. The training envelope is built
+# at this value, so changing it is a retrain -- but the SERVE path accepts a
+# user-set ring anywhere in MONITOR_RING_RANGE_M and flags values outside it.
 COMPLIANCE_BUFFER_M = 100.0
+# Licensed range observed by NRC, used to bound the serve-time ring input and to
+# tell a user when their ring would need regulatory justification.
+MONITOR_RING_RANGE_M = (75.0, 180.0)
+MONITOR_RING_JUSTIFY_BEYOND_M = 150.0
+MONITOR_RING_CITATION = ("US NRC NUREG-1569 Sec. 5.7.8.3 p.139 (citing NRC 2001, "
+                         "NUREG/CR-6733 Table 4-6): licensed perimeter monitor "
+                         "wells 75-180 m from the well-field edge; justification "
+                         "required beyond ~150 m")
+# NUREG-1569 Sec. 5.7.8.3 p.140: "all monitor wells will be sampled for excursion
+# indicators at least every 2 weeks during in situ leaching", and an acceptable
+# technical basis for a wider ring is "a rigorous modeling demonstration that a
+# theoretical excursion can be controlled at the monitor well locations within
+# 60 days of detection" (p.139). Both are reported as detectability context.
+MONITOR_SAMPLING_INTERVAL_DAYS = 14.0
+EXCURSION_CONTROL_WINDOW_DAYS = 60.0
 
 # Excursions are scored on the MINING-ATTRIBUTABLE (incremental) concentration:
 #   breach if C_plume >= max(threshold - background, INCREMENTAL_FLOOR*threshold)
 # The floor keeps the criterion meaningful when the ambient baseline already
 # sits at/above the limit (otherwise any pin in naturally poor water would
 # "breach" over the whole grid regardless of the mine).
+# NOTE this is a MODELLING POLICY, not a physical constant -- it decides how much
+# of a naturally-poor baseline the mine is held responsible for. Registered in
+# UNGROUNDED_PARAMETERS as a policy choice so it is never mistaken for measured.
 INCREMENTAL_FLOOR = 0.10
+
+# ---------------------------------------------------------------------------
+# 1c. ISR REGULATORY EXCURSION TEST (NUREG-1569)   [fix R-1, 2026-08-10]
+# ---------------------------------------------------------------------------
+# The health-limit breach above ("is the BIS/WHO limit exceeded at the ring")
+# is NOT how a real ISR operation detects an excursion, and the difference is
+# decision-relevant rather than cosmetic. US NRC NUREG-1569 Sec. 5.7.8.3:
+#
+#   p.138: "An excursion is defined to occur whenever TWO OR MORE excursion
+#           indicators in a monitoring well exceed their upper control limits."
+#   p.137: "A minimum of three excursion indicators should be proposed."
+#          Indicators must be "parameters that are strong indicators of the in
+#          situ leach process and that are NOT SIGNIFICANTLY ATTENUATED by
+#          geochemical reactions in the aquifers."
+#          "Conductivity, which is correlated to total dissolved solids, is also
+#           [used]."
+#   p.137: "URANIUM IS NOT CONSIDERED A GOOD EXCURSION INDICATOR because,
+#           although it is mobilized by in situ leaching, IT MAY BE RETARDED by
+#           reducing conditions in the aquifer."
+#   p.137: "The use of SULFATE may give FALSE ALARMS because of induced
+#           oxidation around a monitor well (Staub, 1986; Deutsch, 1985).
+#           However, this should only be a problem if upper control limit values
+#           are set too conservatively."
+#   p.137: cations (Ca2+, Na+) are "generally not appropriate because they are
+#           subject to ion exchange with the host rock".
+#
+# The regulator's own reason for excluding uranium is exactly what this model
+# measures independently: fractured uranium carries beta_eff ~ 700 retardation
+# plus redox trapping, and its excursion probability collapses to ~0.01 while
+# TDS and sulfate retain meaningful values. So the tool was leading with the
+# indicator the regulator explicitly rejects.
+ISR_EXCURSION_INDICATORS = ("tds_mg_l", "sulfate_mg_l")
+# Species that must NEVER be used as an ISR excursion indicator, with the reason.
+ISR_NON_INDICATORS = {
+    "uranium_ppb": "retarded by reducing conditions (NUREG-1569 p.137)",
+    "radium_226_mbq_l": ("strongly sorbing alkaline earth; same retardation "
+                         "objection as uranium, more so (NUREG-1569 p.137 "
+                         "principle; Kd 6.7-2000 L/kg here)"),
+}
+ISR_EXCURSION_MIN_INDICATORS = 2      # "two or more" -- NUREG-1569 p.138
+ISR_EXCURSION_REQUIRED_PANEL = 3      # "a minimum of three" -- NUREG-1569 p.137
+# Indicators a licensed programme would use that this model does NOT carry as
+# transported species. Stated so the shortfall is reported, not hidden.
+ISR_INDICATORS_NOT_MODELLED = ("chloride_mg_l", "total_alkalinity_mg_l")
+
+# UPPER CONTROL LIMIT rule. NUREG-1569 p.138 bounds the UCL from both sides:
+#   "The upper control limit for each excursion indicator must generally be LESS
+#    than the lowest concentration that typically occurs in the lixiviant while
+#    the well field is in operation. Each upper control limit must also be
+#    GREATER than the baseline concentration for its respective excursion
+#    indicator."
+# and permits, as one acceptable form, "the use of a simple percentage increase
+# above baseline values".
+#
+# WHY THE PERCENTAGE FORM AND NOT THE STATISTICAL ONE. NUREG's preferred rules
+# (mean + 5 standard deviations; student's t; ASTM D6312) all need a per-well
+# TEMPORAL baseline distribution. Verified 2026-08-10 against the data on disk:
+# waterQuality_jharkhand.csv holds 397 wells, ONE sample each, all from a single
+# year -- zero repeat measurements at any site. There is no temporal variance to
+# take 5 sigma of. Substituting the REGIONAL (spatial) spread was tested and
+# rejected: sd(TDS) = 286.5 mg/L across the state gives mean + 5sd = 1,965 mg/L,
+# an upper control limit near the BIS permissible limit itself, which would make
+# the test fire only after the water was already unusable.
+#
+# !! SCENARIO ASSUMPTION -- the RULE is NUREG-sanctioned, the PERCENTAGE is not
+# measured. !! Registered in UNGROUNDED_PARAMETERS. It is reported in the API
+# response alongside the indicator ratios so a user can re-apply their own UCL.
+ISR_UCL_BASELINE_INCREASE = 0.20      # UCL = baseline * (1 + this), then bracketed
+
+
+def isr_upper_control_limit(baseline: float, lixiviant_c0: float,
+                            increase: float | None = None) -> float:
+    """Upper control limit for one ISR excursion indicator [same units as input].
+
+    Implements the NUREG-1569 p.138 bracket exactly: a simple percentage
+    increase above baseline, forced to stay strictly ABOVE the baseline and
+    strictly BELOW the lixiviant concentration. If the source is so weak that
+    the bracket collapses (C0 <= baseline), no UCL exists and the indicator
+    cannot signal -- returned as +inf so the test can never fire on it.
+    """
+    inc = ISR_UCL_BASELINE_INCREASE if increase is None else float(increase)
+    b = float(baseline)
+    ucl = b * (1.0 + max(inc, 0.0))
+    if not (lixiviant_c0 > b):
+        return float("inf")
+    # keep it inside the regulator's bracket: baseline < UCL < lixiviant
+    return float(min(max(ucl, b * (1.0 + 1e-9)), lixiviant_c0 * (1.0 - 1e-9)))
 
 # EC (uS/cm) -> TDS (mg/L). waterQuality_jharkhand.csv has EC but not TDS.
 # Factor 0.55-0.75 typical; 0.64 standard for mixed groundwater. [Freeze & Cherry]
@@ -860,6 +1069,28 @@ def depth_decay_factor(z_m: float, fracture_base_m: float | None = None,
 
     fracture_base_m: the district's documented fracture-death depth (NAQUIM
     `fracture_max_m`); None -> K_DEPTH_FRACTURE_BASE_DEFAULT_M.
+
+    THE EXPONENTIAL IS NOT EXTRAPOLATED PAST ITS EVIDENCE (fixed 2026-08-10).
+    The decay length is calibrated on ONE interval -- from the tested shallow
+    zone (45 m) down to the district's NAQUIM-documented fracture-death depth,
+    where K has fallen to K_DEPTH_RESIDUAL_AT_FRACTURE_BASE. Running it further
+    was unsupported and produced physically implausible numbers: for a district
+    with a shallow fracture base (Ranchi, 121 m) the factor at 300 m came out at
+    4.3e-5, a 23,000x reduction from 45 m.
+
+    Two independent checks say that is too much:
+      * LOCAL. The NAQUIM reports describe "massive rock" below the fracture
+        base -- low permeability, not vanishing permeability. The evidence ends
+        at the fracture base; it does not license a continued exponential.
+      * GLOBAL. Manning & Ingebritsen (1999) / Ingebritsen & Manning (2010) give
+        mean crustal permeability log k = -14 - 3.2 log z (k in m2, z in km),
+        i.e. about 440x between 45 m and 300 m, and roughly 3-4 orders of
+        magnitude over the whole upper 2 km. A 23,000x drop across 255 m exceeds
+        the global crustal trend by ~50x.
+    So below the fracture base the factor is HELD at its fracture-base value.
+    Above it the district-calibrated exponential is unchanged. This is
+    serve-time only (K is sampled directly from the polygon ranges when training
+    labels are baked), so it needs no retrain.
     """
     import math
     if not K_DEPTH_DECAY_ENABLED:
@@ -873,7 +1104,9 @@ def depth_decay_factor(z_m: float, fracture_base_m: float | None = None,
     # minimum span so lambda stays finite and positive.
     span = max(base - K_DEPTH_REF_M, 20.0)
     lam = span / math.log(1.0 / K_DEPTH_RESIDUAL_AT_FRACTURE_BASE)
-    f = math.exp(-(z - K_DEPTH_REF_M) / lam)
+    # clamp the depth at the calibration's lower limit rather than extrapolating
+    z_eff = min(z, K_DEPTH_REF_M + span)
+    f = math.exp(-(z_eff - K_DEPTH_REF_M) / lam)
     s = K_DEPTH_DECAY_STRENGTH if strength is None else float(strength)
     return float(min(1.0, max(f ** s, 1e-6)))
 
@@ -908,8 +1141,15 @@ OPERATIONAL_RANGES = {
 # the pumps are down => effective eta = eta*(1 - downtime_fraction)); the
 # seasonal gradient amplitude and bleed drift enter the parameter-uncertainty
 # Monte Carlo (they widen the outcome distribution rather than shift the mean).
-# Placeholder ranges -- to be re-fit from TCEQ excursion records + the CGWB
-# water-level seasonality (plan Phase 5).
+#
+# !! SCENARIO ASSUMPTIONS -- every range in this dict is a chosen envelope, not a
+# measurement, EXCEPT `gradient_seasonal_amp`, whose upper bound 0.40 is now
+# anchored by the CGWB seasonal analysis (see VERTICAL_SEASONAL) and which the
+# flow field populates per pin. The original note said "to be re-fit from TCEQ
+# excursion records"; those records were never obtained and this is recorded as a
+# standing data gap rather than left as an aspiration. Registered in
+# UNGROUNDED_PARAMETERS. These widen the P10-P90 bands, so the effect of getting
+# them wrong is mis-sized uncertainty, not a biased central estimate.
 IRREGULARITY = {
     "downtime_episodes_per_year": (0.0, 2.0),
     "downtime_days_per_episode":  (5.0, 30.0),
@@ -927,6 +1167,15 @@ IRREGULARITY = {
 # time-consistent: at t < t_op only the volume injected SO FAR widens the source.
 #   W_eff(t) = W * (1 + SOURCE_BV_GAIN * tanh(BV(t) / SOURCE_BV_REF))
 # tanh-saturating so the source never exceeds (1 + gain) x the permitted width.
+#
+# !! SCENARIO ASSUMPTION -- NO MEASUREMENT BEHIND EITHER NUMBER. !!
+# See UNGROUNDED_PARAMETERS below. The FORM (monotone, saturating, throughput-
+# driven) is defensible -- lixiviant does flare beyond the pattern and the flare
+# does not grow without bound -- but the gain 0.40 and the half-saturation scale
+# 2.0 BV are chosen, not measured. This is high-leverage: W_eff sets the E1 leach
+# disc radius, and the disc is 76-97% of the reported `affected_area_ha`
+# (DOMENICO_ERROR_ENVELOPE.md). Grounding it needs per-pattern lixiviant-flare or
+# exempted-vs-pattern area data that the Texas sheets do not resolve.
 SOURCE_BV_GAIN = 0.40    # max +40% effective source width at high throughput
 SOURCE_BV_REF = 2.0      # bulk pattern volumes at which widening half-saturates
 
@@ -986,6 +1235,39 @@ E1_ENABLED = True
 # grounded here for defensibility, not sensitivity. Set 0 to disable (disc held at
 # C0/residual indefinitely, the pre-#4 behaviour).
 DISC_FLUSH_HALFLIFE_YEARS = 30.0
+
+# ---------------------------------------------------------------------------
+# POST-RESTORATION REBOUND FLOOR   [2026-08-10]
+# ---------------------------------------------------------------------------
+# Uranium rebound after ISR restoration has been an acknowledged, unmodelled gap
+# since 2026-07-13: the source only ever decays here, while real leached zones
+# can REBOUND as residual U(IV) re-oxidises and re-dissolves (Wyoming study,
+# ScienceDirect S0883292715300342; the same evidence already cited to justify
+# DISC_FLUSH_HALFLIFE_YEARS being slow rather than fast).
+#
+# The defect this creates is specific and was measurable: the served source
+# fraction was  restoration_credit x disc_flush_factor,  compounding, so after an
+# active restoration the source kept decaying exponentially FOREVER -- at op = 8,
+# t = 50 yr it fell to 0.023 x C0, well BELOW the empirical restoration endpoint
+# of 0.060. That asserts continued natural clean-up past the measured endpoint,
+# in the exact direction the rebound literature says is wrong.
+#
+# WHY THE ENDPOINT IS THE RIGHT FLOOR -- verified in the source data 2026-08-10.
+# The Texas endpoint is not a snapshot taken the day pumping stopped. The sheet
+# it comes from is headed "Post-restoration groundwater composition - Average
+# composition of groundwater achieved AFTER RESTORATION WAS COMPLETE", and its
+# footnote 2 refers to "stability samples" (TCEQ 2009; Rosita PAAs 1 and 2). A
+# post-restoration stability demonstration is precisely the regulatory test that
+# the aquifer has stopped changing -- so whatever rebound occurred is already
+# inside the measured 0.060 / 0.138 / 0.337 residuals.
+#
+# So rather than invent a rebound magnitude and timescale (no defensible local or
+# Texas numbers exist for either), the model stops claiming clean-up the data does
+# not show: once a restoration sweep has run, the passive flush may no longer take
+# the source BELOW the demonstrated stable endpoint. Unrestored scenarios keep the
+# full 30-yr flush, which is separately justified above.
+# Set False to restore the pre-2026-08-10 compounding behaviour.
+RESTORATION_REBOUND_FLOOR = True
 
 # ---------------------------------------------------------------------------
 # 7. Ore-body masking (Module 2). ISR leaches uranium only where uranium ore
@@ -1098,10 +1380,34 @@ VERTICAL = {
     # Vertical anisotropy Kv/Kh is where the regime DOES belong: fractured rock's
     # sub-vertical joint sets raise vertical conductivity; weathered/porous is more
     # layered (Kv << Kh). This is the physically-correct channel for "fractured is
-    # riskier vertically". [screening values -- re-fit from GSI Bhukosh structure]
+    # riskier vertically".
+    # !! SCENARIO ASSUMPTION -- screening values, no Singhbhum measurement.
+    #    The DIRECTION (fractured > porous) is standard hard-rock hydrogeology;
+    #    the magnitudes are chosen. Registered in UNGROUNDED_PARAMETERS.
     "Kv_Kh_by_regime": {"fractured": 0.03, "porous": 0.008},
-    "upward_gradient": 0.005,        # net upward head gradient (injection driven)
-    "wellbore_failure_prob": 0.05,   # base rate: casing / legacy-borehole shortcut
+    # !! SCENARIO ASSUMPTION -- net upward head gradient (injection driven).
+    #    Now BRACKETED by the measured monsoon swing (fix 3.7 / VERTICAL_SEASONAL
+    #    reports a two-end-member band around it), but the baseline itself has no
+    #    local piezometry behind it -- no deep confined-aquifer head record for
+    #    Singhbhum is published (same wall as fidelity row 3.4).
+    "upward_gradient": 0.005,
+    # Base rate for a casing / legacy-borehole shortcut to the shallow aquifer.
+    # !! SCENARIO ASSUMPTION, but no longer contextless (2026-08-10). NUREG-1569
+    # Sec. 5.7.8.3 p.139, citing NUREG/CR-6733 (NRC 2001) Sec. 4.3.3, records that
+    # "significant risks for vertical excursions may exist if monitor wells are
+    # randomly located, given the typical criteria for spacing of vertical
+    # excursion monitor wells at licensed in situ leach facilities {e.g., one well
+    # per 1.6 ha [4 acres] for overlying aquifers; one well per 3.2 ha [8 acres]
+    # for underlying aquifers}". So a non-trivial vertical-pathway rate is the
+    # regulator's own working assumption; 0.05 is this model's screening stand-in
+    # for it and is NOT a published failure frequency. Registered below.
+    "wellbore_failure_prob": 0.05,
+    # Licensed vertical-excursion monitor-well densities, reported as detectability
+    # context next to the vertical screening index (NUREG/CR-6733 Sec. 4.3.3).
+    "vertical_monitor_ha_per_well_overlying": 1.6,
+    "vertical_monitor_ha_per_well_underlying": 3.2,
+    "vertical_monitor_citation": ("US NRC NUREG-1569 Sec. 5.7.8.3 p.139 citing "
+                                  "NUREG/CR-6733 (NRC 2001) Sec. 4.3.3"),
     "ore_depth_default_m": 150.0,
     "ore_thickness_default_m": 20.0,
     "ore_depth_range_m": (50.0, 600.0),
@@ -1239,6 +1545,90 @@ def water_table_shape(month: int) -> float:
 def water_table_at_month(month: int, wet_m: float, dry_m: float) -> float:
     """Depth to water [m bgl] for a month, scaled to a pin's own wet/dry pair."""
     return float(wet_m + water_table_shape(month) * (dry_m - wet_m))
+
+# ---------------------------------------------------------------------------
+# SCENARIO-ASSUMPTION REGISTER   [2026-08-10]
+# ---------------------------------------------------------------------------
+# Every constant in this file is meant to be either (a) derived from a dataset on
+# disk, (b) cited to a real source, or (c) an explicit scenario assumption. The
+# third class used to live only in prose, which is how ungrounded numbers kept
+# being discovered by audits instead of being declared. This register makes class
+# (c) machine-readable: `tests/test_assumptions_register.py` fails if a listed
+# constant changes value without its entry being updated, and the API exposes it
+# so a reader can see what the answer rests on.
+#
+# `leverage`  what moves if the number is wrong.
+# `grounding` what evidence would retire it from this list.
+UNGROUNDED_PARAMETERS = {
+    "SOURCE_BV_GAIN": {
+        "value": SOURCE_BV_GAIN, "kind": "scenario_assumption",
+        "leverage": ("sets the E1 leach-disc radius via W_eff; the disc is "
+                     "76-97% of reported affected_area_ha"),
+        "grounding": "per-pattern lixiviant flare or exempted-vs-pattern area data",
+    },
+    "SOURCE_BV_REF": {
+        "value": SOURCE_BV_REF, "kind": "scenario_assumption",
+        "leverage": "how fast the source-width growth saturates with throughput",
+        "grounding": "as above",
+    },
+    "INCREMENTAL_FLOOR": {
+        "value": INCREMENTAL_FLOOR, "kind": "modelling_policy",
+        "leverage": ("how much of a naturally-poor baseline the mine is held "
+                     "responsible for; sets every exceedance threshold"),
+        "grounding": "a regulator's attribution rule, not a measurement",
+    },
+    "ISR_UCL_BASELINE_INCREASE": {
+        "value": ISR_UCL_BASELINE_INCREASE, "kind": "scenario_assumption",
+        "leverage": "when the NUREG 2-of-N indicator excursion test fires",
+        "grounding": ("per-well TEMPORAL baseline series, which would enable "
+                      "NUREG-1569's preferred mean+5sd / ASTM D6312 rules; the "
+                      "CGWB file has one sample per well and cannot support them"),
+    },
+    "DUAL_POROSITY.beta_range": {
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": "apparent retardation of every fractured plume (Rd ~ 1+beta)",
+        "grounding": "a Singhbhum tracer test (fidelity row 3.4 -- none published)",
+    },
+    "DUAL_POROSITY.mass_transfer_omega": {
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": "how fast the retarded clock matures toward 1+beta",
+        "grounding": "as above",
+    },
+    "FRACTURE.full_aperture_m": {
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": "Tang envelope (sigma ~ 1/b_half); IS MC-sampled into the bands",
+        "grounding": "a Singhbhum packer test (fidelity row 3.4 -- none published)",
+    },
+    "FRACTURE.De_m2_day": {
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": "Tang envelope; NOT sampled -- served and trained at one value",
+        "grounding": ("a defensible range; P.FRACTURE carries none and inventing "
+                      "one would relabel an assumption as data"),
+    },
+    "VERTICAL.Kv_Kh_by_regime": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": "advective upward leakage rate in the shallow-impact screen",
+        "grounding": "GSI Bhukosh structural analysis or local packer data",
+    },
+    "VERTICAL.upward_gradient": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": ("shallow-impact index is violently sensitive to it "
+                     "(0.005 -> moderate, 0.020 -> high); bracketed by fix 3.7"),
+        "grounding": "deep confined-aquifer piezometry for Singhbhum (unpublished)",
+    },
+    "VERTICAL.wellbore_failure_prob": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": "floor on the shallow-impact index wherever C0 > threshold",
+        "grounding": ("published ISR mechanical-integrity-test failure statistics; "
+                      "NUREG/CR-6733 Sec. 4.3.3 establishes the risk is non-trivial "
+                      "but gives no frequency"),
+    },
+    "IRREGULARITY": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": "width of the P10-P90 bands (not the central estimate)",
+        "grounding": "TCEQ/NRC excursion and downtime records (never obtained)",
+    },
+}
 
 # Reproducibility
 RANDOM_SEED = 42

@@ -63,7 +63,7 @@ from ml_pipeline.physics.transport import (
     simulate_plume, front_position, matrix_sigma, TransportParams,
     concentration_point, mc_field_metrics, disc_flush_factor,
     restoration_source_fraction, effective_capacity_ratio,
-    matrix_transfer_omega, disc_growth_factor,
+    matrix_transfer_omega, disc_growth_factor, source_strength_fraction,
 )
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "outputs"
@@ -354,9 +354,7 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     # the ELAPSED sweep x natural post-closure flush -- MUST match
     # physics.params_from_features so training labels and the served analytical
     # engine stay identical.
-    f_src = (restoration_source_fraction(residual_fraction, t_days, op_days,
-                                         rest_days)
-             * disc_flush_factor(t_days, op_days))
+    f_src = source_strength_fraction(residual_fraction, t_days, op_days, rest_days)
     Xc_clean, C_res = None, 0.0
     if f_src < 1.0:
         C_res = f_src * scn["C0"][species]
@@ -412,7 +410,8 @@ def _throughput_width(scn: dict, t_days: float, op_days: float) -> float:
 def excursion_probability(scn: dict, species: str, t_days: float, op_days: float,
                           draws: dict[str, np.ndarray],
                           rest_days: float = 0.0,
-                          residual_fraction: float = 1.0) -> float:
+                          residual_fraction: float = 1.0,
+                          compliance_x: float | None = None) -> float:
     """Fraction of MC realizations whose MINING-ATTRIBUTABLE concentration at
     the compliance ring exceeds the incremental threshold. (Serving path --
     the training loop gets this from mc_band_labels for coherence.)"""
@@ -424,7 +423,8 @@ def excursion_probability(scn: dict, species: str, t_days: float, op_days: float
     for i in range(n):
         p = _draw_params(scn, species, t_days, op_days, draws, i, w_eff,
                          rest_days, residual_fraction)
-        if concentration_point(P.COMPLIANCE_BUFFER_M, 0.0, p) >= thr_inc:
+        ring_x = P.COMPLIANCE_BUFFER_M if compliance_x is None else float(compliance_x)
+        if concentration_point(ring_x, 0.0, p) >= thr_inc:
             breaches += 1
     return breaches / max(n, 1)
 
@@ -591,12 +591,18 @@ if __name__ == "__main__":
     ap.add_argument("--mc", type=int, default=48)
     ap.add_argument("--seed", type=int, default=P.RANDOM_SEED)
     ap.add_argument("--out", type=str, default=None)
+    # V-5: 1.0 pins every scenario to the REAL flow/strike field at its jittered
+    # pin, which is the serving distribution. Used to bake the field-resampled
+    # coverage batch the E1 design mandated but that was never run.
+    ap.add_argument("--field-mix", type=float, default=FIELD_MIX_FRAC,
+                    dest="field_mix")
     args = ap.parse_args()
 
     print(f"Generating synthetic training data v2: {args.scenarios} scenarios "
           f"x {len(DEFAULT_TIMES_YEARS)} times x {len(SPECIES)} species, MC={args.mc}")
     df = generate(n_scenarios=args.scenarios, n_mc=args.mc, seed=args.seed,
-                  out_csv=Path(args.out) if args.out else None)
+                  out_csv=Path(args.out) if args.out else None,
+                  field_mix=args.field_mix)
     print(f"\nDONE -> shape={df.shape}")
     print("\nMean excursion probability by species:")
     print(df.groupby("species")["excursion_probability"].mean().round(3).to_string())

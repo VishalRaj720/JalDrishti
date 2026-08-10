@@ -95,3 +95,6 @@ Datasets/HydroRIVERS_v10_as_shp/
 # JHARKHAND_FIDELITY_MATRIX.md. The curated fulltext extraction of the Jaduguda
 # mine-water paper (small, cited, human-readable) IS tracked, not ignored.
 Datasets/phase1_sources/*.pdf
+
+ml_pipeline/FABLE5_ARCHITECTURE_AUDIT_PROMPT.md
+ml_pipeline/outputs/
