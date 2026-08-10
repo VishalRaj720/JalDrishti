@@ -60,34 +60,34 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|radium_226_mbq_l": 0.64076,
-      "fractured|sulfate_mg_l": 0.92988,
-      "fractured|tds_mg_l": 1.19113,
-      "fractured|uranium_ppb": 0.19229,
-      "porous|radium_226_mbq_l": 0.61702,
-      "porous|sulfate_mg_l": 1.12099,
-      "porous|tds_mg_l": 1.27991,
-      "porous|uranium_ppb": 0.32276
+      "fractured|radium_226_mbq_l": 0.63009,
+      "fractured|sulfate_mg_l": 0.71686,
+      "fractured|tds_mg_l": 0.87233,
+      "fractured|uranium_ppb": 0.18154,
+      "porous|radium_226_mbq_l": 0.86537,
+      "porous|sulfate_mg_l": 0.90702,
+      "porous|tds_mg_l": 0.96073,
+      "porous|uranium_ppb": 0.25212
     },
     "max_migration_distance_m": {
-      "fractured|radium_226_mbq_l": 0.19143,
-      "fractured|sulfate_mg_l": 1.10404,
-      "fractured|tds_mg_l": 1.55758,
-      "fractured|uranium_ppb": 0.90442,
-      "porous|radium_226_mbq_l": 0.7105,
-      "porous|sulfate_mg_l": 1.68249,
-      "porous|tds_mg_l": 2.13396,
-      "porous|uranium_ppb": 0.95651
+      "fractured|radium_226_mbq_l": 0.14404,
+      "fractured|sulfate_mg_l": 0.9696,
+      "fractured|tds_mg_l": 1.21619,
+      "fractured|uranium_ppb": 0.99876,
+      "porous|radium_226_mbq_l": 0.65837,
+      "porous|sulfate_mg_l": 1.47404,
+      "porous|tds_mg_l": 1.63237,
+      "porous|uranium_ppb": 0.94704
     },
     "compliance_conc": {
-      "fractured|radium_226_mbq_l": 0.05821,
-      "fractured|sulfate_mg_l": 0.94976,
-      "fractured|tds_mg_l": 0.54544,
-      "fractured|uranium_ppb": 1.29993,
-      "porous|radium_226_mbq_l": 0.04467,
-      "porous|sulfate_mg_l": 1.46838,
-      "porous|tds_mg_l": 0.57887,
-      "porous|uranium_ppb": 2.04944
+      "fractured|radium_226_mbq_l": 0.04838,
+      "fractured|sulfate_mg_l": 0.97286,
+      "fractured|tds_mg_l": 0.54188,
+      "fractured|uranium_ppb": 1.25859,
+      "porous|radium_226_mbq_l": 0.04091,
+      "porous|sulfate_mg_l": 1.48103,
+      "porous|tds_mg_l": 0.73556,
+      "porous|uranium_ppb": 2.0859
     }
   },
   "monotone_maps": {

@@ -209,3 +209,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .ore-tier.t-deposit { background: rgba(255,45,45,.20); color: #ff7a7a; }
 .ore-tier.t-belt { background: rgba(255,184,77,.18); color: #ffb84d; }
 .ore-tier.t-none { background: rgba(139,151,167,.18); color: #8b97a7; }
+
+/* R-1: the NUREG regulatory excursion test. Deliberately styled like the
+   vertical-impact card (an independent screen), not like the BIS breach badge --
+   they answer different questions and this one fires earlier. */
+.metric.isr{border-color:rgba(255,184,77,.35);
+  background:linear-gradient(180deg,rgba(255,184,77,.06),var(--card))}
+.badge.bad{background:rgba(255,90,90,.2);color:var(--danger)}
+.badge.ok{background:rgba(55,211,155,.18);color:var(--ok)}
+.metric.isr .m-band{font-size:11px;line-height:1.45;margin-top:6px}

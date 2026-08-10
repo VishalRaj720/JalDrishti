@@ -128,7 +128,7 @@ gradient — `_auto_grid` resolution quantization. Cosmetic at screening scale.
 Guardrails: out-of-state 422s (incl. near-boundary Bihar), slider corners (24 extreme combos — no
 crash/NaN/negative), determinism (bit-identical repeats), band ordering p10≤p50≤p90 everywhere,
 probabilities in [0,1]. Wiring: u-suppression at non-ore pins (ML bypassed, analytical ~0 area),
-ore C0 ordering deposit (13,272) > belt (6,636) > none (5.0 trace), shear-zone K on/off (2.467 auto
+ore C0 ordering deposit > belt > none (trace), shear-zone K on/off (2.467 auto
 → larger plume; explicit K disables), river crossing at Jamshedpur (Subarnarekha, 311 m³/s +
 far-field note), per-district NAQUIM vertical (E. Singhbhum profile, fracture band 20–258 m),
 flow/strike azimuth provenance (`flow_field+strike`, divide fallback defined), pin ore-depth
@@ -145,3 +145,18 @@ confirm the step is gone → then the retrain is credibly final.
 + 9 new continuity regressions); serve-level reproductions re-run clean (Ranchi boundary step
 6.584 → 6.578; Jaduguda smooth to the causal saturation point; diagnostic consistent with the
 field); training data re-baked and the surrogate retrained on the corrected labels/features.
+
+---
+
+## Correction — 2026-08-10 (audit `review3.md`)
+
+Two numbers quoted in the all-clear checklist above were absolute values that a
+later change moved, which is the same staleness pattern the retraction in item 3
+already records. The **ordering** they were checking is the real assertion, and
+it still holds; the literals have been removed rather than re-pinned.
+
+The uranium source envelope changed when `texas_source_signature()` was corrected
+from an undocumented P25-P95 window over pseudo-replicated rows to the full
+observed range of per-mine means (review2.md V-2): uranium 9,800-34,440 ->
+9,000-41,600 ppb. Deposit C0 at Jaduguda moved 13,272 -> 15,180 ppb accordingly.
+No physics changed; the envelope now spans exactly the measured evidence.

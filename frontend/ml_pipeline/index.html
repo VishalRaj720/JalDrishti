@@ -57,7 +57,9 @@
            old 0.5 yr step (2 samples/yr), so the timeline scrubs month-by-month -->
       <div class="slider"><label>Evaluation time <span class="u">yr</span><b id="v-time">10</b></label>
         <input type="range" id="time" min="0" max="50" step="0.0833333" value="10"></div>
-      <div class="slider"><label>Wellfield width <span class="u">m</span><b id="v-width">300</b></label>
+      <!-- "Wellfield width" invited reading this as a borehole width or a well
+           spacing. It is the DIAMETER of the circular well-pattern footprint. -->
+      <div class="slider"><label title="Diameter of the circular well-pattern footprint — the full transverse extent of the wellfield. Not a borehole width and not a well spacing.">Well-pattern footprint ⌀ <span class="u">m</span><b id="v-width">300</b></label>
         <input type="range" id="width" min="100" max="800" step="10" value="300"></div>
       <div class="slider"><label>Restoration sweep <span class="u">yr</span><b id="v-rest">0</b></label>
         <input type="range" id="rest" min="0" max="30" step="0.5" value="0"></div>
@@ -128,6 +130,18 @@
       <div class="metric two">
         <div><div class="m-label">Excursion Prob.</div><div class="m-value sm"><span id="m-pex">–</span>%</div></div>
         <div><div class="m-label">BIS breach</div><div class="m-value sm"><span id="m-breach" class="badge">–</span></div></div>
+      </div>
+      <!-- R-1: the REGULATORY excursion test. A real ISR operation is judged on
+           two-or-more conservative INDICATORS over their upper control limits
+           (NUREG-1569 §5.7.8.3), not on a single species over a health limit --
+           and the regulator explicitly rejects uranium as an indicator because
+           it is retarded. This fires earlier than the BIS breach above, which is
+           the whole point of the indicator system. -->
+      <div class="metric isr">
+        <div class="m-label">ISR Excursion <span class="muted">(NUREG-1569 · 2-of-N indicators)</span></div>
+        <div class="m-value sm"><span id="m-isr" class="badge">–</span>
+          <span class="muted small" id="m-isr-count"></span></div>
+        <div class="m-band" id="m-isr-detail"></div>
       </div>
       <div class="metric two">
         <div><div class="m-label">Peak conc.</div><div class="m-value sm" id="m-peak">–</div></div>

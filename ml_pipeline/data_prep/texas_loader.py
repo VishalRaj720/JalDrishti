@@ -36,6 +36,26 @@ CONSTITUENTS = [
     "Radium-226",
 ]
 
+# V-4 parser hardening. A mine label is a short proper noun; anything longer is
+# a title or footnote sentence, not data. "Longest Sand Production Area" style
+# names stay well inside this.
+_MAX_MINE_LABEL_CHARS = 40
+
+# PINNED row counts, verified 2026-08-10 against
+# Datasets/Real_dataset/Dataset_1/TX_ISR_Final.xlsx. `_load_geochem_sheet`
+# raises if a parse deviates, so a workbook edit or a pandas/openpyxl behaviour
+# change cannot silently move the source-term envelope this whole model scales
+# linearly with.
+# Counts are POST-trailer-filter. Pre-filter the sheets read 87 / 9 / 92, i.e.
+# the filter removed 1 trailer row from Baseline and 6 from Final
+# Post-restoration, and no real mine row (verified: first/last labels are
+# 'Altamesa'/'Zamzow', longest surviving label 15 characters).
+EXPECTED_GEOCHEM_ROWS = {
+    "Baseline": 86,
+    "End of Mining": 9,
+    "Final Post-restoration": 86,
+}
+
 
 # --------------------------------------------------------------------------- #
 # Generic helpers
@@ -121,12 +141,63 @@ def _load_geochem_sheet(sheet: str) -> pd.DataFrame:
     data = data[data[label_col].notna()]
     data = data.dropna(how="all")
 
+    # ---- V-4: terminate the data block instead of ingesting the trailer ----
+    # The sheets carry a title line, a REPEATED header token, and numbered
+    # footnotes below the data, e.g. on 'Final Post-restoration':
+    #   "Post-restoration groundwater composition - Average composition ..."
+    #   "Mine"                                             <- repeated header
+    #   "1 Lixiviant type from U.S. Environmental Protection Agency (2007)."
+    #   "2  The post-restoration average for Rosita PAAs 1 and 2 ..."
+    #   "3  Tweeton (1981)"
+    # These were previously kept as rows. Harmless TODAY because they carry no
+    # parseable numbers, so pd.to_numeric().dropna() removes them from every
+    # constituent column -- but the sparsity guards that decide whether to fall
+    # back to config values COUNT them, and any future column whose footnote
+    # contains a number would be silently ingested as data (review2.md V-4).
+    def _is_trailer(label: str) -> bool:
+        s = str(label).strip()
+        if not s or s.lower() == "nan":
+            return True
+        if s == label_col:                      # repeated header row
+            return True
+        if len(s) > _MAX_MINE_LABEL_CHARS:      # prose / footnote sentence
+            return True
+        if re.match(r"^\d+\s", s):              # numbered footnote "1 Lixiviant..."
+            return True
+        return False
+
+    # A title line can sit BEFORE the first data row (it does on
+    # 'Final Post-restoration'), so we cannot simply cut at the first trailer --
+    # doing that emptied the sheet. Skip leading preamble, then terminate at the
+    # first trailer AFTER the data block has started.
+    labels = data[label_col].astype(str)
+    bad = labels.map(_is_trailer).to_numpy()
+    good = np.flatnonzero(~bad)
+    if good.size:
+        start = int(good[0])
+        rest_bad = np.flatnonzero(bad[start:])
+        stop = start + int(rest_bad[0]) if rest_bad.size else len(data)
+        data = data.iloc[start:stop]
+    else:
+        data = data.iloc[:0]
+
     # Coerce constituents to numeric (handles '<0.001', 'BDL', etc. -> NaN)
     for c in data.columns:
         if c in CONSTITUENTS:
             data[c] = pd.to_numeric(data[c], errors="coerce")
     data.insert(0, "stage", sheet)
-    return data.reset_index(drop=True)
+    data = data.reset_index(drop=True)
+
+    # Fail LOUDLY if a re-import changes the sheet layout, rather than silently
+    # serving a different source envelope (review2.md V-4).
+    expected = EXPECTED_GEOCHEM_ROWS.get(sheet)
+    if expected is not None and len(data) != expected:
+        raise ValueError(
+            f"Texas sheet '{sheet}' parsed {len(data)} data rows, expected "
+            f"{expected}. The workbook layout changed, or the trailer filter "
+            f"needs updating. Refusing to derive source/restoration terms from "
+            f"an unverified parse -- update EXPECTED_GEOCHEM_ROWS deliberately.")
+    return data
 
 
 def load_texas_geochem() -> dict[str, pd.DataFrame]:
@@ -242,25 +313,85 @@ def load_operations() -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 # Convenience: derived Texas source signature (end-of-mining minus baseline)
 # --------------------------------------------------------------------------- #
+_EOM_COLS = {"uranium_ppb": "Uranium", "sulfate_mg_l": "Sulfate", "tds_mg_l": "TDS"}
+_EOM_UNIT_MULT = {"uranium_ppb": 1000.0, "sulfate_mg_l": 1.0, "tds_mg_l": 1.0}
+
+
+def _eom_per_mine() -> dict[str, pd.Series]:
+    """End-of-Mining source concentrations averaged PER MINE, in served units.
+
+    Two of the seven mines contribute two production-area rows each, so a
+    row-level statistic pseudo-replicates them (review2.md V-2). Averaging to
+    one value per mine makes each independent site count once.
+    """
+    eom = load_texas_geochem()["End of Mining"]
+    label = "Mine" if "Mine" in eom.columns else eom.columns[1]
+    mines = eom[label].astype(str).str.strip()
+    out = {}
+    for key, col in _EOM_COLS.items():
+        if col not in eom:
+            out[key] = pd.Series([], dtype=float)
+            continue
+        v = pd.to_numeric(eom[col], errors="coerce") * _EOM_UNIT_MULT[key]
+        d = pd.DataFrame({"mine": mines, "v": v}).dropna()
+        out[key] = d.groupby("mine")["v"].mean()
+    return out
+
+
 def texas_source_signature() -> dict[str, tuple[float, float]]:
-    """Empirical (min, max) source concentrations for U / Sulfate / TDS taken
-    from the Texas 'End of Mining' sheet (the in-aquifer excursion signature).
-    Falls back to config ranges if the sheet is too sparse.
+    """Empirical (min, max) source concentrations for U / Sulfate / TDS from the
+    Texas 'End of Mining' sheet (the in-aquifer excursion signature).
+
+    WINDOW CHANGED 2026-08-10 (review2.md V-2). This returned the P25-P95
+    quantiles of the ROW values -- an asymmetric window with no justification
+    anywhere in the code, config or docs, computed over pseudo-replicated rows.
+    For uranium it discarded the real observed minimum (O'Hern, 9,000 ppb) and
+    truncated the real observed maximum (Benavides, 41,600 ppb) to 34,440, so the
+    served envelope was narrower than the evidence at the bottom and invented a
+    value at the top that no mine ever reported.
+
+    It is now the FULL OBSERVED RANGE of the per-mine means. With n = 7 mines a
+    quantile window is not meaningful anyway, and the full range is the choice
+    that adds no assumption: every endpoint is a real measured site value.
+
+    n is small and that matters -- C0 scales the entire concentration field
+    linearly. `texas_source_provenance()` reports the sample size and the
+    per-mine values so the API can surface them instead of showing four
+    significant figures with no context.
     """
     from ml_pipeline.config.parameters import FALLBACK_SOURCE_CONC
-    geo = load_texas_geochem()
-    eom = geo["End of Mining"]
+    per_mine = _eom_per_mine()
     out = {}
-    mapping = {"uranium_ppb": "Uranium", "sulfate_mg_l": "Sulfate", "tds_mg_l": "TDS"}
-    for key, col in mapping.items():
-        vals = pd.to_numeric(eom.get(col), errors="coerce").dropna() if col in eom else pd.Series([], dtype=float)
-        if key == "uranium_ppb":
-            vals = vals * 1000.0  # mg/L -> ppb
-        if len(vals) >= 2:
-            out[key] = (float(vals.quantile(0.25)), float(vals.quantile(0.95)))
-        else:
-            out[key] = FALLBACK_SOURCE_CONC[key]
+    for key in _EOM_COLS:
+        s = per_mine[key]
+        out[key] = ((float(s.min()), float(s.max())) if len(s) >= 2
+                    else FALLBACK_SOURCE_CONC[key])
     return out
+
+
+def texas_source_provenance() -> dict:
+    """Sample size and per-mine values behind the served C0 envelope (V-2).
+
+    Reported to the user so "13,272 ppb" is never read as a precise figure: it
+    descends from nine production-area measurements at seven mines.
+    """
+    eom = load_texas_geochem()["End of Mining"]
+    label = "Mine" if "Mine" in eom.columns else eom.columns[1]
+    per_mine = _eom_per_mine()
+    env = texas_source_signature()
+    return {
+        "sheet": "TX_ISR_Final.xlsx :: 'End of Mining'",
+        "n_rows": int(len(eom)),
+        "n_mines": int(eom[label].astype(str).str.strip().nunique()),
+        "window_rule": ("full observed range of per-mine means (no quantile "
+                        "window; each mine weighted once)"),
+        "per_mine": {k: {m: round(float(x), 1) for m, x in s.items()}
+                     for k, s in per_mine.items()},
+        "envelope": {k: [round(v[0], 1), round(v[1], 1)] for k, v in env.items()},
+        "caveat": ("C0 scales the concentration field linearly and rests on "
+                   "n = 9 production-area measurements from 7 Texas mines; it is "
+                   "an order-of-magnitude anchor, not a calibrated value."),
+    }
 
 
 def _paired_residual_ratios() -> dict[str, list]:

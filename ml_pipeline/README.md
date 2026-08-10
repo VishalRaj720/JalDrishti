@@ -57,7 +57,7 @@ Contaminant vel.  vc  = v / Rd                         [m/day]
 Dispersivity      αL  = 0.83·(log₁₀L)^2.414 ; αT = r·αL [m]      (Xu & Eckstein 1995)
 Péclet            Pe  = L / αL                         [-]       (advection vs dispersion)
 Pore volumes      PV  = Q_in·t / (φ_mobile·V_swept)    [-]       (throughput)
-Containment       η   = Q_net / (q·b·W + Q_net)        [-]       (cone-of-depression capture)
+Containment       η   = min(1, Q_net / (q·b·W))        [-]       (mass-balance capture)
 ```
 
 These dimensionless groups (Pe, Rd, PV, η, anisotropy αL/αT, τ) are what transfer between
@@ -114,13 +114,26 @@ python -m ml_pipeline.synthetic.generate --scenarios 900 --mc 48
 python -m ml_pipeline.ml.train            # -> ml/artifacts/*.joblib + metrics.json + model_card.json
 python -m ml_pipeline.ml.shap_analysis    # -> ml/artifacts/shap_top_*.json (+ PNG)
 python -m ml_pipeline.ml.predict          # demo: analytical vs ML toggle
+
+# Phase 3b — the SERVING-DISTRIBUTION coverage gate (review2.md V-5).
+# The conformal 80% is calibrated on the GENERATOR's distribution, whose median
+# gradient runs ~1.35x the real field's. --field-mix 1.0 pins every scenario to
+# the real flow/strike field, giving a held-out batch drawn from what users
+# actually query. If it fails, widen the deltas -- do not lower the gate.
+python -m ml_pipeline.synthetic.generate --scenarios 120 --mc 48     --field-mix 1.0 --out ml_pipeline/outputs/field_batch.csv
+python -m ml_pipeline.validation.field_coverage --write-metrics
+
+# Keep the documented metrics equal to the deployed ones (they drifted three
+# times when hand-copied). tests/test_docs_in_sync.py fails if this is stale.
+python -m ml_pipeline.tools.sync_docs
 ```
 
 ### Phase 3 guardrails (v2 — enforced + honestly verified)
 - **No leakage, two skill numbers:** `GroupKFold(5)` on `scenario_id` (interpolation
   skill) **and** leave-aquifer-out CV on `polygon_id` (new-hydrogeology skill,
-  enabled by jittered pins): area R² 0.94 / 0.92, migration 0.90 / 0.87,
-  compliance-conc 0.88 / 0.87, P_ex R² 0.94 (MAE 0.062).
+  enabled by jittered pins). **Current numbers are not repeated here** — they are
+  generated into `ARCHITECTURE.md` §6.5 from `ml/artifacts/metrics.json`, because
+  hand-copied metrics in prose went stale across three separate retrains.
 - **Per-target monotone maps** (`dataset.MONOTONE_MAPS`) — the shared v1 tuple
   forced signs the physics violates. Q_out (the collinear constraint back-door)
   is dropped. Verified **on-manifold** post-fit: the raw operating point is swept

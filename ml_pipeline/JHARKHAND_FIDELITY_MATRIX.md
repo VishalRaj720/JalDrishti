@@ -34,6 +34,15 @@ What it cannot do: discrete fracture networks, channeling along individual
 structures, flow-wetted-surface statistics, or connectivity percolation. A real
 SSZ plume would be a few narrow fingers along shears, not a smooth ellipse.
 
+> **Superseded in part, 2026-08-10.** "The UI's Rd ≈ 11" was true of the number
+> the UI *displayed* and false of the retardation the engine *used*. `1+β` is the
+> CONSERVATIVE-TRACER value; since the sorbing-capacity correction the kinematics
+> run on `β_eff = β·R_m`, which at fractured Jharkhand materials is **720 for
+> uranium and ~9,400 for radium**. The UI now shows the effective value with the
+> tracer value beside it. The paragraph below is still correct about the
+> *mechanism* (capacity retardation, not bulk sorption) — only the magnitude it
+> quotes was the wrong one of the two.
+
 **Is Rd ≈ 11 defensible?** As an *order of magnitude*, yes — it is **not sorption**
 (the code correctly refuses bulk-density Kd retardation in fractured rock,
 `feature_engineering.py:96-112`); it is matrix-capacity retardation `1+β` with
@@ -303,6 +312,111 @@ with k > 0 and fractured the only regime with β_eff.
 **Still open after round 2:** `wellfield_width_m` is the *diameter of the circular
 well-pattern footprint*, not a width or a borehole size, and the UI label invites
 exactly that misreading.
+
+---
+
+## Correction notes — 2026-08-10 remediation (audit `review3.md`, branch `fix/pipeline-completion`)
+
+A third audit ran before the product-design phase. What it found, and what
+changed. Rows above are left as written; this is the current state.
+
+### Row 3.6 — the THIRD seam is now closed, and the guard that hid it was broken
+
+The regime-contact step (Alluvium/porous ↔ Basement Gneissic Complex/fractured,
+85.399 °E 23.312 °N) was left open in the 2026-08-05 note because K stepped
+**2.16×** there purely from `depth_decay_factor`'s result being clamped into the
+deployed model's **per-regime trained-K box** (floors 0.0959 vs 0.0444 m/day).
+
+Fixed by **deleting the clamp**, not by widening it. The clamp existed so our own
+correction would not raise an out-of-distribution flag — i.e. it suppressed
+exactly the signal the user needs. K is now the physical value and
+`envelope_violations` reports the consequence. Measured across the contact:
+**2.16× → 1.07×**, and the residual variation is the aquifer-polygon blend doing
+its job.
+
+**A second defect surfaced underneath.** With the clamp gone the flag still did
+not fire, because the hydro-OOD guard used a tolerance of **2 % of the LINEAR
+span**. For fractured K (support 0.044–10.6 m/day) that tolerance is 0.21 — about
+**five times the trained minimum itself** — so a served K three orders of
+magnitude below support raised nothing. The guard was only ever exercised at the
+*high* end (β = 50, K = 50), which is why two prior audits called it working.
+Tolerances are now ratio-based for positive quantities spanning more than a
+decade.
+
+### Row 3.3 — the depth-decay law was being extrapolated past its own evidence
+
+`K(z) = K_ref·exp(−(z−45)/λ)` is calibrated on ONE interval: 45 m down to the
+district's NAQUIM-documented fracture-death depth. It was being run far below
+that. For a shallow-fracture district (Ranchi, base 121 m) the factor at 300 m
+came out at **4.3 × 10⁻⁵ — a 23,000× reduction**.
+
+Two independent checks reject that. Locally, the NAQUIM reports say "massive
+rock" below the fracture base — low permeability, not vanishing permeability, and
+the evidence simply stops there. Globally, Manning & Ingebritsen (1999)
+(log k = −14 − 3.2 log z, k in m², z in km; ~3–4 orders over the upper 2 km) give
+about **440×** between 45 m and 300 m, so the model exceeded the global crustal
+trend by ~50×. The decay is now **held at its fracture-base value below the
+fracture base**. Serve-time only — K is sampled from polygon ranges when labels
+are baked, so no retrain. Consequence: pins flagged as extrapolating at 300 m ore
+depth fall from **98 % to ~10 %** of the state, and the flags that remain are real.
+
+### Row 3.9 — Rn-222 assessed and CLOSED as scope, not as physics
+
+The first hypothesis tested was "a 3.82-day half-life means radon cannot reach
+the ring". **That is false over part of this model's own envelope** and is
+recorded as such: at the p99 seepage velocity (14.3 m/day) 28 % of the radon
+survives 100 m, and 4.3 % of training rows retain >1 %. Radon is not modelled for
+two other reasons — there is no Rn-222 source term for this ore body (Sethy et
+al. 2013 report U and Ra-226 only), and radon's governing exposure pathway at an
+ISR facility is **atmospheric** (wellhead and header-house degassing), which a
+saturated-zone transport model structurally cannot address.
+
+### NEW ROW 3.11 — the excursion criterion was not the regulatory one
+
+Not previously in this register at all. The tool declared an excursion when a
+**single** species exceeded a **health limit** at the ring. NUREG-1569 §5.7.8.3
+p.138 defines one as **two or more** *indicator* parameters over their upper
+control limits, and p.137 explicitly rejects the species this tool led with:
+*"Uranium is not considered a good excursion indicator because, although it is
+mobilized by in situ leaching, it may be retarded by reducing conditions in the
+aquifer."* That is the same mechanism this model computes independently
+(β_eff ≈ 700 plus redox trapping), so the tool and the regulator agreed on the
+physics while disagreeing on the metric.
+
+Now implemented on the species already transported — TDS (the conductivity proxy
+NUREG names) and sulfate. **Measured effect:** at Jaduguda, gradient 0.005,
+t = 20 yr, the indicator test declares an excursion while the uranium health
+limit is still clear. That ordering — conservative indicators warning first — is
+the entire reason the indicator system exists, and the tool now reproduces it.
+**Limitation, reported in every response:** a licensed panel needs ≥ 3
+indicators; this model carries 2. Chloride and total alkalinity have no ISR
+source term in the available data.
+
+### NEW — post-restoration rebound, closed with data rather than a new model
+
+Open since 2026-07-13. The source only ever decayed, while real leached zones can
+rebound. The specific defect was that the served source fraction was
+`restoration_credit × disc_flush_factor`, **compounding without bound**: at
+op = 8, t = 50 yr it reached 0.023 × C₀, *below* the empirical Texas restoration
+endpoint of 0.060.
+
+No rebound magnitude was invented. Verified instead that the Texas endpoint is
+already a post-rebound number: the sheet is headed *"Average composition of
+groundwater achieved AFTER RESTORATION WAS COMPLETE"* and its footnote refers to
+**"stability samples"** — the regulatory demonstration that the aquifer has
+stopped changing. So the fix is to stop claiming clean-up the data does not show:
+once a sweep has run, the passive flush may not take the source below the
+demonstrated stable endpoint. Unrestored scenarios keep the full 30-yr flush.
+
+### NEW — the radium restoration residual had gone stale and was a training label
+
+`RADIUM_RESTORATION_RESIDUAL = 0.99` was computed from Kd values the config
+stopped holding at the 2026-08-06 rebase (its own comment still named
+"fractured: 500 vs 1.0"). Re-running the **same derivation** on the current
+constants gives **0.806 (fractured) / 0.571 (porous)** — the model was asserting
+a sweep removes 1 % of the radium source while its own physics said 19–43 %. It
+also still used the pre-V-3 unpaired uranium anchor. Now 0.81, with a test that
+re-derives it from the live constants instead of pinning the number.
 
 ---
 

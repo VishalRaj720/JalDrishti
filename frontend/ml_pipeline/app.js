@@ -767,6 +767,14 @@ function renderMetrics(r) {
       + ` not by travel`;
   }
 
+  // R-1: the REGULATORY excursion test, next to (not instead of) the health
+  // limit. NUREG-1569 §5.7.8.3 p.138 defines an excursion as two or more
+  // conservative INDICATORS over their upper control limits, and p.137
+  // explicitly rejects uranium as an indicator "because ... it may be retarded
+  // by reducing conditions" -- the same mechanism this model computes. This test
+  // therefore fires BEFORE the BIS breach, which is why it exists.
+  renderIsrExcursion(r.isr_excursion);
+
   // A footprint that drops to zero is arithmetic, not a fault -- say which.
   // The leach disc is uniform-concentration, so once the post-closure flush
   // takes it under the limit the whole footprint leaves the exceedance area in
@@ -825,20 +833,86 @@ function renderMetrics(r) {
   renderHydro(r.hydro);
 }
 
+function renderIsrExcursion(e) {
+  const badge = document.getElementById("m-isr");
+  const count = document.getElementById("m-isr-count");
+  const detail = document.getElementById("m-isr-detail");
+  if (!badge) return;
+  if (!e || e.status) {
+    badge.textContent = "n/a";
+    badge.className = "badge";
+    count.textContent = "";
+    detail.textContent = e && e.status ? e.status : "";
+    return;
+  }
+  badge.textContent = e.excursion_declared ? "DECLARED" : "none";
+  badge.className = "badge " + (e.excursion_declared ? "bad" : "ok");
+  count.textContent = ` ${e.indicators_over_ucl}/${e.indicators_required}`
+                    + ` indicators over UCL · ring ${e.monitor_ring_m} m`;
+  const rows = (e.indicators || []).map(i => i.status
+    ? `${i.species}: ${i.status}`
+    : `${i.species.replace(/_(mg_l|ppb|mbq_l)$/, "")} `
+      + `${i.ring_conc} vs UCL ${i.upper_control_limit}${i.over_ucl ? " ⚠" : ""}`);
+  // The panel shortfall is a real weakness and must be visible, not buried in
+  // the API response: a licensed programme uses >= 3 indicators; we carry 2.
+  detail.innerHTML = rows.join(" · ")
+    + (e.panel_shortfall
+       ? `<br><span class="muted">${e.indicators.length} of `
+         + `${e.indicators_required + 1}+ regulatory indicators modelled — `
+         + `chloride and total alkalinity have no ISR source term here, so this `
+         + `screen is weaker than a licensed monitoring programme.</span>`
+       : "");
+}
+
+// Effective retardation spans 9 to ~10^5 across species, so plain toFixed makes
+// the interesting cases unreadable.
+function fmtBig(v) {
+  if (v === null || v === undefined || !isFinite(v)) return "—";
+  if (v >= 1e5) return v.toExponential(1).replace("e+", "×10^");
+  if (v >= 1000) return Math.round(v).toLocaleString();
+  return (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10).toString();
+}
+
 function renderHydro(h) {
   const el = document.getElementById("hydro-line");
   if (!el || !h) return;
-  const parts = [`Rd≈<b>${h.retardation_Rd}</b>`, `φ=<b>${h.phi_mobile}</b>`,
-                 `Kd=<b>${h.Kd_L_kg}</b> L/kg`];
+  // RETARDATION: show what the PHYSICS actually uses, not the species-blind
+  // tracer value. `retardation_Rd` is 1+beta in fractured rock, so it read 9-11
+  // for every species while the front was being retarded 720x for uranium and
+  // ~9,400x for radium -- a three-order-of-magnitude contradiction between the
+  // displayed explanation and the displayed answer (review3.md D-5).
+  const rdEff = (h.retardation_effective !== undefined
+                 && h.retardation_effective !== null)
+                ? h.retardation_effective : h.retardation_Rd;
+  const rdParts = [`Rd≈<b>${fmtBig(rdEff)}</b>`];
+  if (rdEff !== h.retardation_Rd)
+    rdParts.push(`<span class="muted">(tracer 1+β=${h.retardation_Rd}; `
+                 + `sorption raises it to ${fmtBig(rdEff)})</span>`);
+  // SHOW THE K THE ENGINE ACTUALLY USES. The shear-zone note below reports the
+  // SHALLOW corrected K (2.467 at Jaduguda), but fix 3.3 then decays it to ore
+  // depth (0.563), so the line was displaying a value 4x the one the physics ran
+  // on -- the same UI-contradicts-physics class as the retardation readout.
+  const parts = [rdParts.join(" "), `K=<b>${h.K_m_day}</b> m/day`,
+                 `φ=<b>${h.phi_mobile}</b>`, `Kd=<b>${h.Kd_L_kg}</b> L/kg`];
   let note = "";
   if (h.regime_overridden)
     note = `<span class="muted"> · regime overridden to <b>${h.regime}</b> `
          + `(natural: ${h.natural_regime}) — using representative ${h.regime} materials</span>`;
   // D5: flag the Singhbhum shear-zone transmissivity correction
   if (h.shear_zone)
-    note += `<span class="muted"> · K=<b>${h.shear_zone.K_m_day}</b> from Singhbhum `
+    note += `<span class="muted"> · shallow K <b>${h.shear_zone.K_m_day}</b> from Singhbhum `
          + `shear-zone transmissivity (NAQUIM T≈${h.shear_zone.T_m2day} m²/day, `
          + `vs schist ${h.shear_zone.polygon_K_m_day}) — leakier, larger plume</span>`;
+  // fix 3.3: the shallow K above is decayed to ore depth. Say so, and say when
+  // that takes the model outside its own trained support instead of hiding it.
+  if (h.k_depth)
+    note += `<span class="muted"> · decayed to ore depth ${h.k_depth.ore_depth_m} m `
+         + `(×${h.k_depth.decay_factor}, fracture base ${h.k_depth.fracture_base_m} m)</span>`
+         + (h.k_depth.below_trained_support
+            ? `<span class="warn"> · below the surrogate's trained K range `
+              + `(&lt;${h.k_depth.trained_min_K_m_day}) — ML bands extrapolating, `
+              + `use the analytical value</span>`
+            : "");
   el.innerHTML = parts.join(" · ") + note;
 }
 

@@ -1,0 +1,46 @@
+{
+  "model": "area_p50",
+  "method": "shap_mean_abs",
+  "top10": [
+    {
+      "feature": "alpha_L",
+      "importance": 0.48373
+    },
+    {
+      "feature": "Xc_m",
+      "importance": 0.32814
+    },
+    {
+      "feature": "wellfield_width_m",
+      "importance": 0.2055
+    },
+    {
+      "feature": "Xc_clean_m",
+      "importance": 0.18188
+    },
+    {
+      "feature": "source_conc_C0",
+      "importance": 0.11204
+    },
+    {
+      "feature": "peclet_L",
+      "importance": 0.08814
+    },
+    {
+      "feature": "time_years",
+      "importance": 0.08753
+    },
+    {
+      "feature": "D_T",
+      "importance": 0.07331
+    },
+    {
+      "feature": "pore_volumes_PV",
+      "importance": 0.06935
+    },
+    {
+      "feature": "is_tds_mg_l",
+      "importance": 0.05807
+    }
+  ]
+}

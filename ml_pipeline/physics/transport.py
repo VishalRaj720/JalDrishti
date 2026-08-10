@@ -78,7 +78,26 @@ _TANG_GRID_LEVEL = 1e-2
 def apparent_retardation(t_days: float, beta: float, omega: float) -> float:
     """Time-dependent apparent retardation R_app(t) = 1 + beta*(1 - e^(-a t)),
     a = omega*(1+beta)/beta. R_app(0)=1 (early unretarded front), -> 1+beta
-    at late time. [Goltz & Roberts 1986 first-order mobile/immobile model]"""
+    at late time. [Goltz & Roberts 1986 first-order mobile/immobile model]
+
+    !! OMEGA CONVENTION -- READ BEFORE CHANGING HOW omega IS SUPPLIED. !!
+    Writing the first-order exchange as theta_m dC_m/dt = -alpha(C_m - C_im) and
+    theta_im dC_im/dt = +alpha(C_m - C_im), the non-zero eigenvalue of the pair is
+        a = alpha*(1/theta_m + 1/theta_im)
+    which equals the `omega*(1+beta)/beta` used here ONLY under the MOBILE-side
+    convention  omega == alpha/theta_mobile.  Under the immobile-side convention
+    (omega == alpha/theta_immobile, which is what the standard slab approximation
+    omega ~ 3*De/(R_m*L^2) actually returns) the correct constant is a = omega*(1+beta).
+
+    The two differ by a factor of beta -- 2 to 20 in this model. `DUAL_POROSITY
+    ["mass_transfer_omega"]` is a pinned literature scalar with no stated
+    convention, so nothing served or trained today is affected; but
+    `matrix_transfer_omega()` DOES derive the immobile-side rate, and feeding it
+    here without converting would introduce exactly that factor-beta error. That
+    path is gated off (P.OMEGA_FROM_GEOMETRY = False) and the gate carries the
+    same warning. Documented 2026-08-10 (review3.md D-4) so the flag cannot be
+    flipped on into a silent error.
+    """
     if beta <= 0.0 or omega <= 0.0:
         return 1.0
     a = omega * (1.0 + beta) / beta
@@ -272,6 +291,17 @@ def matrix_transfer_omega(phi_mobile: float, phi_total: float,
     Introduces NO new parameter -- L comes from the aperture and mobile porosity
     already in the feature row.
 
+    !! UNIT-CONVENTION WARNING (2026-08-10, review3.md D-4). !! The value this
+    function returns is the IMMOBILE-side rate alpha/theta_immobile, but
+    `apparent_retardation` / `retarded_clock` expect the MOBILE-side convention
+    alpha/theta_mobile (they use a = omega*(1+beta)/beta, not omega*(1+beta)).
+    Enabling P.OMEGA_FROM_GEOMETRY without multiplying this result by beta would
+    therefore under-state the clock constant by a factor of beta (2-20). The flag
+    is OFF and the branch is documented-and-rejected for an independent reason
+    (see the config note: geometry-derived omega makes early-time retardation
+    species-blind because R_m cancels in beta_eff*omega). Fix BOTH before ever
+    turning it on.
+
     HONEST LIMITATION: a first-order model cannot reproduce the sqrt(t)
     early-time behaviour of true diffusion at all; it relaxes exponentially. The
     Tang kernel (matrix_sigma / tang_attenuation) is the exact solution and is
@@ -440,6 +470,37 @@ def disc_flush_factor(t_days: float, op_days: float,
     return float(0.5 ** ((t_days - op_days) / (halflife_years * 365.0)))
 
 
+def source_strength_fraction(residual_ref: float, t_days: float, op_days: float,
+                             rest_days: float) -> float:
+    """C_src(t)/C0 -- the SINGLE definition of source strength at evaluation time.
+
+    Combines the two effects that weaken the source after mining stops:
+      * `restoration_source_fraction` -- the ELAPSED-sweep clean-up credit
+        (causal; a planned-but-unexecuted sweep has cleaned nothing);
+      * `disc_flush_factor` -- passive flushing of the leach zone by regional
+        flow once injection stops (30-yr half-life, EPA monitoring horizon).
+
+    REBOUND FLOOR (P.RESTORATION_REBOUND_FLOOR, 2026-08-10). Multiplying the two
+    let a restored source decay indefinitely, passing BELOW the empirical Texas
+    restoration endpoint -- 0.023xC0 at op 8 / t 50 yr against a measured 0.060.
+    That endpoint is measured on post-restoration STABILITY samples, i.e. after
+    the aquifer demonstrably stopped changing, so any rebound is already inside
+    it and further decay is unsupported. Once a sweep has run, the flush may not
+    take the source below the realized restoration credit. Unrestored scenarios
+    are untouched and keep the full flush.
+
+    EXISTS AS A SHARED HELPER ON PURPOSE. This expression previously lived
+    verbatim in BOTH physics.params_from_features and generate._draw_params, and
+    divergence between mirrored sites is this project's most repeated defect
+    (radium residual, species tuple, Cb defaults). One definition, two callers.
+    """
+    credit = restoration_source_fraction(residual_ref, t_days, op_days, rest_days)
+    f = credit * disc_flush_factor(t_days, op_days)
+    if P.RESTORATION_REBOUND_FLOOR and rest_days > 0.0:
+        f = max(f, credit)
+    return float(min(max(f, 0.0), 1.0))
+
+
 def _disc_mask(X: np.ndarray, Y: np.ndarray, p: TransportParams,
                thr_inc: float = 0.0):
     """Boolean grid inside the E1 leach-zone disc whose (uniform) conc clears the
@@ -456,6 +517,17 @@ def concentration_field(X: np.ndarray, Y: np.ndarray, p: TransportParams,
     """Plume-attributable concentration (NO background) on meshgrids X, Y. The E1
     source-zone disc is unioned in only when include_disc (display + area); the
     plume-travel metrics pass include_disc=False."""
+    # t = 0: NOTHING HAS BEEN INJECTED, so the plume is identically zero.
+    # (review2.md V-8, fixed 2026-08-10.) Domenico is a CONTINUOUS-source
+    # solution and its t -> 0+ limit is C -> 0 for every x > 0; the served answer
+    # was 0.336 m of "migration" purely because _long_factor clamps Xc to 1e-3 m,
+    # turning the degenerate front into a narrow step that dispersion then smears.
+    # The area metric already read 0.00 ha at t = 0 (the E1 disc scales with
+    # injected pore volumes), so the two headline numbers contradicted each other
+    # at the origin. Same class of error as the 7.07 ha t = 0 disc bug.
+    # Training times start at t = 2 yr, so no label moves -- this is serve-only.
+    if p.t_days <= 0.0:
+        return np.zeros_like(np.asarray(X, dtype=float))
     A_tran = _tran_factor(X, Y, p.aT, p.source_width_m)
     A_long = _long_factor(X, p.Xc, p.aL)
     if p.sigma > 0.0 and p.Xw > p.Xc:
@@ -935,9 +1007,8 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
     # wiping the upstream source-zone box to C_res) and it advances with
     # regional drift -- the ESCAPED plume keeps its history until clean water
     # overtakes it (the "dark band migrates downgradient" signature).
-    f_src = (restoration_source_fraction(float(residual_fraction), t_days,
-                                         operation_days, restoration_days)
-             * disc_flush_factor(t_days, operation_days))
+    f_src = source_strength_fraction(float(residual_fraction), t_days,
+                                     operation_days, restoration_days)
     Xc_clean, C_res = None, 0.0
     if f_src < 1.0:
         C_res = f_src * species_C0
@@ -1092,6 +1163,10 @@ def _stack_field(X3, Y3, *, C0, aL, aT, W, Xc, Xw, sigma, t_days,
     rest_active: (nd,) bool -- draws with a restoration sweep. Needed because a
     MID-SWEEP draw has Xc_clean == 0.0 (wave wall at the source, QA F-1) which
     the old `Xc_clean > 0` test cannot distinguish from no-restoration."""
+    # t = 0 -> nothing injected -> zero plume. Mirrors concentration_field so the
+    # two engines cannot disagree at the origin (review2.md V-8).
+    if t_days <= 0.0:
+        return np.zeros(np.broadcast(X3, Y3, np.asarray(C0)).shape, dtype=float)
     Xc = np.maximum(Xc, 1e-3)
     aL = np.maximum(aL, 1e-3)
     aT = np.maximum(aT, 1e-4)

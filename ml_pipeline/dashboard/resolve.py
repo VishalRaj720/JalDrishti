@@ -124,9 +124,21 @@ def envelope_violations(inputs: dict) -> list[str]:
                       "retardation_Rd": Rd, "K_m_day": inputs["K_m_day"]}
         for key, val in hydro_vals.items():
             lo, hi = support[key]
-            span = max(hi - lo, 1e-9)
-            if val < lo - 0.02 * span or val > hi + 0.02 * span:
-                out.append(f"hydro:{key}")
+            # TOLERANCE IS SCALE-AWARE (fixed 2026-08-10). It used to be a flat
+            # 2% of the LINEAR span, which is blind at the bottom of a log-scale
+            # quantity: fractured K spans 0.044-10.6, so 0.02*span = 0.21 is
+            # FIVE TIMES the trained minimum itself, and a served K of 0.00009 --
+            # 500x below trained support -- raised no flag at all. That is how
+            # the depth-decay clamp removal initially appeared to produce no
+            # honest signal. Ratios, not differences, for positive quantities
+            # whose support spans more than a decade.
+            if lo > 0.0 and hi / lo > 10.0:
+                if val < lo * 0.98 or val > hi * 1.02:
+                    out.append(f"hydro:{key}")
+            else:
+                span = max(hi - lo, 1e-9)
+                if val < lo - 0.02 * span or val > hi + 0.02 * span:
+                    out.append(f"hydro:{key}")
     return out
 
 
@@ -365,13 +377,26 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         factor = P.depth_decay_factor(ore_depth, fb["fracture_base_m"])
         k_shallow = k_default
         k_dec = k_shallow * factor
-        # keep the served K inside the trained support so no extrapolation flag
-        # is raised by our own correction
+        # CLAMP REMOVED 2026-08-10 -- fidelity row 3.6's third seam.
+        # This used to clamp the depth-decayed K up into the DEPLOYED MODEL'S
+        # PER-REGIME trained-K box, so that our own correction would not trip the
+        # out-of-distribution flag. Two things were wrong with that:
+        #   (1) The two regimes have different floors (porous 0.0959 vs fractured
+        #       0.0444 m/day), so at a genuine regime contact (measured at
+        #       85.399 E, 23.312 N) two adjacent pins with the SAME physical
+        #       K(z) = 0.033 m/day were served 2.16x apart -- an ML TRAINING
+        #       ARTEFACT setting the size of a physical discontinuity.
+        #   (2) It suppressed exactly the signal the user needs. Below the trained
+        #       support the ML bands ARE extrapolating and the conformal 80%
+        #       guarantee IS void; hiding that to keep the badge green inverts the
+        #       project's whole uncertainty-honesty posture.
+        # The analytical engine has no training range and remains valid at any K,
+        # which is what the UI's extrapolation banner already tells the user. So
+        # the served K is now the physical one and `envelope_violations` reports
+        # the consequence.
         support = _hydro_support().get(regime, {})
         k_lo, k_hi = support.get("K_m_day", (None, None)) if support else (None, None)
-        clamped = False
-        if k_lo is not None and k_dec < k_lo:
-            k_dec, clamped = float(k_lo), True
+        below_support = bool(k_lo is not None and k_dec < float(k_lo))
         k_default = k_dec
         k_depth = {
             "ore_depth_m": round(float(ore_depth), 1),
@@ -386,7 +411,12 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
             "decay_factor": round(float(factor), 4),
             "K_shallow_m_day": round(float(k_shallow), 4),
             "K_at_depth_m_day": round(float(k_default), 4),
-            "clamped_to_trained_min": clamped,
+            # was `clamped_to_trained_min`; the clamp is gone (see above). The
+            # flag now reports the TRUTH it used to conceal: the physical K at
+            # ore depth is below the surrogate's trained support, so the ML bands
+            # there are extrapolating and only the analytical engine is valid.
+            "below_trained_support": below_support,
+            "trained_min_K_m_day": (None if k_lo is None else round(float(k_lo), 4)),
             "strength": P.K_DEPTH_DECAY_STRENGTH,
         }
 
@@ -428,8 +458,34 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     )
     # retardation (asymptotic) so the UI can SHOW why a plume is slow (P2)
     from ml_pipeline.data_prep.feature_engineering import retardation_factor
+    from ml_pipeline.physics.transport import effective_capacity_ratio
     Rd = retardation_factor(inputs["kd_L_kg"], inputs["n_total"],
                             inputs["grain_density"], regime, inputs["beta"])
+    # EFFECTIVE retardation -- what the transport engine ACTUALLY uses.
+    # `Rd` above is the CONSERVATIVE-TRACER value (1 + beta in fractured rock),
+    # kept unchanged because it is a MODEL FEATURE and the trained support box is
+    # built on it (remediation decision D1, Option A). But it is species-blind,
+    # and the kinematics are not: the front runs on beta_eff = beta * R_m. Serving
+    # only the tracer number told a user "Rd = 9" for radium while the plume was
+    # being retarded ~9,400x -- a three-order-of-magnitude contradiction between
+    # the displayed explanation and the displayed answer (review3.md D-5).
+    # Both are now reported, each labelled for what it is.
+    if regime == "fractured":
+        Rd_eff = 1.0 + effective_capacity_ratio(inputs["beta"], inputs["n_total"],
+                                                inputs["grain_density"],
+                                                inputs["kd_L_kg"])
+    else:
+        Rd_eff = Rd            # porous already uses the linear-equilibrium Rd
+    # Ambient-alkalinity Kd context (NOT applied to the plume -- see
+    # P.alkalinity_adjusted_kd). The plume carries its own lixiviant carbonate,
+    # so the served Kd comes straight from KD_RANGES (train == serve). This
+    # reports what the AMBIENT groundwater's bicarbonate would imply for a
+    # far-field, post-lixiviant Kd, which is the "optional context" the config
+    # has always claimed this helper was retained for but never actually
+    # surfaced (review3.md D-7: it had no callers outside the test suite).
+    _kd_lo, _kd_c, _kd_hi = P.kd_range_for(species, regime)
+    _hco3 = b.get("hco3_mg_l")
+    _kd_ambient = P.alkalinity_adjusted_kd(_kd_c, _hco3, _kd_lo, _kd_hi)
     hydro = {
         "lithology": lithology, "regime": regime,
         "natural_regime": natural_regime,
@@ -439,7 +495,16 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         "n_total": round(inputs["n_total"], 3),
         "thickness_m": round(inputs["thickness_m"], 1),
         "Kd_L_kg": round(inputs["kd_L_kg"], 3),
+        # tracer-equivalent (the MODEL FEATURE); species-blind in fractured rock
         "retardation_Rd": round(float(Rd), 1),
+        # what the transport engine actually runs on -- species-dependent
+        "retardation_effective": round(float(Rd_eff), 1),
+        "retardation_basis": (
+            "1 + beta*R_m (dual-porosity capacity scaled by matrix sorption)"
+            if regime == "fractured"
+            else "1 + rho_b*Kd/n_total (linear equilibrium)"),
+        # ambient far-field context only -- never applied to the plume Kd
+        "kd_ambient_alkalinity_adjusted": round(float(_kd_ambient), 3),
         "dual_porosity_beta": round(inputs["beta"], 2),
         "source_conc_C0": round(c0, 1),
         "background_conc_Cb": round(inputs["background_conc_Cb"], 2),
@@ -499,8 +564,24 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
                      "value; only <1% of ore radium leaches during processing, "
                      "so radium supply is genuinely limited."),
             "citation": P.JADUGUDA_SOURCE_CITATION,
-            "kd_citation": ("EPA 402-R-04-002C Vol III Table 5.28 "
-                            "(Thibault et al. 1990 compilation)"),
+            # CORRECTED 2026-08-10 (review3.md D-2). This previously cited
+            # Table 5.28 -- the Thibault et al. (1990) SOIL compilation -- which
+            # the 2026-08-06 Kd rebase explicitly REJECTED as the anchor (wrong
+            # medium, and the same EPA document calls those values "unusually
+            # large ... orders of magnitude greater than those reported by most
+            # researchers", p.96). The served band is anchored on the p.95
+            # GROUNDWATER measurements. Users were being pointed at the
+            # superseded source.
+            "kd_served_L_kg": list(P.RADIUM_KD_RANGES[regime]),
+            "kd_citation": (
+                "EPA 402-R-04-002C Vol III p.95 -- MEASURED Kd for radium on "
+                "sandy sediment in groundwater (6.7/12.6/26.3/26.3 mL/g at "
+                "pH 6/7/8/9), with the pH 8-9 value halved for high ionic "
+                "strength (ibid. p.95: sorption in the high-ionic-strength "
+                "groundwater experiment was <50% of the low-ionic-strength "
+                "case). The Thibault et al. (1990) SOIL compilation "
+                "(Table 5.28) is retained ONLY as the immobile upper end "
+                "member of the sampled band, not as the anchor."),
         } if species == "radium_226_mbq_l" else None),
     }
     return inputs, hydro

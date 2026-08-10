@@ -165,7 +165,13 @@ def _surrogate() -> MLSurrogate:
 # --------------------------------------------------------------------------- #
 # Analytical engine (same schema; deterministic central + MC bands/excursion)
 # --------------------------------------------------------------------------- #
-def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
+def predict_analytical(*, n_mc: int = 48, seed: int = 0,
+                       compliance_x: float | None = None, **inputs) -> dict:
+    """compliance_x: monitor-ring distance from the wellfield EDGE [m].
+    None -> P.COMPLIANCE_BUFFER_M, the distance the surrogate's compliance head
+    was trained at. The server passes the user's ring (R-2) so the reported
+    concentration always refers to the circle actually drawn on the map."""
+    ring_x = float(P.COMPLIANCE_BUFFER_M if compliance_x is None else compliance_x)
     species = inputs["species"]
     threshold = P.EXCURSION_THRESHOLDS[species]
     rest_years = float(inputs.get("restoration_years", 0.0) or 0.0)
@@ -182,7 +188,7 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
                          t_days=t_days, operation_days=op_days,
                          restoration_days=rest_years * 365.0,
                          residual_fraction=residual, grid_n=200,
-                         compliance_x=P.COMPLIANCE_BUFFER_M)
+                         compliance_x=ring_x)
     m = res.metrics
 
     # excursion probability via the same parameter-uncertainty MC as Phase 2
@@ -205,26 +211,46 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0, **inputs) -> dict:
     draws = mc_draws(n_mc, seed)
     p_ex = excursion_probability(scn, species, t_days, op_days, draws,
                                  rest_days=rest_years * 365.0,
-                                 residual_fraction=residual)
+                                 residual_fraction=residual,
+                                 compliance_x=ring_x)
 
     def pt(v):  # analytical central run is a point estimate -> degenerate band
         return {"p10": float(v), "p50": float(v), "p90": float(v)}
     # restoration diagnostic (QA F-3 fix): credit the ELAPSED sweep, not the
     # planned one -- mid-sweep the old diagnostic claimed the full-sweep clean-up
     # while the served field showed none, contradicting itself.
-    from ml_pipeline.physics.transport import restoration_source_fraction
+    from ml_pipeline.physics.transport import (restoration_source_fraction,
+                                                source_strength_fraction)
     restoration = None
     if rest_years > 0.0:
         rest_days = rest_years * 365.0
         elapsed_days = min(max(t_days - op_days, 0.0), rest_days)
         f_now = restoration_source_fraction(residual, t_days, op_days, rest_days)
+        # WHAT THE PHYSICS ACTUALLY USES (2026-08-10). The diagnostic used to
+        # report the sweep credit alone while params_from_features multiplied it
+        # by the passive flush -- so `source_conc_after_restoration` did not match
+        # the source concentration in the served field. That is the same
+        # diagnostic-contradicts-the-field defect QA F-3 fixed once already, so
+        # both numbers are now reported and the served one is named as such.
+        f_served = source_strength_fraction(residual, t_days, op_days, rest_days)
         restoration = {
             "restoration_years": round(rest_years, 2),
             "sweep_elapsed_years": round(elapsed_days / 365.0, 2),
             "sweep_complete": bool(t_days >= op_days + rest_days),
             "residual_endpoint_fraction": round(float(residual), 4),  # Texas @ ref yr
             "residual_realized_fraction": round(float(f_now), 4),     # after ELAPSED sweep
-            "source_conc_after_restoration": round(f_now * inputs["source_conc_C0"], 1),
+            # the fraction the transport engine is actually running with
+            "served_source_fraction": round(float(f_served), 4),
+            "source_conc_after_restoration": round(f_served * inputs["source_conc_C0"], 1),
+            "rebound_floor_active": bool(P.RESTORATION_REBOUND_FLOOR
+                                         and f_served > f_now * 0.999
+                                         and t_days > op_days),
+            "rebound_floor_note": (
+                "Post-restoration source strength is held at the demonstrated "
+                "stable endpoint rather than decaying further: the Texas endpoint "
+                "is measured on post-restoration stability samples, and residual "
+                "uranium can re-oxidise (rebound) rather than continue to clean up."
+                if P.RESTORATION_REBOUND_FLOOR else None),
             "ref_years": P.RESTORATION_REF_YEARS,
         }
     return {
