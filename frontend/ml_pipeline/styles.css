@@ -74,10 +74,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ---------- legend ---------- */
 .legend-row{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);margin:5px 0}
 .sw{width:16px;height:12px;border-radius:3px;flex:none}
-.sw.bis{background:transparent;border:2px solid #ff2d2d}
-.sw.plume{background:linear-gradient(90deg,#ffd27f,#ff5a5a,#7a0d0d)}
+.sw.bis{background:transparent;border:2px solid #8c1c24}
+.sw.plume{background:linear-gradient(90deg,#ffcdd2,#ef5350,#b71c1c)}
+.sw.leach{background:rgba(211,47,47,.18);border:2px dashed #d32f2f}
 .sw.ring{background:transparent;border:2px dashed #6fd1ff}
-.sw.env{background:transparent;border:2px dashed #c08bff}
+.sw.env{background:transparent;border:3px solid #5b21b6}
 
 .disclaimer{font-size:10.5px;color:var(--warn);line-height:1.5;background:rgba(255,184,77,.07);
   border:1px solid rgba(255,184,77,.25);border-radius:8px;padding:8px 10px}
@@ -218,3 +219,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .badge.bad{background:rgba(255,90,90,.2);color:var(--danger)}
 .badge.ok{background:rgba(55,211,155,.18);color:var(--ok)}
 .metric.isr .m-band{font-size:11px;line-height:1.45;margin-top:6px}
+
+/* Inline warning emphasis. Used by the depth-decay OOD note and the leach-zone
+   threshold-crossing note -- both are statements the user must not skim past. */
+.warn{color:var(--warn);font-weight:700}
+

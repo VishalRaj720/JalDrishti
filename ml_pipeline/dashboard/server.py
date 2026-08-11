@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import math
 import os
 from pathlib import Path
 
@@ -47,7 +48,20 @@ from ml_pipeline.dashboard.resolve import (
 )
 from ml_pipeline.dashboard.plume_geometry import (
     field_to_contours, compliance_ring, ml_envelope_ellipses,
+    source_zone_polygon,
 )
+
+
+def _replace_field(field, C_new):
+    """A PlumeResult view carrying a different concentration grid.
+
+    Used to contour the plume-only field while leaving `field.metrics` — the
+    numbers actually reported — completely untouched (bug A).
+    """
+    import copy
+    view = copy.copy(field)
+    view.C = C_new
+    return view
 from ml_pipeline.dashboard.drift import MONITOR
 from ml_pipeline.data_prep.boundary import in_jharkhand, boundary_geojson
 
@@ -269,6 +283,82 @@ def _timeline(start_date: str | None, t_years: float, op_years: float,
     }
 
 
+def _source_zone_crossing(*, C0: float, thr_inc: float, op_years: float,
+                          rest_years: float, residual_ref: float,
+                          start_date: str | None) -> dict:
+    """When does the uniform leach disc drop below the screening threshold?
+
+    THE PROBLEM THIS ANSWERS (bug C, 2026-08-11). The E1 leach disc carries a
+    SINGLE uniform concentration, so the moment that one value crosses the
+    incremental threshold the ENTIRE footprint leaves the exceedance area at
+    once. Measured at a deposit pin with radium: 13.78 ha at t = 44 y 1 mo,
+    0.00 ha at 44 y 2 mo. That is arithmetically correct for a uniform disc and
+    physically an artefact -- a real source zone has a concentration gradient,
+    so its above-threshold area would shrink continuously.
+
+    Radium shows it most starkly because its migration is 0 m at every time
+    (Rd ~ 1.2e4), so the disc IS the whole area; for U/SO4/TDS a travelling
+    plume survives the disc dropping out.
+
+    Fixing the disc itself means giving it a radial taper, which changes the
+    training labels and needs a re-bake -- forbidden under the current freeze
+    (ML_PIPELINE_READINESS.md section 7). So the step stays and is REPORTED:
+    the UI states the crossing time instead of showing a bare 0.00 ha.
+
+    Solved by bisection on `source_strength_fraction`, which is monotone
+    non-increasing in t across every branch (elapsed-sweep credit, post-closure
+    flush, rebound floor). Using the real function rather than re-deriving a
+    closed form per branch is what keeps this diagnostic honest: it cannot
+    disagree with the served field.
+    """
+    from ml_pipeline.physics.transport import source_strength_fraction
+
+    def disc_at(t_years: float) -> float:
+        return C0 * source_strength_fraction(residual_ref, t_years * 365.0,
+                                             op_years * 365.0, rest_years * 365.0)
+
+    # the ratio itself lives on the parent `source_zone` block as
+    # `conc_over_threshold`; this block answers only "when does it cross".
+    out = {"crosses": False, "crossing_years": None,
+           "crossing_date": None, "reason": None}
+    if thr_inc <= 0 or C0 <= 0:
+        out["reason"] = "no screening threshold for this species"
+        return out
+    if disc_at(op_years) < thr_inc:
+        out["reason"] = ("the source zone is below the screening threshold "
+                         "already at end-of-operations")
+        return out
+
+    # search out to a long horizon; the disc is monotone so a sign change is
+    # necessary and sufficient
+    T_MAX = 500.0
+    if disc_at(T_MAX) >= thr_inc:
+        out["reason"] = (
+            "the source zone never falls below the threshold on this model's "
+            "horizon" + (" — after a restoration sweep it is held at the "
+                         "measured stable endpoint and stops decaying"
+                         if rest_years > 0 and P.RESTORATION_REBOUND_FLOOR else ""))
+        return out
+
+    lo, hi = op_years, T_MAX
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        if disc_at(mid) >= thr_inc:
+            lo = mid
+        else:
+            hi = mid
+    t_cross = 0.5 * (lo + hi)
+    out.update(crosses=True, crossing_years=round(t_cross, 3), reason=None)
+    if start_date:
+        try:
+            t0 = _dt.date.fromisoformat(start_date.strip())
+            out["crossing_date"] = (
+                t0 + _dt.timedelta(days=round(t_cross * 365.25))).isoformat()
+        except (ValueError, AttributeError):
+            pass
+    return out
+
+
 # Module 1: strict boundary. The state bbox is a cheap pre-filter; the dissolved
 # district polygon (data_prep.boundary) is authoritative.
 _OUTSIDE_JH = {
@@ -477,7 +567,34 @@ def api_predict(req: PredictRequest):
     field = a.pop("_field")
     restoration = a.get("restoration")     # realized-residual diagnostic (or None)
     fm = field.metrics
-    contours = field_to_contours(field, lon0=req.lon, lat0=req.lat,
+    # BUG A (2026-08-11): contour the PLUME-ONLY field, not the display field
+    # with the source disc unioned into it. Contouring the union welded a circle
+    # to the plume lobe and produced re-entrant notches that read as a rendering
+    # fault. The disc is returned separately (plume.source_zone.polygon) and drawn
+    # as its own layer. Read-only reuse of frozen functions -- no physics changes,
+    # and the METRICS still come from `field.metrics`, untouched.
+    try:
+        from ml_pipeline.ml.predict import features_from_inputs as _ffi2
+        from ml_pipeline.physics.transport import (params_from_features,
+                                                   concentration_field)
+        import numpy as _np
+        _feat = _ffi2(**inputs)[1]
+        _prm = params_from_features(
+            _feat, species_C0=inputs["source_conc_C0"],
+            t_days=inputs["time_years"] * 365.0,
+            operation_days=inputs["operation_years"] * 365.0,
+            restoration_days=float(inputs.get("restoration_years", 0.0) or 0.0) * 365.0,
+            residual_fraction=_feat.get("_residual_endpoint", 1.0))
+        _cp = concentration_field(field.X, field.Y, _prm, include_disc=False)
+        # same up-gradient display mask solve_plume applies (the Domenico
+        # upstream half-plane is a solution artifact, not a plume)
+        field_for_contours = _replace_field(field, _np.where(field.X > 0.0, _cp, 0.0))
+        source_zone_poly = source_zone_polygon(
+            req.lon, req.lat, azimuth, _prm.disc_radius_m, _prm.disc_center_x_m,
+            x_offset_m=half_w) if _prm.disc_radius_m > 0 else None
+    except Exception:
+        field_for_contours, source_zone_poly = field, None
+    contours = field_to_contours(field_for_contours, lon0=req.lon, lat0=req.lat,
                                  azimuth_deg=azimuth, threshold=threshold,
                                  background=inputs["background_conc_Cb"],
                                  x_offset_m=half_w)
@@ -496,6 +613,7 @@ def api_predict(req: PredictRequest):
     # level (far outside the surrogate's training envelope), so bypass the ML
     # call entirely and let the analytical engine report the ~zero U plume.
     ml_metrics, envelope, ml_status, m = None, None, "ok", None
+    envelope_skipped = {}
     from ml_pipeline.ml.predict import ML_SPECIES
     if species not in ML_SPECIES:
         # fix 3.9: Ra-226 is served by the physics engine only. The deployed
@@ -518,10 +636,15 @@ def api_predict(req: PredictRequest):
                 "breach_probability": round(m["breach_probability"], 3),
                 "off_scale": bool(m.get("off_scale", False)),
             }
-            envelope = ml_envelope_ellipses(
+            # BUG B: down-gradient lobes anchored at the source plane, sized by
+            # the plume's measured half-width; bands too small to draw are
+            # reported as skipped rather than rendered as an invisible dot.
+            _env = ml_envelope_ellipses(
                 req.lon, req.lat, azimuth,
                 {k: m["migration_m"][k] for k in ("p10", "p50", "p90")}, aspect,
-                x_offset_m=half_w)
+                x_offset_m=half_w, halfwidth_m=fm.get("plume_halfwidth_m"))
+            envelope = _env["rings"]
+            envelope_skipped = _env["skipped"]
         except Exception as e:
             m = None
             ml_status = f"unavailable: {type(e).__name__} ({e})"
@@ -773,6 +896,25 @@ def api_predict(req: PredictRequest):
                 "threshold": round(float(fm["incremental_threshold"]), 2),
                 "above_threshold": bool(fm.get("source_zone_above_threshold", False)),
                 "radius_m": round(float(fm.get("source_zone_radius_m", 0.0)), 1),
+                # drawn as its OWN layer so the plume contour is not welded to it
+                "polygon": source_zone_poly,
+                # bug C: the disc is uniform, so its footprint leaves the
+                # exceedance area in ONE step. Report the step instead of
+                # letting the user meet a bare 0.00 ha.
+                "area_ha": round(math.pi
+                                 * float(fm.get("source_zone_radius_m", 0.0)) ** 2 / 1e4, 3),
+                "conc_over_threshold": (
+                    round(float(fm.get("source_zone_conc", 0.0))
+                          / float(fm["incremental_threshold"]), 4)
+                    if fm.get("incremental_threshold") else None),
+                "crossing": _source_zone_crossing(
+                    C0=float(inputs["source_conc_C0"]),
+                    thr_inc=float(fm["incremental_threshold"]),
+                    op_years=float(req.operation_years),
+                    rest_years=float(req.restoration_years or 0.0),
+                    residual_ref=float((restoration or {}).get(
+                        "residual_endpoint_fraction", 1.0)),
+                    start_date=req.start_date),
             },
         },
         "metrics": {
@@ -786,6 +928,8 @@ def api_predict(req: PredictRequest):
             "ml": ml_metrics,
         },
         "ml_envelope": envelope,
+        # bands whose extent is below the minimum drawable size, with the reason
+        "ml_envelope_skipped": envelope_skipped,
         "ml_status": ml_status,
         # per-request analytical-vs-ML relative disagreement (surrogate health)
         "disagreement": disagreement,

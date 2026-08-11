@@ -87,8 +87,64 @@ const BasemapControl = L.Control.extend({
 });
 map.addControl(new BasemapControl());
 
+// PANES: the reference geometry (leach zone, monitoring ring, ML envelope) must
+// never be buried under the plume it describes. Leaflet's default overlayPane is
+// 400; contours go just above it and the reference lines above those, so z-order
+// is explicit rather than a side-effect of the order render() happens to add in.
+map.createPane("panePlume");        // concentration contours
+map.getPane("panePlume").style.zIndex = 420;
+map.createPane("paneMarks");        // leach zone · monitoring ring · ML envelope
+map.getPane("paneMarks").style.zIndex = 460;
+
 const plumeLayer = L.layerGroup().addTo(map);
 let pinMarker = null;
+
+/** A dashed reference line with a white CASING under it.
+ *
+ * A 1.6 px cyan ring is invisible over a 0.5-opacity dark-maroon plume fill and
+ * nearly invisible over the pale basemap — which is why the monitoring ring and
+ * the leach zone could not be told apart from the plume. A casing fixes both
+ * backgrounds at once: over dark fill the white halo carries the line, over pale
+ * ground the coloured core does, and the dash gaps let the casing show through.
+ */
+function casedRing(latlngs, opts) {
+  const filled = !!opts.fillColor;
+  L.polygon(latlngs, {
+    pane: "paneMarks", color: "#ffffff",
+    // thin lines need a proportionally thinner halo, or the white swamps the
+    // colour it is supposed to be separating from the background
+    weight: opts.casingWeight || (opts.weight || 2) + 2.5,
+    opacity: 0.85, fill: false, dashArray: opts.dashArray || null,
+    lineCap: opts.lineCap || "butt", interactive: false,
+  }).addTo(plumeLayer);
+  const line = L.polygon(latlngs, {
+    pane: "paneMarks", color: opts.color, weight: opts.weight || 2,
+    opacity: 1, dashArray: opts.dashArray || null,
+    lineCap: opts.lineCap || "butt",
+    fill: filled, fillColor: opts.fillColor,
+    fillOpacity: opts.fillOpacity || 0,
+    // a filled shape owns hover over its area; an unfilled line hands hover to
+    // the wide invisible hit stroke below, so a 2 px line is actually catchable
+    interactive: filled,
+  }).addTo(plumeLayer);
+  if (filled && opts.tooltip) {
+    line.bindTooltip(opts.tooltip, { className: "plume-tip", sticky: true });
+  }
+  if (!filled && opts.tooltip) {
+    // HOVER TARGET, not a visible element. Without it these lines are ~2 px of
+    // hittable area and the pointer lands on the plume polygon underneath
+    // instead — which is exactly the "hover hits the plume, not the band"
+    // problem. opacity 0.01 keeps the stroke "painted" so SVG still delivers
+    // pointer events to it.
+    L.polygon(latlngs, {
+      pane: "paneMarks", color: opts.color, weight: 16, opacity: 0.01,
+      fill: false, interactive: true,
+    }).addTo(plumeLayer)
+      .bindTooltip(opts.tooltip, { className: "plume-tip", sticky: true });
+  }
+  return line;
+}
+
 
 const toLatLng = (c) => [c[1], c[0]];
 const ll = (arr) => arr.map(toLatLng);
@@ -479,52 +535,183 @@ function renderTimeline(t) {
 }
 
 /* ---------------- render ---------------- */
-const RED_RAMP = ["#ffd27f", "#ffa64d", "#ff7043", "#ff5a5a", "#d32f2f", "#7a0d0d"];
+// CONCENTRATION COLOUR SCALE (2026-08-11)
+// -------------------------------------------------------------------------
+// Sequential light -> dark: LIGHTER = LOWER concentration, DARKER = HIGHER.
+// The anchors are this project's existing palette, whose perceived brightness
+// (0.299R+0.587G+0.114B) falls monotonically 0.84 -> 0.72 -> 0.59 -> 0.55 ->
+// 0.38 -> 0.18, so interpolating through them is a valid sequential scale.
+//
+// WHAT WAS WRONG. Colour was indexed by POSITION in the contour array and the
+// BIS contour was overridden to a vivid red. `_choose_levels` returns levels
+// ASCENDING, so the BIS threshold is always index 0 — the LOWEST concentration
+// — and it was being painted the most saturated red on the map while the 3x,
+// 10x and 100x contours above it got pale ambers. The scale was inverted at
+// exactly the contour users read first. Indexing by position also ignored the
+// level values: sulfate's 400 / 1200 / 1211 mg/L got three maximally-separated
+// shades even though the last two are the same concentration.
+// Pure red family (Material red 100/300/400/500/700/900), so the darkest step
+// reads as a saturated dark RED rather than the brownish-maroon the previous
+// endpoint (#7a0d0d, R=122 G=13 B=13 — low, muted brightness) produced. Every
+// stop keeps R clearly dominant over G/B so the hue never drifts toward brown.
+const CONC_RAMP = ["#ffcdd2", "#ef9a9a", "#ef5350", "#f44336", "#d32f2f", "#b71c1c"];
+
+function _hexToRgb(c) {
+  return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16),
+          parseInt(c.slice(5, 7), 16)];
+}
+function _rgbToHex(a) {
+  return "#" + a.map(v => Math.max(0, Math.min(255, Math.round(v)))
+                          .toString(16).padStart(2, "0")).join("");
+}
+/** t in [0,1] -> ramp colour. 0 = lightest (lowest conc), 1 = darkest. */
+function rampColor(t) {
+  t = Math.max(0, Math.min(1, isFinite(t) ? t : 1));
+  const s = t * (CONC_RAMP.length - 1);
+  const i = Math.min(Math.floor(s), CONC_RAMP.length - 2);
+  const f = s - i;
+  const a = _hexToRgb(CONC_RAMP[i]), b = _hexToRgb(CONC_RAMP[i + 1]);
+  return _rgbToHex([0, 1, 2].map(k => a[k] + (b[k] - a[k]) * f));
+}
+/** Normalised position of each raw value within its own set, on a LOG scale.
+ *  LOG because concentration is a log-scale quantity here (the surrogate itself
+ *  trains on log1p targets) and the supra-threshold levels are geometric
+ *  (1x, 3x, 10x, 30x, 100x) — equal ratios must get equal colour steps.
+ *  A single-value set (hi == lo) maps to 1 (darkest) — if it is the only
+ *  concentration on the map, it IS the highest one shown. */
+function logShades(values) {
+  const lv = values.map(v => Math.log(Math.max(v, 1e-9)));
+  const lo = Math.min.apply(null, lv), hi = Math.max.apply(null, lv);
+  return lv.map(v => (hi > lo ? (v - lo) / (hi - lo) : 1));
+}
+/** Per-species normalised position of each CONTOUR level. INDEPENDENT PER
+ *  PARAMETER: each species spans the full light->dark range across its own
+ *  levels, so a shade is read against that species' own scale. */
+function concShades(contours) {
+  return logShades(contours.map(c => c.level));
+}
 
 function render() {
   const r = state.last; if (!r) return;
   plumeLayer.clearLayers();
 
   const cs = r.plume.contours;
-  const n = cs.length;
+  const shades = concShades(cs);
+
+  // BUG A (2026-08-11): the SOURCE ZONE is its own object, drawn first and
+  // underneath. It used to be unioned into the contoured field, so the BIS
+  // contour came back as one polygon welding a circle to the plume lobe with
+  // re-entrant notches — which read as a rendering fault rather than a plume.
+  // It is the leach zone (the ground the lixiviant deliberately swept), not a
+  // concentration contour — but it IS a concentration, so it gets the SAME
+  // red ramp as the plume, coloured by ITS OWN reading. The reference set is
+  // the plume's own contour levels plus the leach-zone value itself, so
+  // "darker = higher" holds true ACROSS the two layers together: if the leach
+  // zone happens to be the single hottest thing on the map, it gets the
+  // darkest red, not an arbitrary fixed orange.
+  const szp = r.plume.source_zone && r.plume.source_zone.polygon;
+  if (szp) {
+    const sz = r.plume.source_zone;
+    const live = sz.above_threshold;
+    let szColor, szFillOpacity;
+    if (live) {
+      const szT = logShades(cs.map(c => c.level).concat([sz.conc]))[cs.length];
+      szColor = rampColor(szT);
+      szFillOpacity = 0.14 + 0.30 * szT;
+    } else {
+      // No longer contributing concentration — a neutral grey, not a red
+      // shade, so it reads as "was hot, now flushed" rather than as a reading.
+      szColor = "#7a8699";
+      szFillOpacity = 0.05;
+    }
+    // LONG dash + cased, so it is unmistakable against both the pale basemap and
+    // the dark plume fill, and clearly a different line from the dotted ring.
+    casedRing(ll(szp), {
+      color: szColor,
+      weight: 2.6,
+      dashArray: "12 7",
+      fillColor: szColor,
+      fillOpacity: szFillOpacity,
+      tooltip: `<b>Leach zone</b> (well-pattern footprint) · ${sz.area_ha.toFixed(2)} ha · `
+        + `${sz.conc} ${SPECIES_UNIT[r.species]}`
+        + (live ? "" : " — below the screening limit, no longer counted as affected area"),
+    });
+  }
+  // Draw LOW concentration first so the darker, higher-concentration bands sit
+  // on top; otherwise a pale outer band would paint over the dark core.
   cs.forEach((c, i) => {
-    const col = c.is_bis ? "#ff2d2d" : RED_RAMP[Math.min(i, RED_RAMP.length - 1)];
+    const t = shades[i];
+    const col = rampColor(t);
     c.polygons.forEach(poly => {
       L.polygon(ll(poly), {
-        color: c.is_bis ? "#ff2d2d" : col,
-        weight: c.is_bis ? 2.6 : 0.6,
+        pane: "panePlume",
+        // COLOUR ALWAYS ENCODES CONCENTRATION — including for the BIS contour,
+        // which is the lowest level and therefore the lightest. The BIS line is
+        // distinguished by WEIGHT plus a fixed dark casing colour, never by
+        // hijacking the fill hue (that was the inversion being fixed).
+        color: c.is_bis ? "#8c1c24" : rampColor(Math.min(1, t + 0.15)),
+        weight: c.is_bis ? 2.8 : 0.8,
         fillColor: col,
-        fillOpacity: c.is_bis ? 0.10 : 0.18 + 0.10 * i,
-        dashArray: c.is_bis ? null : null,
+        // capped below the old 0.50 so the reference lines drawn above stay
+        // readable through the darkest band
+        fillOpacity: 0.12 + 0.30 * t,
       }).addTo(plumeLayer).bindTooltip(
-        `${c.is_bis ? "BIS limit" : ""} ${c.level} ${SPECIES_UNIT[r.species]}`,
+        `${c.is_bis ? "BIS limit · " : ""}${c.level} ${SPECIES_UNIT[r.species]}`,
         { className: "plume-tip", sticky: true });
     });
   });
 
-  // compliance ring
-  L.polygon(ll(r.plume.compliance_ring.polygon), {
-    color: "#6fd1ff", weight: 1.6, dashArray: "6 5", fill: false,
-  }).addTo(plumeLayer).bindTooltip(`Monitoring ring (${r.plume.compliance_ring.radius_m} m)`);
+  // MONITORING / COMPLIANCE RING — DOTTED, cased. Deliberately a different dash
+  // pattern from the leach zone's long dash so the two circles are never
+  // confused. Radius is measured from the PIN, i.e. wellfield half-width +
+  // monitor-ring offset.
+  const cr = r.plume.compliance_ring;
+  const ringOffset = (r.wellfield_geometry && r.wellfield_geometry.monitor_ring_m);
+  casedRing(ll(cr.polygon), {
+    color: "#2bb3ff", weight: 2.4, dashArray: "1 8", lineCap: "round",
+    tooltip: `<b>Monitoring ring</b> — ${cr.radius_m} m from the pin`
+      + (ringOffset ? ` (${ringOffset} m beyond the wellfield edge)` : "")
+      + `<br><span class="muted">where an excursion would be detected</span>`,
+  });
 
-  // ML migration envelope (only in ML mode). When the request is outside the
-  // validated training envelope (or the front runs off the gridded reach), the
-  // conformal 80% guarantee is void here -> render amber + heavy dash and say so.
+  // ML migration envelope (only in ML mode). ALWAYS VIOLET — the extrapolation
+  // warning ("80% guarantee void") is already surfaced in the metric cards and
+  // the warn banner (band()/renderMetrics() below), so the map lines do not
+  // also need to change colour for it. They used to swap to amber, which read
+  // as the bands turning yellow rather than as a warning.
   if (state.mode === "ml" && r.ml_envelope) {
     const env = r.ml_envelope;
     const mlm = r.metrics.ml;
     const beyond = (r.extrapolation && r.extrapolation.length > 0) ||
                    (mlm && mlm.off_scale);
-    const col = beyond ? "#ffb84d" : "#c08bff";
     const note = beyond ? " · beyond validated range" : "";
-    [["p90", 0.9], ["p50", 1.6], ["p10", 0.9]].forEach(([q, w]) => {
+    // DARK VIOLET, SOLID, MEDIUM-THICK — one line per band, no dashes. The three
+    // shades deepen with distance (P10 nearest → P90 farthest), matching the
+    // concentration ramp's "darker = more" convention.
+    const VIOLET = { p10: "#7c3aed", p50: "#5b21b6", p90: "#3f1178" };
+    // BUG B: these are DOWN-GRADIENT lobes anchored at the source plane. They
+    // used to be ellipses CENTRED on it, so a P90 of ~1 km drew a ring 869 m
+    // UP-gradient — predicted contamination in the one direction the model says
+    // has none. Bands too small to draw are now reported, not silently dropped.
+    // THIN solid lines. No permanent labels — the band identity is revealed on
+    // hover only, so the map is not carrying three chips the user did not ask
+    // for. The wide invisible hit stroke in casedRing() is what makes a ~1 px
+    // line hoverable, so thin does not mean unreachable.
+    [["p90", 1.2], ["p10", 1.2], ["p50", 1.6]].forEach(([q, w]) => {
       if (!env[q]) return;
-      L.polygon(ll(env[q]), {
-        color: col, weight: w,
-        dashArray: beyond ? "2 7" : (q === "p50" ? "2 0" : "4 6"),
-        fill: false, opacity: beyond ? 1 : .9,
-      }).addTo(plumeLayer).bindTooltip(`ML migration ${q.toUpperCase()}${note}`);
+      const dist = mlm && mlm.migration_m ? mlm.migration_m[q] : null;
+      const dtxt = dist == null ? "" : ` — ${dist < 10 ? dist.toFixed(1) : Math.round(dist)} m`;
+      casedRing(ll(env[q]), {
+        color: VIOLET[q], weight: w, casingWeight: w + 1.4,
+        tooltip: `<b>ML migration ${q.toUpperCase()}</b>${dtxt}${note}`
+          + `<br><span class="muted">`
+          + (q === "p50" ? "central estimate of down-gradient travel"
+             : q === "p10" ? "lower bound — 10th percentile of the parameter uncertainty"
+             : "upper bound — 90th percentile of the parameter uncertainty")
+          + `</span>`,
+      });
     });
+    state.envelopeSkipped = r.ml_envelope_skipped || {};
     // A strongly retarded plume now yields a SUB-METRE envelope (radium at a
     // deposit: P10-P90 spans 0.12-1.23 m), which draws as nothing at any usable
     // zoom. Silently rendering an empty map under a legend that promises an
@@ -782,13 +969,35 @@ function renderMetrics(r) {
   // function), so in ML mode the card and this note would otherwise contradict
   // each other -- name the analytical value explicitly instead.
   const sz = r.plume.source_zone;
-  if (sz && !sz.above_threshold && sz.radius_m > 0) {
+  if (sz && sz.radius_m > 0) {
+    const el = document.getElementById("m-area-band");
     const ana = r.metrics.analytical.area_ha;
-    document.getElementById("m-area-band").textContent =
-      `leach zone has flushed below the limit (${sz.conc} < ${sz.threshold} ${U})`
-      + ` — analytical engine: ${ana.toFixed(2)} ha`
-      + (useML ? " · the ML surrogate cannot represent this step; trust the analytical value here"
-               : "");
+    const cr = sz.crossing || {};
+    // WHEN the step happens, in plain terms. The disc is uniform, so its whole
+    // footprint crosses at one instant; without a date this reads as a fault.
+    const when = cr.crossing_years != null
+      ? `year ${cr.crossing_years.toFixed(2)}`
+        + (cr.crossing_date ? ` (${cr.crossing_date.slice(0, 7)})` : "")
+      : null;
+
+    if (!sz.above_threshold) {
+      // The footprint has dropped out. Never show a bare 0.00 ha.
+      el.innerHTML =
+        `<span class="warn">Leach zone dropped below the screening limit</span>`
+        + ` at ${when || "this horizon"} — its ${sz.area_ha.toFixed(2)} ha no longer`
+        + ` counts as affected area (${sz.conc} vs ${sz.threshold} ${U}).`
+        + ` Analytical engine: <b>${ana.toFixed(2)} ha</b> (migrating plume only).`
+        + (useML ? ` · the ML surrogate fits a smooth function and cannot represent`
+                 + ` this step — trust the analytical value here.` : "")
+        + `<br><span class="muted">The source zone is modelled as a single`
+        + ` uniform concentration, so its whole footprint crosses the limit at`
+        + ` once. A real source zone has a gradient and would shrink gradually.</span>`;
+    } else if (sz.conc_over_threshold != null && sz.conc_over_threshold < 1.25 && when) {
+      // Approaching the cliff — warn BEFORE the user falls off it.
+      el.textContent += ` · leach zone is ${sz.conc_over_threshold.toFixed(2)}× the`
+        + ` limit and drops below it at ${when}, when this footprint`
+        + ` (${sz.area_ha.toFixed(2)} ha) leaves the area in one step`;
+    }
   }
   // eta saturates at 1, and only holds the front while operating: say so rather
   // than letting the bleed slider look broken.
@@ -806,6 +1015,15 @@ function renderMetrics(r) {
   if (state.envelopeTooSmall) {
     document.getElementById("m-dist-band").textContent +=
       " · envelope too small to plot at map scale (no measurable migration)";
+  }
+  // BUG B: name the individual bands that were not drawn and why, so a missing
+  // ring is never mistaken for a layer that failed to load.
+  const skipped = state.envelopeSkipped || {};
+  const skippedKeys = Object.keys(skipped);
+  if (state.mode === "ml" && skippedKeys.length) {
+    document.getElementById("m-dist-band").textContent +=
+      ` · ${skippedKeys.map(k => k.toUpperCase()).join(" & ")} envelope not drawn:`
+      + ` ${skipped[skippedKeys[0]]}`;
   }
 
   // extrapolation / off-scale warnings
