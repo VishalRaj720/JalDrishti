@@ -1,10 +1,11 @@
 # JalDrishti — Product Design: Frontend, Backend API & Database
 
-**Version:** 2.0 · **Date:** 2026-08-11 · **Status:** Design for stakeholder review
-**Supersedes:** v1.0 (2026-08-05), written before the `review3.md` remediation
+**Version:** 3.0 · **Date:** 2026-08-11 · **Status:** Implementation-ready
+**Supersedes:** v2.0 (2026-08-11, review-patched), v1.0 (2026-08-05)
 **Programme:** TEXMiN–BIT Sindri Mining CPS CoE · *Smart Water Monitoring: ML and CPS for Safe & Sustainable Mining*
 
 **Two audiences, by name:**
+
 1. **Government officials** — CGWB / SPCB / district administration, who need to know which aquifers
    are vulnerable to an ISR process and what the monitoring network is reporting.
 2. **Common users** — residents of Jharkhand mining districts, who need a plain answer to
@@ -16,35 +17,39 @@ Everything below is role-based around those two, plus the technical and field st
 
 ## 0. What this document decides
 
-The repository contains **three disconnected parts**: a legacy CRUD backend, a scientifically
-validated simulation engine (`ml_pipeline/`), and a static frontend mock. None is a product an
-authority can be handed, and — critically — **they disagree with each other about the physics**
+The repository contains **three parts that do not talk to each other**: a CRUD backend, a
+scientifically validated simulation engine (`ml_pipeline/`), and a static frontend mock. None is a
+product an authority can be handed, and — critically — **two of them disagree about the physics**
 (§1.3). This document specifies one system: which APIs survive, the database behind them, the screens
-each audience actually uses, and the access control that makes it safe to expose.
+each audience uses, and the access control that makes it safe to expose.
 
-**One-line product statement.** *A groundwater-vulnerability portal for Jharkhand: for officials, where
-a hypothetical ISR plume would travel, who is downstream, and what the monitoring network reports; for
-residents, whether their area is at risk and what that means — with every number carrying its
-provenance and uncertainty.*
+**One-line product statement.** *A groundwater-vulnerability portal for Jharkhand: for officials,
+where a hypothetical ISR plume would travel, who is downstream, and what the monitoring network
+reports; for residents, whether their area is at risk and what that means — with every number carrying
+its provenance and uncertainty.*
 
 The word **hypothetical** is load-bearing and appears on every simulation surface. No ISR operation
 exists in Jharkhand. This is a screening and preparedness tool, not a permitting instrument.
 
-### 0.1 What changed from v1.0
+### 0.1 What changed from v2.0
 
-v1.0 was written on 2026-08-05. The `review3.md` remediation (merged as PR #6) changed the facts it
-was built on. Corrections:
+v2.0 was patched during a review rather than rebuilt against the tree, and carried stale numbers.
+Every factual claim in v3.0 was re-verified on 2026-08-11 against the working copy, the deployed
+`metrics.json`, and a live `psql` query. Corrections:
 
-| v1.0 said | Reality now |
+| v2.0 said | Verified reality |
 |---|---|
-| `ml_pipeline`: 222 tests | **260 tests** |
-| `ml_pipeline` has "no auth, **no rate limiting**, no database" | Rate limiting (240/min token bucket) and `ETag`/`Cache-Control` on all five overlay endpoints **now exist**. No auth and no database remain true |
-| 57 legacy + 12 pipeline endpoints | **55 legacy + 14 pipeline** |
-| Risk 3: *"until the field-resampled gate runs, say 80% calibrated on modelled scenarios"* | **The gate has run and passed** (0.865 / 0.904 / 0.913 on a held-out serving-distribution batch). The UI claim can be stronger — see §4.3 |
-| — | The pipeline gained the **NUREG-1569 ISR excursion test**, a configurable monitor ring, `/api/assumptions`, and effective-retardation reporting. v1.0 knows about none of them. §4.2 fixes that |
+| `ml_pipeline`: 260 tests | **307 tests** |
+| `backend/`: "PostGIS models, **Celery**, Alembic" | **No Celery, no Redis** — absent from `requirements.txt` and the tree; `app/tasks/` is an empty package |
+| 55 legacy + **14** pipeline = 69 endpoints | 55 legacy + **13** pipeline = **68** |
+| `monitoring_stations` 398 / readings 9,583 | **415 stations / 8,345 readings** actually seeded — see §1.4 |
+| Field-coverage 0.865 / 0.904 / **0.913** | 0.865 / 0.904 / **0.912** |
+| — | The database is now **seeded and live**; v2.0 was written against an empty one (§1.4) |
+| — | **5 orphan tables** exist in the DB with no ORM model — schema drift v2.0 never noticed (§1.4) |
+| — | Documentation reorganised into `docs/`; all references in this document point at the new paths |
 
-**Three gaps v1.0 had, now addressed:** the ISR excursion framework (§4.2), the common-user audience
-(§4.4), and honesty about the CPS sensor path (§7).
+Numbers that v2.0 got right and v3.0 retains: the 22 deletable endpoints, radium's R² failures
+(0.516 / 0.431), the 12-entry assumption register, and the NUREG excursion design.
 
 ---
 
@@ -54,9 +59,9 @@ was built on. Corrections:
 
 | Component | State | Verdict |
 |---|---|---|
-| `ml_pipeline/` | **Production-grade.** 260 tests, exact-solution-benchmarked transport kernel, conformal bands validated on the serving distribution, drift monitor, 12-entry assumption register | **Keep — this is the crown jewel.** Frozen; see [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE_READINESS.md) |
-| `backend/` | 55 endpoints, JWT auth, 3 roles, PostGIS models, Celery, Alembic | **Keep the plumbing, replace the science** (§1.3) |
-| `frontend/JalDrishti.html` + `*.jsx` | Static mock, no `package.json`, no build. Hexagon districts, hardcoded risk badges | **Keep the visual language, rebuild the app** |
+| `ml_pipeline/` | **Production-grade.** 307 tests, exact-solution-benchmarked transport kernel, conformal bands validated on the serving distribution, drift monitor, 12-entry assumption register | **Keep — this is the crown jewel.** Frozen; see [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE_READINESS.md) |
+| `backend/` | 55 endpoints, JWT auth, 3 roles, PostGIS models, Alembic (`0001`…`0005`). **No task queue** — simulations run as in-process FastAPI background tasks | **Keep the plumbing, replace the science** (§1.3) |
+| `frontend/JalDrishti.html` + `*.jsx` | Static mock, no `package.json`, no build step. Hexagon districts, hardcoded risk badges | **Keep the visual language, rebuild the app** |
 | `frontend/ml_pipeline/` | Vanilla JS + Leaflet, genuinely functional, real physics | **Absorb as the Simulation Studio** |
 
 ### 1.2 The visual language worth keeping
@@ -71,44 +76,88 @@ From `frontend/screenshots/01-map-final2.png` — stakeholders have already seen
 **Keep all of it.** Replace the hexagons with the real 24-district GeoJSON and the hardcoded badges
 with computed indices.
 
-### 1.3 The core problem — worse than v1.0 stated
+### 1.3 The core problem — two engines, one of them wrong
 
-v1.0 said the two halves "cannot talk". Verified: they also **contradict each other**.
+The two halves do not merely fail to talk; they **contradict each other**.
 `backend/app/services/simulation.py` runs a 9-step pipeline in which:
 
-- step 2 sets the groundwater gradient with **`random.uniform(30, 90)`** — a literal random direction;
-- step 5 calls `ml_prediction.py`, whose own docstring labels it a **`month1_placeholder`**, not a
-  trained model;
-- step 6 computes area from a **hardcoded** `rx = 50·√365`, `ry = 10·√365` stub.
+- line 136 sets the groundwater gradient with **`random.uniform(30, 90)`** — a literal random direction;
+- step 5 calls `ml_prediction.py`, whose own output is tagged **`model: "month1_placeholder"`** (lines 56, 68), not a trained model;
+- lines 161–162 compute area from a **hardcoded** `rx = 50·√365`, `ry = 10·√365` stub.
 
-Meanwhile `ml_pipeline` derives the gradient from a plane fit over 398 real CGWB stations and solves
+Meanwhile `ml_pipeline` derives the gradient from a plane fit over real CGWB stations and solves
 Domenico transport with conformal bands. **Two endpoints in one product would return different,
 incompatible answers for the same site, and the worse one is the one the legacy API exposes.**
 
 This makes §3 (rewire simulations to `ml_pipeline`) not an enhancement but a **correctness fix**.
 
-Also stale and needing cleanup: `backend/app/services/ml_prediction.py`, `simulation.py`,
-`backend/requirements.txt` and `ml_pipeline/README.md` still reference **`DataGen_ModelMVP/`**, a
-directory that no longer exists.
+**Dead references still in the tree**, all confirmed present and all pointing at a directory that no
+longer exists (`DataGen_ModelMVP/` was deleted from disk *and* git):
+
+| File | Line |
+|---|---|
+| `backend/app/services/ml_prediction.py` | 5 |
+| `backend/app/services/simulation.py` | 84 |
+| `backend/requirements.txt` | 29 |
+| `ml_pipeline/README.md` | 3 |
+
+### 1.4 NEW — the database is live, and it has drifted
+
+v2.0 designed against an empty database. `groundwater_db` was reset and reseeded on 2026-08-11 and
+now holds real data. Verified by direct query:
+
+| Table | Rows | Table | Rows |
+|---|---|---|---|
+| `groundwater_level_readings` | 8,345 | `districts` | 24 |
+| `data_sources` | 419 | `aquifers` | 23 |
+| `monitoring_stations` | 415 | `users` | 3 |
+| `monitoring_wells` | 397 | `isr_points` | 1 |
+| `water_samples` | 397 | `simulations` | 0 |
+| `blocks` | 264 | | |
+
+**Two facts the design must absorb:**
+
+**(a) The 398 → 415 station split is correct, not a bug.** `cgwb_waterlevel_jharkhand.csv` has 9,583
+rows and **398 distinct `station_name` values**, but **415 distinct `(name, latitude, longitude)`
+triples** — the same station name recurs at different coordinates. The seed groups on the triple,
+which is right: two physically distinct wells must not merge because a clerk reused a name.
+The 9,583 → 8,345 reduction is likewise correct: there are exactly **1,238 duplicate
+`(station, date)` pairs** in the source CSV, collapsed by the composite primary key.
+
+> **Design consequence.** `station_name` is **not** a key. Any UI that lists or searches stations by
+> name must disambiguate by coordinates, and `GET /monitoring_stations?name=` must be able to return
+> more than one result. This is exactly the kind of silent join error that would corrupt a
+> district-level risk roll-up.
+
+**(b) Five tables exist in the database with no ORM model.** Migrations `0001`–`0005` created them;
+the model files were later deleted without a down-migration:
+
+`contamination_events` · `hydraulic_heads` · `ml_models` · `piezometric_heads` · `spatial_analysis_results`
+
+All five are empty. They are unreachable from the application, invisible to SQLAlchemy, and will
+confuse anyone reading the schema. **P1 drops them in migration `0006`.** The ORM currently defines
+13 tables across 10 model files (`simulation.py` alone declares `simulations`, `simulation_aquifers`
+and `plume_parameters`).
 
 ---
 
 ## 2. Roles — built around the two stated audiences
 
-v1.0 proposed seven roles including `operator` (a "UCLL-class mine operator" with CRUD over its own
-sites). That contradicts the product's own premise: **no ISR operates in Jharkhand**, so there is no
-operator to onboard. Five roles, mapped to real people:
+v1.0 proposed seven roles including `operator` (a mine operator with CRUD over its own sites). That
+contradicts the product's own premise: **no ISR operates in Jharkhand**, so there is no operator to
+onboard. Five roles, mapped to real people:
 
 | Role | Who | Can |
 |---|---|---|
 | `admin` | BIT Sindri / TEXMiN system owner | Everything incl. ingest, dataset promotion, user management |
 | `regulator` | **CGWB / SPCB / district officer** — the primary government user | Read every site, publish/archive, export signed reports, resolve alerts, see raw coordinates |
-| `analyst` | Technical staff, researchers | Run and save scenarios, no publish, no ingest |
+| `analyst` | Technical staff, researchers | Run and save scenarios; no publish, no ingest |
 | `field_officer` | Station/well data collectors | Upload readings and samples only — **the CPS data path** |
 | `citizen` | **Common user** (registered or anonymous) | District/block risk view, plain-language explanations, alerts for a subscribed area. **No precise site coordinates, no simulation controls** |
 
-The backend today has only `admin`, `analyst`, `viewer` — `viewer` is renamed and re-scoped to
-`citizen`, and `regulator` / `field_officer` are added.
+The backend today has only `admin`, `analyst`, `viewer` (`backend/app/models/user.py:14-16`).
+`viewer` is renamed and re-scoped to `citizen`; `regulator` and `field_officer` are added. This is a
+migration, not a greenfield design — existing `viewer` rows map to `citizen`.
 
 **Why citizens cannot see exact ISR coordinates.** Every site is hypothetical. Publishing a precise
 point for a *speculative* mine next to a named village invites it being read as a real plan, and
@@ -122,7 +171,7 @@ application code — so a service bug cannot leak site detail to a citizen sessi
 
 ## 3. API audit — keep, delete, add
 
-**55 legacy + 14 pipeline = 69 endpoints today → ~40 in the target design.**
+**55 legacy + 13 pipeline = 68 endpoints today → ~40 in the target design.**
 
 ### 3.1 DELETE — 22 endpoints
 
@@ -134,7 +183,7 @@ application code — so a service bug cannot leak site detail to a citizen sessi
 | `POST /auth/token` (1) | Duplicate of `POST /auth/login` |
 | `GET /` root banner (1) | Replaced by the SPA |
 | `POST /api/drift/reset` (1) | Debug affordance → admin-only, off the public API |
-| `GET /api/aquifers`, `/boundary`, `/ore`, `/rivers` in `ml_pipeline` (4) | Duplicated by the unified geography service. The pipeline should not serve map layers |
+| `GET /api/aquifers`, `/api/boundary`, `/api/ore`, `/api/rivers` (4) | Duplicated by the unified geography service. The pipeline should not serve map layers |
 
 ### 3.2 KEEP — with changes
 
@@ -144,11 +193,11 @@ application code — so a service bug cannot leak site detail to a citizen sessi
 | `GET /districts`, `/districts/geojson`, `/blocks`, `/aquifers` | Read-only; `?simplify=`, `ETag`/`Cache-Control` |
 | `GET/POST/PUT/DELETE /isr_points` | **The heart of the product** — the hypothetical-site registry. Add `status`, `owner_org_id`, soft delete |
 | `POST /simulations/{isr_id}`, `GET /simulations/{sim_id}` | **Rewire to `ml_pipeline`.** Delete the random-gradient stub and `month1_placeholder` outright (§1.3) |
-| `GET/POST /monitoring_stations`, `/{id}/readings` | Keep — the CPS data path |
+| `GET/POST /monitoring_stations`, `/{id}/readings` | Keep — the CPS data path. **Must return multiple rows for a repeated station name** (§1.4a) |
 | `GET /monitoring_wells`, `GET/POST /water_samples` | Keep |
 | `POST /ingest/*` (5), `GET /ingest/data-quality-report` | Keep, admin-only. The data-quality report is a named proposal deliverable |
-| `GET /health` | Extend to report ML artifact + DB + queue status |
-| `POST /api/predict`, `GET /api/pin`, `/api/flow_field`, `/api/strike_field`, `/api/drift`, `/api/assumptions` | Keep behind the gateway with auth + limits |
+| `GET /health` | Extend to report ML artifact + DB status |
+| `POST /api/predict`, `GET /api/pin`, `/api/flow_field`, `/api/strike_field`, `/api/drift`, `/api/assumptions`, `/api/health` | Keep behind the gateway with auth + limits |
 
 ### 3.3 ADD — new endpoints
 
@@ -159,9 +208,9 @@ application code — so a service bug cannot leak site detail to a citizen sessi
 | `GET /me/permissions` | Frontend renders from server truth, never guesses |
 | `GET /sites/{id}/risk` | Composite risk index — what the map colours by |
 | `GET /sites/{id}/downstream` | Receptors at risk: villages, wells, river reaches |
-| `GET /sites/{id}/excursion` | **NEW in v2.0** — the NUREG-1569 indicator excursion state (§4.2) |
+| `GET /sites/{id}/excursion` | The NUREG-1569-inspired indicator excursion state (§4.2) |
 | `POST /scenarios`, `GET /scenarios/{id}`, `POST /scenarios/{id}/compare` | Saved, named, shareable scenarios — **what makes this a product rather than a calculator** |
-| `GET /public/risk/{district_id}` | **NEW in v2.0** — the citizen-facing aggregate, no auth, heavily cached |
+| `GET /public/risk/{district_id}` | The citizen-facing aggregate; no auth, heavily cached |
 | `GET /alerts`, `POST /alerts/rules`, `POST /alerts/{id}/ack` | CPS loop: breach → alert → acknowledgement |
 | `GET /reports/{site_id}.pdf` | Signed, dated regulator report with provenance appendix |
 | `GET /audit` | Who ran what, when — non-negotiable for a government portal |
@@ -173,12 +222,15 @@ application code — so a service bug cannot leak site detail to a citizen sessi
 **Stack:** React 18 + TypeScript + Vite · **Leaflet** (as today) · TanStack Query · Tailwind +
 shadcn/ui · Recharts.
 
-**Map library decision, revised from v1.0.** v1.0 mandated MapLibre GL vector tiles on a 60 fps
-argument. That is premature: `frontend/ml_pipeline/app.js` already renders 23 aquifer polygons, 4,577
-river reaches (decimated) and plume contours on Leaflet acceptably, and MapLibre requires standing up
-a tile server (tippecanoe / pg_tileserv) — real infrastructure for a UG fellowship prototype. **Ship
-on Leaflet; revisit MapLibre only if the 260-block layer measurably drops frames.** Do not pay
-infrastructure cost for a hypothetical.
+Note this is a **greenfield build**: `frontend/` has no `package.json` and no build step today, so
+adopting Vite adds tooling rather than replacing it.
+
+**Map library decision.** v1.0 mandated MapLibre GL vector tiles on a 60 fps argument. That is
+premature: `frontend/ml_pipeline/app.js` already renders 23 aquifer polygons, 4,577 river reaches
+(decimated) and plume contours on Leaflet acceptably, and MapLibre requires standing up a tile server
+(tippecanoe / pg_tileserv) — real infrastructure for a UG fellowship prototype. **Ship on Leaflet;
+revisit MapLibre only if the 264-block layer measurably drops frames.** Do not pay infrastructure
+cost for a hypothetical.
 
 ### 4.1 Screens — officials
 
@@ -207,32 +259,32 @@ lack recent samples, where the flow field falls back to DEM).
 
 **8 · Admin** — orgs, users, roles, API keys, rate-limit tiers, audit log.
 
-### 4.2 NEW — the ISR Excursion panel
+### 4.2 The ISR Excursion panel
 
-**This is the single most product-relevant thing the pipeline gained, and v1.0 predates it.**
+**This is the most product-relevant thing the pipeline has, and it is what a regulator actually acts on.**
 
 A real ISR operation is not judged by "did uranium exceed a drinking-water limit". US NRC NUREG-1569
 §5.7.8.3 defines an excursion as **two or more conservative indicator parameters exceeding their
 upper control limits** at a perimeter monitoring well — and p.137 explicitly rejects uranium as an
 indicator *"because … it may be retarded by reducing conditions in the aquifer."*
 
-The pipeline now implements this, and it **fires earlier than the health-limit breach** — verified at
+The pipeline implements this, and it **fires earlier than the health-limit breach** — verified at
 Jaduguda, gradient 0.005, t = 20 yr: excursion DECLARED while the BIS uranium breach still reads NO.
 
-**Product implication.** For a government official monitoring aquifer vulnerability, this is the
-headline, because it is the metric a regulator actually acts on. The panel shows:
+The panel shows:
 
 - **Excursion status** (`DECLARED` / `none`) and the indicator count, under a **2-of-3** rule
+  (`ISR_EXCURSION_MIN_INDICATORS = 2`, verified in config)
 - Per indicator (**chloride, TDS, sulfate**): ring concentration vs its upper control limit
-- **A persistent non-compliance statement** — the panel now meets NUREG's minimum of three, which
-  makes the test *structurally* like a licensed one but **does not make it one**. What is still
-  missing is named in the response: per-well temporal baselines, the verification-resampling
-  protocol, the 60-day controllability demonstration, and an actual wellfield
-- The monitor ring distance and its NUREG-licensed range (75–180 m)
+  (UCL = baseline × 1.20, then bracketed per NUREG p.138)
+- **A persistent non-compliance statement** — the panel meets NUREG's minimum count of three
+  indicators, which makes the test *structurally* like a licensed one but **does not make it one**.
+  What is still missing is named in the response: per-well temporal baselines, the
+  verification-resampling protocol, the 60-day controllability demonstration, and an actual wellfield
+- The monitor ring distance and its NUREG-licensed range (**75–180 m**, verified)
 
-**Chloride was added 2026-08-11** after a measured review, and the reasoning is worth carrying into
-the product because it is counter-intuitive. Enrichment was measured on this project's own paired
-Texas baseline/end-of-mining data, then tested against *Jharkhand* background:
+**Why chloride and not alkalinity.** Enrichment was measured on this project's own paired Texas
+baseline/end-of-mining data, then tested against *Jharkhand* background:
 
 | indicator | TX enrichment | contrast vs JH background | sensitivity |
 |---|---|---|---|
@@ -248,22 +300,35 @@ the ring before tripping. **Chloride is the reverse**: the weakest enricher in T
 here, and the only perfectly conservative (Kd = 0) member — so unlike sulfate it is immune to the
 sulfide-oxidation false alarms NUREG warns about, a risk *elevated* in the Singhbhum polymetallic
 sulphide province. It required **no new dataset** (the `Cl (mg/L)` column was already in the CGWB
-file, 397/397 wells) and **no retrain** (it is excursion-layer only, deliberately outside `SPECIES`).
+file, 397/397 wells) and **no retrain** — it lives in `EXCURSION_ONLY_SPECIES`, deliberately outside
+`SPECIES` and `ML_SPECIES`.
 
-It sits **next to, not instead of,** the BIS/WHO health-limit result. They answer different questions
-and the difference is itself informative.
+> **Architectural note for implementers.** That registry split is load-bearing. `SPECIES` /
+> `ML_SPECIES` are `("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")`;
+> `EXCURSION_ONLY_SPECIES` is `("chloride_mg_l",)`, resolved on the analytical path only in
+> `dashboard/isr_excursion.py`, which never calls the surrogate. **Adding an indicator is cheap;
+> adding a predicted species costs a full re-bake and retrain.** Do not let a product requirement
+> quietly cross that line.
 
-### 4.3 NEW — how to state the uncertainty claim
+The excursion result sits **next to, not instead of,** the BIS/WHO health-limit result. They answer
+different questions and the difference is itself informative.
 
-v1.0's Risk 3 instructed the UI to say *"80% calibrated on modelled scenarios"* because the
-field-resampled gate had never run. **It has now run and passed** on a held-out batch drawn from the
-real flow field (median gradient 0.94× the field, vs the training set's 1.34×).
+### 4.3 How to state the uncertainty claim
+
+The field-resampled gate has run and **passed** on a held-out batch of 120 scenarios / 2,400 rows
+drawn from the real flow field, at a 0.80 gate:
+
+| target | scenario coverage | passes |
+|---|---|---|
+| `affected_area_ha` | 0.865 | ✅ |
+| `max_migration_distance_m` | 0.904 | ✅ |
+| `compliance_conc` | 0.912 | ✅ |
 
 The UI may therefore say: **"80% conformal band, validated on a held-out sample of real Jharkhand
 hydrogeology."** It must **not** say "80% guaranteed" — the guarantee is conditional on the parameter
 distribution and is void wherever `extrapolation` is non-empty.
 
-### 4.4 NEW — the citizen surface
+### 4.4 The citizen surface
 
 The proposal names *local communities* as stakeholders and the brief names *common users*. v1.0 gave
 them one line (`public` role, "district risk map only"). That is not a designed experience.
@@ -272,6 +337,7 @@ them one line (`public` role, "district risk map only"). That is not a designed 
 Tap a district → block list with a plain badge. **No site points, no coordinates, no sliders.**
 
 **C2 · "My Area"** — pick or detect a block. One screen, plain language, no jargon:
+
 - *"Groundwater near you: **Moderate concern**"*
 - What was measured (nearest CGWB well, its distance, when sampled)
 - What is hypothetical (*"no uranium mine of this type operates in Jharkhand; this shows what would
@@ -298,14 +364,15 @@ From the audit history, to stop the portal over-claiming:
    conformal guarantee is void and the analytical engine is serving.
 3. **Provenance on hover** for every input, carrying `n` where small (the Texas n = 9 case).
 4. **"Total Vulnerable Area" is relabelled** to **"Contaminated Footprint (wellfield + migrating
-   plume)"** with the split shown — it is 76–97% leach-zone disc.
+   plume)"** with the split shown — it is 76–97 % leach-zone disc.
 5. **Migration reads "no measurable migration"** below map resolution, never a misleading `0`.
 6. **The hypothetical premise is never more than one glance away** — and on citizen screens it is in
    the first paragraph.
 
 ### 4.6 Frozen constraints inherited from `ml_pipeline`
 
-These come from [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE_READINESS.md) §7 and **must not be redesigned around**:
+These come from [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE_READINESS.md) §7 and
+**must not be redesigned around**:
 
 1. **The analytical engine is the authority**; ML supplies bands only. Never show an ML P50 without
    its band; never let ML override analytical.
@@ -325,44 +392,56 @@ These come from [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE
 
 ## 5. Database design
 
-**PostgreSQL 16 + PostGIS 3.4.** PostGIS is already in use.
+**PostgreSQL 16 + PostGIS 3.4**, both already in use and already seeded (§1.4).
 
-**TimescaleDB removed from the MVP, revised from v1.0.** v1.0 added it for "time-series that will grow
-continuously under CPS". The actual load is **9,583 historical rows**, growing four campaigns a year.
-Plain Postgres with a BRIN index on `recorded_at` handles that for years, and every added extension is
-a deployment dependency the host institution has to support. **Adopt TimescaleDB only when real sensor
-streams exist** (§7) — the schema below is compatible either way.
+**TimescaleDB is not in the MVP.** v1.0 added it for "time-series that will grow continuously under
+CPS". The actual load is **8,345 rows**, growing four campaigns a year. Plain Postgres with a BRIN
+index on `recorded_at` handles that for years, and every added extension is a deployment dependency
+the host institution has to support. **Adopt TimescaleDB only when real sensor streams exist** (§7) —
+the schema below is compatible either way.
 
 ### 5.1 Schema map
 
 ```
 ┌─ IDENTITY ────────────────────────────────────────────────┐
 │ orgs ──< users ──< user_roles >── roles ──< permissions   │
-│                      └──< api_keys        audit_log        │
-└────────────────────────────────────────────────────────────┘
+│                      └──< api_keys        audit_log       │
+└───────────────────────────────────────────────────────────┘
 ┌─ REFERENCE GEOGRAPHY (read-only, versioned) ──────────────┐
-│ districts ──< blocks ──< aquifers                          │
-│ rivers · lineaments · ore_deposits · naquim_profiles       │
-│ dataset_versions ──< dataset_files                         │
-└────────────────────────────────────────────────────────────┘
+│ districts ──< blocks ──< aquifers                         │
+│ rivers · lineaments · ore_deposits · naquim_profiles      │
+│ dataset_versions ──< dataset_files                        │
+└───────────────────────────────────────────────────────────┘
 ┌─ MONITORING (time-series) ────────────────────────────────┐
-│ monitoring_stations ──< groundwater_readings               │
-│ monitoring_wells    ──< water_samples                      │
-│ sensors             ──< sensor_readings   [empty; see §7]  │
-└────────────────────────────────────────────────────────────┘
+│ monitoring_stations ──< groundwater_level_readings        │
+│ monitoring_wells    ──< water_samples                     │
+│ sensors             ──< sensor_readings   [empty; see §7] │
+└───────────────────────────────────────────────────────────┘
 ┌─ SIMULATION ──────────────────────────────────────────────┐
-│ isr_sites ──< scenarios ──< simulation_runs                │
-│                               ├──< run_metrics             │
-│                               ├──< run_geometry (PostGIS)  │
-│                               └──< run_provenance          │
-└────────────────────────────────────────────────────────────┘
+│ isr_sites ──< scenarios ──< simulation_runs               │
+│                               ├──< run_metrics            │
+│                               ├──< run_geometry (PostGIS) │
+│                               └──< run_provenance         │
+└───────────────────────────────────────────────────────────┘
 ┌─ DECISION SUPPORT ────────────────────────────────────────┐
-│ alert_rules ──< alerts ──< alert_acknowledgements          │
-│ risk_snapshots · reports · citizen_subscriptions           │
-└────────────────────────────────────────────────────────────┘
+│ alert_rules ──< alerts ──< alert_acknowledgements         │
+│ risk_snapshots · reports · citizen_subscriptions          │
+└───────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 Tables that matter most
+### 5.2 Migration `0006` — clean up before building on it
+
+Before any new table lands, drop the five orphans identified in §1.4b. They are all empty, so the
+migration is non-destructive in practice, but it must still be written as a reversible Alembic step
+with the original `CREATE TABLE` bodies in `downgrade()`:
+
+```
+contamination_events · hydraulic_heads · ml_models · piezometric_heads · spatial_analysis_results
+```
+
+Doing this first means the ERD a reviewer reads matches the database they connect to.
+
+### 5.3 Tables that matter most
 
 **`isr_sites`** — the registry authorities navigate.
 
@@ -415,23 +494,31 @@ CREATE TABLE simulation_runs (
 );
 ```
 
-**`groundwater_readings`**
+**`monitoring_stations`** — with the §1.4a constraint made explicit.
 
 ```sql
-CREATE TABLE groundwater_readings (
+-- The CGWB source reuses station names across distinct coordinates: 398 names,
+-- 415 real stations. The natural key is the triple, NOT the name.
+CREATE UNIQUE INDEX ON monitoring_stations (name, ST_SnapToGrid(location::geometry, 0.000001));
+```
+
+**`groundwater_level_readings`**
+
+```sql
+CREATE TABLE groundwater_level_readings (
   station_id   UUID NOT NULL REFERENCES monitoring_stations(id),
   recorded_at  TIMESTAMPTZ NOT NULL,
   level_m_bgl  NUMERIC(7,3) NOT NULL,
   season       TEXT,                                -- Jan/May/Aug/Nov campaign
   source       TEXT NOT NULL DEFAULT 'cgwb',        -- cgwb | sensor | manual
   quality_flag TEXT NOT NULL,                       -- measured | interpolated
-  PRIMARY KEY (station_id, recorded_at)
+  PRIMARY KEY (station_id, recorded_at)             -- collapses the 1,238 dupes
 );
-CREATE INDEX ON groundwater_readings USING BRIN (recorded_at);
+CREATE INDEX ON groundwater_level_readings USING BRIN (recorded_at);
 ```
 
-`quality_flag` is **required, not optional**: the pipeline already distinguishes measured CGWB campaign
-months from interpolated ones, and the portal must not launder that distinction.
+`quality_flag` is **required, not optional**: the pipeline already distinguishes measured CGWB
+campaign months from interpolated ones, and the portal must not launder that distinction.
 
 **`dataset_versions`** — the provenance spine.
 
@@ -453,20 +540,22 @@ CREATE TABLE dataset_versions (
 mines**, and a portal rendering "15,180 ppb" to five significant figures without saying so is
 misleading by omission.
 
-### 5.3 Dataset → table mapping
+### 5.4 Dataset → table mapping
 
-| Dataset on disk | Target table | Rows |
+Row counts are **as actually loaded**, not as they appear in the source file.
+
+| Dataset on disk | Target table | Loaded |
 |---|---|---|
 | `District_Boundary_JH.geojson` | `districts` | 24 |
-| `Sub_District_Boundary_JH.geojson` | `blocks` | ~260 |
+| `Sub_District_Boundary_JH.geojson` | `blocks` | 264 |
 | `Aquifers_Jharkhand.geojson` | `aquifers` | 23 |
-| `cgwb_waterlevel_jharkhand.csv` | `monitoring_stations` + `groundwater_readings` | 398 / 9,583 |
-| `waterQuality_jharkhand.csv` | `monitoring_wells` + `water_samples` | 397 |
+| `cgwb_waterlevel_jharkhand.csv` (9,583 rows) | `monitoring_stations` + `groundwater_level_readings` | **415 / 8,345** (§1.4a) |
+| `waterQuality_jharkhand.csv` | `monitoring_wells` + `water_samples` | 397 / 397 |
 | `jharkhand_rivers.geojson` | `rivers` | 4,577 |
 | `jharkhand_lineaments.geojson` | `lineaments` | 1,889 |
 | `Jharkhand Ore/*.csv`, `udepo_*.xlsx` | `ore_deposits` | 7 + belt |
 | `naquim_reference/naquim_vertical.csv` | `naquim_profiles` | 24 |
-| `Real_dataset/` (Texas ISR) | `reference_isr_records` | 9 EOM / 7 mines |
+| Texas ISR chemistry | `reference_isr_records` | 9 EOM / 7 mines |
 | DEM, `.npz` field artifacts | Object storage + `dataset_files` checksums | — |
 
 ---
@@ -490,13 +579,18 @@ misleading by omission.
         ┌───────────▼─┐ ┌───▼────┐ ┌────▼──────────┐
         │ PostgreSQL  │ │ Redis  │ │ Object store  │
         │ PostGIS     │ │ cache  │ │ DEM, .npz,    │
-        │             │ │ queue  │ │ artifacts     │
+        │ (seeded)    │ │ [NEW]  │ │ artifacts     │
         └─────────────┘ └────────┘ └───────────────┘
 ```
 
 **Key decision: `ml_pipeline/` is never exposed directly.** It becomes an internal service behind the
 gateway, keeping its own test suite and release cadence; the gateway owns auth, limits and audit. Its
-in-process rate limiter stays as defence in depth, not as the primary control.
+in-process rate limiter (240/min token bucket) stays as defence in depth, not as the primary control.
+
+**Redis is new infrastructure.** It does not exist in this checkout — v2.0's diagram implied it was
+already there. It is worth adding for response caching and the alert queue, but it is a **new
+deployment dependency**, and P0–P4 can ship without it using the existing in-process cache. Defer it
+to P7 with the alerts loop.
 
 **Corollary:** the legacy simulation stub is **deleted**, not deprecated. Leaving a second, worse
 physics path reachable is the failure mode §1.3 describes.
@@ -506,19 +600,19 @@ physics path reachable is the failure mode §1.3 describes.
 ## 7. The CPS story — stated honestly
 
 The proposal commits to Cyber-Physical Systems: *"environmental sensors, real-time data streams and
-machine learning in a unified monitoring framework… a closed-loop system."* v1.0 implied this was
-built. It is not, and the design must say so to TEXMiN reviewers rather than imply otherwise.
+machine learning in a unified monitoring framework… a closed-loop system."* That is not built, and the
+design must say so to TEXMiN reviewers rather than imply otherwise.
 
 | CPS element | Status |
 |---|---|
 | Sensor hardware | **Does not exist.** No sensor is deployed |
-| Real-time ingest path | **Schema-ready, unfed.** `sensors` / `sensor_readings` exist; `source` already distinguishes `cgwb` \| `sensor` \| `manual` |
+| Real-time ingest path | **Schema-ready, unfed.** `sensors` / `sensor_readings` are designed; `source` already distinguishes `cgwb` \| `sensor` \| `manual` |
 | Data → ML → prediction | **Built** — but on historical CGWB campaigns (4/yr), not live streams |
 | Threshold → alert → acknowledgement | **Designed** (§3.3, §4.1) — this is the closed loop, and it works on manual/CGWB data today |
 | Closed-loop actuation | **Out of scope.** The system advises; it does not control pumps |
 
 **The honest framing:** the portal is a CPS-*ready* decision-support system whose sensing layer is
-currently a 398-station manual monitoring network. Swapping a sensor feed into `sensor_readings`
+currently a 415-station manual monitoring network. Swapping a sensor feed into `sensor_readings`
 requires no model change. Claiming a live CPS loop today would be the same over-claim the pipeline
 audits spent three rounds removing.
 
@@ -531,17 +625,22 @@ Stated plainly, because the portal must not present them as solved:
 1. **No ISR operates in Jharkhand.** Every simulation is hypothetical. Schema, API and UI enforce it.
 2. **The uranium source term rests on 9 measurements from 7 mines**, surfaced via
    `dataset_versions.n_supporting`.
-3. **Radium's ML point estimate fails the project's own R² ≥ 0.60 gate** (migration 0.516, compliance
-   0.431) because its labels are a point mass — 81.8% exact zeros. **Its uncertainty bands remain
-   adequately covered** (0.891–0.986). Product rule: expose radium as *analytical value + band*, never
-   as a standalone ML point estimate. This is frozen and out of scope to fix.
-4. **β, aperture, Dₑ, ω are foreign-analogue literature values** with zero Singhbhum measurements.
-   Permanent until someone runs a packer or tracer test in the Singhbhum Shear Zone.
-5. **Contaminated footprint is wellfield-dominated** (76–97% disc), which is why it is renamed.
+3. **Radium's ML point estimate fails the project's own R² ≥ 0.60 gate** — verified in the deployed
+   `metrics.json`: migration **0.516**, compliance **0.431** — because its labels are a point mass
+   (81.8 % exact zeros). **Its uncertainty bands remain adequately covered** (0.891–0.986). Product
+   rule: expose radium as *analytical value + band*, never as a standalone ML point estimate. Frozen
+   and out of scope to fix.
+4. **β, aperture, Dₑ, ω are foreign-analogue literature values** with zero Singhbhum measurements —
+   part of the 12-entry `UNGROUNDED_PARAMETERS` register. Permanent until someone runs a packer or
+   tracer test in the Singhbhum Shear Zone.
+5. **Contaminated footprint is wellfield-dominated** (76–97 % disc), which is why it is renamed.
 6. **The ISR excursion panel is 3 indicators (chloride, TDS, sulfate), 2-of-3.** It meets NUREG's
-   minimum count but is still not a licensed programme — the gap is named in every response.
+   minimum count but is **NUREG-1569-inspired screening, not a licensed programme** — the gap is
+   named in every response.
 7. **No sensors exist** (§7).
 8. **The conformal band is validated, not guaranteed** (§4.3), and is void under `extrapolation`.
+9. **Station names are not unique** (§1.4a). Any aggregation that groups by name will silently
+   over-merge 17 stations.
 
 A portal that shows these honestly is more defensible to a regulator than one that hides them — and
 this project's entire audit history is the argument for that.
@@ -552,17 +651,40 @@ this project's entire audit history is the argument for that.
 
 | Phase | Scope | Outcome |
 |---|---|---|
-| **P0** | Delete the legacy simulation stub + `DataGen_ModelMVP` references | No contradictory physics path |
-| **P1** | Postgres schema + migrations; load all `Datasets/` with `dataset_versions` | Real data, versioned, queryable |
+| **P0** | Delete the legacy simulation stub; strip the 4 dead `DataGen_ModelMVP` references (§1.3) | No contradictory physics path |
+| **P1** | Migration `0006` drops the 5 orphan tables (§5.2); add `orgs`/`roles`/`audit_log`/`dataset_versions`; backfill `dataset_versions` for the already-seeded data | Schema matches reality, provenance spine exists |
 | **P2** | Gateway: auth, 5 roles, RLS, rate limits, audit; delete the 22 dead endpoints | Safe to expose |
 | **P3** | Wire `POST /simulations` → `ml_pipeline`; scenarios; run persistence | Reproducible runs |
 | **P4** | React shell: Login, Map Console, Site Registry | ◀ **MVP — demoable to stakeholders** |
 | **P5** | Simulation Studio: bands, provenance drawer, **ISR Excursion panel** | Full official decision support |
 | **P6** | **Citizen surface** (C1–C4) | Second audience served |
-| **P7** | Monitoring & Alerts loop + Data Gap Report | Proposal deliverables complete |
+| **P7** | Monitoring & Alerts loop (+ Redis) + Data Gap Report | Proposal deliverables complete |
 | **P8** | Signed PDF reports, audit export, hardening | Production candidate |
 
 **MVP line is P4.** P0–P4 is the defensible minimum: one physics engine, real data, role-based access,
 a map an official can use. P5–P8 deepen it. If the fellowship timeline compresses, **cut from the
 bottom, never from P0** — shipping two disagreeing simulation paths is worse than shipping fewer
 screens.
+
+**P0 is one day's work and removes a correctness bug.** It should land before anything else in this
+plan, independent of whether the rest is scheduled.
+
+---
+
+## 10. Verification record
+
+Every quantitative claim in this document was checked on 2026-08-11 against the working copy:
+
+| Claim | How verified |
+|---|---|
+| 307 tests | `python -m pytest ml_pipeline/tests -q` |
+| 55 backend endpoints | `grep -c '@router\.(get\|post\|put\|patch\|delete)' backend/app/api/v1/*.py` |
+| 13 pipeline endpoints | `grep -c '@app\.' ml_pipeline/dashboard/server.py` |
+| No Celery / Redis | absent from `backend/requirements.txt`; `app/tasks/` empty |
+| Row counts, orphan tables | `psql groundwater_db` against `information_schema` |
+| 398 names / 415 stations / 1,238 dupes | pandas over `cgwb_waterlevel_jharkhand.csv` |
+| Radium 0.516 / 0.431; coverage 0.865 / 0.904 / 0.912 | `ml_pipeline/ml/artifacts/metrics.json` |
+| Species split, 2-of-3 rule, 75–180 m ring | `ml_pipeline/config/parameters.py` |
+| 4 dead `DataGen_ModelMVP` references | `grep -rn DataGen_ModelMVP backend/ ml_pipeline/` |
+
+If a number here ever disagrees with the code, **the code is right and this document is stale.**
