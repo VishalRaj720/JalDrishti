@@ -26,7 +26,7 @@ slowapi==0.1.9
 # Logging
 loguru==0.7.3
 
-# Data ingestion + ML pipeline (DataGen_ModelMVP/pipeline)
+# Data ingestion (bulk GeoJSON/Excel/CSV with spatial validation)
 pandas==2.2.3
 geopandas==1.0.1
 shapely==2.0.6

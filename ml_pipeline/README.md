@@ -1,6 +1,7 @@
 # ml_pipeline — Physics-Informed ISR Plume Surrogate (Texas → Jharkhand domain adaptation)
 
-A **standalone** redesign (isolated from `DataGen_ModelMVP/`, "approach 1") that maps
+A **standalone** redesign ("approach 2", isolated from the since-deleted `DataGen_ModelMVP/`
+tabular estimator that preceded it) that maps
 real Texas alkaline-ISR groundwater data onto Jharkhand's variable hydrogeology and
 predicts the spatiotemporal footprint of a *hypothetical* ISR uranium operation dropped
 anywhere in the state.

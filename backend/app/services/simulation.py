@@ -1,102 +1,63 @@
-"""
-Simulation service – orchestrates plume geometry, ADE physics,
-ML calls, and result storage.
+"""Simulation service — registry and retrieval of simulation runs.
 
-Designed to be called from a Celery task for async execution.
+P0 (2026-08-11): THE FABRICATED PHYSICS PATH WAS DELETED FROM THIS MODULE.
+
+What used to be here was a 9-step `run()` that produced numbers no one should
+have trusted, and that contradicted `ml_pipeline/` — the engine this project
+actually validated. Specifically:
+
+  * the groundwater flow direction was `random.uniform(30, 90)`, so two runs of
+    the same site returned different plumes;
+  * `affected_area` was `pi * (50*sqrt(365)/1000) * (10*sqrt(365)/1000)`, which
+    is the constant **0.5733 km2** for every site, every injection rate, every
+    aquifer — it did not even read the plume geometry computed two steps above;
+  * the concentration time series was the peak scaled by the literal sequence
+    [1.0, 0.8, 0.6, 0.4, 0.2];
+  * "uncertainty" was the standard deviation of Gaussian noise applied to that
+    peak, which measures the noise generator, not the model;
+  * remediation advice ("enhanced bioremediation with electron donor
+    injection") was emitted from three uncited porosity thresholds;
+  * the whole thing called `ml_prediction.predict_for_simulation`, which
+    labelled its own output `month1_placeholder`.
+
+`ml_pipeline/` derives the gradient from a plane fit over real CGWB stations
+and solves Domenico transport with conformal bands, and it is covered by 307
+tests. Two endpoints in one product returning different answers for the same
+site is a correctness bug, not a migration detail, so the weaker path is gone
+rather than deprecated. See PRODUCT_DESIGN.md section 1.3.
+
+`POST /simulations/{isr_id}` therefore returns 501 until P3 wires this service
+to `ml_pipeline`. The read paths below are real and stay: they serve rows that
+a future, honest engine will write.
 """
 import uuid
-import math
-import random
-from typing import Optional, List
-from datetime import datetime, timezone
+from typing import List
 
-from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.simulation import SimulationRepository
-from app.repositories.aquifer import AquiferRepository
 from app.repositories.isr_point import IsrPointRepository
-from app.models.simulation import Simulation, SimulationAquifer
-from app.services.ml_prediction import predict_for_simulation
+from app.models.simulation import Simulation
 from app.exceptions import ResourceNotFoundError
 
-
-# ── Physics helpers (Advection-Dispersion Equation stub) ──────────
-
-def _compute_plume_wkt(
-    lon: float,
-    lat: float,
-    gradient_angle_deg: float,
-    dispersivity_l: float = 50.0,
-    dispersivity_t: float = 10.0,
-    days: float = 365.0,
-) -> str:
-    """
-    Approximate plume as an ellipse WKT projected from the ISR point.
-    gradient_angle_deg: direction of groundwater flow (degrees from North).
-    Returns a POLYGON WKT representing the plume footprint.
-    """
-    # Longitudinal and transverse spread (metres → degrees approx)
-    rx = dispersivity_l * math.sqrt(days) / 111320  # ~1 degree lat ≈ 111 km
-    ry = dispersivity_t * math.sqrt(days) / 111320
-
-    angle_rad = math.radians(gradient_angle_deg)
-
-    # Offset centre of ellipse along gradient direction
-    cx = lon + rx * math.sin(angle_rad)
-    cy = lat + rx * math.cos(angle_rad)
-
-    # Build ellipse as 36-point polygon (approximation)
-    points = []
-    for i in range(37):
-        theta = math.radians(i * 10)
-        dx = rx * math.cos(theta) * math.sin(angle_rad) - ry * math.sin(theta) * math.cos(angle_rad)
-        dy = rx * math.cos(theta) * math.cos(angle_rad) + ry * math.sin(theta) * math.sin(angle_rad)
-        points.append(f"{cx + dx} {cy + dy}")
-
-    wkt_coords = ", ".join(points)
-    return f"POLYGON(({wkt_coords}))"
-
-
-def _monte_carlo_uncertainty(base_value: float, n: int = 100) -> float:
-    """Return std-dev of Monte Carlo runs (Gaussian noise model)."""
-    runs = [base_value * (1 + random.gauss(0, 0.15)) for _ in range(n)]
-    mean = sum(runs) / n
-    variance = sum((r - mean) ** 2 for r in runs) / n
-    return math.sqrt(variance)
-
-
-def _recovery_suggestion(porosity: Optional[float]) -> str:
-    if porosity is None:
-        return "Insufficient data to recommend recovery method."
-    if porosity > 0.15:
-        return (
-            "High porosity aquifer: consider enhanced bioremediation with "
-            "electron donor injection to stimulate uranium reduction."
-        )
-    elif porosity > 0.05:
-        return "Moderate porosity: pump-and-treat with in-situ redox manipulation recommended."
-    return "Low porosity: permeable reactive barrier (PRB) installation suggested."
-
-
-# ── ML predictions ────────────────────────────────────────────────
-# predict_for_simulation() is a transparent deterministic placeholder for now;
-# Month 2 wires in the trained uranium model from DataGen_ModelMVP/pipeline.
-
-
-# ── Main Simulation Service ───────────────────────────────────────
 
 class SimulationService:
     def __init__(self, db: AsyncSession):
         self.sim_repo = SimulationRepository(db)
-        self.aquifer_repo = AquiferRepository(db)
         self.isr_repo = IsrPointRepository(db)
         self.db = db
 
-    async def create_pending(self, isr_point_id: uuid.UUID) -> Simulation:
-        isr = await self.isr_repo.get(isr_point_id)
-        if not isr:
+    async def assert_isr_exists(self, isr_point_id: uuid.UUID) -> None:
+        """Validate the ISR point before the router reports 501.
+
+        Kept separate from `create_pending` so the API can still answer 404 for
+        an unknown site without first writing a row it can never complete.
+        """
+        if not await self.isr_repo.get(isr_point_id):
             raise ResourceNotFoundError("ISR Point", str(isr_point_id))
+
+    async def create_pending(self, isr_point_id: uuid.UUID) -> Simulation:
+        await self.assert_isr_exists(isr_point_id)
         return await self.sim_repo.create({
             "isr_point_id": isr_point_id,
             "status": "pending",
@@ -110,110 +71,3 @@ class SimulationService:
 
     async def list_by_isr(self, isr_point_id: uuid.UUID) -> List[Simulation]:
         return await self.sim_repo.get_by_isr_point(isr_point_id)
-
-    async def run(self, simulation_id: uuid.UUID) -> Simulation:
-        """Execute the full simulation workflow."""
-        sim = await self.get(simulation_id)
-        isr = await self.isr_repo.get(sim.isr_point_id)
-
-        try:
-            await self.sim_repo.update(sim, {"status": "running"})
-
-            # ── 1. Extract ISR location ───────────────────────────
-            # location stored as WKB; parse lon/lat from WKT representation
-            # For stub: use a default Jharkhand centroid if not set
-            lon, lat = 85.3, 23.5
-            if isr.location is not None:
-                try:
-                    from shapely import wkb as shapely_wkb
-                    geom = shapely_wkb.loads(bytes(isr.location.desc), hex=True)
-                    lon, lat = geom.x, geom.y
-                except Exception:
-                    pass
-
-            # ── 2. Compute gradient vector ────────────────────────
-            # Without real piezometric data we stub a NE gradient
-            gradient_angle_deg = random.uniform(30, 90)
-
-            # ── 3. Generate directional plume geometry (WKT) ──────
-            plume_wkt = _compute_plume_wkt(lon, lat, gradient_angle_deg)
-
-            # ── 4. Spatial query for impacted aquifers ────────────
-            impacted = await self.aquifer_repo.get_intersecting_plume(plume_wkt)
-
-            # ── 5. Call MLPredictionService (Month 4 baseline) ───
-            avg_porosity = (
-                sum(a.porosity for a in impacted if a.porosity) / max(len(impacted), 1)
-            )
-            ml_input = {
-                "lon": lon,
-                "lat": lat,
-                "injection_rate": isr.injection_rate or 100.0,
-                "gradient_angle_deg": gradient_angle_deg,
-                "aquifer_count": len(impacted),
-                "avg_porosity": avg_porosity,
-            }
-            ml_result = await predict_for_simulation(
-                self.db, isr, impacted, sample_date=datetime.now(timezone.utc),
-            )
-
-            # ── 6. Compute affected area (stub: π*rx*ry) ──────────
-            rx = 50 * math.sqrt(365) / 1000  # km
-            ry = 10 * math.sqrt(365) / 1000
-            affected_area_km2 = round(math.pi * rx * ry, 4)
-
-            # ── 7. Uncertainty via Monte Carlo ────────────────────
-            base_conc = ml_result["concentration"]["uranium"]["max"]
-            uncertainty = round(_monte_carlo_uncertainty(base_conc), 5)
-
-            # ── 8. Recovery suggestion ────────────────────────────
-            avg_por = ml_input["avg_porosity"]
-            suggestion = _recovery_suggestion(avg_por if avg_por > 0 else None)
-
-            # ── 9. Persist results ────────────────────────────────
-            import shapely.wkt
-            from shapely.geometry import mapping
-            plume_geom = mapping(shapely.wkt.loads(plume_wkt))
-
-            updates = {
-                "status": "completed",
-                "affected_area": affected_area_km2,
-                "estimated_concentration_spread": {
-                    **ml_result["concentration"],
-                    "geometry": plume_geom,
-                    "time_steps": [0, 90, 180, 270, 365],
-                    "concentrations": [
-                        ml_result["concentration"]["uranium"]["max"] * decay
-                        for decay in [1.0, 0.8, 0.6, 0.4, 0.2]
-                    ]
-                },
-                "vulnerability_assessment": ml_result["vulnerability"],
-                "uncertainty_estimate": uncertainty,
-                "suggested_recovery": suggestion,
-            }
-            sim = await self.sim_repo.update(sim, updates)
-
-            # Insert junction records for impacted aquifers
-            if impacted:
-                for aquifer in impacted:
-                    self.db.add(
-                        SimulationAquifer(
-                            simulation_id=sim.id, aquifer_id=aquifer.id
-                        )
-                    )
-                await self.db.flush()
-
-            logger.info(
-                f"Simulation {simulation_id} completed. "
-                f"Affected area: {affected_area_km2} km², "
-                f"Impacted aquifers: {len(impacted)}"
-            )
-            return sim
-
-        except Exception as exc:
-            await self.sim_repo.update(sim, {
-                "status": "failed",
-                "error_message": str(exc),
-            })
-            logger.error(f"Simulation {simulation_id} failed: {exc}")
-            raise

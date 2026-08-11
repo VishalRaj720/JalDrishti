@@ -1,49 +1,46 @@
-"""Simulations router – trigger async simulation, poll status."""
+"""Simulations router — read simulation runs; triggering is disabled until P3.
+
+P0 (2026-08-11): the stub engine behind `POST /simulations/{isr_id}` was
+deleted (see `app/services/simulation.py` for what it fabricated). Rather than
+keep serving invented numbers, the trigger reports **501 Not Implemented** and
+names the engine that does work. P3 rewires it to `ml_pipeline`.
+"""
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.simulation import SimulationResponse
-from app.schemas.common import JobResponse
 from app.services.simulation import SimulationService
 from app.dependencies import require_analyst_or_admin, require_any_role
 from app.exceptions import AppException
 
 router = APIRouter(prefix="/simulations", tags=["Simulations"])
 
+_NOT_WIRED = (
+    "Simulation execution is not available. The previous in-backend engine "
+    "produced fabricated results (a random flow direction and a constant "
+    "0.5733 km2 affected area) and was removed in P0. The validated engine is "
+    "ml_pipeline; until it is wired in (P3), run scenarios against the "
+    "ml_pipeline dashboard at POST /api/predict. See PRODUCT_DESIGN.md 1.3."
+)
 
-@router.post("/{isr_id}", response_model=JobResponse, status_code=202)
+
+@router.post("/{isr_id}", status_code=501)
 async def trigger_simulation(
     isr_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_analyst_or_admin),
 ):
-    """
-    Trigger a new simulation for an ISR point.
+    """Trigger a simulation for an ISR point. Disabled — see module docstring.
 
-    The simulation is lightweight (no heavy physics), so it runs in a FastAPI
-    BackgroundTask — no Celery/Redis required. Returns a job_id to poll.
+    The ISR point is still validated first, so an unknown site reports 404
+    rather than a misleading 501.
     """
     try:
-        svc = SimulationService(db)
-        sim = await svc.create_pending(isr_id)
-        background_tasks.add_task(_run_simulation_bg, sim.id)
-        return JobResponse(
-            job_id=str(sim.id),
-            status="queued",
-            message=f"Simulation started in background. Poll GET /api/v1/simulations/{sim.id}",
-        )
+        await SimulationService(db).assert_isr_exists(isr_id)
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
-
-
-async def _run_simulation_bg(sim_id: uuid.UUID):
-    """Background task wrapper: runs the simulation in its own DB session."""
-    from app.database import AsyncSessionLocal
-    async with AsyncSessionLocal() as db:
-        svc = SimulationService(db)
-        await svc.run(sim_id)
+    raise HTTPException(status_code=501, detail=_NOT_WIRED)
 
 
 @router.get("/{sim_id}", response_model=SimulationResponse)

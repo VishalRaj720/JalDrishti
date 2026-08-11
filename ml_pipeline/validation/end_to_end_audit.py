@@ -121,7 +121,15 @@ def audit_labels() -> None:
     env = texas_source_signature()
     ok = True
     detail = []
-    for sp, (lo, hi) in env.items():
+    # Check the intersection of "has a Texas C0 envelope" and "is baked".
+    # Neither set contains the other: chloride is in EXCURSION_ONLY_SPECIES, so
+    # it carries an envelope for the analytical excursion path but is
+    # deliberately never baked (iterating the signature blindly made this check
+    # read an empty frame and report nan); radium is baked but its C0 comes from
+    # the Ra-226 ingrowth chain, not from the Texas signature, so it has no
+    # entry here and indexing it blindly raised KeyError.
+    for sp in [s for s in P.ML_SPECIES if s in env]:
+        lo, hi = env[sp]
         s = df[df.species == sp]["source_conc_C0"]
         inside = (s.min() >= lo * 0.98) and (s.max() <= hi * 1.02)
         # and it must actually USE most of the range, not sit in a sub-window
@@ -129,6 +137,12 @@ def audit_labels() -> None:
         ok &= inside and spans > 0.9
         detail.append(f"{sp.split('_')[0]}:{spans:.2f}")
     check("labels", "labels baked on the CURRENT C0 envelope", ok, " ".join(detail))
+    # The other half of that invariant: excursion-only species must be ABSENT
+    # from the training set. If one ever appears, the no-retrain guarantee that
+    # justifies the SPECIES / EXCURSION_ONLY_SPECIES split has silently broken.
+    leaked = [sp for sp in P.EXCURSION_ONLY_SPECIES if (df.species == sp).any()]
+    check("labels", "excursion-only species stay out of the training set",
+          not leaked, ",".join(leaked) or "none")
     check("labels", "compliance ring in meta matches config",
           meta.get("compliance_buffer_m") == P.COMPLIANCE_BUFFER_M)
 
@@ -191,8 +205,25 @@ def audit_serving() -> None:
           abs(inp["K_m_day"] - h["K_m_day"]) < 1e-3,
           f"{inp['K_m_day']:.4f} vs {h['K_m_day']}")
     e = j["isr_excursion"]
-    check("serving", "NUREG 2-of-N excursion test present + shortfall disclosed",
-          e.get("indicators_required") == 2 and e.get("panel_shortfall") is True)
+    check("serving", "NUREG 2-of-N excursion rule present",
+          e.get("indicators_required") == 2)
+    # `panel_shortfall` used to be pinned True, from when the panel carried only
+    # two indicators. Chloride filled it to three, so pinning the literal made
+    # the audit fail on an IMPROVEMENT. Assert the invariant instead: the flag
+    # must agree with the panel size, and the note must appear exactly when it
+    # is short.
+    short = e.get("indicators_available", 0) < P.ISR_EXCURSION_REQUIRED_PANEL
+    check("serving", "panel shortfall flag agrees with the panel size",
+          e.get("panel_shortfall") is short
+          and (e.get("panel_note") is not None) is short,
+          f"available={e.get('indicators_available')} "
+          f"required={P.ISR_EXCURSION_REQUIRED_PANEL}")
+    # This one must hold no matter how full the panel gets. A complete panel
+    # makes the test STRUCTURALLY like a licensed one, which is exactly when the
+    # disclaimer is easiest to drop and most misleading to lose.
+    check("serving", "non-regulatory framing disclosed unconditionally",
+          "NOT REGULATORY-COMPLIANT" in (e.get("compliance_status") or "")
+          and bool(e.get("compliance_note")))
     check("serving", "uranium/radium excluded as excursion indicators",
           all(sp not in P.ISR_EXCURSION_INDICATORS
               for sp in ("uranium_ppb", "radium_226_mbq_l")))
