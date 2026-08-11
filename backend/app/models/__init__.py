@@ -1,5 +1,13 @@
-"""Models package – imports all ORM classes so SQLAlchemy metadata is populated."""
+"""Models package – imports all ORM classes so SQLAlchemy metadata is populated.
+
+Every table in the database must be represented here. Five tables
+(`contamination_events`, `hydraulic_heads`, `ml_models`, `piezometric_heads`,
+`spatial_analysis_results`) were orphaned when their models were deleted without
+a matching migration; `0006_drop_orphan_tables` removed them, and
+`tests/test_schema_integrity.py` now fails if the two ever diverge again.
+"""
 from app.models.base import UUIDPrimaryKeyMixin, TimestampMixin  # noqa: F401
+from app.models.org import Org  # noqa: F401
 from app.models.user import User, UserRole  # noqa: F401
 from app.models.district import District  # noqa: F401
 from app.models.block import Block  # noqa: F401
@@ -13,7 +21,12 @@ from app.models.data_source import DataSource  # noqa: F401
 from app.models.monitoring_well import MonitoringWell  # noqa: F401
 from app.models.water_sample import WaterSample  # noqa: F401
 
+# P1: provenance spine + audit trail
+from app.models.dataset_version import DatasetVersion  # noqa: F401
+from app.models.audit_log import AuditLog  # noqa: F401
+
 __all__ = [
+    "Org",
     "User", "UserRole",
     "District",
     "Block",
@@ -24,4 +37,6 @@ __all__ = [
     "DataSource",
     "MonitoringWell",
     "WaterSample",
+    "DatasetVersion",
+    "AuditLog",
 ]

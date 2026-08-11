@@ -429,17 +429,58 @@ the schema below is compatible either way.
 └───────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 Migration `0006` — clean up before building on it
+### 5.2 Migrations `0006` / `0007` — **shipped**
 
-Before any new table lands, drop the five orphans identified in §1.4b. They are all empty, so the
-migration is non-destructive in practice, but it must still be written as a reversible Alembic step
-with the original `CREATE TABLE` bodies in `downgrade()`:
+**`0006_drop_orphan_tables`** drops the five orphans from §1.4b:
 
 ```
 contamination_events · hydraulic_heads · ml_models · piezometric_heads · spatial_analysis_results
 ```
 
-Doing this first means the ERD a reviewer reads matches the database they connect to.
+It refuses to run if any of them has gained a row since the audit — dropping an empty orphan is
+housekeeping, dropping a populated one is data loss, and the migration is not authorised to make
+that call silently. `downgrade()` restores all five with their original columns, indexes and
+constraints, and the up→down→up round trip is verified.
+
+> **One recon error worth recording.** §1.4b was drafted believing three of the five were never in
+> any migration. They were — `0004_month3_schema` creates them; a line-based grep could not match
+> `op.create_table(` against the table name on the next line. **The migration chain is healthy** and
+> `alembic upgrade head` on an empty database reproduces the schema exactly. The real fault was
+> one-directional: models deleted without a matching down-migration, so the chain kept building
+> tables the application could no longer see.
+
+`tests/test_schema_integrity.py` now pins the two together. It stands up a scratch database, runs
+`alembic upgrade head`, and diffs the result against `Base.metadata` in both directions — a
+migrated table with no model, and a model with no migrated table. The normal suite cannot catch
+this, because `conftest.py` builds its schema with `create_all()` and so compares the ORM against
+itself.
+
+**`0007_orgs_provenance_audit`** adds `orgs`, `dataset_versions`, `audit_log`, `users.org_id`,
+`data_sources.dataset_version_id`, and extends the `userrole` enum. Two deliberate deviations from
+what §5.1/§5.3 originally sketched:
+
+**(a) `dataset_versions` does not absorb `data_sources`.** The design gave `dataset_versions` a
+`sha256` and a `row_count` — both of which `data_sources` already carries, across 419 rows of real
+load history. Two tables owning checksum semantics is the same "two code paths for one entity"
+failure §3.1 rejects, and provenance is the last place to accept it. They are split by the
+granularity they actually operate at:
+
+| Table | Grain | Owns |
+|---|---|---|
+| `data_sources` | one row per ingested **batch** | file name, checksum, row count, load time |
+| `dataset_versions` | one row per **citable dataset** | label, source org, citation, `n_supporting`, `caveat` |
+
+`data_sources.dataset_version_id` links ledger to spine. All 419 existing loads are linked, zero
+unregistered. The grain difference is real: 415 of those rows are per-station groundwater batches
+(`gw_level:<station>`) that all came from one CSV.
+
+**(b) `roles` / `user_roles` / `permissions` are deferred to P2.** `users.role` is still the only
+thing the auth layer reads. Standing up a parallel, unread role store would recreate exactly the
+duplication described in (a). `0007` instead extends the `userrole` enum with `regulator`,
+`field_officer` and `citizen` so the vocabulary exists; P2 builds the gateway that reads them and
+migrates `viewer` → `citizen` alongside the code that depends on it. The enum change is purely
+additive — Postgres cannot remove an enum value, so retiring `viewer` before its readers exist would
+strand the running app.
 
 ### 5.3 Tables that matter most
 
@@ -520,25 +561,36 @@ CREATE INDEX ON groundwater_level_readings USING BRIN (recorded_at);
 `quality_flag` is **required, not optional**: the pipeline already distinguishes measured CGWB
 campaign months from interpolated ones, and the portal must not launder that distinction.
 
-**`dataset_versions`** — the provenance spine.
+**`dataset_versions`** — the citable provenance spine, **as shipped in `0007`**. No `sha256` or
+`row_count`: those stay in `data_sources`, per §5.2(a).
 
 ```sql
 CREATE TABLE dataset_versions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  label         TEXT NOT NULL,                     -- 'CGWB-2013-2021-v1'
+  label         TEXT NOT NULL UNIQUE,              -- 'CGWB-WATERLEVEL-JH-v1'
   source_org    TEXT NOT NULL,                     -- CGWB | GSI | IAEA | NRC
   citation      TEXT NOT NULL,
-  sha256        TEXT NOT NULL,
-  row_count     INTEGER,
   n_supporting  INTEGER,   -- e.g. 9 for the Texas uranium source term
-  caveat        TEXT,      -- surfaces small-n honestly
+  caveat        TEXT,      -- surfaces small-n and known defects honestly
+  is_current    BOOLEAN NOT NULL DEFAULT true,
   ingested_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
 
-`n_supporting` and `caveat` exist because the uranium source term rests on **9 measurements from 7
-mines**, and a portal rendering "15,180 ppb" to five significant figures without saying so is
-misleading by omission.
+`n_supporting` and `caveat` are why the table exists. The uranium source term rests on **9
+measurements from 7 mines**, and a portal rendering "15,180 ppb" to five significant figures without
+saying so is misleading by omission. The five registered datasets and their caveats:
+
+| label | source | n | caveat |
+|---|---|---|---|
+| `CGWB-WATERLEVEL-JH-v1` | CGWB | 8,345 | 1,238 duplicate `(station, date)` pairs collapsed; station names not unique (398 names, 415 stations) |
+| `CGWB-WATERQUALITY-JH-v1` | CGWB | 397 | one sample per well; seasonal and spatial variation inseparable |
+| `JH-AQUIFER-v1` | CGWB | 23 | regional averages, not site-specific values |
+| `JH-ADMIN-BLOCK-v1` | GSI / SoI | 264 | — |
+| `JH-ADMIN-DISTRICT-v1` | GSI / SoI | 24 | — |
+
+The station-name caveat is carried in the data itself, not only in this document, so a query that
+joins on name meets the warning where it happens.
 
 ### 5.4 Dataset → table mapping
 
@@ -651,8 +703,8 @@ this project's entire audit history is the argument for that.
 
 | Phase | Scope | Outcome |
 |---|---|---|
-| **P0** | Delete the legacy simulation stub; strip the 4 dead `DataGen_ModelMVP` references (§1.3) | No contradictory physics path |
-| **P1** | Migration `0006` drops the 5 orphan tables (§5.2); add `orgs`/`roles`/`audit_log`/`dataset_versions`; backfill `dataset_versions` for the already-seeded data | Schema matches reality, provenance spine exists |
+| **P0** ✅ | Delete the legacy simulation stub; strip the dead `DataGen_ModelMVP` references (§1.3) | **Done.** One physics path. `POST /simulations` returns 501 until P3 |
+| **P1** ✅ | `0006` drops the 5 orphans; `0007` adds `orgs`/`dataset_versions`/`audit_log`, links the load ledger, extends the role vocabulary; seed backfills all of it | **Done.** Schema matches reality, provenance spine populated (§5.2). `roles` tables deferred to P2 |
 | **P2** | Gateway: auth, 5 roles, RLS, rate limits, audit; delete the 22 dead endpoints | Safe to expose |
 | **P3** | Wire `POST /simulations` → `ml_pipeline`; scenarios; run persistence | Reproducible runs |
 | **P4** | React shell: Login, Map Console, Site Registry | ◀ **MVP — demoable to stakeholders** |

@@ -43,6 +43,9 @@ from app.database import AsyncSessionLocal
 from app.services.auth import hash_password
 from app.services.ingestion import IngestionService
 from app.models.user import User, UserRole
+from app.models.org import Org
+from app.models.dataset_version import DatasetVersion
+from app.models.data_source import DataSource
 from app.models.isr_point import IsrPoint
 from app.models.district import District
 from app.models.block import Block
@@ -82,6 +85,119 @@ def _default_datasets_dir() -> Path:
 
 def _default_report_path() -> Path:
     return Path(__file__).resolve().parents[1] / "reports" / "data_quality_report.json"
+
+
+# ----------------- 0b. organisations + provenance spine (P1) -----------------
+
+SEED_ORGS = [
+    {"code": "BITS", "name": "BIT Sindri — TEXMiN Mining CPS CoE", "kind": "academic"},
+    {"code": "CGWB", "name": "Central Ground Water Board", "kind": "regulator"},
+    {"code": "SPCB", "name": "Jharkhand State Pollution Control Board", "kind": "regulator"},
+]
+
+# The org that owns seeded accounts and hypothetical sites. BIT Sindri runs the
+# platform; CGWB and SPCB exist so P2's row-level security has real tenants to
+# separate, not so seed users are filed under a regulator they do not work for.
+HOST_ORG_CODE = "BITS"
+
+# One entry per CITABLE dataset, keyed by the `source_type` its loads carry in
+# `data_sources`. `n_supporting` and `caveat` are the reason this table exists:
+# they carry what a checksum cannot, and the portal must surface them wherever
+# the derived number is shown.
+SEED_DATASET_VERSIONS = {
+    "geojson_district": dict(
+        label="JH-ADMIN-DISTRICT-v1", source_org="GSI / Survey of India",
+        citation="Jharkhand district administrative boundaries, District_Boundary_JH.geojson.",
+        n_supporting=24, caveat=None),
+    "geojson_subdistrict": dict(
+        label="JH-ADMIN-BLOCK-v1", source_org="GSI / Survey of India",
+        citation="Jharkhand sub-district (block) boundaries, Sub_District_Boundary_JH.geojson.",
+        n_supporting=264, caveat=None),
+    "geojson_aquifer": dict(
+        label="JH-AQUIFER-v1", source_org="CGWB",
+        citation="CGWB principal aquifer systems of Jharkhand, Aquifers_Jharkhand.geojson.",
+        n_supporting=23,
+        caveat="23 polygons for the whole state: aquifer properties are regional "
+               "averages and must not be read as site-specific values."),
+    "json_gw_level": dict(
+        label="CGWB-WATERLEVEL-JH-v1", source_org="CGWB",
+        citation="CGWB Jharkhand groundwater level monitoring campaigns, "
+                 "cgwb_waterlevel_jharkhand.csv.",
+        n_supporting=8345,
+        caveat="9,583 source rows contain 1,238 duplicate (station, date) pairs, "
+               "collapsed to 8,345 by the composite primary key. Station names are "
+               "NOT unique: 398 distinct names span 415 distinct "
+               "(name, latitude, longitude) triples, so any aggregation grouping "
+               "by name alone over-merges 17 stations."),
+    "csv_water_quality": dict(
+        label="CGWB-WATERQUALITY-JH-v1", source_org="CGWB",
+        citation="CGWB Jharkhand groundwater quality survey, waterQuality_jharkhand.csv.",
+        n_supporting=397,
+        caveat="One sample per well; no temporal series, so seasonal variation "
+               "cannot be separated from spatial variation."),
+}
+
+
+async def seed_orgs(db) -> None:
+    logger.info("Seeding organisations ...")
+    for o in SEED_ORGS:
+        existing = await db.execute(select(Org).where(Org.code == o["code"]))
+        if existing.scalar_one_or_none():
+            logger.info(f"  [skip] org {o['code']} already exists")
+            continue
+        db.add(Org(**o))
+        logger.info(f"  [ok]   created org {o['code']}")
+    await db.commit()
+
+
+async def seed_dataset_versions(db) -> None:
+    """Register the citable datasets and link the load ledger to them.
+
+    Idempotent on `label`, and the linking step only ever fills a NULL, so
+    re-running never re-points a load that was deliberately reassigned.
+    """
+    logger.info("Seeding dataset versions (provenance spine) ...")
+    for source_type, spec in SEED_DATASET_VERSIONS.items():
+        row = (await db.execute(
+            select(DatasetVersion).where(DatasetVersion.label == spec["label"])
+        )).scalar_one_or_none()
+        if row is None:
+            row = DatasetVersion(**spec)
+            db.add(row)
+            await db.flush()
+            logger.info(f"  [ok]   registered {spec['label']}")
+        else:
+            logger.info(f"  [skip] {spec['label']} already registered")
+
+        linked = await db.execute(
+            text("UPDATE data_sources SET dataset_version_id = :dv "
+                 "WHERE source_type = :st AND dataset_version_id IS NULL"),
+            {"dv": row.id, "st": source_type},
+        )
+        if linked.rowcount:
+            logger.info(f"         linked {linked.rowcount} load(s) of "
+                        f"source_type={source_type}")
+    await db.commit()
+
+    orphaned = (await db.execute(text(
+        "SELECT count(*) FROM data_sources WHERE dataset_version_id IS NULL"
+    ))).scalar()
+    if orphaned:
+        # Not fatal: an unregistered load is a data-quality finding, not a
+        # broken seed. It is reported so it cannot pass unnoticed.
+        logger.warning(f"  {orphaned} data_sources row(s) have no dataset_version; "
+                       f"add a SEED_DATASET_VERSIONS entry for their source_type.")
+
+
+async def assign_users_to_host_org(db) -> None:
+    """Give every account without an org the host org. Never reassigns."""
+    org_id = (await db.execute(
+        select(Org.id).where(Org.code == HOST_ORG_CODE))).scalar_one()
+    res = await db.execute(
+        text("UPDATE users SET org_id = :o WHERE org_id IS NULL"), {"o": org_id})
+    await db.commit()
+    if res.rowcount:
+        logger.info(f"  [ok]   assigned {res.rowcount} user(s) to {HOST_ORG_CODE}")
 
 
 # ----------------- 1. users -----------------
@@ -338,9 +454,11 @@ async def run(datasets_dir: Path, report_path: Path, skip_schema: bool) -> int:
         logger.info("Ensuring schema (PostGIS + ENUMs + tables) ...")
         await init_db()
 
-    # 1 + 2. Users and ISR points
+    # 0b + 1 + 2. Orgs, users and ISR points. Orgs come first: users reference them.
     async with AsyncSessionLocal() as db:
+        await seed_orgs(db)
         await seed_users(db)
+        await assign_users_to_host_org(db)
         await seed_isr_points(db)
 
     # 3. Geodata
@@ -354,6 +472,11 @@ async def run(datasets_dir: Path, report_path: Path, skip_schema: bool) -> int:
             await db.rollback()
             logger.exception("Ingestion failed; rolled back.")
             return 1
+
+    # 3b. Provenance spine — after ingestion, because it links the loads that
+    # ingestion just wrote into `data_sources`.
+    async with AsyncSessionLocal() as db:
+        await seed_dataset_versions(db)
 
     # 4. Quality report
     async with AsyncSessionLocal() as db:
