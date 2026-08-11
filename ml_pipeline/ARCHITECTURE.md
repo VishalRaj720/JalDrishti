@@ -413,7 +413,7 @@ reads as an "excursion").
 > than read off the grid — the grid is sized to hold the disc, so its 5–13 m
 > cells quantised short plumes to zero (29 of 60 sampled scenarios read exactly
 > 0.0 m while not being immobile at all). See `review.md` findings #1 and the
-> Gate-3 record in `REMEDIATION_GATE3_DECISION.md`.
+> Gate-3 record in [`docs/audits/REMEDIATION_GATE3_DECISION.md`](../docs/audits/REMEDIATION_GATE3_DECISION.md).
 
 **Radial vs directional.** The diagnostic `λ = X_c / (W_eff/2)` says which
 regime you are in: λ < 1 means the source disc dominates the picture
@@ -867,10 +867,17 @@ ml_pipeline/
 │
 ├── tests/                   See §9.
 ├── E1_geometry_design.md    Design contract for the radial/anisotropic geometry.
-├── QA_SWEEP_REPORT.md       The 2026-07-13 pre-retrain QA findings (F-1..F-5).
-├── FABLE5_QA_SWEEP_PROMPT.md The executable QA brief that produced the report.
+├── JHARKHAND_FIDELITY_MATRIX.md  Per-parameter provenance + correction notes.
 └── README.md                Quick-start + phase history.
 ```
+
+The audit and remediation record — `QA_SWEEP_REPORT.md`, `FABLE5_QA_SWEEP_PROMPT.md`,
+`REMEDIATION_PROMPT.md`, `REMEDIATION_GATE3_DECISION.md`, `review*.md`,
+`DOMENICO_ERROR_ENVELOPE.md`, `ML_PIPELINE_READINESS.md` — moved to
+[`docs/audits/`](../docs/audits/) in the 2026-08-11 documentation reorganisation.
+The four files above stay here because they are code-coupled: `tools/sync_docs.py`
+writes §6.5 of this file, and `validation/end_to_end_audit.py` reads `README.md`
+and `JHARKHAND_FIDELITY_MATRIX.md` by path.
 
 ---
 
@@ -957,7 +964,7 @@ This section exists because the project's rule is *critique your own tool*.
 | **Depth-decay K is held constant below the district fracture base** | The exponential K(z) law is calibrated only from 45 m to the district's NAQUIM fracture-death depth; below that it is held, not extrapolated. | **Fixed 2026-08-10.** Extrapolating it gave a 23,000× reduction at 300 m for a shallow-fracture district, against ~440× from the global crustal permeability-depth relation (Manning & Ingebritsen 1999) over the same interval — i.e. the extrapolation exceeded both the local evidence (which stops at the fracture base) and the global trend. |
 | **Depth-decay K is NO LONGER clamped into the trained-K box** | Below the surrogate's trained K support the served K is now the physical one, and `extrapolation` reports `hydro:K_m_day`. | **Fixed 2026-08-10.** The clamp existed so our own correction would not raise the OOD flag — it suppressed the signal the user needs, and because the per-regime floors differ (0.0959 vs 0.0444 m/day) it also made an **ML training artefact set the size of a physical discontinuity** (2.16× across a regime contact, now 1.07×). The guard that should have caught this was itself broken: a 2%-of-linear-span tolerance is ~5× the trained K minimum, so a K 500× below support raised nothing. Tolerances are ratio-based now for decade-spanning quantities. |
 | **operation_years default 8** | A single wellfield runs 1–3 yr; 8+ yr represents a sequential multi-wellfield mine unit compressed onto one footprint. | Interpret long operations as mine-unit scale. |
-| **ISR excursion panel is 2 indicators, not the regulatory 3+** | NUREG-1569 §5.7.8.3 p.137 requires a minimum of three excursion indicators; this model transports TDS (conductivity proxy) and sulfate. | Chloride and total alkalinity have no ISR source term in the available data. Reported as `panel_shortfall` in every response — the screen is weaker than a licensed monitoring programme, and says so. |
+| **ISR excursion panel is 3 indicators (2-of-3)** | chloride + TDS (conductivity proxy) + sulfate. | **Chloride added 2026-08-11** from the existing `Cl (mg/L)` CGWB column (397/397 wells) and the Texas End-of-Mining `Chloride` series — no new dataset, no retrain (excursion-layer only, outside `SPECIES`). **Alkalinity deliberately excluded**: measured contrast in Jharkhand is only 2.5× (f_min 13.3%) because this groundwater is already bicarbonate-dominated, versus chloride's 9.9×. Meeting the count does NOT confer compliance — `compliance_status` states that permanently. |
 | **Excursion UCL is a percentage-over-baseline rule** | NUREG-1569 p.138 permits "a simple percentage increase above baseline", which is what is used; its preferred statistical rules (mean + 5sd, ASTM D6312) need a per-well TEMPORAL baseline series. | The CGWB chemistry file holds 397 wells with ONE sample each from a single year — zero repeats, so there is no temporal variance to take 5sd of. Substituting the regional spatial spread was tested and rejected (sd(TDS) = 286.5 mg/L gives a UCL of 1,965 mg/L, near the BIS permissible limit itself). The percentage is registered as a scenario assumption. |
 | **Post-restoration source is held at the measured stable endpoint** | After a sweep, the passive flush may not carry the source below the Texas restoration endpoint. | The endpoint is measured on post-restoration **stability samples** ("composition achieved after restoration was complete"), so rebound is already inside it. Previously the credit and the flush compounded without bound, reaching 0.023×C0 at 50 yr against a measured 0.060 — claiming clean-up the data does not show. No rebound magnitude was invented. |
 | **Texas→Jharkhand transfer** | Source chemistry and restoration behavior from porous Texas sandstone applied to fractured Indian shear-zone rock. | The headline caveat on the UI. No field calibration exists or is possible without an actual ISR test. |

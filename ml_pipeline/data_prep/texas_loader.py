@@ -313,8 +313,14 @@ def load_operations() -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 # Convenience: derived Texas source signature (end-of-mining minus baseline)
 # --------------------------------------------------------------------------- #
-_EOM_COLS = {"uranium_ppb": "Uranium", "sulfate_mg_l": "Sulfate", "tds_mg_l": "TDS"}
-_EOM_UNIT_MULT = {"uranium_ppb": 1000.0, "sulfate_mg_l": 1.0, "tds_mg_l": 1.0}
+# `chloride_mg_l` is an ISR EXCURSION INDICATOR ONLY -- it is deliberately NOT in
+# P.SPECIES, so the synthetic generator never sees it and no retrain is implied.
+# Its presence here only adds a key to the returned dicts; every consumer reads
+# them as `d[sp] for sp in SPECIES`, so the extra key is inert.
+_EOM_COLS = {"uranium_ppb": "Uranium", "sulfate_mg_l": "Sulfate",
+             "tds_mg_l": "TDS", "chloride_mg_l": "Chloride"}
+_EOM_UNIT_MULT = {"uranium_ppb": 1000.0, "sulfate_mg_l": 1.0,
+                  "tds_mg_l": 1.0, "chloride_mg_l": 1.0}
 
 
 def _eom_per_mine() -> dict[str, pd.Series]:
@@ -419,7 +425,10 @@ def _paired_residual_ratios() -> dict[str, list]:
     me = eom[le].astype(str).str.strip()
     mp = post[lp].astype(str).str.strip()
     common = sorted(set(me) & set(mp))
-    mapping = {"uranium_ppb": "Uranium", "sulfate_mg_l": "Sulfate", "tds_mg_l": "TDS"}
+    # chloride: excursion-indicator only, same inert-extra-key argument as
+    # _EOM_COLS above. The 'Final Post-restoration' sheet does carry Chloride.
+    mapping = {"uranium_ppb": "Uranium", "sulfate_mg_l": "Sulfate",
+               "tds_mg_l": "TDS", "chloride_mg_l": "Chloride"}
     out = {}
     for key, col in mapping.items():
         ratios = []

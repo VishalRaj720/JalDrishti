@@ -62,22 +62,17 @@ build/
 
 myvenv/
 .claude
-docs/
 utilities/
 
-# Trained model binaries — regenerate with `python -m pipeline.train`
-# (the small unified_dataset.csv, feature_schema.json and metrics.json ARE tracked)
-DataGen_ModelMVP/pipeline/artifacts/*.joblib
+# docs/ was blanket-ignored while it held personal planning notes. Since the
+# 2026-08-11 reorganisation `docs/audits/` is the tracked audit record and only
+# `docs/local/` — scratch, reference PDFs, and the learning write-ups that were
+# previously ignored as `/mdFiles`, `datasets_source.md`, `My_Proposal.pdf` —
+# stays out of git.
+docs/local/
 
 # Generated data-quality report (rebuilt by `python -m scripts.seed`)
 backend/reports/
-datasets_source.md
-My_Proposal.pdf
-
-# derivationsfurther.md
-# FAQ.md
-/mdFiles
-commit.txt
 
 /fetch_data
 
@@ -96,5 +91,4 @@ Datasets/HydroRIVERS_v10_as_shp/
 # mine-water paper (small, cited, human-readable) IS tracked, not ignored.
 Datasets/phase1_sources/*.pdf
 
-ml_pipeline/FABLE5_ARCHITECTURE_AUDIT_PROMPT.md
 ml_pipeline/outputs/

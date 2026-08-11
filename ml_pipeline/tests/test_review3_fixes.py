@@ -304,15 +304,23 @@ def test_r1_ucl_respects_the_nureg_bracket():
     assert P.isr_upper_control_limit(500.0, 400.0) == float("inf")
 
 
-def test_r1_two_of_n_rule_and_panel_shortfall_are_reported():
+def test_r1_two_of_n_rule_is_reported():
+    """UPDATED 2026-08-11: this originally asserted panel_shortfall is True,
+    which was correct when the panel carried only TDS + sulfate. Chloride was
+    added as a third EXCURSION-ONLY indicator (see test_isr_excursion_panel.py),
+    so the panel now meets NUREG's minimum of three and the shortfall clears.
+    The non-compliance framing does NOT clear with it — asserted below."""
     from ml_pipeline.dashboard.isr_excursion import isr_indicator_excursion
     out = isr_indicator_excursion(dict(lon=86.347, lat=22.652,
                                        species="uranium_ppb", time_years=20,
                                        operation_years=8, gradient_i=0.02))
     assert out["indicators_required"] == 2
+    assert out["indicators_available"] == 3
     assert out["excursion_declared"] == (out["indicators_over_ucl"] >= 2)
-    assert out["panel_shortfall"] is True and out["panel_note"]
+    assert out["panel_shortfall"] is False and out["panel_note"] is None
     assert "NUREG-1569" in out["citation"]
+    # a full panel must never be allowed to read as regulatory compliance
+    assert "NOT REGULATORY-COMPLIANT" in out["compliance_status"]
 
 
 def test_r1_indicators_detect_before_the_health_limit_does():

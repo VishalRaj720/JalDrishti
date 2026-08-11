@@ -123,23 +123,42 @@ def isr_indicator_excursion(payload: dict,
         "excursion_declared": declared,
         "indicators_over_ucl": n_over,
         "indicators_required": P.ISR_EXCURSION_MIN_INDICATORS,
+        "indicators_available": n_available,
+        "rule": (f"{P.ISR_EXCURSION_MIN_INDICATORS}-of-{n_available}: an "
+                 f"excursion is declared when {P.ISR_EXCURSION_MIN_INDICATORS} "
+                 f"or more indicators exceed their upper control limits"),
         "indicators": indicators,
+        "indicator_rationale": dict(P.ISR_INDICATOR_RATIONALE),
         "monitor_ring_m": round(ring, 1),
         "ucl_rule": (f"baseline x (1 + {inc:g}), bracketed to stay above baseline "
                      f"and below the lixiviant concentration (NUREG-1569 p.138)"),
         "ucl_rule_is_scenario_assumption": True,
-        # what a licensed programme would have that this model does not
         "panel_shortfall": shortfall,
         "panel_note": (
-            f"NUREG-1569 p.137 requires a minimum of "
-            f"{P.ISR_EXCURSION_REQUIRED_PANEL} indicators; this model transports "
-            f"{n_available} of them ({', '.join(P.ISR_EXCURSION_INDICATORS)}). "
-            f"Not modelled: {', '.join(P.ISR_INDICATORS_NOT_MODELLED)} — no ISR "
-            f"source term exists for them in the available data. The test is "
-            f"therefore weaker than a licensed monitoring programme."
-            if shortfall else None),
+            f"NUREG-1569 p.137 asks for a minimum of "
+            f"{P.ISR_EXCURSION_REQUIRED_PANEL} indicators; this model carries "
+            f"{n_available}." if shortfall else None),
+        # Candidate indicators left out ON PURPOSE, each with its measured reason
+        # -- so an absent parameter reads as a decision, not an oversight.
+        "indicators_excluded": dict(P.ISR_INDICATORS_EXCLUDED),
         "excluded_species": dict(P.ISR_NON_INDICATORS),
         "sampling_interval_days": P.MONITOR_SAMPLING_INTERVAL_DAYS,
         "citation": ("US NRC NUREG-1569 Sec. 5.7.8.3 pp.137-139 "
                      "(excursion definition, indicator selection, UCL bracket)"),
+        # NON-NEGOTIABLE FRAMING. A full three-indicator panel makes this test
+        # STRUCTURALLY like a licensed one; it does not make it a licensed one,
+        # and the difference must not be allowed to blur as the panel fills out.
+        "compliance_status": "NUREG-1569-INSPIRED SCREENING — NOT REGULATORY-COMPLIANT",
+        "compliance_note": (
+            "This implements the NUREG-1569 excursion CRITERION. It is not a "
+            "licensed monitoring programme and must not be described as one. "
+            "Missing: (1) per-well TEMPORAL baselines — the CGWB file holds 397 "
+            "wells with one sample each from a single year, so NUREG's preferred "
+            "statistical UCL rules (mean + 5sd, student's t, ASTM D6312) cannot "
+            "be computed and the permitted percentage-over-baseline fallback is "
+            "used instead, with the percentage itself a scenario assumption; "
+            "(2) the verification-resampling protocol (NUREG p.140 requires a "
+            "second and third confirming sample before declaring); (3) the "
+            "60-day controllability demonstration; (4) an actual wellfield — no "
+            "ISR operation has ever existed in Jharkhand."),
     }

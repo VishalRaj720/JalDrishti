@@ -74,7 +74,7 @@
 | 3.4 fracture β / aperture / Dₑ / ω | 🔴 Permanently blocked | No packer or tracer test for the Singhbhum Shear Zone is published. Aperture *is* MC-sampled into the bands; Dₑ is not — `P.FRACTURE` carries no defensible range and inventing one would relabel an assumption as data |
 | 3.8 As / Ni / Cu / Co co-contaminants | 🟡 Blocked on source term | Kd data is on disk; how much an alkaline lixiviant mobilises from SSZ ore has never been measured |
 | 3.10 Field validation | 🔴 Permanently impossible | No ISR plume has ever been measured in Jharkhand. The bands quantify **parameter** uncertainty, not structural model error |
-| ISR indicator panel is 2, not ≥ 3 | 🟡 Disclosed in every response | Chloride and total alkalinity have no ISR source term in the available data |
+| ISR indicator panel | ✅ **Closed 2026-08-11** — chloride added as a third excursion-only indicator (2-of-3). No new dataset, no retrain. Alkalinity excluded on measured grounds (contrast 2.5× vs chloride 9.9×) | Still not a licensed programme; `compliance_status` says so permanently |
 | Excursion UCL percentage | 🟡 Registered scenario assumption | NUREG's preferred statistical rules need a per-well **temporal** baseline series. Verified: the CGWB file has 397 wells, **one sample each, one year, zero repeats**. Substituting regional spatial spread was tested and rejected (sd(TDS) = 286.5 → UCL 1,965 mg/L, near the BIS limit itself) |
 
 ---

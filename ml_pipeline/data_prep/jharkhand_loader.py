@@ -123,6 +123,11 @@ def load_jharkhand_water_quality() -> pd.DataFrame:
         "ph": num("pH"),
         "uranium_ppb": num("U (ppb)"),
         "sulfate_mg_l": num("SO4"),
+        # CHLORIDE -- ISR excursion indicator only (see parameters.py section 1c).
+        # The column was already in this CSV and simply was not being parsed;
+        # coverage is 397/397, better than sulfate's 393. It is NOT a modelled
+        # water-quality species and is deliberately absent from P.SPECIES.
+        "chloride_mg_l": num("Cl (mg/L)"),
         "ec_uS_cm": ec,
         "tds_mg_l": ec * EC_TO_TDS_FACTOR,   # EC -> TDS [Freeze & Cherry]
         "fluoride_mg_l": num("F (mg/L)"),
@@ -235,6 +240,9 @@ def baseline_at_point(lon: float, lat: float, wq: pd.DataFrame | None = None) ->
     return {
         "uranium_ppb": float(r["uranium_ppb"]) if pd.notna(r["uranium_ppb"]) else np.nan,
         "sulfate_mg_l": float(r["sulfate_mg_l"]) if pd.notna(r["sulfate_mg_l"]) else np.nan,
+        # excursion-indicator background; resolve_inputs reads this via b.get(species)
+        "chloride_mg_l": (float(r["chloride_mg_l"])
+                          if pd.notna(r.get("chloride_mg_l")) else np.nan),
         "tds_mg_l": float(r["tds_mg_l"]) if pd.notna(r["tds_mg_l"]) else np.nan,
         "ph": float(r["ph"]) if pd.notna(r["ph"]) else np.nan,
         "hco3_mg_l": float(r["hco3_mg_l"]) if pd.notna(r.get("hco3_mg_l")) else np.nan,

@@ -139,26 +139,55 @@ async def _stage_aquifers(svc: IngestionService, path: Path) -> Dict[str, Any]:
     return await svc.ingest_geojson_aquifers(path.read_bytes(), file_name=path.name)
 
 
-async def _stage_groundwater_levels(svc: IngestionService, folder: Path) -> Dict[str, Any]:
-    logger.info(f"[4/5] Ingesting groundwater-level JSONs from {folder} ...")
-    files = sorted(folder.glob("*.json"))
-    total_stations, total_readings, skipped = 0, 0, 0
-    for f in files:
-        try:
-            station_json = json.loads(f.read_bytes())
-        except json.JSONDecodeError as e:
-            logger.warning(f"  {f.name}: JSON parse error ({e}); skipping")
-            skipped += 1
+async def _stage_groundwater_levels(svc: IngestionService, csv_path: Path) -> Dict[str, Any]:
+    """Ingest the CGWB statewide water-level series.
+
+    SOURCE CHANGED 2026-08-11. This stage used to walk `Datasets/waterLevelJson/`,
+    a folder of 28 India-WRIS JSON files covering Dhanbad only. That folder was
+    deleted in the July dataset consolidation when it was superseded by
+    `cgwb_waterlevel_jharkhand.csv` -- 398 stations across all 24 districts,
+    9,583 readings, 2013-2021, four CGWB campaigns a year. The seed still pointed
+    at the deleted folder and aborted with "Required dataset missing".
+
+    The CSV is grouped per station and handed to the SAME
+    `ingest_json_groundwater_levels()` the JSON files used, so the ingestion
+    service, its dedupe and its provenance registration are untouched -- only
+    the reader in front of it changed.
+    """
+    import csv as _csv
+    from collections import defaultdict
+
+    logger.info(f"[4/5] Ingesting groundwater levels from {csv_path.name} ...")
+    with csv_path.open(newline="", encoding="utf-8-sig") as fh:
+        rows = list(_csv.DictReader(fh))
+
+    # group by the physical station: name + coordinates
+    grouped: Dict[tuple, list] = defaultdict(list)
+    for r in rows:
+        key = (r.get("station_name"), r.get("latitude"), r.get("longitude"))
+        if not all(key):
             continue
-        result = await svc.ingest_json_groundwater_levels(station_json, file_name=f.name)
+        grouped[key].append(r)
+
+    total_stations, total_readings, skipped = 0, 0, 0
+    for (name, lat, lon), recs in grouped.items():
+        station_json = {
+            "station": {"Station Name": name, "Latitude": lat, "Longitude": lon,
+                        "Village": recs[0].get("district_name")},
+            "readings": [{"timestamp": r.get("date"),
+                          "water_level_m": r.get("currentlevel")} for r in recs],
+        }
+        result = await svc.ingest_json_groundwater_levels(
+            station_json, file_name=csv_path.name)
         if result.get("skipped"):
             skipped += 1
-            logger.debug(f"  {f.name}: skipped ({result.get('reason')})")
+            logger.debug(f"  {name}: skipped ({result.get('reason')})")
             continue
         total_stations += 1
         total_readings += result.get("readings_inserted", 0)
-    return {"files_processed": len(files), "stations": total_stations,
-            "readings_inserted": total_readings, "skipped": skipped}
+    return {"rows_read": len(rows), "stations_in_file": len(grouped),
+            "stations": total_stations, "readings_inserted": total_readings,
+            "skipped": skipped}
 
 
 async def _stage_water_quality(svc: IngestionService, path: Path) -> Dict[str, Any]:
@@ -171,10 +200,11 @@ async def seed_geodata(db, datasets_dir: Path) -> Dict[str, Any]:
     district_file = datasets_dir / "District_Boundary_JH.geojson"
     subdistrict_file = datasets_dir / "Sub_District_Boundary_JH.geojson"
     aquifer_file = datasets_dir / "Aquifers_Jharkhand.geojson"
-    gwl_folder = datasets_dir / "waterLevelJson"
+    # statewide CGWB series; replaced the deleted Dhanbad-only waterLevelJson/
+    gwl_file = datasets_dir / "cgwb_waterlevel_jharkhand.csv"
     wq_file = datasets_dir / "waterQuality_jharkhand.csv"
 
-    for p in (district_file, subdistrict_file, aquifer_file, gwl_folder, wq_file):
+    for p in (district_file, subdistrict_file, aquifer_file, gwl_file, wq_file):
         if not p.exists():
             raise FileNotFoundError(f"Required dataset missing: {p}")
 
@@ -186,7 +216,7 @@ async def seed_geodata(db, datasets_dir: Path) -> Dict[str, Any]:
     logger.info(f"  -> {stage_results['subdistricts']}")
     stage_results["aquifers"] = await _stage_aquifers(svc, aquifer_file)
     logger.info(f"  -> {stage_results['aquifers']}")
-    stage_results["groundwater_levels"] = await _stage_groundwater_levels(svc, gwl_folder)
+    stage_results["groundwater_levels"] = await _stage_groundwater_levels(svc, gwl_file)
     logger.info(f"  -> {stage_results['groundwater_levels']}")
     stage_results["water_quality"] = await _stage_water_quality(svc, wq_file)
     logger.info(f"  -> {stage_results['water_quality']}")

@@ -365,6 +365,45 @@ RADIUM_RESTORATION_RESIDUAL = 0.81
 SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
 ML_SPECIES = ("uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l")
 
+# EXCURSION-ONLY CONSTITUENTS  [2026-08-11]
+# ---------------------------------------------------------------------------
+# Solved by the ANALYTICAL engine for the ISR excursion test only. Deliberately
+# NOT in SPECIES, because SPECIES is what synthetic.generate iterates to bake
+# training labels (900 scenarios x 5 times x len(SPECIES)) -- adding a member
+# there would force a full re-bake and retrain for a constituent that is a
+# TRACER, not a contaminant of concern, and that the surrogate has no reason to
+# predict. Every registry below is read by the generator only as
+# `d[sp] for sp in SPECIES`, so these extra keys are inert to training.
+#
+# WHY CHLORIDE, AND WHY ONLY CHLORIDE (measured, not assumed -- see review of
+# 2026-08-11). Enrichment measured on this project's own paired Texas
+# baseline/end-of-mining data (7 mines), then tested against JHARKHAND
+# background rather than Texas background:
+#
+#   indicator      TX enrich   TX lixiviant   JH background   contrast   f_min*
+#   sulfate           9.5x        1123 mg/L        38 mg/L      29.6x     0.7%
+#   chloride          1.7x         776 mg/L        78 mg/L       9.9x     2.2%
+#   TDS               3.1x        3710 mg/L       490 mg/L       7.6x     3.0%
+#   bicarbonate       2.2x         625 mg/L       250 mg/L       2.5x    13.3%
+#   * f_min = smallest fraction of the source that must reach the ring to trip
+#     a +20% UCL. Lower is a more sensitive indicator.
+#
+# Two findings drove the choice, and both invert the naive assumption:
+#  1. BICARBONATE/ALKALINITY -- the canonical alkaline-ISR lixiviant signature
+#     and a member of the licensed US triad -- is the WEAKEST candidate HERE,
+#     because Jharkhand hard-rock groundwater is already bicarbonate-dominated
+#     (250 mg/L median). The property that makes it diagnostic in Texas makes it
+#     nearly useless in Singhbhum. Deliberately NOT added.
+#  2. CHLORIDE is the reverse: the weakest ENRICHER in Texas (its baseline there
+#     is already 384 mg/L in coastal sediments) but an excellent indicator here,
+#     where background is 78 mg/L. It is also the only PERFECTLY conservative
+#     candidate (Kd = 0), so unlike sulfate it is immune to the sulfide-oxidation
+#     false-alarm mechanism NUREG-1569 p.137 warns about -- a mechanism that is
+#     ELEVATED in Singhbhum, a polymetallic sulphide province (see
+#     U_ATTENUATION_MODE_BY_ZONE). That interference-independence is why a
+#     2-of-2 panel of sulfate+TDS was fragile: both can be perturbed together.
+EXCURSION_ONLY_SPECIES = ("chloride_mg_l",)
+
 # One-hot column names, DERIVED from SPECIES so the two can never disagree.
 SPECIES_ONEHOT = [f"is_{sp}" for sp in SPECIES]
 
@@ -376,12 +415,16 @@ BACKGROUND_DEFAULTS = {
     "sulfate_mg_l": 20.0,
     "tds_mg_l": 300.0,
     "radium_226_mbq_l": RADIUM_BACKGROUND_MBQ_L,
+    # excursion-only; CGWB median is 78 mg/L over 397/397 wells, so this
+    # fallback is used only if a pin somehow resolves to a well without Cl
+    "chloride_mg_l": 78.0,
 }
 
 # Display units, so the API/frontend cannot invent a different one per surface.
 SPECIES_UNITS = {
     "uranium_ppb": "ppb", "sulfate_mg_l": "mg/L",
     "tds_mg_l": "mg/L", "radium_226_mbq_l": "mBq/L",
+    "chloride_mg_l": "mg/L",              # excursion-only
 }
 
 
@@ -474,7 +517,29 @@ INCREMENTAL_FLOOR = 0.10
 # plus redox trapping, and its excursion probability collapses to ~0.01 while
 # TDS and sulfate retain meaningful values. So the tool was leading with the
 # indicator the regulator explicitly rejects.
-ISR_EXCURSION_INDICATORS = ("tds_mg_l", "sulfate_mg_l")
+# THE PANEL: chloride + TDS(as conductivity) + sulfate, evaluated 2-of-3.
+# Mirrors the STRUCTURE of the licensed US triad (chloride, conductivity, total
+# alkalinity) with sulfate substituting for alkalinity, because in THIS aquifer
+# sulfate is the most sensitive indicator (f_min 0.7%) while alkalinity is the
+# least (13.3%) -- see EXCURSION_ONLY_SPECIES above for the measured basis.
+ISR_EXCURSION_INDICATORS = ("chloride_mg_l", "tds_mg_l", "sulfate_mg_l")
+# Why each member is here, surfaced to the user rather than left implicit.
+ISR_INDICATOR_RATIONALE = {
+    "chloride_mg_l": ("perfectly conservative (Kd = 0); the indicator licensed "
+                      "US ISR programmes lead with. Immune to the sulfide-"
+                      "oxidation false-alarm mechanism that affects sulfate"),
+    "tds_mg_l": ("bulk salinity. NUREG-1569 p.137 names CONDUCTIVITY, 'which is "
+                 "correlated to total dissolved solids' -- TDS is derived here "
+                 "as EC x 0.64, so this IS the conductivity indicator"),
+    "sulfate_mg_l": ("most sensitive indicator in this aquifer (Jharkhand "
+                     "background is only 38 mg/L against a ~1123 mg/L "
+                     "lixiviant). NUREG-1569 p.137 cautions that sulfate 'may "
+                     "give false alarms because of induced oxidation around a "
+                     "monitor well' -- a risk ELEVATED in the Singhbhum "
+                     "polymetallic sulphide province, which is exactly why the "
+                     "2-of-3 rule exists and why sulfate must never decide an "
+                     "excursion alone"),
+}
 # Species that must NEVER be used as an ISR excursion indicator, with the reason.
 ISR_NON_INDICATORS = {
     "uranium_ppb": "retarded by reducing conditions (NUREG-1569 p.137)",
@@ -484,9 +549,31 @@ ISR_NON_INDICATORS = {
 }
 ISR_EXCURSION_MIN_INDICATORS = 2      # "two or more" -- NUREG-1569 p.138
 ISR_EXCURSION_REQUIRED_PANEL = 3      # "a minimum of three" -- NUREG-1569 p.137
-# Indicators a licensed programme would use that this model does NOT carry as
-# transported species. Stated so the shortfall is reported, not hidden.
-ISR_INDICATORS_NOT_MODELLED = ("chloride_mg_l", "total_alkalinity_mg_l")
+# Candidate indicators DELIBERATELY EXCLUDED, with the measured reason. This
+# replaced an earlier "not modelled" list that implied chloride and alkalinity
+# were both missing gaps; the 2026-08-11 review found chloride was a real gap
+# (now closed) and alkalinity was not a gap at all but a poor fit for this site.
+ISR_INDICATORS_EXCLUDED = {
+    "total_alkalinity_mg_l": (
+        "WEAK IN THIS AQUIFER, not unavailable. HCO3 is present in both datasets "
+        "(CGWB n=393; Texas End-of-Mining n=7 mines) and CO3 is 0.00 at every "
+        "Jharkhand well, so total alkalinity ~ bicarbonate and could be built. "
+        "It is excluded because Jharkhand groundwater is already bicarbonate-"
+        "dominated (250 mg/L), giving a contrast of only 2.5x and requiring "
+        "13.3% of the source to reach the ring before it trips -- 6x less "
+        "sensitive than chloride and 19x less than sulfate. Adding it would "
+        "enlarge the panel without improving detection."),
+    "ph": ("moves the WRONG WAY -- measured 8.5 -> 7.0 across the Texas mines "
+           "(0.85x). An upper-control-limit test cannot detect a decrease; it "
+           "would need a separate lower-limit mechanism."),
+    "calcium/magnesium/sodium/potassium": (
+        "NUREG-1569 p.137 excludes cations as 'subject to ion exchange with the "
+        "host rock'. They do enrich 2-5.7x in the Texas data, but that mobility "
+        "is exactly what makes them unreliable as tracers."),
+    "molybdenum/selenium/manganese/iron": (
+        "contaminants of concern, not indicators: only 3 paired mines each and "
+        "wildly inconsistent (Mo spans 0.4-144x; Fe DECREASES at one mine)."),
+}
 
 # UPPER CONTROL LIMIT rule. NUREG-1569 p.138 bounds the UCL from both sides:
 #   "The upper control limit for each excursion indicator must generally be LESS
@@ -639,6 +726,14 @@ KD_RANGES = {  # L/kg
         "porous":    (0.0, 0.10, 0.5),
     },
     "tds_mg_l": {      # bulk salinity proxy -> conservative
+        "fractured": (0.0, 0.0, 0.0),
+        "porous":    (0.0, 0.0, 0.0),
+    },
+    # EXCURSION-ONLY. Chloride is the archetypal conservative tracer: the Cl-
+    # anion is excluded from the negatively-charged mineral surfaces that
+    # dominate these aquifers, so Kd is 0 by definition, not by approximation.
+    # That is precisely why NUREG-1569 licensees lead with it.
+    "chloride_mg_l": {
         "fractured": (0.0, 0.0, 0.0),
         "porous":    (0.0, 0.0, 0.0),
     },
@@ -871,6 +966,8 @@ REGIME_ARCHETYPE = {
 # ---------------------------------------------------------------------------
 RESTORATION_FALLBACK_RESIDUAL = {
     "uranium_ppb": 0.30, "sulfate_mg_l": 0.50, "tds_mg_l": 0.50,
+    # excursion-only; conservative tracer, so it sweeps like TDS
+    "chloride_mg_l": 0.50,
 }
 
 
@@ -1185,6 +1282,9 @@ FALLBACK_SOURCE_CONC = {
     "uranium_ppb":  (500.0, 5000.0),   # alkaline ISR pregnant fluid is U-rich
     "sulfate_mg_l": (500.0, 3000.0),
     "tds_mg_l":     (1500.0, 8000.0),
+    # excursion-only; the real Texas End-of-Mining series carries 6 mines
+    # (331-1402 mg/L), so this fallback should never be reached
+    "chloride_mg_l": (330.0, 1400.0),
 }
 
 # Geographic bounds of Jharkhand (for validating dropped pins / dashboard map).

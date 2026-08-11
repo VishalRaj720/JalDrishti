@@ -54,7 +54,7 @@ was built on. Corrections:
 
 | Component | State | Verdict |
 |---|---|---|
-| `ml_pipeline/` | **Production-grade.** 260 tests, exact-solution-benchmarked transport kernel, conformal bands validated on the serving distribution, drift monitor, 12-entry assumption register | **Keep — this is the crown jewel.** Frozen; see `ML_PIPELINE_READINESS.md` |
+| `ml_pipeline/` | **Production-grade.** 260 tests, exact-solution-benchmarked transport kernel, conformal bands validated on the serving distribution, drift monitor, 12-entry assumption register | **Keep — this is the crown jewel.** Frozen; see [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE_READINESS.md) |
 | `backend/` | 55 endpoints, JWT auth, 3 roles, PostGIS models, Celery, Alembic | **Keep the plumbing, replace the science** (§1.3) |
 | `frontend/JalDrishti.html` + `*.jsx` | Static mock, no `package.json`, no build. Hexagon districts, hardcoded risk badges | **Keep the visual language, rebuild the app** |
 | `frontend/ml_pipeline/` | Vanilla JS + Leaflet, genuinely functional, real physics | **Absorb as the Simulation Studio** |
@@ -222,11 +222,33 @@ Jaduguda, gradient 0.005, t = 20 yr: excursion DECLARED while the BIS uranium br
 **Product implication.** For a government official monitoring aquifer vulnerability, this is the
 headline, because it is the metric a regulator actually acts on. The panel shows:
 
-- **Excursion status** (`DECLARED` / `none`) and the `n/2` indicator count
-- Per indicator (TDS, sulfate): ring concentration vs its upper control limit
-- **The panel shortfall, always visible** — a licensed programme uses ≥3 indicators; this model
-  carries 2, because chloride and total alkalinity have no ISR source term in the available data
+- **Excursion status** (`DECLARED` / `none`) and the indicator count, under a **2-of-3** rule
+- Per indicator (**chloride, TDS, sulfate**): ring concentration vs its upper control limit
+- **A persistent non-compliance statement** — the panel now meets NUREG's minimum of three, which
+  makes the test *structurally* like a licensed one but **does not make it one**. What is still
+  missing is named in the response: per-well temporal baselines, the verification-resampling
+  protocol, the 60-day controllability demonstration, and an actual wellfield
 - The monitor ring distance and its NUREG-licensed range (75–180 m)
+
+**Chloride was added 2026-08-11** after a measured review, and the reasoning is worth carrying into
+the product because it is counter-intuitive. Enrichment was measured on this project's own paired
+Texas baseline/end-of-mining data, then tested against *Jharkhand* background:
+
+| indicator | TX enrichment | contrast vs JH background | sensitivity |
+|---|---|---|---|
+| sulfate | 9.5× | 29.6× | most sensitive |
+| **chloride** | 1.7× | **9.9×** | **added** |
+| TDS (= conductivity) | 3.1× | 7.6× | in use |
+| bicarbonate/alkalinity | 2.2× | **2.5×** | **rejected** |
+
+Two findings inverted the naive assumption. **Alkalinity — the canonical alkaline-ISR signature and a
+member of the licensed US triad — is the weakest candidate here**, because Jharkhand hard-rock
+groundwater is already bicarbonate-dominated (250 mg/L); it would need 13.3 % of the source to reach
+the ring before tripping. **Chloride is the reverse**: the weakest enricher in Texas, but excellent
+here, and the only perfectly conservative (Kd = 0) member — so unlike sulfate it is immune to the
+sulfide-oxidation false alarms NUREG warns about, a risk *elevated* in the Singhbhum polymetallic
+sulphide province. It required **no new dataset** (the `Cl (mg/L)` column was already in the CGWB
+file, 397/397 wells) and **no retrain** (it is excursion-layer only, deliberately outside `SPECIES`).
 
 It sits **next to, not instead of,** the BIS/WHO health-limit result. They answer different questions
 and the difference is itself informative.
@@ -283,7 +305,7 @@ From the audit history, to stop the portal over-claiming:
 
 ### 4.6 Frozen constraints inherited from `ml_pipeline`
 
-These come from `ML_PIPELINE_READINESS.md` §7 and **must not be redesigned around**:
+These come from [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE_READINESS.md) §7 and **must not be redesigned around**:
 
 1. **The analytical engine is the authority**; ML supplies bands only. Never show an ML P50 without
    its band; never let ML override analytical.
@@ -516,7 +538,8 @@ Stated plainly, because the portal must not present them as solved:
 4. **β, aperture, Dₑ, ω are foreign-analogue literature values** with zero Singhbhum measurements.
    Permanent until someone runs a packer or tracer test in the Singhbhum Shear Zone.
 5. **Contaminated footprint is wellfield-dominated** (76–97% disc), which is why it is renamed.
-6. **The ISR excursion panel uses 2 of the ≥3 regulatory indicators** — always disclosed.
+6. **The ISR excursion panel is 3 indicators (chloride, TDS, sulfate), 2-of-3.** It meets NUREG's
+   minimum count but is still not a licensed programme — the gap is named in every response.
 7. **No sensors exist** (§7).
 8. **The conformal band is validated, not guaranteed** (§4.3), and is void under `extrapolation`.
 

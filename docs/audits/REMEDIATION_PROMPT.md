@@ -17,7 +17,7 @@ do not follow the old instructions where they conflict.
 
 | Old instruction | Why it is wrong | Correct instruction |
 |:---|:---|:---|
-| "Fix `max_migration_distance_m` in `plume_metrics`" | There are **two** implementations of this metric. `mc_field_metrics` ([transport.py:883](physics/transport.py:883)) computes the identical radial max for the Monte-Carlo path — **and the MC path is what produces the ML training labels.** Fixing only `plume_metrics` leaves the artifact in every trained band. | Fix **both** `plume_metrics` (transport.py:610-616) and `mc_field_metrics` (transport.py:882-883). `test_physics_laws.py:429` pins them equal and will fail if you fix one — treat that failure as the guard working, not as a test to relax. |
+| "Fix `max_migration_distance_m` in `plume_metrics`" | There are **two** implementations of this metric. `mc_field_metrics` ([transport.py:883](../../ml_pipeline/physics/transport.py:883)) computes the identical radial max for the Monte-Carlo path — **and the MC path is what produces the ML training labels.** Fixing only `plume_metrics` leaves the artifact in every trained band. | Fix **both** `plume_metrics` (transport.py:610-616) and `mc_field_metrics` (transport.py:882-883). `test_physics_laws.py:429` pins them equal and will fail if you fix one — treat that failure as the guard working, not as a test to relax. |
 | "`dashboard/predict.py`" | No such file. | `ml/predict.py` — `_restoration_residual()` at line 54, consumed at line 80. |
 | "Update `_draw_params` in `physics/transport.py`" | `_draw_params` lives in `synthetic/generate.py:253`. | Physics changes land in **three** mirrored sites: `transport.params_from_features` (:637), `generate._draw_params` (:253), and `feature_engineering.build_feature_row` (:169). All three must agree or train ≠ serve. |
 | "Pass sampled aperture into `matrix_sigma` in generate.py **and live serve paths**" | The live serve path is **deterministic** — there is nothing to sample there. | Sample aperture in the **MC only** (`mc_draws` + `_draw_params`), so it widens the P10–P90 bands. The deterministic serve path keeps the central aperture. This is precisely the "parameter uncertainty reaches the bands" mechanism the fidelity matrix claims. |
@@ -35,7 +35,7 @@ corrections beyond `ARCHITECTURE.md` §6 (Phase 7).
 
 Making fractured retardation species-dependent means the physics uses an effective capacity ratio
 **β_eff = β · R_m** (Goltz–Roberts: the immobile zone stores dissolved *and* sorbed mass; `R_m` is already
-computed inside `matrix_sigma`, [transport.py:179](physics/transport.py:179)). The question is whether the
+computed inside `matrix_sigma`, [transport.py:179](../../ml_pipeline/physics/transport.py:179)). The question is whether the
 **model feature vector** changes with it.
 
 - **Option A (RECOMMENDED — adopt unless you have a reason not to).** β_eff is used inside the physics only.
@@ -46,7 +46,7 @@ computed inside `matrix_sigma`, [transport.py:179](physics/transport.py:179)). T
 - **Option B.** Redefine `retardation_Rd = 1 + β_eff`. More physically descriptive and gives the
   `retardation_Rd: -1` monotone constraint real meaning — but the fractured `hydro_support` box for
   `retardation_Rd` widens from ~[3, 21] to ~[3, 10⁶], and `envelope_violations` uses a ±2 % *span* tolerance
-  ([resolve.py:127-130](dashboard/resolve.py:127)), so the out-of-distribution guard on Rd goes vacuous.
+  ([resolve.py:127-130](../../ml_pipeline/dashboard/resolve.py:127)), so the out-of-distribution guard on Rd goes vacuous.
   If you choose B, you must also switch that support check to log space.
 
 Record the decision in the Phase 1 commit message. Everything below assumes **Option A**.
@@ -76,15 +76,15 @@ before/after record you cannot tell a correct fix from a regression.
 
 ### 1.1 Re-base the migration metric — **both** implementations
 
-- `plume_metrics` ([transport.py:610-616](physics/transport.py:610)): restrict the radial max to
+- `plume_metrics` ([transport.py:610-616](../../ml_pipeline/physics/transport.py:610)): restrict the radial max to
   down-gradient cells. Compute the mask as `mask & (X > 0)` for `max_dist`, or replace
   `max_migration_distance_m` with the `X > 0` radial max. `max_downgradient_m` already exists and is correct —
   keep it. `plume_halfwidth_m` should also be computed on the down-gradient mask (it currently inherits the
   upstream box's transverse extent).
-- `mc_field_metrics` ([transport.py:882-883](physics/transport.py:882)): apply the identical restriction to
+- `mc_field_metrics` ([transport.py:882-883](../../ml_pipeline/physics/transport.py:882)): apply the identical restriction to
   `dist[bucket]`. **This is the one that produces training labels.**
 - **Area decision:** the upstream artifact box is currently counted in `affected_area_ha`. The E1 disc
-  ([E1_geometry_design.md](E1_geometry_design.md) §1) is the *intended* representation of the contaminated
+  ([E1_geometry_design.md](../../ml_pipeline/E1_geometry_design.md) §1) is the *intended* representation of the contaminated
   source footprint. Keep the disc, and restrict the *plume* mask contribution to `X > 0` so the box is not
   double-counting the disc region. Document the choice in the docstring — the disc is the physical claim,
   the box is a solution artifact.
@@ -94,11 +94,11 @@ before/after record you cannot tell a correct fix from a regression.
 Apply β_eff = β · R_m consistently at all three mirrored sites. Use the same `R_m` expression already in
 `matrix_sigma` (do not re-derive it — factor it into a shared helper so the two cannot drift):
 
-- `transport.params_from_features` ([:648-655](physics/transport.py:648)): `beta_k` for the fractured branch.
-- `generate._draw_params` ([:276-284](synthetic/generate.py:276)): `beta_k`, **and** the local
-  `v_c = v_base / (1 + beta_k)` used for `atten_per_m` ([:313](synthetic/generate.py:313)) — otherwise
+- `transport.params_from_features` ([:648-655](../../ml_pipeline/physics/transport.py:648)): `beta_k` for the fractured branch.
+- `generate._draw_params` ([:276-284](../../ml_pipeline/synthetic/generate.py:276)): `beta_k`, **and** the local
+  `v_c = v_base / (1 + beta_k)` used for `atten_per_m` ([:313](../../ml_pipeline/synthetic/generate.py:313)) — otherwise
   attenuation and kinematics disagree.
-- `feature_engineering.build_feature_row` ([:207-220](data_prep/feature_engineering.py:207)): the `beta_k`
+- `feature_engineering.build_feature_row` ([:207-220](../../ml_pipeline/data_prep/feature_engineering.py:207)): the `beta_k`
   passed to `front_position` for `_Xc_eval_m` and `_Xc_clean_m`. Under Option A the returned
   `dual_porosity_beta` / `retardation_Rd` fields are **unchanged**.
 
@@ -113,14 +113,14 @@ matrix retardation rises, so β_eff alone is a partial correction. Record this i
 
 `ml/predict.py:80` currently falls through to `1.0` because `texas_restoration_residual()` has no radium key.
 Route it through a single helper that overlays `P.RADIUM_RESTORATION_RESIDUAL` (0.99), mirroring
-[generate.py:165-168](synthetic/generate.py:165).
+[generate.py:165-168](../../ml_pipeline/synthetic/generate.py:165).
 
 **Note:** this fix *aligns serve to existing training* — training already sampled 0.99 × noise. It therefore
 requires **no re-bake on its own** and could ship as an independent hotfix if you want value before Phase 4.
 
 ### 1.4 Propagate fracture-kernel uncertainty (Finding #4)
 
-- Add a draw key `u_aperture` to `mc_draws` ([generate.py:227](synthetic/generate.py:227)) — same
+- Add a draw key `u_aperture` to `mc_draws` ([generate.py:227](../../ml_pipeline/synthetic/generate.py:227)) — same
   common-random-number discipline as the existing keys.
 - In `_draw_params`, sample the aperture from `P.FRACTURE["full_aperture_m"]` (lo, central, hi) using the
   existing `_triangular` helper, and pass `half_aperture_m = aperture/2` into `matrix_sigma`.
@@ -165,7 +165,7 @@ defaults, thresholds, units, and restoration residuals (including the radium ove
 
 Update importers: `ml/dataset.py:39-41`, `ml/predict.py:50-51`, `dashboard/resolve.py:32-35`,
 `synthetic/generate.py:72`, `synthetic/generate.py:189-194` (the `Cb` literals duplicate
-`resolve._BG_DEFAULT`). **Delete `resolve.ML_SPECIES` ([resolve.py:33](dashboard/resolve.py:33))** — it has
+`resolve._BG_DEFAULT`). **Delete `resolve.ML_SPECIES` ([resolve.py:33](../../ml_pipeline/dashboard/resolve.py:33))** — it has
 zero importers; the server correctly imports `predict.ML_SPECIES`.
 
 Extend the existing guard `test_phase1_fixes.py:356` so it asserts **every** module's view of the species
@@ -204,11 +204,11 @@ Record the reviewed decision before proceeding.
 
 **Gate 4:**
 - Mondrian scenario-level coverage **≥ 0.80** for all three band targets (current: 0.881 / 0.881 / 0.856).
-  If coverage fails, adjust `DELTA_INFLATE` ([train.py:57](ml/train.py:57)) and record why — as was done at
+  If coverage fails, adjust `DELTA_INFLATE` ([train.py:57](../../ml_pipeline/ml/train.py:57)) and record why — as was done at
   1.15 → 1.35 — rather than lowering the gate.
 - `monotonicity_on_manifold`: both `qin_law_holds` and `bleed_law_holds` true.
 - Per-species `r2_log_by_species` ≥ 0.60 for every species × target. Report the pooled R² too, but judge on
-  the log/per-species figures — the pooled number mixes ppb, mg/L and mBq/L (see [train.py:110-132](ml/train.py:110)).
+  the log/per-species figures — the pooled number mixes ppb, mg/L and mBq/L (see [train.py:110-132](../../ml_pipeline/ml/train.py:110)).
 - Full suite green against the new artifacts.
 - Reset the drift monitor after deploying (`POST /api/drift/reset`) — the pre-change baseline is meaningless
   against new artifacts; same atomic-cutover discipline as E1 Stage H.
@@ -220,14 +220,14 @@ Record the reviewed decision before proceeding.
 Deliberately after the retrain: these are serve-time corrections that do not touch labels, so they must not
 be entangled with the bake.
 
-1. **District λ steps ([resolve.py:331-358](dashboard/resolve.py:331)).** The per-district NAQUIM
+1. **District λ steps ([resolve.py:331-358](../../ml_pipeline/dashboard/resolve.py:331)).** The per-district NAQUIM
    `fracture_max_m` steps at district borders (measured: K 0.147 → 0.256, 1.74× over ~130 m). Blend
    `fracture_max_m` (or the resulting decay factor) across district boundaries using the same inverse-distance
    weighting `jharkhand_loader._blend_K_at_boundary` uses for K. Note the ordering: the K blend runs *before*
    depth decay and is unaware of λ — the blend must be applied to λ itself, not re-applied to K.
-2. **Belt-edge compound step ([resolve.py:314-321](dashboard/resolve.py:314)).** K (2.2×), thickness (4×),
+2. **Belt-edge compound step ([resolve.py:314-321](../../ml_pipeline/dashboard/resolve.py:314)).** K (2.2×), thickness (4×),
    C0 and the attenuation mode all flip at the constructed hull+buffer line. Taper the D5 shear-zone K and
-   thickness over `P.ORE_TAPER_KM` using the same ramp shape as `_belt_c0` ([resolve.py:134-167](dashboard/resolve.py:134)),
+   thickness over `P.ORE_TAPER_KM` using the same ramp shape as `_belt_c0` ([resolve.py:134-167](../../ml_pipeline/dashboard/resolve.py:134)),
    composing with the polygon-K blend rather than replacing it. Keep the C0 belt→none step as-is — that one is
    deliberate and documented ("the tool cannot invent contamination"), but update its justification comment,
    which currently describes the CSV geological envelope rather than the post-`61b1260` constructed hull.
@@ -240,12 +240,12 @@ Ranchi→Jaduguda transect < 0.3 (ratio < 1.35×, down from 1.74×); sulfate are
 
 ## Phase 6 — Frontend (Finding #1 user-facing half)
 
-- `renderMetrics` ([app.js:697](../frontend/ml_pipeline/app.js:697)): the "Max Migration Distance" card now
+- `renderMetrics` ([app.js:697](../../frontend/ml_pipeline/app.js:697)): the "Max Migration Distance" card now
   receives the corrected metric — verify it reads sensibly at radial pins.
-- Fix the Λ<1 note ([app.js:730-734](../frontend/ml_pipeline/app.js:730)): it currently claims the number is
+- Fix the Λ<1 note ([app.js:730-734](../../frontend/ml_pipeline/app.js:730)): it currently claims the number is
   "source-zone extent, not travel", which was wrong even as a mitigation (the disc radius is ~207 m, the
   reported number was 423 m). Restate it as down-gradient travel with the disc footprint reported separately.
-- Confirm `ml_envelope_ellipses` ([plume_geometry.py:114](dashboard/plume_geometry.py:114)) still renders
+- Confirm `ml_envelope_ellipses` ([plume_geometry.py:114](../../ml_pipeline/dashboard/plume_geometry.py:114)) still renders
   sensibly — it uses `migration_m` as the ellipse semi-major axis, so collapsed migration will shrink the
   envelopes substantially. This is correct, but check it does not degenerate to invisible.
 
