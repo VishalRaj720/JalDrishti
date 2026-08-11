@@ -80,16 +80,24 @@ async def setup_db(_bootstrap_test_db):
 
 
 @pytest.fixture(autouse=True)
-def _audit_writes_go_to_the_test_db(monkeypatch):
-    """Point the audit writer at the test database.
+def _own_session_writers_go_to_the_test_db(monkeypatch):
+    """Point every component that opens its OWN session at the test database.
 
-    `app.services.audit.record` deliberately opens its OWN session (so a
-    rolled-back request cannot erase its own audit record), which means it
-    bypasses the `get_db` override every other query goes through. Without this
-    patch the audit rows are written to the DEVELOPMENT database during tests —
-    which is both a false pass and real pollution of `groundwater_db`.
+    Two places deliberately bypass the `get_db` override:
+
+      * `app.services.audit.record` — so a rolled-back request cannot erase its
+        own audit record;
+      * the simulation background task — it outlives the request, so there is
+        no request session to borrow.
+
+    Both are correct designs and both write to the DEVELOPMENT database during
+    tests unless redirected here. That is a false pass *and* real pollution of
+    `groundwater_db`: the background task's run row landed in dev while the test
+    read the test database and saw its run stuck at `queued`.
     """
     monkeypatch.setattr("app.services.audit.AsyncSessionLocal", TestSessionLocal)
+    # Imported inside the function it is used in, so patch it at the source.
+    monkeypatch.setattr("app.database.AsyncSessionLocal", TestSessionLocal)
 
 
 @pytest_asyncio.fixture()

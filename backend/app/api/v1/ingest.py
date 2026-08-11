@@ -5,8 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.services.ingestion import IngestionService
-from app.dependencies import require_analyst_or_admin, require_any_role
+from app.dependencies import require_admin, require_any_role
 from app.exceptions import AppException
+
+# D-2 (docs/roles.md), fixed 2026-08-12: every POST here was
+# `require_analyst_or_admin`, but PRODUCT_DESIGN.md section 2 gives `analyst`
+# "no ingest". Ingest REPLACES reference geography, which is the same objection
+# section 3.1 raises against the deleted CRUD writes — it silently forks the
+# scientific basis of every simulation already run against that data. Writes are
+# admin-only; the data-quality report stays readable by all staff.
 
 router = APIRouter(prefix="/ingest", tags=["Data Ingestion"])
 
@@ -17,7 +24,7 @@ router = APIRouter(prefix="/ingest", tags=["Data Ingestion"])
 async def ingest_districts_geojson(
     file: UploadFile = File(..., description="GeoJSON FeatureCollection of districts"),
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
+    _=Depends(require_admin),
 ):
     """Upload a GeoJSON file to upsert district boundaries."""
     try:
@@ -33,7 +40,7 @@ async def ingest_districts_geojson(
 async def ingest_subdistricts_geojson(
     file: UploadFile = File(..., description="GeoJSON FeatureCollection of sub-districts/blocks"),
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
+    _=Depends(require_admin),
 ):
     """Upload a GeoJSON file to upsert sub-district (block) boundaries."""
     try:
@@ -49,7 +56,7 @@ async def ingest_subdistricts_geojson(
 async def ingest_aquifers_geojson(
     file: UploadFile = File(..., description="GeoJSON FeatureCollection of aquifers"),
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
+    _=Depends(require_admin),
 ):
     """Upload GeoJSON aquifers. Parses range strings → midpoint; fills missing
     porosity / hydraulic_conductivity from literature with `*_source` provenance tags."""
@@ -68,7 +75,7 @@ async def ingest_aquifers_geojson(
 async def ingest_groundwater_levels_json(
     file: UploadFile = File(..., description="CGWB station JSON with readings"),
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
+    _=Depends(require_admin),
 ):
     """Upload a single CGWB groundwater-level station JSON."""
     try:
@@ -89,7 +96,7 @@ async def ingest_groundwater_levels_json(
 async def ingest_water_quality_csv(
     file: UploadFile = File(..., description="Water-quality sample CSV"),
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
+    _=Depends(require_admin),
 ):
     """Upload a water-quality CSV. Creates monitoring_wells deduped by (lat,lon);
     derives TDS = 0.65 × EC with `tds_derived=true` when EC present and TDS absent."""

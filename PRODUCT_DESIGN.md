@@ -141,6 +141,36 @@ and `plume_parameters`).
 
 ---
 
+### 1.5 NEW — district and block geometry was transposed
+
+Found on 2026-08-12 while building the citizen district aggregate, and fixed by migration `0011`.
+
+`districts.geometry` and `blocks.geometry` were stored as **(lat, lon)** instead of (lon, lat). The
+source files are the cause: `District_Boundary_JH.geojson` and `Sub_District_Boundary_JH.geojson`
+violate RFC 7946 §3.1.1, while `Aquifers_Jharkhand.geojson` does not — it even declares EPSG:4326 —
+which is why aquifers, wells and ISR points were correct and only these two tables were wrong.
+
+**Nothing errored.** The polygons sat at (23.98, 85.68) instead of (85.68, 23.98): valid coordinates,
+just in the wrong place. The damage was silent and compounding:
+
+| Symptom | Consequence |
+|---|---|
+| Every `ST_Within` against a district or block matched nothing | `_find_block_for_point` always fell through to its "nearest block" fallback |
+| The fallback picked the same centroid every time | **All 397 monitoring wells were attributed to one block** |
+| A district map or aggregate read that attribution | The whole state's groundwater data would have appeared under a single district |
+
+The last row is why this was fixed before §3.5 shipped: the wrong answer would have been
+**public-facing and confidently wrong** — exactly the failure mode this document's audit history
+exists to prevent.
+
+After the fix, wells distribute sensibly across all 24 districts (Ranchi 54, East Singhbhum 28,
+Hazaribagh 27, …). `IngestionService._normalise_axis_order` now detects the order on load rather
+than hard-coding a swap, so it corrects itself if the upstream file is ever fixed and leaves
+already-correct files alone. Jharkhand's longitude (83.3–87.9) and latitude (21.9–25.4) bands do not
+overlap, which makes the detection reliable rather than a guess.
+
+---
+
 ## 2. Roles — built around the two stated audiences
 
 v1.0 proposed seven roles including `operator` (a mine operator with CRUD over its own sites). That
@@ -292,6 +322,58 @@ future one.
 | `GET /audit` | Who ran what, when — non-negotiable for a government portal |
 
 ---
+
+### 3.4 P3 — simulations on the real engine
+
+`POST /simulations/{isr_id}` now runs `ml_pipeline` and persists the result. It returns **202** with
+a queued run; a prediction takes ~5 s, too long to hold a request open. Poll
+`GET /simulations/runs/{run_id}`.
+
+| | |
+|---|---|
+| `POST /simulations/{isr_id}` | admin, analyst. Sliders only — **the location comes from the ISR point, never the body**, so a caller cannot run a scenario at a pin the registry does not hold |
+| `GET /simulations/runs/{run_id}` | staff |
+| `GET /simulations/runs?isr_id=` | staff |
+| `GET /simulations/{sim_id}` | staff. Legacy rows from the pre-P0 engine; nothing writes there any more |
+
+**Reproducibility is enforced, not encouraged.** Every completed run stores `model_card_sha`,
+`artifacts_sha` (one digest over the whole artifact bundle, so swapping a single `.joblib` is
+visible) and `code_version`. `ck_sim_runs_completed_is_pinned` **rejects a completed run that cannot
+name all three** — a screening number a regulator acted on has to be re-derivable.
+
+> **THE ML MODEL DOES NOT CONSUME FIELD DATA.** Only the pin and the operational sliders cross into
+> the engine — enforced by an allowlist in `app/services/ml_pipeline_adapter.py` that **refuses**,
+> rather than filters, a payload carrying anything else. Everything the engine needs (aquifer
+> properties, flow azimuth, gradient, fracture strike, baselines, the Texas source term) it resolves
+> from its own `Datasets/` and frozen artifacts.
+>
+> This is not tidiness. The surrogate's conformal bands were calibrated against a fixed input
+> distribution; feeding it freshly approved field chemistry would invalidate that calibration
+> **silently** — the bands would still print, and the 80% would no longer be 80%. Routing field data
+> into the model requires a deliberate re-bake, retrain and re-run of the coverage gate (§4.6 rule 9).
+> `test_approving_field_data_does_not_change_the_model_output` proves it end to end: it runs a
+> simulation, has a regulator approve a 9,999 ppb uranium reading at the same coordinates, re-runs,
+> and asserts the metrics are byte-identical.
+
+**Still outstanding in P3:** named/saved scenarios and `POST /scenarios/{id}/compare`. Runs are
+reproducible but not yet nameable or comparable.
+
+### 3.5 P6 (partial) — the citizen surface
+
+Built early to close D-3 in [`docs/roles.md`](docs/roles.md), where `citizen` could reach exactly one
+endpoint and the product's second named audience had no API at all.
+
+| | |
+|---|---|
+| `GET /public/risk/districts` | **no auth**, cached 1 h. All 24 districts, banded |
+| `GET /public/risk/{district_id}` | **no auth**, cached 1 h. Block breakdown with plain-language explanations and a `data_gap` count |
+
+Aggregates only — no site points, no well coordinates, no plume geometry, nothing from a simulation.
+These report **measurements, not predictions**: real CGWB sampling, never the surrogate, so the
+hypothetical-mine framing and the real-water-quality framing cannot blur on the surface a member of
+the public sees. Bands are words (`Low` / `Moderate` / `High concern`), per §4.4's copy rules.
+
+Still outstanding: C3 alert subscription and the C4 methods page.
 
 ## 4. Frontend design
 
@@ -769,6 +851,14 @@ Stated plainly, because the portal must not present them as solved:
 8. **The conformal band is validated, not guaranteed** (§4.3), and is void under `extrapolation`.
 9. **Station names are not unique** (§1.4a). Any aggregation that groups by name will silently
    over-merge 17 stations.
+10. **`analyst` no longer has ingest** (fixed 2026-08-12, roles.md D-2): the five `POST /ingest/*`
+    routes are admin-only, because ingest replaces reference geography.
+11. **District/block geometry was transposed until migration `0011`** (§1.5). Any analysis run
+    against the database before that date used a well-to-block attribution that put all 397 wells in
+    one block.
+12. **A field observation is evidence, not authority.** Approved field data becomes authoritative in
+    `water_samples` / `ore_observations`, but never reaches the surrogate (§3.4). A map value and a
+    model input are different things here, deliberately.
 
 A portal that shows these honestly is more defensible to a regulator than one that hides them — and
 this project's entire audit history is the argument for that.
@@ -782,10 +872,10 @@ this project's entire audit history is the argument for that.
 | **P0** ✅ | Delete the legacy simulation stub; strip the dead `DataGen_ModelMVP` references (§1.3) | **Done.** One physics path. `POST /simulations` returns 501 until P3 |
 | **P1** ✅ | `0006` drops the 5 orphans; `0007` adds `orgs`/`dataset_versions`/`audit_log`, links the load ledger, extends the role vocabulary; seed backfills all of it | **Done.** Schema matches reality, provenance spine populated (§5.2). `roles` tables deferred to P2 |
 | **P2** ✅ | Auth hardening, 5 roles, RLS, audit; endpoint cull 55 → 44 | **Done.** Closed an unauthenticated privilege-escalation hole (§3.0); `0008` migrated `viewer` → `citizen`; `0009` added `owner_org_id` + policies. **RLS needs the `jaldrishti_app` role switch to take effect** — see §2. Rate limiting already existed (slowapi) |
-| **P3** | Wire `POST /simulations` → `ml_pipeline`; scenarios; run persistence | Reproducible runs |
+| **P3** ✅ | Wire `POST /simulations` → `ml_pipeline`; run persistence with provenance | **Done.** Real physics replaces the 501. Every completed run pins model card + artifact bundle + git SHA (§3.4). **Named/saved scenarios and compare remain outstanding** |
 | **P4** | React shell: Login, Map Console, Site Registry | ◀ **MVP — demoable to stakeholders** |
 | **P5** | Simulation Studio: bands, provenance drawer, **ISR Excursion panel** | Full official decision support |
-| **P6** | **Citizen surface** (C1–C4) | Second audience served |
+| **P6** ◐ | **Citizen surface** (C1–C4) | **Partly done early**: `GET /public/risk/districts` and `/public/risk/{district_id}` ship the C1/C2 *data* (§3.5) to close roles.md D-3. The C3 alert subscription and C4 methods page remain |
 | **P7** | Monitoring & Alerts loop (+ Redis) + Data Gap Report | Proposal deliverables complete |
 | **P8** | Signed PDF reports, audit export, hardening | Production candidate |
 
@@ -814,5 +904,9 @@ Every quantitative claim in this document was checked on 2026-08-11 against the 
 | Radium 0.516 / 0.431; coverage 0.865 / 0.904 / 0.912 | `ml_pipeline/ml/artifacts/metrics.json` |
 | Species split, 2-of-3 rule, 75–180 m ring | `ml_pipeline/config/parameters.py` |
 | 4 dead `DataGen_ModelMVP` references | `grep -rn DataGen_ModelMVP backend/ ml_pipeline/` |
+| P3 runs on the real engine | live run against `groundwater_db` as `jaldrishti_app`: completed in 4.6 s, provenance pinned |
+| Approved field data does not move the model | `test_approving_field_data_does_not_change_the_model_output` — metrics byte-identical across an approved 9,999 ppb reading |
+| ML artifacts untouched by backend work | all 16 sha256 digests match `backend/tests/ml_artifact_hashes.json` |
+| Geometry fix | `ST_XMin/XMax` on `districts` before (21.97..25.35) and after (83.33..87.92) migration `0011` |
 
 If a number here ever disagrees with the code, **the code is right and this document is stale.**

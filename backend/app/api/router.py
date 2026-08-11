@@ -1,7 +1,7 @@
 """API v1 router factory."""
 from fastapi import APIRouter
 from app.api.v1 import (
-    auth, audit, field_observations, users, districts, blocks, global_blocks, aquifers, isr_points,
+    auth, audit, field_observations, public_risk, users, districts, blocks, global_blocks, aquifers, isr_points,
     simulations, ingest, monitoring_stations, global_monitoring,
     monitoring_wells, water_samples,
 )
@@ -10,6 +10,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(audit.router)
 api_router.include_router(field_observations.router)
+api_router.include_router(public_risk.router)
 api_router.include_router(users.router)
 api_router.include_router(districts.router)
 api_router.include_router(blocks.router)

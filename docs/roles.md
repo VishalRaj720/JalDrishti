@@ -212,12 +212,12 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/field-observations/{obs_id}/approve` | ● | ● | · | · | · |
 | `POST /api/v1/field-observations/{obs_id}/reject` | ● | ● | · | · | · |
 | `POST /api/v1/field-observations/{obs_id}/withdraw` | ● | · | · | ● | · |
-| `POST /api/v1/ingest/aquifers/geojson` | ● | · | ● | · | · |
+| `POST /api/v1/ingest/aquifers/geojson` | ● | · | · | · | · |
 | `GET /api/v1/ingest/data-quality-report` | ● | ● | ● | ● | · |
-| `POST /api/v1/ingest/districts/geojson` | ● | · | ● | · | · |
-| `POST /api/v1/ingest/groundwater-levels/json` | ● | · | ● | · | · |
-| `POST /api/v1/ingest/subdistricts/geojson` | ● | · | ● | · | · |
-| `POST /api/v1/ingest/water-quality/csv` | ● | · | ● | · | · |
+| `POST /api/v1/ingest/districts/geojson` | ● | · | · | · | · |
+| `POST /api/v1/ingest/groundwater-levels/json` | ● | · | · | · | · |
+| `POST /api/v1/ingest/subdistricts/geojson` | ● | · | · | · | · |
+| `POST /api/v1/ingest/water-quality/csv` | ● | · | · | · | · |
 | `GET /api/v1/isr-points` | ● | ● | ● | ● | · |
 | `POST /api/v1/isr-points` | ● | · | ● | · | · |
 | `DELETE /api/v1/isr-points/{isr_id}` | ● | · | · | · | · |
@@ -229,6 +229,10 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | · | ● | · | · |
 | `GET /api/v1/monitoring-wells/{well_id}` | ● | ● | ● | ● | · |
+| `GET /api/v1/public/risk/districts` | ○ | ○ | ○ | ○ | ○ |
+| `GET /api/v1/public/risk/{district_id}` | ○ | ○ | ○ | ○ | ○ |
+| `GET /api/v1/simulations/runs` | ● | ● | ● | ● | · |
+| `GET /api/v1/simulations/runs/{run_id}` | ● | ● | ● | ● | · |
 | `POST /api/v1/simulations/{isr_id}` | ● | · | ● | · | · |
 | `GET /api/v1/simulations/{sim_id}` | ● | ● | ● | ● | · |
 | `GET /api/v1/users` | ● | · | · | · | · |
@@ -243,7 +247,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 50/54 · **regulator** 28/54 · **analyst** 38/54 · **field_officer** 27/54 · **citizen** 1/54
+Reachable endpoints per role — **admin** 52/58 · **regulator** 30/58 · **analyst** 35/58 · **field_officer** 29/58 · **citizen** 1/58
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

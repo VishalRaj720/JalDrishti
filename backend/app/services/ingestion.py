@@ -191,6 +191,46 @@ class IngestionService:
         })
         return created.id, True
 
+    # ----------------- axis-order normalisation -----------------
+
+    # Jharkhand's longitude and latitude bands do not overlap, which makes a
+    # transposed file detectable rather than a guess:
+    #   longitude 83.3 .. 87.9      latitude 21.9 .. 25.4
+    _LON_BAND = (80.0, 90.0)
+    _LAT_BAND = (19.0, 28.0)
+
+    @classmethod
+    def _normalise_axis_order(cls, gdf, label: str):
+        """Flip (lat, lon) files to the (lon, lat) order GeoJSON requires.
+
+        `District_Boundary_JH.geojson` and `Sub_District_Boundary_JH.geojson`
+        store coordinates as (lat, lon), violating RFC 7946 §3.1.1.
+        `Aquifers_Jharkhand.geojson` does not — it even declares EPSG:4326 —
+        which is why districts and blocks landed in the database mirrored while
+        aquifers, wells and ISR points were fine. Nothing failed loudly: the
+        polygons simply sat at (23.98, 85.68) instead of (85.68, 23.98), so
+        every spatial join against them returned nothing and a district map
+        would have drawn Jharkhand in the wrong place.
+
+        Detection rather than a hard-coded swap, so this corrects itself if the
+        upstream file is ever fixed, and does nothing to files that are already
+        right.
+        """
+        if gdf.empty or gdf.geometry.isna().all():
+            return gdf
+        minx, miny, maxx, maxy = gdf.total_bounds
+        x_is_lat = cls._LAT_BAND[0] <= minx and maxx <= cls._LAT_BAND[1]
+        y_is_lon = cls._LON_BAND[0] <= miny and maxy <= cls._LON_BAND[1]
+        if x_is_lat and y_is_lon:
+            logger.warning(
+                f"{label}: coordinates are (lat, lon) — bounds x={minx:.2f}..{maxx:.2f} "
+                f"y={miny:.2f}..{maxy:.2f}. Flipping to (lon, lat) per RFC 7946.")
+            from shapely.ops import transform
+            gdf = gdf.copy()
+            gdf["geometry"] = gdf.geometry.apply(
+                lambda g: None if g is None else transform(lambda x, y, z=None: (y, x), g))
+        return gdf
+
     # ----------------- districts -----------------
 
     async def ingest_geojson_districts(self, geojson_bytes: bytes, file_name: Optional[str] = None) -> Dict[str, int]:
@@ -199,6 +239,7 @@ class IngestionService:
         if not PANDAS_AVAILABLE:
             raise RuntimeError("geopandas not installed.")
         gdf = gpd.read_file(io.BytesIO(geojson_bytes))
+        gdf = self._normalise_axis_order(gdf, "districts")
         inserted, updated, skipped = 0, 0, 0
         source_id, _ = await self._register_source(
             name="districts_geojson", source_type="geojson_district",
@@ -236,6 +277,7 @@ class IngestionService:
         if not PANDAS_AVAILABLE:
             raise RuntimeError("geopandas not installed.")
         gdf = gpd.read_file(io.BytesIO(geojson_bytes))
+        gdf = self._normalise_axis_order(gdf, "subdistricts")
         inserted, updated, skipped = 0, 0, 0
         source_id, _ = await self._register_source(
             name="subdistricts_geojson", source_type="geojson_subdistrict",
@@ -275,6 +317,7 @@ class IngestionService:
         if not PANDAS_AVAILABLE:
             raise RuntimeError("geopandas not installed.")
         gdf = gpd.read_file(io.BytesIO(geojson_bytes))
+        gdf = self._normalise_axis_order(gdf, "aquifers")
         source_id, is_new = await self._register_source(
             name="aquifers_geojson", source_type="geojson_aquifer",
             file_name=file_name, content=geojson_bytes, row_count=len(gdf),
