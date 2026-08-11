@@ -86,6 +86,9 @@ async def get_current_user(
         db,
         role=user.role.value,
         org_id=(str(user.org_id) if user.org_id else None),
+        # field_observations policies scope a field officer to their OWN
+        # submissions, so the identity has to reach the database too.
+        user_id=str(user.id),
     )
     return user
 

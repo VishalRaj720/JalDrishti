@@ -30,6 +30,7 @@ async def set_rls_context(
     *,
     role: str = "",
     org_id: Optional[str] = None,
+    user_id: Optional[str] = None,
     bypass: bool = False,
 ) -> None:
     """Tell the RLS policies who is asking, for this transaction only.
@@ -44,8 +45,10 @@ async def set_rls_context(
     await session.execute(
         text("SELECT set_config('app.current_role', :role, true), "
              "       set_config('app.current_org_id', :org, true), "
+             "       set_config('app.current_user_id', :uid, true), "
              "       set_config('app.bypass_rls', :bypass, true)"),
-        {"role": role or "", "org": org_id or "", "bypass": "on" if bypass else "off"},
+        {"role": role or "", "org": org_id or "", "uid": user_id or "",
+         "bypass": "on" if bypass else "off"},
     )
 
 

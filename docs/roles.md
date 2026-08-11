@@ -18,7 +18,7 @@ at risk. The other three roles exist to serve those two.
 | `admin` | BIT Sindri / TEXMiN, the system owner | Operate the platform: accounts, ingest, dataset promotion, everything |
 | `regulator` | **CGWB / SPCB / district officer** — the primary government user | Read every site, publish and archive them, export signed reports, resolve alerts, read the audit log |
 | `analyst` | Technical staff and researchers | Run and save scenarios against sites their organisation owns |
-| `field_officer` | Station and well data collectors | Upload readings and samples — the CPS data path |
+| `field_officer` | Station and well data collectors | Submit field observations — ore sightings, water quality, groundwater levels — for review (§3). Never writes authoritative data directly |
 | `citizen` | **Common user**, resident of a mining district | See district/block-level risk in plain language. Nothing precise |
 
 ### The distinctions that actually matter
@@ -65,18 +65,65 @@ decision, not a cleanup. **All three predate the P2 cutover and none is a regres
 
 | # | Drift | Reality | Consequence |
 |---|---|---|---|
-| **D-1** | **`field_officer` cannot upload anything** | 22 reachable endpoints, **all reads, zero writes**. `require_field_upload` is defined in `app/dependencies.py` and never applied to a route | The CPS data path described in `PRODUCT_DESIGN.md` §7 has no one authorised to walk it. Field officers are, in practice, read-only accounts |
+| ~~**D-1**~~ | ~~`field_officer` cannot upload anything~~ | **RESOLVED 2026-08-12.** The role now has a real write path — `POST /field-observations` and `/withdraw` — through the review workflow in §3. It still holds no direct write to any authoritative table, which is the point | — |
 | **D-2** | **`analyst` can ingest** | All five `POST /ingest/*` routes admit `analyst` | §2 says analyst has "no ingest". Ingest replaces reference geography — the same objection §3.1 raises against the deleted CRUD writes: it "silently forks the scientific basis of every simulation" |
-| **D-3** | **`citizen` can reach exactly one endpoint** | `1/47` — `GET /auth/me` | The second named audience has no API surface. This one is *expected*: the citizen endpoints (`GET /public/risk/{district_id}`, C1–C4) are P6. Listed so the `1/47` in the matrix is not mistaken for a bug |
+| **D-3** | **`citizen` can reach exactly one endpoint** | `1/54` — `GET /auth/me` | The second named audience has no API surface. This one is *expected*: the citizen endpoints (`GET /public/risk/{district_id}`, C1–C4) are P6. Listed so the tally is not mistaken for a bug |
 
-**Recommended resolution**, when the scope allows it: apply `require_field_upload` to
-`POST .../readings` and `POST /water-samples/bulk` (fixes D-1), and narrow `POST /ingest/*` to
-`require_admin` (fixes D-2). Both are one-line changes to route guards; both alter who can write to
-real data, so neither belongs in a migration-focused change.
+**Recommended resolution for D-2**, when the scope allows it: narrow `POST /ingest/*` to
+`require_admin`. A one-line guard change, but it alters who can overwrite reference geography, so it
+is a decision rather than a cleanup.
 
 ---
 
-## 3. How authorization is enforced
+## 3. Field observations — the review workflow
+
+A field officer's job is to record what is discovered *after* the initial datasets were loaded: a
+new uranium ore outcrop, a water-quality reading, a groundwater level. Their submissions must not
+become authoritative on their own word, and must never reach a contamination calculation unreviewed.
+
+```
+field officer                 admin / regulator              authoritative data
+──────────────                ─────────────────              ──────────────────
+POST /field-observations
+   → status: pending  ────────►  GET /field-observations
+   (nothing changes yet)         ?status=pending
+                                     │
+                                     ├── /approve ──────────►  row written
+                                     │                         (+ applied_id)
+                                     └── /reject   ─────────►  nothing written
+```
+
+**Why proposals live in their own table.** The alternative — a `status` column on `water_samples` —
+fails open: the guarantee would then depend on every present and future query remembering
+`WHERE status = 'approved'`, and the first one that forgets feeds unreviewed field data into a
+contamination number. A pending proposal is simply **not in `water_samples`**, so no query can see
+it by accident, including queries nobody has written yet.
+
+**What stops a bad submission from becoming authoritative:**
+
+| Guard | Where |
+|---|---|
+| Pending rows are absent from the authoritative tables | schema shape |
+| A submitter can never review their own proposal | `ck_field_obs_no_self_review`, a CHECK constraint — not just a service test |
+| Only `admin`/`regulator` may approve or reject | `require_regulator_or_admin` |
+| A payload may only set allowlisted columns | `ALLOWED_FIELDS` per type — keeps the approval path away from `synthetic`, ids, and anything unreviewed |
+| Approving a stale proposal cannot clobber a newer edit | row fingerprint taken at submit, rechecked at approval → `409` |
+| A decided proposal cannot be re-approved | status check → `409`, so a double click cannot double-apply |
+| `ore_observations` is writable only under the system bypass | RLS policy — **no role**, including admin, can insert an authoritative ore record without going through a review |
+| One officer cannot read another's unreviewed submissions | `field_obs_read` RLS policy, scoped by `app.current_user_id` |
+
+**Provenance.** Every transition writes an audit row carrying `old` and `new` payloads, the
+submitter, the reviewer and the decision note. The proposal row itself keeps `previous` and
+`proposed` permanently, so a value on the map can always be traced back to who observed it and who
+approved it. Refused approval attempts are audited too, as `access_denied`.
+
+**The map keeps them apart.** `GET /field-observations/map` returns `pending` and `authoritative` as
+two separate collections rather than one list with a flag, because a merged list invites a client to
+draw unreviewed field input as though it were confirmed.
+
+---
+
+## 4. How authorization is enforced
 
 Three layers, each of which can independently refuse a request.
 
@@ -131,7 +178,7 @@ role including `admin`.
 
 ---
 
-## 4. Role × endpoint matrix
+## 5. Role × endpoint matrix
 
 Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matrix` from `backend/`.
 
@@ -158,6 +205,13 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/districts/{district_id}` | ● | ● | ● | ● | · |
 | `GET /api/v1/districts/{district_id}/blocks` | ● | ● | ● | ● | · |
 | `GET /api/v1/districts/{district_id}/blocks/{block_id}` | ● | ● | ● | ● | · |
+| `GET /api/v1/field-observations` | ● | ● | ● | ● | · |
+| `POST /api/v1/field-observations` | ● | · | · | ● | · |
+| `GET /api/v1/field-observations/map` | ● | ● | ● | ● | · |
+| `GET /api/v1/field-observations/{obs_id}` | ● | ● | ● | ● | · |
+| `POST /api/v1/field-observations/{obs_id}/approve` | ● | ● | · | · | · |
+| `POST /api/v1/field-observations/{obs_id}/reject` | ● | ● | · | · | · |
+| `POST /api/v1/field-observations/{obs_id}/withdraw` | ● | · | · | ● | · |
 | `POST /api/v1/ingest/aquifers/geojson` | ● | · | ● | · | · |
 | `GET /api/v1/ingest/data-quality-report` | ● | ● | ● | ● | · |
 | `POST /api/v1/ingest/districts/geojson` | ● | · | ● | · | · |
@@ -189,19 +243,18 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 43/47 · **regulator** 23/47 · **analyst** 35/47 · **field_officer** 22/47 · **citizen** 1/47
+Reachable endpoints per role — **admin** 50/54 · **regulator** 28/54 · **analyst** 38/54 · **field_officer** 27/54 · **citizen** 1/54
 
 <!-- END GENERATED AUTHZ MATRIX -->
 
 ### Reading the tallies
 
-- **admin 43/47** — not 47/47, because `POST /auth/login` and the two public routes are counted as
+- **admin 50/54** — not 54/54, because `POST /auth/login` and the two public routes are counted as
   `○` (no authentication) rather than as an admin permission.
-- **regulator 23/47** — reads everything, writes nothing. The publish/archive/export/alert endpoints
-  that make this role meaningful are P5 and P8; until they exist a regulator is a read-only account
-  with audit access.
-- **analyst 35/47** — the widest working role, and the one to watch: 12 of those are writes,
-  including the five ingest routes it should not have (D-2).
-- **field_officer 22/47** — identical to regulator's read set minus the audit log, with no writes
-  (D-1).
-- **citizen 1/47** — `GET /auth/me`, by design until P6.
+- **regulator 28/54** — reads everything, and now approves or rejects field observations. The
+  publish/archive/export/alert endpoints are still P5 and P8.
+- **analyst 38/54** — the widest working role, and the one to watch: it can still ingest (D-2), and
+  it can read the review queue but not decide on it.
+- **field_officer 27/54** — reads, plus the three write routes that make the role real: submit,
+  withdraw, and reading back its own queue. Still zero direct writes to authoritative tables.
+- **citizen 1/54** — `GET /auth/me`, by design until P6.

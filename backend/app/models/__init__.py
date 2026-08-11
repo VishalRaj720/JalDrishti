@@ -24,6 +24,10 @@ from app.models.water_sample import WaterSample  # noqa: F401
 # P1: provenance spine + audit trail
 from app.models.dataset_version import DatasetVersion  # noqa: F401
 from app.models.audit_log import AuditLog  # noqa: F401
+from app.models.field_observation import (  # noqa: F401
+    FieldObservation, OreObservation, ObservationType,
+    ObservationOperation, ObservationStatus,
+)
 
 __all__ = [
     "Org",
@@ -39,4 +43,6 @@ __all__ = [
     "WaterSample",
     "DatasetVersion",
     "AuditLog",
+    "FieldObservation", "OreObservation",
+    "ObservationType", "ObservationOperation", "ObservationStatus",
 ]
