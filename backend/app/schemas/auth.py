@@ -1,12 +1,11 @@
-"""Auth Pydantic schemas."""
-from pydantic import BaseModel, EmailStr
+"""Auth Pydantic schemas.
 
-
-class SignupRequest(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-    role: str = "viewer"
+`SignupRequest` was deleted in P2 along with the endpoint that consumed it. Its
+`role: str = "viewer"` field was client-settable on an unauthenticated route and
+flowed unchecked into `UserRole(...)`, which let anyone mint themselves an
+admin. See `app/api/v1/auth.py` for the full account.
+"""
+from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):

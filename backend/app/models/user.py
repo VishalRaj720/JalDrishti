@@ -35,7 +35,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     role: Mapped[UserRole] = mapped_column(
         PGEnum(UserRole, name="userrole", create_type=False),
         nullable=False,
-        default=UserRole.viewer,
+        default=UserRole.citizen,
     )
     org_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("orgs.id", ondelete="RESTRICT"),

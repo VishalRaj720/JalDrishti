@@ -9,7 +9,7 @@ from app.models.user import UserRole
 class UserBase(BaseModel):
     username: str
     email: EmailStr
-    role: UserRole = UserRole.viewer
+    role: UserRole = UserRole.citizen
 
 
 class UserCreate(UserBase):

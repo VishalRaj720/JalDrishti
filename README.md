@@ -23,7 +23,7 @@ Three codebases, deliberately **not yet wired together**. Joining them is what
 | Component | State |
 |---|---|
 | `ml_pipeline/` | **The mature part.** Physics-informed ISR plume surrogate, 307 passing tests, transport kernel benchmarked against an exact solution, conformal bands validated on the serving distribution, 12-entry assumption register. Frozen. |
-| `backend/` | FastAPI + PostgreSQL/PostGIS, JWT + 3-role RBAC, idempotent seed. Does **not** call `ml_pipeline/` — `services/ml_prediction.py` is still a placeholder. |
+| `backend/` | FastAPI + PostgreSQL/PostGIS, JWT + 5-role RBAC, idempotent seed, provenance spine and audit log. Does **not** call `ml_pipeline/` yet — the fabricated stub engine was deleted in P0 and `POST /simulations` returns 501 until P3 wires the real one. |
 | `frontend/` | Two separate UIs: the static `JalDrishti.html` prototype (talks to `backend/`), and `frontend/ml_pipeline/` (vanilla JS + Leaflet, talks to the surrogate's own dashboard server). |
 
 ## Repository layout
@@ -116,8 +116,8 @@ Swagger UI at `http://localhost:8000/docs`. Routes under `/api/v1`: `/auth`, `/u
 `/monitoring-stations`, `/monitoring-wells`, `/water-samples`, `/ingest`; plus
 `/health`, `/docs`, `/metrics`.
 
-Simulations run as **in-process background tasks** — there is no Celery or Redis in
-this checkout.
+There is no Celery or Redis in this checkout. `POST /simulations` currently returns
+501 — see Known gaps.
 
 ### Tests
 ```bash
@@ -150,12 +150,18 @@ Brings up `db` (PostGIS) + `backend`.
 |---|---|---|
 | admin | `admin@jaldrishti.local` | `admin123` |
 | analyst | `analyst@jaldrishti.local` | `analyst123` |
-| viewer | `viewer@jaldrishti.local` | `viewer123` |
+| citizen | `citizen@jaldrishti.local` | `citizen123` |
+
+The five designed roles are `admin`, `regulator`, `analyst`, `field_officer` and
+`citizen`. `viewer` was renamed to `citizen` by migration `0008`; any pre-existing
+`viewer` account keeps its email and is moved to the `citizen` role. Only the three
+above are seeded — `regulator` and `field_officer` are created per deployment.
 
 ## Known gaps
 
-- `backend/services/ml_prediction.py` does not call `ml_pipeline/`. Wiring the two is
-  the central task in [`PRODUCT_DESIGN.md`](PRODUCT_DESIGN.md).
+- `POST /simulations` returns 501. The backend's own stub engine was deleted in P0
+  (it fabricated results); wiring it to `ml_pipeline/` is P3 in
+  [`PRODUCT_DESIGN.md`](PRODUCT_DESIGN.md).
 - Two unrelated frontends exist; the product design picks one path.
 - The surrogate is calibrated on transferred Texas physics — see the readiness
   report's frozen-limitations section before quoting any number from it.

@@ -42,43 +42,11 @@ async def get_aquifer(
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
-
-@router.post("", response_model=AquiferResponse, status_code=201)
-async def create_aquifer(
-    payload: AquiferCreate,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
-):
-    try:
-        return await AquiferService(db).create(payload)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"DEBUG ERROR: {str(e)}")
-
-
-@router.put("/{aquifer_id}", response_model=AquiferResponse)
-async def update_aquifer(
-    aquifer_id: uuid.UUID,
-    payload: AquiferUpdate,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
-):
-    try:
-        return await AquiferService(db).update(aquifer_id, payload)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
-
-
-@router.delete("/{aquifer_id}", status_code=204)
-async def delete_aquifer(
-    aquifer_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
-):
-    try:
-        await AquiferService(db).delete(aquifer_id)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
+# ── Reference geography is READ-ONLY ────────────────────────────────
+# P2 (PRODUCT_DESIGN.md section 3.1) deleted POST / PUT / DELETE here.
+# Aquifers come from CGWB/GSI and are not user-editable content: editing them
+# through an ad-hoc CRUD endpoint silently forks the scientific basis of every
+# simulation that has already run against them, with no version record.
+# The supported path is versioned bulk ingest -- POST /api/v1/ingest/* --
+# which checksums the source file and writes a `data_sources` row linked to a
+# `dataset_versions` entry.

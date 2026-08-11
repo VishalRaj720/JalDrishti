@@ -7,7 +7,7 @@ ONE command takes an empty database all the way to a fully populated one:
 
 What it does, in order:
   0. Schema      : PostGIS extension + ENUM types + all tables (via scripts.init_db)
-  1. Users       : default RBAC users (admin / analyst / viewer)
+  1. Users       : default RBAC users (admin / analyst / citizen)
   2. ISR points  : a hypothetical uranium ISR injection point near Jaduguda
   3. Geodata     : Jharkhand districts, sub-districts (blocks), aquifers,
                    groundwater-level time series, and CGWB water-quality samples
@@ -67,7 +67,7 @@ TARGET_MIN_SAMPLES = 200
 SEED_USERS = [
     {"username": "admin",   "email": "admin@jaldrishti.local",   "password": "admin123",   "role": UserRole.admin},
     {"username": "analyst", "email": "analyst@jaldrishti.local", "password": "analyst123", "role": UserRole.analyst},
-    {"username": "viewer",  "email": "viewer@jaldrishti.local",  "password": "viewer123",  "role": UserRole.viewer},
+    {"username": "citizen", "email": "citizen@jaldrishti.local", "password": "citizen123", "role": UserRole.citizen},
 ]
 
 # A hypothetical ISR field near Jaduguda — the East Singhbhum uranium belt is the

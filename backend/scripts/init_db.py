@@ -30,7 +30,24 @@ _ENUMS = {
 
 
 def _create_enum_sql(name: str, values: list[str]) -> str:
+    """Create the enum, or reconcile it if it already exists.
+
+    The create-only version of this silently skipped databases that already had
+    the type, so when P2 added `regulator`, `field_officer` and `citizen` to
+    `UserRole`, every pre-existing database — including the test database — kept
+    the three-value enum and failed at INSERT with "invalid input value for enum
+    userrole". Creating without reconciling means `_ENUMS` deriving from the ORM
+    buys nothing after the first run.
+
+    `ADD VALUE IF NOT EXISTS` is append-only, which matches Postgres: a value
+    cannot be removed from an enum, so this reconciles additions only. Removing
+    one requires a deliberate type swap in a migration.
+    """
     labels = ", ".join(f"'{v}'" for v in values)
+    adds = "\n".join(
+        f"        ALTER TYPE {name} ADD VALUE IF NOT EXISTS '{v}';"
+        for v in values
+    )
     # CREATE TYPE has no IF NOT EXISTS; guard with a catalog check.
     return f"""
     DO $$ BEGIN
@@ -38,6 +55,7 @@ def _create_enum_sql(name: str, values: list[str]) -> str:
             CREATE TYPE {name} AS ENUM ({labels});
         END IF;
     END $$;
+{adds}
     """
 
 

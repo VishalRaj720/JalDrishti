@@ -79,6 +79,19 @@ async def setup_db(_bootstrap_test_db):
         await conn.run_sync(Base.metadata.drop_all)
 
 
+@pytest.fixture(autouse=True)
+def _audit_writes_go_to_the_test_db(monkeypatch):
+    """Point the audit writer at the test database.
+
+    `app.services.audit.record` deliberately opens its OWN session (so a
+    rolled-back request cannot erase its own audit record), which means it
+    bypasses the `get_db` override every other query goes through. Without this
+    patch the audit rows are written to the DEVELOPMENT database during tests —
+    which is both a false pass and real pollution of `groundwater_db`.
+    """
+    monkeypatch.setattr("app.services.audit.AsyncSessionLocal", TestSessionLocal)
+
+
 @pytest_asyncio.fixture()
 async def db_session(setup_db):
     async with TestSessionLocal() as session:

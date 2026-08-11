@@ -167,13 +167,70 @@ aggregation**; regulators get points. This is a deliberate design constraint, no
 Enforced with **row-level security in Postgres** keyed on `owner_org_id` and role, not only in
 application code — so a service bug cannot leak site detail to a citizen session.
 
+> **RLS shipped in P2, and it is inert until one deployment change is made.** Postgres skips
+> row-level security entirely for a superuser or any role with `BYPASSRLS`. The API connects as
+> `postgres`, which is both. This was verified rather than assumed: a table with
+> `FORCE ROW LEVEL SECURITY` and a `USING (false)` deny-all policy still returned **every row** to
+> the application's connection.
+>
+> Writing policies under that connection would be **security theatre** — present in the schema,
+> clean on review, enforcing nothing. So P2 ships three things together:
+> `0009_isr_owner_org_and_rls` (the policies, plus `isr_points.owner_org_id`),
+> `scripts/create_app_role.py` (creates `jaldrishti_app`: `NOSUPERUSER NOBYPASSRLS`, DML only, no
+> ownership — so the app cannot drop a policy that constrains it), and a **startup guard** that logs
+> a loud warning whenever policies exist but the connected role can bypass them. It is currently
+> firing.
+>
+> `tests/test_rls.py` proves enforcement by connecting **as a non-bypassing role** and checking what
+> it can actually see, not by asserting rows exist in `pg_policies`. It also pins the policy's staff
+> list against `app.dependencies.STAFF_ROLES` so the two cannot drift.
+>
+> **To activate:** run `python -m scripts.create_app_role --password ...` and point the API's
+> `DATABASE_URL` at `jaldrishti_app`, leaving migrations on the owner role. Until then, access
+> control is application-layer only — which is what the warning says.
+
+**One RLS semantic worth knowing before relying on it.** A write blocked by a `USING` clause affects
+**zero rows; it does not raise**. Postgres only errors on a `WITH CHECK` violation. So a denied
+`UPDATE` or `DELETE` fails *silently* — anything built to detect tampering by catching an exception
+would never fire. The audit log's append-only guarantee has this shape: there is no `UPDATE` or
+`DELETE` policy on `audit_log`, so both affect nothing, for every role.
+
 ---
 
 ## 3. API audit — keep, delete, add
 
 **55 legacy + 13 pipeline = 68 endpoints today → ~40 in the target design.**
 
-### 3.1 DELETE — 22 endpoints
+### 3.0 What P2 actually deleted, and one thing this section missed
+
+**55 → 44 endpoints.** The list in §3.1 was written before the code was read closely; three
+corrections came out of executing it.
+
+> **A privilege-escalation hole §3.1 did not list.** `POST /auth/signup` was **unauthenticated** and
+> accepted a client-settable `role` that flowed into `UserRole(data.role)` with no server-side check.
+> Verified exploitable end to end: an anonymous caller created an `admin` (201), logged in, and read
+> the admin-only user list (200). §3.1 deleted `POST /users` for being "the wrong primitive for a
+> government portal" while the *same primitive, unauthenticated*, sat one router away. **Deleted in
+> P2**, with `tests/test_auth_hardening.py` written against the property — no unauthenticated route
+> may mint a user — rather than against the path, so it cannot reappear under another name.
+
+**`GET /blocks`, `/monitoring-stations`, `/monitoring-stations/count` are NOT duplicates — kept.**
+§3.1 called them "undocumented duplicates of the scoped equivalents". They are not. `GET /blocks`
+returns all 264 blocks statewide (`BlockService.list_all`); the scoped route returns one district's.
+The Map Console in §4.1 lists Districts, Blocks and Stations as *statewide layers* — deleting these
+would have broken the screen this document specifies, and forced 24 nested calls to rebuild it.
+
+**`POST/PUT/DELETE /users` kept, admin-only.** §3.1 deletes them as "superseded by invitation + role
+assignment" — but the invitation flow (§3.3) does not exist yet, and with signup gone these are the
+only way to administer accounts. They were already behind `require_admin`. Delete them when
+`POST /orgs/{id}/invite` ships, not before.
+
+**The 5 `ml_pipeline` deletions are deferred.** §3.1 removes four overlay endpoints because they are
+"duplicated by the unified geography service" — a service that does not exist until P4/P5. The
+frozen dashboard serves them today. Deleting them in P2 would break a working screen to satisfy a
+future one.
+
+### 3.1 DELETE — the original list
 
 | Endpoint(s) | Why it goes |
 |---|---|
@@ -705,7 +762,7 @@ this project's entire audit history is the argument for that.
 |---|---|---|
 | **P0** ✅ | Delete the legacy simulation stub; strip the dead `DataGen_ModelMVP` references (§1.3) | **Done.** One physics path. `POST /simulations` returns 501 until P3 |
 | **P1** ✅ | `0006` drops the 5 orphans; `0007` adds `orgs`/`dataset_versions`/`audit_log`, links the load ledger, extends the role vocabulary; seed backfills all of it | **Done.** Schema matches reality, provenance spine populated (§5.2). `roles` tables deferred to P2 |
-| **P2** | Gateway: auth, 5 roles, RLS, rate limits, audit; delete the 22 dead endpoints | Safe to expose |
+| **P2** ✅ | Auth hardening, 5 roles, RLS, audit; endpoint cull 55 → 44 | **Done.** Closed an unauthenticated privilege-escalation hole (§3.0); `0008` migrated `viewer` → `citizen`; `0009` added `owner_org_id` + policies. **RLS needs the `jaldrishti_app` role switch to take effect** — see §2. Rate limiting already existed (slowapi) |
 | **P3** | Wire `POST /simulations` → `ml_pipeline`; scenarios; run persistence | Reproducible runs |
 | **P4** | React shell: Login, Map Console, Site Registry | ◀ **MVP — demoable to stakeholders** |
 | **P5** | Simulation Studio: bands, provenance drawer, **ISR Excursion panel** | Full official decision support |

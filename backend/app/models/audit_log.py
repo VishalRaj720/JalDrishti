@@ -11,7 +11,8 @@ government portal. Two deliberate choices:
 """
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from ipaddress import IPv4Address, IPv6Address
+from typing import Any, Optional, Union
 from sqlalchemy import (String, Text, BigInteger, DateTime, ForeignKey, Index,
                         func)
 from sqlalchemy.dialects.postgresql import UUID, JSONB, INET
@@ -38,7 +39,9 @@ class AuditLog(Base):
     entity_type: Mapped[str] = mapped_column(String(64), nullable=False)
     entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     detail: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
-    ip_address: Mapped[Optional[str]] = mapped_column(INET, nullable=True)
+    # Accepts a str on write; asyncpg reads it back as an ipaddress object.
+    ip_address: Mapped[Optional[Union[str, IPv4Address, IPv6Address]]] = \
+        mapped_column(INET, nullable=True)
 
     __table_args__ = (
         Index("ix_audit_log_occurred_at", "occurred_at"),

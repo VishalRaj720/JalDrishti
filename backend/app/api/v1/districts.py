@@ -59,42 +59,11 @@ async def get_district(
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
-
-@router.post("", response_model=DistrictResponse, status_code=201)
-async def create_district(
-    payload: DistrictCreate,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
-):
-    try:
-        return await DistrictService(db).create(payload)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"DEBUG ERROR: {str(e)}")
-
-
-@router.put("/{district_id}", response_model=DistrictResponse)
-async def update_district(
-    district_id: uuid.UUID, payload: DistrictUpdate,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
-):
-    try:
-        return await DistrictService(db).update(district_id, payload)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
-
-
-@router.delete("/{district_id}", status_code=204)
-async def delete_district(
-    district_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
-):
-    try:
-        await DistrictService(db).delete(district_id)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
+# ── Reference geography is READ-ONLY ────────────────────────────────
+# P2 (PRODUCT_DESIGN.md section 3.1) deleted POST / PUT / DELETE here.
+# Districts come from CGWB/GSI and are not user-editable content: editing them
+# through an ad-hoc CRUD endpoint silently forks the scientific basis of every
+# simulation that has already run against them, with no version record.
+# The supported path is versioned bulk ingest -- POST /api/v1/ingest/* --
+# which checksums the source file and writes a `data_sources` row linked to a
+# `dataset_versions` entry.

@@ -34,44 +34,11 @@ async def get_block(
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
-
-
-@router.post("", response_model=BlockResponse, status_code=201)
-async def create_block(
-    district_id: uuid.UUID,
-    payload: BlockCreate,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
-):
-    try:
-        payload.district_id = district_id
-        return await BlockService(db).create(payload)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
-
-
-@router.put("/{block_id}", response_model=BlockResponse)
-async def update_block(
-    district_id: uuid.UUID,
-    block_id: uuid.UUID,
-    payload: BlockUpdate,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
-):
-    try:
-        return await BlockService(db).update(block_id, payload)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
-
-
-@router.delete("/{block_id}", status_code=204)
-async def delete_block(
-    district_id: uuid.UUID,
-    block_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
-):
-    try:
-        await BlockService(db).delete(block_id)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
+# ── Reference geography is READ-ONLY ────────────────────────────────
+# P2 (PRODUCT_DESIGN.md section 3.1) deleted POST / PUT / DELETE here.
+# Blocks come from CGWB/GSI and are not user-editable content: editing them
+# through an ad-hoc CRUD endpoint silently forks the scientific basis of every
+# simulation that has already run against them, with no version record.
+# The supported path is versioned bulk ingest -- POST /api/v1/ingest/* --
+# which checksums the source file and writes a `data_sources` row linked to a
+# `dataset_versions` entry.
