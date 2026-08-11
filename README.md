@@ -51,6 +51,7 @@ Start at [`docs/README.md`](docs/README.md). The short version:
 - [`ml_pipeline/ARCHITECTURE.md`](ml_pipeline/ARCHITECTURE.md) — the surrogate explained from zero
 - [`ml_pipeline/README.md`](ml_pipeline/README.md) — quick start and phase history
 - [`ml_pipeline/JHARKHAND_FIDELITY_MATRIX.md`](ml_pipeline/JHARKHAND_FIDELITY_MATRIX.md) — provenance of every physical constant
+- [`docs/roles.md`](docs/roles.md) — the five roles, and a generated role × endpoint matrix
 - [`docs/audits/`](docs/audits/) — the audit and remediation record, chronological
 - [`docs/local/`](docs/local/) — learning write-ups and reference material (not tracked)
 
@@ -85,16 +86,44 @@ CREATE DATABASE groundwater_db;
 cd backend && pip install -r requirements.txt
 ```
 
-Create `backend/.env` (defaults live in `app/config.py`):
+### 3. Create the restricted application role
+
+The API and the migrations connect as **different** Postgres roles. This is not optional: Postgres
+skips row-level security entirely for a superuser, so an API connected as `postgres` silently
+disables every policy in migration `0009`.
+
+```bash
+python -m scripts.create_app_role --password 'choose-a-real-one'
+```
+
+That creates `jaldrishti_app` — `NOSUPERUSER`, `NOBYPASSRLS`, DML only, no ownership, so it cannot
+drop a policy that constrains it.
+
+### 4. Create `backend/.env`
+
+Defaults live in `app/config.py`.
+
 ```env
 APP_ENV=development
-DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/groundwater_db
+# What the running API connects as — restricted, so RLS applies.
+DATABASE_URL=postgresql+asyncpg://jaldrishti_app:YOUR_APP_PASSWORD@localhost:5432/groundwater_db
+# Owner role, used only by alembic and scripts/init_db (CREATE EXTENSION, DDL).
+MIGRATION_DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/groundwater_db
+DB_NAME=groundwater_db
+DB_USER=postgres
+DB_PASSWORD=YOUR_PASSWORD
 JWT_SECRET=change-this-secret
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 RATE_LIMIT_PER_MINUTE=60
 ```
 
-### 3. Create tables and seed (idempotent)
+The API logs `Row-level security active: N policies, connected as 'jaldrishti_app' (no bypass)` at
+startup. If it instead warns `ROW-LEVEL SECURITY IS INERT`, `DATABASE_URL` is pointing at a
+privileged role and access control has fallen back to the application layer only.
+
+Who can reach which endpoint is in [`docs/roles.md`](docs/roles.md) — generated from the running app.
+
+### 5. Create tables and seed (idempotent)
 ```bash
 python -m scripts.init_db
 ```
@@ -106,7 +135,7 @@ python -m scripts.seed
 `seed` is safe to re-run: users dedupe by email, ISR points by name, and geodata
 ingestion dedupes by file checksum.
 
-### 4. Run the API
+### 6. Run the API
 ```bash
 uvicorn app.main:app --reload
 ```

@@ -15,10 +15,20 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # Database
+    # DATABASE_URL is what the RUNNING API connects as. Since the P2 cutover
+    # that is `jaldrishti_app`: NOSUPERUSER, NOBYPASSRLS, DML only. Row-level
+    # security does not apply to a superuser, so connecting as `postgres` here
+    # silently disables every policy in migration 0009.
     DATABASE_URL: str = "postgresql+asyncpg://postgres:040812@localhost:5432/groundwater_db"
+    # The privileged connection, used ONLY by alembic and scripts/init_db.
+    # Empty means "fall back to DATABASE_URL", which is right for a fresh clone
+    # that has not split the roles yet.
+    MIGRATION_DATABASE_URL: str = ""
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_NAME: str = "groundwater_db"
+    # DB_USER / DB_PASSWORD stay PRIVILEGED: scripts/init_db creates the PostGIS
+    # extension and the enum types, and the test harness creates databases.
     DB_USER: str = "postgres"
     DB_PASSWORD: str = "040812"
 

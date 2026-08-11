@@ -25,9 +25,30 @@ def _sync_url(url: str) -> str:
 
 
 def _get_url() -> str:
-    raw = os.environ.get(
-        "DATABASE_URL",
-        config.get_main_option("sqlalchemy.url"),
+    """Resolve the migration connection.
+
+    MIGRATION_DATABASE_URL wins over DATABASE_URL. Since the P2 cutover the API
+    connects as `jaldrishti_app`, which is NOSUPERUSER/NOBYPASSRLS and holds DML
+    only — deliberately unable to CREATE, ALTER or DROP, so it cannot remove a
+    policy that constrains it. Migrations need the owner role, so they must not
+    inherit the application's URL.
+
+    Falling back to DATABASE_URL keeps `alembic upgrade head` working in
+    environments that never split the two (CI, a fresh clone).
+
+    The `.env` values are consulted BEFORE alembic.ini. Without that, a plain
+    `alembic upgrade head` with no exported environment fell through to the
+    literal in alembic.ini, which pointed at `groundwater_db_test` -- a stray,
+    unmigrated database. Silently migrating the wrong database is a worse
+    failure than refusing to start.
+    """
+    from app.config import settings
+    raw = (
+        os.environ.get("MIGRATION_DATABASE_URL")
+        or os.environ.get("DATABASE_URL")
+        or settings.MIGRATION_DATABASE_URL
+        or settings.DATABASE_URL
+        or config.get_main_option("sqlalchemy.url")
     )
     return _sync_url(raw)
 

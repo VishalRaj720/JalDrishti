@@ -59,7 +59,32 @@ def _create_enum_sql(name: str, values: list[str]) -> str:
     """
 
 
+def _privileged_engine():
+    """DDL needs the owner role, not the API's restricted one.
+
+    Since the P2 cutover `DATABASE_URL` points at `jaldrishti_app`, which has no
+    CREATE privilege by design. CREATE EXTENSION postgis and CREATE TYPE would
+    both fail under it, so this schema work uses MIGRATION_DATABASE_URL when one
+    is configured and falls back to the app engine otherwise (a fresh clone that
+    has not split the roles yet).
+    """
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from app.config import settings
+    if settings.MIGRATION_DATABASE_URL:
+        return create_async_engine(settings.MIGRATION_DATABASE_URL), True
+    return engine, False
+
+
 async def init_db() -> None:
+    ddl_engine, owned = _privileged_engine()
+    try:
+        await _init_db_with(ddl_engine)
+    finally:
+        if owned:
+            await ddl_engine.dispose()
+
+
+async def _init_db_with(engine) -> None:
     async with engine.begin() as conn:
         logger.info("Ensuring PostGIS extension ...")
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
@@ -73,7 +98,7 @@ async def init_db() -> None:
 
     tables = ", ".join(sorted(Base.metadata.tables))
     logger.info(f"Done. Tables present: {tables}")
-    await engine.dispose()
+    # Disposal is the caller's job (init_db): this may be the shared app engine.
 
 
 if __name__ == "__main__":

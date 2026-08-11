@@ -26,7 +26,7 @@ from typing import Any, Optional
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, set_rls_context
 from app.models.audit_log import AuditLog
 
 # Mutating verbs are audited wholesale. Reads are not: at 415 stations and 8,345
@@ -48,6 +48,19 @@ async def record(
     """Append one audit row. Never raises."""
     try:
         async with AsyncSessionLocal() as db:
+            # The audit writer acts as the SYSTEM, not as the caller, so it runs
+            # with the bypass flag rather than the caller's role.
+            #
+            # This is not a convenience. `audit_log` has RLS enabled, and
+            # SQLAlchemy emits `INSERT ... RETURNING id, occurred_at` — RETURNING
+            # requires the new row to be visible under the SELECT policy, which
+            # only admits admin and regulator. Without the bypass, every audit
+            # write by an analyst, field officer or citizen failed with "new row
+            # violates row-level security policy", and because `record()`
+            # swallows its own errors (rule 1), the trail died SILENTLY while
+            # the API kept answering 200. The test suite could not see it either:
+            # tests connect as `postgres`, which bypasses RLS anyway.
+            await set_rls_context(db, bypass=True)
             db.add(AuditLog(
                 actor_id=actor_id,
                 actor_label=actor_label,
@@ -65,6 +78,9 @@ async def record(
                 # happened, so keep the record and drop the broken link rather
                 # than losing the line entirely.
                 await db.rollback()
+                # ROLLBACK discards SET LOCAL, so the bypass has to be re-applied
+                # or this retry hits the same RLS wall the first insert cleared.
+                await set_rls_context(db, bypass=True)
                 db.add(AuditLog(
                     actor_id=None,
                     actor_label=actor_label or (str(actor_id) if actor_id else None),

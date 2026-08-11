@@ -124,7 +124,10 @@ def create_app() -> FastAPI:
         if not (mutating or denied) or request.url.path in _AUDIT_EXEMPT:
             return response
 
-        user = getattr(request.state, "current_user", None)
+        # Plain values, not the ORM object: by the time this runs the request's
+        # session is closed, and on the 403 path it was rolled back, which
+        # expires every instance. See dependencies.get_current_user.
+        actor = getattr(request.state, "audit_actor", None) or {}
         entity_type, entity_id = audit.entity_from_path(request.url.path)
         detail = {"method": request.method, "status": response.status_code}
         if denied:
@@ -135,8 +138,8 @@ def create_app() -> FastAPI:
                     else f"{request.method.lower()}:{entity_type}"),
             entity_type=entity_type,
             entity_id=entity_id,
-            actor_id=(user.id if user else None),
-            actor_label=(user.email if user else None),
+            actor_id=actor.get("id"),
+            actor_label=actor.get("email"),
             detail=detail,
             # X-Forwarded-For only when a trusted proxy sets it; behind none,
             # request.client is the truthful source.

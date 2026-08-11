@@ -64,6 +64,13 @@ def create_app_role(password: str, dbname: str, role: str = APP_ROLE) -> None:
         db_ident = sql.Identifier(dbname)
         cur.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(db_ident, ident))
         cur.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(ident))
+        # Postgres grants CREATE on `public` to the PUBLIC pseudo-role on older
+        # versions and on databases built from such a template, which quietly
+        # contradicts "DML only" -- the app role could create its own tables.
+        # Revoke it from PUBLIC (the owner and superusers are unaffected) and
+        # explicitly from this role.
+        cur.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
+        cur.execute(sql.SQL("REVOKE CREATE ON SCHEMA public FROM {}").format(ident))
         # DML only. No CREATE, no ownership: the app must not be able to drop a
         # policy that constrains it.
         cur.execute(sql.SQL(
@@ -86,7 +93,14 @@ def create_app_role(password: str, dbname: str, role: str = APP_ROLE) -> None:
             raise SystemExit(
                 f"REFUSING: {role} has superuser={rolsuper} bypassrls={rolbypassrls}. "
                 f"RLS would not apply to it.")
-        print(f"verified {role}: superuser=False bypassrls=False")
+        cur.execute("SELECT has_schema_privilege(%s, 'public', 'CREATE')", (role,))
+        can_create = cur.fetchone()[0]
+        if can_create:
+            raise SystemExit(
+                f"REFUSING: {role} can still CREATE in schema public, so "
+                f"'DML only' is not true. Check for a grant this script did not "
+                f"revoke.")
+        print(f"verified {role}: superuser=False bypassrls=False create=False")
     conn.close()
 
 

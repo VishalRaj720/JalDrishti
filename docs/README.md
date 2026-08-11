@@ -12,6 +12,7 @@ the code because tooling loads them by path (see *Docs that deliberately stay pu
 | Understand the ISR plume surrogate end to end | [`../ml_pipeline/ARCHITECTURE.md`](../ml_pipeline/ARCHITECTURE.md) |
 | Run the surrogate or retrain it | [`../ml_pipeline/README.md`](../ml_pipeline/README.md) |
 | Know what is trustworthy and what is not | [`audits/ML_PIPELINE_READINESS.md`](audits/ML_PIPELINE_READINESS.md) |
+| Know which role can reach which endpoint | [`roles.md`](roles.md) — generated from the running app |
 | Check where a physical constant came from | [`../ml_pipeline/JHARKHAND_FIDELITY_MATRIX.md`](../ml_pipeline/JHARKHAND_FIDELITY_MATRIX.md) |
 | Set up and run the whole repo | [`../README.md`](../README.md) |
 

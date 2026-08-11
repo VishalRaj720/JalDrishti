@@ -69,6 +69,15 @@ async def get_current_user(
     # is both cheaper and safer than re-decoding the token there — a token claim
     # would let a forged `sub` name someone else in the audit trail.
     request.state.current_user = user
+    # Also stash the identity as PLAIN VALUES. The audit middleware runs after
+    # the request's session has closed, and on the 403 path `get_db` rolls back
+    # — which expires every ORM instance regardless of `expire_on_commit`.
+    # Touching `user.email` there raised DetachedInstanceError and took out the
+    # whole response. The test suite cannot see this: its `get_db` override
+    # holds one session open for the entire test, so nothing is ever detached.
+    request.state.audit_actor = {
+        "id": user.id, "email": user.email, "role": user.role.value,
+    }
 
     # Hand the verified identity to the RLS policies for this transaction.
     # Done here rather than in `get_db` because only now is the caller known,

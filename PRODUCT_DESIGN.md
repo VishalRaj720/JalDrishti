@@ -178,16 +178,35 @@ application code — so a service bug cannot leak site detail to a citizen sessi
 > `0009_isr_owner_org_and_rls` (the policies, plus `isr_points.owner_org_id`),
 > `scripts/create_app_role.py` (creates `jaldrishti_app`: `NOSUPERUSER NOBYPASSRLS`, DML only, no
 > ownership — so the app cannot drop a policy that constrains it), and a **startup guard** that logs
-> a loud warning whenever policies exist but the connected role can bypass them. It is currently
-> firing.
+> a loud warning whenever policies exist but the connected role can bypass them.
+>
+> **The cutover is done (2026-08-12).** The API connects as `jaldrishti_app`; migrations and
+> `init_db` use `MIGRATION_DATABASE_URL` (the owner role) because the app role deliberately cannot
+> `CREATE`, `ALTER` or `DROP`. The startup guard now reports
+> *"Row-level security active: 4 policies, connected as 'jaldrishti_app' (no bypass)"*.
 >
 > `tests/test_rls.py` proves enforcement by connecting **as a non-bypassing role** and checking what
 > it can actually see, not by asserting rows exist in `pg_policies`. It also pins the policy's staff
 > list against `app.dependencies.STAFF_ROLES` so the two cannot drift.
 >
-> **To activate:** run `python -m scripts.create_app_role --password ...` and point the API's
-> `DATABASE_URL` at `jaldrishti_app`, leaving migrations on the owner role. Until then, access
-> control is application-layer only — which is what the warning says.
+> **Two production-only bugs the cutover exposed**, both invisible to the test suite for structural
+> reasons — tests connect as `postgres` (bypassing RLS) and hold one session open per test:
+>
+> 1. **The audit trail died silently.** `audit_log` has RLS enabled and SQLAlchemy emits
+>    `INSERT … RETURNING`, which requires the new row to be visible under the SELECT policy —
+>    admin and regulator only. Every audit write by anyone else failed, and because `record()`
+>    swallows its own errors by design, the trail stopped without a single failed request. Fixed by
+>    running the audit writer with the system bypass, which is what `app.bypass_rls` was for.
+> 2. **`DetachedInstanceError` on every 403.** The audit middleware read `user.email` off the ORM
+>    instance; by then `get_db` had rolled back, which expires instances regardless of
+>    `expire_on_commit`. The identity is now captured as plain values at authentication time.
+>
+> Both are pinned by `tests/test_authz_matrix.py`, which asserts the invariant rather than trying to
+> reproduce a session lifecycle the fixtures do not have.
+
+**Who can reach what** is documented — and generated from the running app, not hand-written — in
+[`docs/roles.md`](docs/roles.md), together with the three places where the enforced authorization
+still disagrees with the role definitions above.
 
 **One RLS semantic worth knowing before relying on it.** A write blocked by a `USING` clause affects
 **zero rows; it does not raise**. Postgres only errors on a `WITH CHECK` violation. So a denied
