@@ -73,6 +73,16 @@ class RunResponse(BaseModel):
     completed_at: Optional[datetime]
 
 
+class RunWithSyncState(RunResponse):
+    """A run plus how far the datasets it read lag the approved record.
+
+    Surfaced on the run itself because that is where it matters: a user reading
+    a plume needs to know that N approved observations were not part of the
+    inputs that produced it."""
+    approved_pending_sync: int = 0
+    sync_note: Optional[str] = None
+
+
 async def _run_in_background(run_id: uuid.UUID) -> None:
     from app.database import AsyncSessionLocal, set_rls_context
     async with AsyncSessionLocal() as db:
@@ -105,16 +115,29 @@ async def trigger_simulation(
     return run
 
 
-@router.get("/runs/{run_id}", response_model=RunResponse)
+@router.get("/runs/{run_id}", response_model=RunWithSyncState)
 async def get_run(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_staff),
 ):
     try:
-        return await SimulationRunService(db).get(run_id)
+        run = await SimulationRunService(db).get(run_id)
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+    # The split-brain, made visible at the point it matters. A plume is read as
+    # "what we know"; if approved observations were not in the inputs that
+    # produced it, the reader has to be told here, not in a settings screen.
+    from app.services.dataset_sync import pending_summary
+    summary = await pending_summary(db)
+    n = summary["approved_pending_sync"]
+    out = RunWithSyncState.model_validate(run, from_attributes=True)
+    out.approved_pending_sync = n
+    out.sync_note = (
+        f"{n} approved field observation(s) are not yet in Datasets/, so they "
+        f"were not part of the inputs to this run." if n else None)
+    return out
 
 
 @router.get("/runs", response_model=list[RunResponse])

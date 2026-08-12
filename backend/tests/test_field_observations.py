@@ -413,13 +413,29 @@ async def test_only_the_submitter_may_withdraw(client, officer, officer2):
 
 
 @pytest.mark.asyncio
-async def test_map_keeps_pending_and_authoritative_separate(
-        client, officer, regulator):
-    await client.post("/api/v1/field-observations", headers=_tok(officer),
-                      json=ORE)
+async def test_map_keeps_the_three_states_separate(client, officer, regulator):
+    """Three collections, not one list with a flag — a merged list invites a
+    client to draw unreviewed or unsynced input as though it were in the model."""
+    obs = await client.post("/api/v1/field-observations", headers=_tok(officer),
+                            json=ORE)
     r = await client.get("/api/v1/field-observations/map", headers=_tok(regulator))
     assert r.status_code == 200
     body = r.json()
-    assert "pending" in body and "authoritative" in body
-    assert len(body["pending"]) == 1
-    assert body["authoritative"] == []
+    assert set(body["counts"]) == {"pending_review", "approved_pending_sync",
+                                   "approved_in_model"}
+
+    # red: submitted, not reviewed
+    assert body["counts"]["pending_review"] == 1
+    assert body["counts"]["approved_pending_sync"] == 0
+    assert body["counts"]["approved_in_model"] == 0
+
+    await client.post(f"/api/v1/field-observations/{obs.json()['id']}/approve",
+                      headers=_tok(regulator), json={})
+
+    # amber: authoritative here, but Datasets/ has not been synced, so the
+    # engine still does not see it
+    body = (await client.get("/api/v1/field-observations/map",
+                             headers=_tok(regulator))).json()
+    assert body["counts"]["pending_review"] == 0
+    assert body["counts"]["approved_pending_sync"] == 1
+    assert body["counts"]["approved_in_model"] == 0

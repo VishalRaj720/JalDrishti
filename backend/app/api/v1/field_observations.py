@@ -111,31 +111,53 @@ async def observations_map(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_staff),
 ):
-    """Map overlay.
+    """Map overlay, in the three states the UI must distinguish.
 
-    `pending` and `authoritative` are separate collections on purpose. Returning
-    one merged list with a status flag invites a client to draw unreviewed field
-    data as though it were confirmed — the exact confusion this workflow exists
-    to prevent.
+    Three collections rather than one list with a flag. A merged list invites a
+    client to draw unreviewed field input, or approved-but-not-yet-modelled
+    input, as though it were confirmed and in the model — the exact confusion
+    this workflow exists to prevent.
+
+        pending_review        red    — awaiting a reviewer. Changes nothing.
+        approved_pending_sync amber  — authoritative in the portal, NOT yet in
+                                       `Datasets/`, so a simulation at that point
+                                       still ignores it.
+        approved_in_model     green  — synced; the engine now sees it.
     """
-    pending = (await db.execute(text("""
-        SELECT id::text, observation_type, operation, status, submitted_at,
+    pending_review = (await db.execute(text("""
+        SELECT id::text, observation_type, operation, submitted_at,
                ST_X(location::geometry) AS lon, ST_Y(location::geometry) AS lat
         FROM field_observations
         WHERE status = 'pending' AND location IS NOT NULL
     """))).mappings().all()
 
-    authoritative = (await db.execute(text("""
-        SELECT id::text, name, ore_zone, uranium_grade_pct, observed_at,
-               ST_X(location::geometry) AS lon, ST_Y(location::geometry) AS lat
-        FROM ore_observations
+    # Ore rows carry their sync state through the observation that produced them.
+    ore = (await db.execute(text("""
+        SELECT o.id::text, o.name, o.ore_zone, o.uranium_grade_pct, o.observed_at,
+               ST_X(o.location::geometry) AS lon,
+               ST_Y(o.location::geometry) AS lat,
+               f.synced_to_dataset_at, f.dataset_sync_ref
+        FROM ore_observations o
+        LEFT JOIN field_observations f ON f.id = o.origin_observation_id
     """))).mappings().all()
 
+    amber = [dict(r) for r in ore if r["synced_to_dataset_at"] is None]
+    green = [dict(r) for r in ore if r["synced_to_dataset_at"] is not None]
+
     return {
-        "pending": [dict(r) for r in pending],
-        "authoritative": [dict(r) for r in authoritative],
-        "note": ("`pending` is unreviewed field input. It is not part of the "
-                 "authoritative dataset and does not feed any calculation."),
+        "pending_review": [dict(r) for r in pending_review],
+        "approved_pending_sync": amber,
+        "approved_in_model": green,
+        "legend": {
+            "pending_review": "red — awaiting review; changes nothing",
+            "approved_pending_sync": ("amber — approved and authoritative here, "
+                                      "but not yet in Datasets/, so the physics "
+                                      "engine and surrogate do not see it"),
+            "approved_in_model": "green — approved and reflected in the model",
+        },
+        "counts": {"pending_review": len(pending_review),
+                   "approved_pending_sync": len(amber),
+                   "approved_in_model": len(green)},
     }
 
 

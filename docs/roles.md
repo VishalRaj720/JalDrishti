@@ -117,6 +117,12 @@ submitter, the reviewer and the decision note. The proposal row itself keeps `pr
 `proposed` permanently, so a value on the map can always be traced back to who observed it and who
 approved it. Refused approval attempts are audited too, as `access_denied`.
 
+**Three states, not two.** Approval makes an observation authoritative in the portal; only an
+admin-triggered dataset sync (`POST /dataset-sync/ore`) puts it in front of the physics engine, which
+reads `Datasets/`. The UI distinguishes 🔴 pending review, 🟡 approved but pending sync, and 🟢
+approved and in the model, and `GET /dataset-sync/status` carries the count. See
+`PRODUCT_DESIGN.md` §3.6 for why the gap is shown rather than closed automatically.
+
 **The map keeps them apart.** `GET /field-observations/map` returns `pending` and `authoritative` as
 two separate collections rather than one list with a flag, because a merged list invites a client to
 draw unreviewed field input as though it were confirmed.
@@ -200,6 +206,9 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `PUT /api/v1/blocks/{block_id}/monitoring-stations/{station_id}` | ● | · | ● | · | · |
 | `GET /api/v1/blocks/{block_id}/monitoring-stations/{station_id}/readings` | ● | ● | ● | ● | · |
 | `POST /api/v1/blocks/{block_id}/monitoring-stations/{station_id}/readings` | ● | · | ● | · | · |
+| `POST /api/v1/dataset-sync/ore` | ● | · | · | · | · |
+| `GET /api/v1/dataset-sync/pending` | ● | ● | ● | ● | · |
+| `GET /api/v1/dataset-sync/status` | ● | ● | ● | ● | · |
 | `GET /api/v1/districts` | ● | ● | ● | ● | · |
 | `GET /api/v1/districts/geojson` | ● | ● | ● | ● | · |
 | `GET /api/v1/districts/{district_id}` | ● | ● | ● | ● | · |
@@ -231,6 +240,12 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/monitoring-wells/{well_id}` | ● | ● | ● | ● | · |
 | `GET /api/v1/public/risk/districts` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/{district_id}` | ○ | ○ | ○ | ○ | ○ |
+| `GET /api/v1/scenarios` | ● | ● | ● | ● | · |
+| `POST /api/v1/scenarios` | ● | · | ● | · | · |
+| `DELETE /api/v1/scenarios/{scenario_id}` | ● | · | ● | · | · |
+| `GET /api/v1/scenarios/{scenario_id}` | ● | ● | ● | ● | · |
+| `POST /api/v1/scenarios/{scenario_id}/compare` | ● | ● | ● | ● | · |
+| `POST /api/v1/scenarios/{scenario_id}/run` | ● | · | ● | · | · |
 | `GET /api/v1/simulations/runs` | ● | ● | ● | ● | · |
 | `GET /api/v1/simulations/runs/{run_id}` | ● | ● | ● | ● | · |
 | `POST /api/v1/simulations/{isr_id}` | ● | · | ● | · | · |
@@ -247,7 +262,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 52/58 · **regulator** 30/58 · **analyst** 35/58 · **field_officer** 29/58 · **citizen** 1/58
+Reachable endpoints per role — **admin** 61/67 · **regulator** 35/67 · **analyst** 43/67 · **field_officer** 34/67 · **citizen** 1/67
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

@@ -375,6 +375,103 @@ the public sees. Bands are words (`Low` / `Moderate` / `High concern`), per §4.
 
 Still outstanding: C3 alert subscription and the C4 methods page.
 
+### 3.6 DECISION — approved field data vs the frozen model
+
+**Decided 2026-08-12.** An approved field observation is authoritative in the portal
+immediately, but `ml_pipeline` reads only `Datasets/`. The question was how to close that gap
+without letting approved data slide into a frozen, gate-validated model.
+
+**A correction to the framing first.** "Approved chemistry ⇒ ML retraining required" is *not* right
+for this pipeline. The 40 trained features (`background_conc_Cb`, `gradient_i`, `source_conc_C0`, …)
+are **resolved at serve time** from the datasets. Correcting one well's uranium changes a feature
+*value*, not the model, and the surrogate was trained across a range of those values. **Retraining is
+required only when the generator's assumptions change** — physics constants, the Texas C0 envelope,
+the species set (§4.6 rule 9). A field reading is not that.
+
+**Three options were compared:**
+
+| | Auto-feed DB → engine | Continuous DB → dataset sync | **Admin-triggered export** |
+|---|---|---|---|
+| Reproducibility | **Broken** — same pin and sliders drift over time with nothing recorded | preserved | preserved |
+| `ml_pipeline` freeze | broken; adds a DB dependency its tests forbid | intact | intact |
+| Fits the real change rate? | — | built for continuous data | matches a handful of ore sightings |
+
+**Chosen: option 3.** Option 1 fails on the project's core claim — a regulator cannot defend a number
+that moves. Option 2 is the right end state if this ever ingests sensor streams (§7) and is heavy
+machinery for the expected volume. **No scheduled rebake:** a weekly retrain on a frozen model whose
+coverage was hand-verified buys nothing and risks silently replacing those artifacts.
+
+#### The split-brain is made visible, not closed
+
+Three states, surfaced by `GET /dataset-sync/status` and per-feature on
+`GET /field-observations/map`:
+
+| | State | Meaning |
+|---|---|---|
+| 🔴 | `pending_review` | Submitted, not reviewed. Changes nothing. |
+| 🟡 | `approved_pending_sync` | Authoritative in the portal, **not yet in `Datasets/`** — the engine does not see it. |
+| 🟢 | `approved_in_model` | Synced; the engine now resolves it. |
+
+`GET /simulations/runs/{id}` carries the count too, because a plume is read as *"what we know"*: if
+N approved observations were not among its inputs, the reader is told **on the result**, not in a
+settings screen. The map returns three separate collections rather than one flagged list — a merged
+list invites a client to draw unreviewed or unsynced input as confirmed.
+
+#### Only ore has an automated export
+
+`POST /dataset-sync/ore` (admin only) appends approved ore observations to both files:
+
+| File | Drives |
+|---|---|
+| `Datasets/Jharkhand Ore/jharkhand_uranium_deposits.csv` | `ore_zone_at()` — whether a pin is deposit/belt/none, and therefore **whether a uranium plume is possible at all** |
+| `Datasets/udepo_uranium_deposits.xlsx` (header row 8) | `grade_c0_factor()` — scales the source concentration C0 |
+
+Both gain an **`origin` column**: `original` for the rows that shipped, `added` for anything a
+regulator approved, so the map can render the two differently. Existing rows are backfilled as
+`original` on first sync. Each run backs both files up, tags the batch with a `sync_ref`, marks the
+observations synced, clears the pipeline's `lru_cache`d loaders (without which a running process
+keeps serving the pre-sync ore map and the sync looks like it did nothing), and audits the batch. It
+is idempotent, has a `dry_run`, and refuses a name that collides with an existing deposit — the grade
+lookup keys on name, so a duplicate would make C0 ambiguous.
+
+**Verified end to end:** at (85.20, 23.80) the resolved zone is `none`; after a sync it is `deposit`,
+and it returns to `none` when the file is restored. That is the case the field-officer role exists
+for, and it did nothing at all before this.
+
+**Chemistry and groundwater levels stay manual.** They move a feature value the model already covers,
+they are rare, and the audit log gives an admin the old/new values to apply by hand.
+`GET /dataset-sync/pending` is the working list.
+
+#### A gap this surfaced, not yet fixed
+
+`source_conc_C0` and `background_conc_Cb` are **not** in `envelope_violations()`. Every other input
+is range-checked against the training support, and a violation voids the conformal guarantee loudly.
+If approved data ever pushed a baseline or a source term outside trained support, the model would
+extrapolate **without raising the flag** — the 80% band would print and be wrong. Low risk today
+(ore additions move C0 within the Texas envelope), worth closing before chemistry syncing becomes
+routine.
+
+### 3.7 P3 (final) — named scenarios and comparison
+
+`scenarios` (migration `0014`) names a **set of inputs**, never a result. Running one queues a normal
+`simulation_run` tagged with the scenario, so results stay immutable and pinned to the artifacts that
+produced them — re-running after a retrain adds a second run with a different `artifacts_sha` rather
+than overwriting the first, which is what makes a before/after comparison possible at all.
+
+| | |
+|---|---|
+| `POST /scenarios` | admin, analyst. Params validated **at save time** against the engine allowlist — a scenario that cannot run is worse than one that is refused, because it looks saved |
+| `GET /scenarios`, `GET /scenarios/{id}` | staff |
+| `POST /scenarios/{id}/run` | admin, analyst |
+| `POST /scenarios/{id}/compare` | staff |
+| `DELETE /scenarios/{id}` | archives; runs reference the scenario that produced them |
+
+Names are unique **per site**, not globally — two districts may both want a "baseline".
+
+`compare` reports **why** two runs differ, not just the delta: *inputs differ; same model* / *same
+inputs; the MODEL changed* / *both differ — the delta cannot be attributed without re-running one*.
+"The number changed" is only actionable once you know which of those happened.
+
 ## 4. Frontend design
 
 **Stack:** React 18 + TypeScript + Vite · **Leaflet** (as today) · TanStack Query · Tailwind +
@@ -512,6 +609,30 @@ citizen or journalist can see what the numbers rest on.
 P10/P90 bands — a plain three-level band label (*Low / Moderate / High concern*) with "how sure are
 we?" as words. No model jargon (`conformal`, `Domenico`, `β_eff`) anywhere on C1–C3.
 
+### 4.4b Field-observation states — the UI contract for P4
+
+The Map Console renders field observations and simulation output on the same canvas, so it must
+distinguish three states from the first version. Drawing them as one layer would have to be rebuilt.
+
+| | State | Source | Rendering |
+|---|---|---|---|
+| 🔴 | **Pending review** | `map.pending_review` | Hollow marker, dashed outline. Never counted in any total. Visible to staff only |
+| 🟡 | **Approved, pending dataset sync** | `map.approved_pending_sync` | Solid marker, amber ring + "not in model" chip. Authoritative as an *observation*; the plume on screen did not use it |
+| 🟢 | **Approved and in the model** | `map.approved_in_model` | Solid marker, no qualifier. The engine resolves it |
+
+**A global counter belongs in the header**, from `GET /dataset-sync/status`:
+*"N approved observations are not yet in the model."* Clicking it opens the amber list
+(`GET /dataset-sync/pending`); for an admin it also offers `POST /dataset-sync/ore`.
+
+**And on the result itself.** `GET /simulations/runs/{id}` returns `approved_pending_sync` and a
+`sync_note`. The Simulation Studio must show it beside the plume, not in a settings screen: a plume
+is read as *"what we know"*, and if approved observations were not among its inputs the reader has to
+be told where they are looking.
+
+**Rule:** never merge the three into one list with a status field. A merged list invites a client to
+draw unreviewed or unsynced input as confirmed, which is the confusion the whole review workflow
+exists to prevent.
+
 ### 4.5 Non-negotiable UI rules
 
 From the audit history, to stop the portal over-claiming:
@@ -526,6 +647,8 @@ From the audit history, to stop the portal over-claiming:
 5. **Migration reads "no measurable migration"** below map resolution, never a misleading `0`.
 6. **The hypothetical premise is never more than one glance away** — and on citizen screens it is in
    the first paragraph.
+7. **Field data carries its state.** Every observation renders as 🔴 pending / 🟡 approved-not-synced
+   / 🟢 in-model (§4.4b). A value the engine has not seen must never look like one it has.
 
 ### 4.6 Frozen constraints inherited from `ml_pipeline`
 
@@ -859,6 +982,12 @@ Stated plainly, because the portal must not present them as solved:
 12. **A field observation is evidence, not authority.** Approved field data becomes authoritative in
     `water_samples` / `ore_observations`, but never reaches the surrogate (§3.4). A map value and a
     model input are different things here, deliberately.
+13. **The portal and the engine can disagree, on purpose.** Approved data is authoritative here
+    immediately but reaches `ml_pipeline` only via a deliberate admin sync (§3.6). The gap is shown
+    as an amber state and a count on every run, never hidden.
+14. **`source_conc_C0` and `background_conc_Cb` are not envelope-checked** (§3.6). Every other input
+    is; if approved data pushed either outside trained support the model would extrapolate without
+    flagging it. Low risk today, worth closing before chemistry syncing becomes routine.
 
 A portal that shows these honestly is more defensible to a regulator than one that hides them — and
 this project's entire audit history is the argument for that.
@@ -872,7 +1001,7 @@ this project's entire audit history is the argument for that.
 | **P0** ✅ | Delete the legacy simulation stub; strip the dead `DataGen_ModelMVP` references (§1.3) | **Done.** One physics path. `POST /simulations` returns 501 until P3 |
 | **P1** ✅ | `0006` drops the 5 orphans; `0007` adds `orgs`/`dataset_versions`/`audit_log`, links the load ledger, extends the role vocabulary; seed backfills all of it | **Done.** Schema matches reality, provenance spine populated (§5.2). `roles` tables deferred to P2 |
 | **P2** ✅ | Auth hardening, 5 roles, RLS, audit; endpoint cull 55 → 44 | **Done.** Closed an unauthenticated privilege-escalation hole (§3.0); `0008` migrated `viewer` → `citizen`; `0009` added `owner_org_id` + policies. **RLS needs the `jaldrishti_app` role switch to take effect** — see §2. Rate limiting already existed (slowapi) |
-| **P3** ✅ | Wire `POST /simulations` → `ml_pipeline`; run persistence with provenance | **Done.** Real physics replaces the 501. Every completed run pins model card + artifact bundle + git SHA (§3.4). **Named/saved scenarios and compare remain outstanding** |
+| **P3** ✅ | Wire `POST /simulations` → `ml_pipeline`; scenarios; run persistence | **Complete.** Real physics replaces the 501; every run pins model card + artifact bundle + git SHA (§3.4); named scenarios with `/run` and `/compare` (§3.7) |
 | **P4** | React shell: Login, Map Console, Site Registry | ◀ **MVP — demoable to stakeholders** |
 | **P5** | Simulation Studio: bands, provenance drawer, **ISR Excursion panel** | Full official decision support |
 | **P6** ◐ | **Citizen surface** (C1–C4) | **Partly done early**: `GET /public/risk/districts` and `/public/risk/{district_id}` ship the C1/C2 *data* (§3.5) to close roles.md D-3. The C3 alert subscription and C4 methods page remain |
@@ -908,5 +1037,8 @@ Every quantitative claim in this document was checked on 2026-08-11 against the 
 | Approved field data does not move the model | `test_approving_field_data_does_not_change_the_model_output` — metrics byte-identical across an approved 9,999 ppb reading |
 | ML artifacts untouched by backend work | all 16 sha256 digests match `backend/tests/ml_artifact_hashes.json` |
 | Geometry fix | `ST_XMin/XMax` on `districts` before (21.97..25.35) and after (83.33..87.92) migration `0011` |
+| Ore sync changes what the engine resolves | `ore_zone_at(85.20, 23.80)`: `none` → `deposit` after a sync, `none` again after restore |
+| `origin` tags round-trip | both files re-read as `['added', 'original']` |
+| Sync leaves ML artifacts alone | `retrain_required: false`; all 16 artifact digests unchanged |
 
 If a number here ever disagrees with the code, **the code is right and this document is stale.**

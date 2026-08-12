@@ -132,6 +132,15 @@ class FieldObservation(Base):
     review_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     applied_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True)
+
+    # Dataset-sync state (0013). Approval makes a row authoritative in the
+    # portal; only a sync puts it in front of the engine, which reads
+    # `Datasets/`. These two columns are what lets the UI tell amber from green.
+    synced_to_dataset_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+    dataset_sync_ref: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True)
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(),
         onupdate=func.now(), nullable=False)
@@ -156,6 +165,8 @@ class FieldObservation(Base):
             name="ck_field_obs_target_matches_operation"),
         CheckConstraint("applied_id IS NULL OR status = 'approved'",
                         name="ck_field_obs_applied_only_when_approved"),
+        CheckConstraint("synced_to_dataset_at IS NULL OR status = 'approved'",
+                        name="ck_field_obs_synced_only_when_approved"),
         Index("ix_field_obs_status", "status"),
         Index("ix_field_obs_submitter", "submitted_by"),
         Index("ix_field_obs_target", "target_table", "target_id"),
