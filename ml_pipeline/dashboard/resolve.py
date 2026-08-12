@@ -86,11 +86,42 @@ def _hydro_support() -> dict:
     return _model_card().get("hydro_support", {})
 
 
-def envelope_violations(inputs: dict) -> list[str]:
+def _species_support() -> dict:
+    """Per-species (C0, Cb) box the deployed model actually saw.
+
+    Prefers the model card so a future retrain that records `species_support`
+    wins automatically; falls back to the measured constant in config. The
+    current card has no such key -- which is exactly why C0 and Cb went
+    unchecked (see P.TRAINED_SPECIES_SUPPORT for the full account)."""
+    return _model_card().get("species_support") or P.TRAINED_SPECIES_SUPPORT
+
+
+def _outside(val: float, lo: float, hi: float) -> bool:
+    """Scale-aware support test, matching the hydro check below.
+
+    Ratios rather than differences once the support spans more than a decade:
+    radium C0 runs 25.7-1699 (66x), so a flat percentage of the linear span
+    would be larger than the trained minimum itself and blind at the bottom --
+    the same scale-blindness fixed in the hydro branch on 2026-08-10.
+    """
+    if lo > 0.0 and hi / lo > 10.0:
+        return val < lo * 0.98 or val > hi * 1.02
+    span = max(hi - lo, 1e-9)
+    return val < lo - 0.02 * span or val > hi + 0.02 * span
+
+
+def envelope_violations(inputs: dict, hydro: dict | None = None) -> list[str]:
     """Names of inputs outside the training support (=> ML extrapolation, the
     conformal 80% guarantee is void; the ANALYTICAL engine is still valid).
-    Covers both the operational sliders and the resolved HYDROGEOLOGY (P1) --
-    a regime override or manual phi/K that lands where no training row exists."""
+    Covers the operational sliders, the resolved HYDROGEOLOGY (P1), and the
+    per-species CONCENTRATION support.
+
+    `hydro` is optional and backward compatible. It is only read for
+    `u_suppressed`: in a non-ore zone the uranium/radium C0 is deliberately
+    clamped to background and the server already bypasses the surrogate for
+    that species, so the clamped value is not an ML extrapolation and flagging
+    it would turn every non-ore pin amber for no reason.
+    """
     env = _training_envelope()
     checks = {
         "injection_rate_m3_day": inputs["Q_in_m3_day"],
@@ -112,6 +143,19 @@ def envelope_violations(inputs: dict) -> list[str]:
         tol = 1e-9 + 1e-6 * max(abs(lo), abs(hi))
         if val < lo - tol or val > hi + tol:
             out.append(key)
+
+    # CONCENTRATION support, per species. These two are trained features whose
+    # bounds live nowhere in `training_envelope`, so until this existed they
+    # were the only inputs that could leave trained support silently.
+    sp_support = _species_support().get(inputs.get("species"))
+    if sp_support and not (hydro or {}).get("u_suppressed"):
+        for key in ("source_conc_C0", "background_conc_Cb"):
+            bounds = sp_support.get(key)
+            if not bounds or key not in inputs:
+                continue
+            lo, hi = float(bounds[0]), float(bounds[1])
+            if _outside(float(inputs[key]), lo, hi):
+                out.append(f"conc:{key}")
 
     # P1 hydro-OOD: check the resolved hydrogeology against the per-regime box.
     support = _hydro_support().get(inputs["regime"])

@@ -534,7 +534,10 @@ def api_predict(req: PredictRequest):
 
     species = inputs["species"]
     threshold = P.EXCURSION_THRESHOLDS[species]
-    extrapolation = envelope_violations(inputs)
+    # `hydro` carries `u_suppressed`: in a non-ore zone the surrogate is
+    # bypassed for uranium/radium, so the clamped C0 is not an ML
+    # extrapolation and must not be flagged as one.
+    extrapolation = envelope_violations(inputs, hydro)
     half_w = inputs["wellfield_width_m"] / 2.0        # source plane offset from pin
 
     # Effective display azimuth (Stage B/E2): explicit user override wins; else the

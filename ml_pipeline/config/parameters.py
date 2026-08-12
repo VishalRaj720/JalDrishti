@@ -1233,6 +1233,54 @@ OPERATIONAL_RANGES = {
     "u_attenuation_k_per_yr": (0.0, 0.70),
 }
 
+# ---------------------------------------------------------------------------
+# 6b. PER-SPECIES concentration support of the DEPLOYED model.
+#
+# WHY THIS IS SEPARATE FROM OPERATIONAL_RANGES. `source_conc_C0` and
+# `background_conc_Cb` are trained features, but they were the only two the
+# serving-side out-of-distribution guard never checked: `envelope_violations`
+# looked them up in the model card's `training_envelope`, which has no entry for
+# either, and `env.get(key, (-inf, inf))` turned the lookup into a silent no-op.
+# A baseline or source term outside trained support would extrapolate with the
+# conformal 80 % band still printed and no longer meaning 80 %.
+#
+# They cannot share OPERATIONAL_RANGES because the bounds are PER SPECIES and
+# span three orders of magnitude between them -- a single global range would
+# accept a uranium C0 of 25 mBq/L. Checking them per species is the point.
+#
+# PROVENANCE. Measured from the deployed training set
+# `ml_pipeline/outputs/synthetic_training.csv` (18,000 rows, 900 scenarios x 5
+# times x 4 species), the same file the current artifacts were trained on.
+# Recorded here rather than read from that CSV at runtime because
+# `ml_pipeline/outputs/` is gitignored: a fresh clone has the artifacts but not
+# the training set, and a guard that silently disappears in a clean checkout is
+# the failure this fix exists to remove.
+#
+# `tests/test_c0_cb_envelope.py::test_recorded_support_matches_the_training_set`
+# re-derives these from the CSV whenever it is present, so a retrain that shifts
+# the support fails the suite instead of quietly invalidating the guard.
+# ---------------------------------------------------------------------------
+TRAINED_SPECIES_SUPPORT = {
+    "uranium_ppb": {
+        "source_conc_C0":     (9026.96, 41594.9),
+        "background_conc_Cb": (0.0, 25.31),
+    },
+    "sulfate_mg_l": {
+        "source_conc_C0":     (273.753, 2975.66),
+        "background_conc_Cb": (2.0, 190.0),
+    },
+    "tds_mg_l": {
+        "source_conc_C0":     (1591.71, 5698.63),
+        "background_conc_Cb": (97.92, 1513.6),
+    },
+    "radium_226_mbq_l": {
+        "source_conc_C0":     (25.7058, 1698.52),
+        # Degenerate on purpose: there is no measured Jharkhand radium baseline,
+        # so the generator used the single config constant for every row.
+        "background_conc_Cb": (23.0, 23.0),
+    },
+}
+
 # Operational irregularities (Phase-2 v2): industrial reality injected into the
 # synthetic loop. Downtime episodes suspend hydraulic capture (eta -> 0 while
 # the pumps are down => effective eta = eta*(1 - downtime_fraction)); the

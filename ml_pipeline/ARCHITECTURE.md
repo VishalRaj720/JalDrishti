@@ -895,9 +895,18 @@ What happens when you drop a pin at Jaduguda and press *Run*:
    transmissive than the generic schist polygon) → flow field (default azimuth
    + gradient) → strike field (anisotropy) → Kd defaults from the same ranges
    training sampled.
-4. **`envelope_violations`**: every input checked against the *deployed model
-   card's* training envelope — anything outside is listed in `extrapolation`
-   (the ML bands are unvalidated there; the analytical engine still serves).
+4. **`envelope_violations`**: every input checked against the trained support —
+   anything outside is listed in `extrapolation` (the ML bands are unvalidated
+   there; the analytical engine still serves). Three sources, because the
+   deployed model card does not cover all of them:
+   the operational sliders from the card's `training_envelope`; the resolved
+   hydrogeology from its per-regime `hydro_support`; and `source_conc_C0` /
+   `background_conc_Cb` per species from `P.TRAINED_SPECIES_SUPPORT`.
+   Those last two had **no card entry at all**, so until 2026-08-12 the lookup
+   fell through to `(-inf, inf)` and they were never checked — a baseline
+   outside trained support extrapolated with the 80 % band still printed. The
+   check is skipped when `u_suppressed` is set, because a non-ore pin clamps C0
+   to background and the server already bypasses the surrogate there.
 5. **Analytical engine**: `features_from_inputs` → `simulate_plume` (Domenico +
    Tang + disc + restoration wave on a 200² grid) → metrics + contours; plus
    the 48-draw MC for excursion probability.

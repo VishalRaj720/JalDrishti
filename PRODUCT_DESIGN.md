@@ -442,14 +442,35 @@ for, and it did nothing at all before this.
 they are rare, and the audit log gives an admin the old/new values to apply by hand.
 `GET /dataset-sync/pending` is the working list.
 
-#### A gap this surfaced, not yet fixed
+#### A gap this surfaced — **RESOLVED 2026-08-12**
 
-`source_conc_C0` and `background_conc_Cb` are **not** in `envelope_violations()`. Every other input
-is range-checked against the training support, and a violation voids the conformal guarantee loudly.
-If approved data ever pushed a baseline or a source term outside trained support, the model would
-extrapolate **without raising the flag** — the 80% band would print and be wrong. Low risk today
-(ore additions move C0 within the Texas envelope), worth closing before chemistry syncing becomes
-routine.
+`source_conc_C0` and `background_conc_Cb` were the only two trained features `envelope_violations()`
+never checked. They were looked up in the model card's `training_envelope`, which has no entry for
+either, and `env.get(key, (-inf, inf))` turned each lookup into a **silent no-op** — a baseline or
+source term outside trained support extrapolated with the conformal 80 % band still printed.
+
+Fixed additively, without touching artifacts or retraining:
+
+- `P.TRAINED_SPECIES_SUPPORT` records the **per-species** C0/Cb box measured from the deployed
+  training set. Per species, not global, because the bounds span three orders of magnitude between
+  them — one global range would accept a uranium C0 of 25 mBq/L. It lives in config rather than
+  being read from the CSV at runtime because `ml_pipeline/outputs/` is gitignored, and a guard that
+  vanishes in a clean checkout is the failure being removed. A test re-derives it from the CSV
+  whenever present, so a retrain that shifts the support fails the suite.
+- `_species_support()` prefers a `species_support` key in the model card, so a future retrain that
+  records one wins automatically.
+- The tolerance is the same scale-aware rule the hydro check already uses (ratios once the support
+  spans a decade), which keeps a 0.4 % boundary case from flagging while a 17 % excursion does.
+- `envelope_violations(inputs, hydro=None)` gained an optional second argument, read only for
+  `u_suppressed`: in a non-ore zone C0 is deliberately clamped to background and **the server
+  already bypasses the surrogate**, so that clamped value is not an ML extrapolation. Without this
+  every non-ore pin would turn amber for no reason.
+
+**One real behaviour change, deliberately.** At Jaduguda and Bhatin the measured baseline exceeds
+anything the generator sampled — sulfate 227 mg/L against a trained 2–190, TDS 1779 against
+97.9–1513.6 — so those runs now report `conc:background_conc_Cb`. The conformal band there was never
+guaranteed; the run previously said nothing. Across a spread of eight pins × four species, **4 of 32
+combinations flag**, all of them genuine; the non-ore and boundary cases correctly do not.
 
 ### 3.7 P3 (final) — named scenarios and comparison
 
@@ -985,9 +1006,9 @@ Stated plainly, because the portal must not present them as solved:
 13. **The portal and the engine can disagree, on purpose.** Approved data is authoritative here
     immediately but reaches `ml_pipeline` only via a deliberate admin sync (§3.6). The gap is shown
     as an amber state and a count on every run, never hidden.
-14. **`source_conc_C0` and `background_conc_Cb` are not envelope-checked** (§3.6). Every other input
-    is; if approved data pushed either outside trained support the model would extrapolate without
-    flagging it. Low risk today, worth closing before chemistry syncing becomes routine.
+14. ~~**`source_conc_C0` and `background_conc_Cb` are not envelope-checked**~~ — **RESOLVED
+    2026-08-12** (§3.6). Both are now checked per species, with the surrogate-bypass case excluded.
+    Consequence: runs at Jaduguda and Bhatin now correctly report an out-of-support baseline.
 
 A portal that shows these honestly is more defensible to a regulator than one that hides them — and
 this project's entire audit history is the argument for that.
@@ -1040,5 +1061,7 @@ Every quantitative claim in this document was checked on 2026-08-11 against the 
 | Ore sync changes what the engine resolves | `ore_zone_at(85.20, 23.80)`: `none` → `deposit` after a sync, `none` again after restore |
 | `origin` tags round-trip | both files re-read as `['added', 'original']` |
 | Sync leaves ML artifacts alone | `retrain_required: false`; all 16 artifact digests unchanged |
+| C0/Cb envelope guard | 25 new tests; 4/32 real pin-species combinations flag, all genuine; artifacts unchanged |
+| Fix is additive | `ml_pipeline` 307 → 332 passing, backend 105 unchanged, end-to-end audit 43/44 (same documented radium miss) |
 
 If a number here ever disagrees with the code, **the code is right and this document is stale.**
