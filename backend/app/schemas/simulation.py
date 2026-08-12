@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, Any, Dict, List
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 # ── ISR Points ────────────────────────────────────────────────────
@@ -28,10 +28,25 @@ class IsrPointUpdate(BaseModel):
 
 class IsrPointResponse(IsrPointBase):
     id: uuid.UUID
+    # P4: the registry accepted `location` on create/update but never returned
+    # it, so the site registry could not say where a site was and the Map
+    # Console had nothing to plot. Design §3.2 calls this registry "the heart of
+    # the product"; a site without coordinates is not one.
+    location: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _geometry_to_geojson(cls, v: Any) -> Optional[Dict[str, Any]]:
+        """PostGIS hands back a WKB element; the API speaks GeoJSON."""
+        if v is None or isinstance(v, dict):
+            return v
+        from geoalchemy2.shape import to_shape
+        from shapely.geometry import mapping
+        return mapping(to_shape(v))
 
 
 # ── Simulations ───────────────────────────────────────────────────

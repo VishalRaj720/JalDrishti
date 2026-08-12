@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ── Brand Colors ── */
+  --teal-900: #064e52;
+  --teal-800: #0a6267;
+  --teal-700: #0D7377;
+  --teal-600: #0f8589;
+  --teal-500: #14a1a6;
+  --teal-200: #a7dfe1;
+  --teal-100: #d4eff0;
+  --teal-50:  #edf9fa;
+
+  --amber-700: #b45309;
+  --amber-500: #F59E0B;
+  --amber-400: #fbbf24;
+  --amber-100: #fef3c7;
+  --amber-50:  #fffbeb;
+
+  --red-700:   #b91c1c;
+  --red-600:   #DC2626;
+  --red-100:   #fee2e2;
+  --red-50:    #fef2f2;
+
+  --orange-500: #f97316;
+  --orange-100: #ffedd5;
+
+  --green-700: #15803d;
+  --green-600: #16A34A;
+  --green-100: #dcfce7;
+  --green-50:  #f0fdf4;
+
+  --blue-600:  #2563eb;
+  --blue-500:  #3B82F6;
+  --blue-100:  #dbeafe;
+  --blue-50:   #eff6ff;
+
+  --purple-600: #7c3aed;
+  --purple-500: #8b5cf6;
+  --purple-100: #ede9fe;
+
+  /* ── Neutrals ── */
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748B;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #E2E8F0;
+  --slate-100: #f1f5f9;
+  --slate-50:  #F8FAFC;
+  --white:     #ffffff;
+
+  /* ── Semantic ── */
+  --color-primary:        var(--teal-700);
+  --color-primary-hover:  var(--teal-800);
+  --color-primary-light:  var(--teal-50);
+  --color-secondary:      var(--amber-500);
+  --color-danger:         var(--red-600);
+  --color-safe:           var(--green-600);
+
+  --bg-page:    var(--slate-50);
+  --bg-surface: var(--white);
+  --bg-map:     #1A202C;
+
+  --text-primary:   var(--slate-800);
+  --text-secondary: var(--slate-500);
+  --text-muted:     var(--slate-400);
+  --text-inverse:   var(--white);
+
+  --border-default: var(--slate-200);
+  --border-strong:  var(--slate-300);
+
+  /* ── Typography ── */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Roboto Mono', 'JetBrains Mono', monospace;
+
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 14px;
+  --text-md:   15px;
+  --text-lg:   16px;
+  --text-xl:   18px;
+  --text-2xl:  20px;
+  --text-3xl:  24px;
+  --text-4xl:  30px;
+
+  /* ── Spacing ── */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ── Layout ── */
+  --header-h:      64px;
+  --sidebar-w:     320px;
+  --drawer-w:      480px;
+  --radius-sm:     4px;
+  --radius-md:     6px;
+  --radius-lg:     10px;
+  --radius-xl:     14px;
+  --radius-pill:   9999px;
+
+  /* ── Shadows ── */
+  --shadow-sm:    0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04);
+  --shadow-md:    0 4px 12px rgba(0,0,0,.10);
+  --shadow-lg:    0 8px 28px rgba(0,0,0,.14);
+  --shadow-panel: 2px 0 16px rgba(0,0,0,.12);
+  --shadow-drawer: -4px 0 24px rgba(0,0,0,.16);
+
+  /* ── Transitions ── */
+  --ease-fast: 120ms ease-out;
+  --ease-base: 200ms ease-out;
+  --ease-slow: 300ms ease-out;
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background: var(--bg-page);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, select, textarea { font-family: inherit; }
+a { text-decoration: none; color: inherit; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--slate-400); }
+
+/* ── Animations ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(220,38,38,.0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes progressBar {
+  from { width: 0%; }
+  to   { width: 100%; }
+}

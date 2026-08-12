@@ -15,16 +15,18 @@ recommendations, and (3) a prototype decision-support tool.
 > permitting. The frozen limitations are listed in
 > [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE_READINESS.md) §7.
 
-## Status — 2026-08-11
+## Status — 2026-08-12
 
-Three codebases, deliberately **not yet wired together**. Joining them is what
-[`PRODUCT_DESIGN.md`](PRODUCT_DESIGN.md) specifies.
+The three codebases are **wired together** as of P4: the SPA talks to the backend, and
+the backend runs the real `ml_pipeline` engine. [`PRODUCT_DESIGN.md`](PRODUCT_DESIGN.md)
+tracks what is done and what remains (P5–P8).
 
 | Component | State |
 |---|---|
-| `ml_pipeline/` | **The mature part.** Physics-informed ISR plume surrogate, 307 passing tests, transport kernel benchmarked against an exact solution, conformal bands validated on the serving distribution, 12-entry assumption register. Frozen. |
-| `backend/` | FastAPI + PostgreSQL/PostGIS, JWT + 5-role RBAC, idempotent seed, provenance spine and audit log. Does **not** call `ml_pipeline/` yet — the fabricated stub engine was deleted in P0 and `POST /simulations` returns 501 until P3 wires the real one. |
-| `frontend/` | Two separate UIs: the static `JalDrishti.html` prototype (talks to `backend/`), and `frontend/ml_pipeline/` (vanilla JS + Leaflet, talks to the surrogate's own dashboard server). |
+| `ml_pipeline/` | **The mature part.** Physics-informed ISR plume surrogate, 332 passing tests, transport kernel benchmarked against an exact solution, conformal bands validated on the serving distribution, 12-entry assumption register. Frozen — artifacts are never touched by backend work. |
+| `backend/` | FastAPI + PostgreSQL/PostGIS, JWT + 5-role RBAC with row-level security, provenance spine, audit log, field-observation review workflow. **Runs the real `ml_pipeline` engine**; every run pins the model card, artifact bundle and git SHA. 105 passing tests. |
+| `frontend/app/` | **The product SPA** (P4): Vite + React + TypeScript + Leaflet. Login, Map Console, Site Registry, Review queue. Talks to `backend/`. |
+| `frontend/` (legacy) | The original static `JalDrishti.html` prototype — kept as the visual reference its tokens came from — and `frontend/ml_pipeline/`, the surrogate's own dashboard, served by `ml_pipeline`. |
 
 ## Repository layout
 
@@ -33,7 +35,8 @@ JalDrishti/
 ├── ml_pipeline/          ISR plume surrogate: physics, synthetic generator, ML, dashboard API
 ├── backend/              FastAPI app (PostgreSQL/PostGIS), alembic migrations, seed, tests
 ├── frontend/
-│   ├── JalDrishti.html   Static React/Babel/Leaflet prototype against backend/
+│   ├── app/              The product SPA — Vite + React + TS + Leaflet (P4)
+│   ├── JalDrishti.html   Original static prototype, kept as the visual reference
 │   └── ml_pipeline/      Vanilla JS + Leaflet UI for the surrogate dashboard
 ├── Datasets/             Jharkhand geology, water quality/levels, rivers, DEM, NAQUIM refs
 ├── fetch_data/           Standalone download/ETL scripts for the datasets above
@@ -145,8 +148,8 @@ Swagger UI at `http://localhost:8000/docs`. Routes under `/api/v1`: `/auth`, `/u
 `/monitoring-stations`, `/monitoring-wells`, `/water-samples`, `/ingest`; plus
 `/health`, `/docs`, `/metrics`.
 
-There is no Celery or Redis in this checkout. `POST /simulations` currently returns
-501 — see Known gaps.
+There is no Celery or Redis in this checkout. `POST /simulations` queues a real run
+against `ml_pipeline` and returns **202**; poll `GET /simulations/runs/{id}`.
 
 ### Tests
 ```bash
@@ -156,14 +159,25 @@ cd backend && pytest
 Uses a dedicated `groundwater_test_db`, created automatically and isolated from the
 dev database. Override with `TEST_DATABASE_URL`.
 
-## Frontend prototype
+## Frontend (the product SPA)
+
+Needs the backend running on :8000 — Vite proxies `/api` to it.
+
+```bash
+cd frontend/app && npm install && npm run dev
+```
+
+Open `http://localhost:5173` and sign in with a seeded account. Screens: Map Console,
+Site Registry, and (for admin/regulator) the field-observation Review queue.
+
+### Legacy prototype
 
 ```bash
 cd frontend && python -m http.server 4173
 ```
 
-Open `http://localhost:4173/JalDrishti.html`. Loads React/Babel/Leaflet from CDNs and
-falls back to mock data if the backend is down.
+`http://localhost:4173/JalDrishti.html` — the original static mock. Kept because
+`jaldrishti-tokens.css` is the design system the SPA reuses verbatim.
 
 ## Docker
 
@@ -188,10 +202,11 @@ above are seeded — `regulator` and `field_officer` are created per deployment.
 
 ## Known gaps
 
-- `POST /simulations` returns 501. The backend's own stub engine was deleted in P0
-  (it fabricated results); wiring it to `ml_pipeline/` is P3 in
-  [`PRODUCT_DESIGN.md`](PRODUCT_DESIGN.md).
-- Two unrelated frontends exist; the product design picks one path.
+- Approved field data does not reach the model until an admin runs a dataset sync.
+  This is deliberate and shown in the UI as an amber state — see `PRODUCT_DESIGN.md` §3.6.
+- The citizen surface is partial: the risk API exists, the C3 alert subscription and
+  C4 methods page do not.
+- The Simulation Studio (P5), analytics and signed PDF reports (P8) are not built.
 - The surrogate is calibrated on transferred Texas physics — see the readiness
   report's frozen-limitations section before quoting any number from it.
 - Development secrets in `config.py` are placeholders; override them in real

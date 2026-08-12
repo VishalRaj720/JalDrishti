@@ -654,6 +654,51 @@ be told where they are looking.
 draw unreviewed or unsynced input as confirmed, which is the confusion the whole review workflow
 exists to prevent.
 
+### 4.7 P4 — what shipped
+
+`frontend/app/` — Vite + React 18 + TypeScript, TanStack Query, React Router, Leaflet.
+`npm run dev` on :5173, proxying `/api` to :8000 so the browser makes same-origin
+requests and production can sit behind the same gateway unchanged.
+
+| Screen | State |
+|---|---|
+| **1 · Login** | Email/password, session resumed from a stored token, role re-read from the server on every load. Carries the hypothetical framing (§4.5 rule 6) |
+| **2 · Map Console** | Real 24-district GeoJSON, hypothetical ISR sites, field observations in the three §4.4b states, layer toggles, search, risk badges, legend, drawer |
+| **3 · Site Registry** | Table + drawer, run a simulation, poll it, and see `extrapolation` rendered loudly (§4.5 rule 2) |
+| **Review queue** | The reviewer's screen: old/new diff, approve/reject, and the admin-only ore sync |
+
+**One deliberate deviation from §4.** The stack line says Tailwind + shadcn/ui. The app
+instead reuses `frontend/jaldrishti-tokens.css` **verbatim** — the palette, type scale,
+spacing and radii stakeholders have already seen. That file *is* the design system;
+re-expressing it in Tailwind would have created a second vocabulary for the same values
+and risked drift in exactly the identity §1.2 says to preserve. Recharts is not yet
+needed (no charts in P4).
+
+**One UI defect found and fixed during verification.** ISR sites and the amber
+"approved, pending sync" state were both `#F59E0B` and indistinguishable on the map.
+Amber belongs to the observation state, so ISR sites became **diamonds** — which is what
+the original legend used anyway. Shape now carries the distinction, colour carries state.
+
+**Verified in a real browser against the live API**, not asserted:
+
+- login → session → role chip renders `admin`
+- 24 district polygons drawn from the corrected geometry (§1.5), plus the ISR diamond
+- the tri-state cycle end to end: submit → 🔴 dashed red marker and "1 pending review" →
+  approve → 🟡 header badge flips, sync button appears → sync → 🟢 in model, with
+  `origin=added` rows landing in both ore files
+- a simulation queued from the drawer, polled, and completed in 15.3 s with its
+  provenance pinned
+- a sulfate run at Jaduguda rendering **"Outside trained support:
+  `conc:background_conc_Cb`"** — the guard from §3.6 surfacing where a user reads it
+- **the coordinate line holds**: signed in as `citizen`, the Review link is hidden, zero
+  ISR markers are drawn, and the API returns **403** for `/isr-points` and
+  `/field-observations/map` while `/public/risk/districts` returns **200**
+
+**A backend gap P4 exposed.** `IsrPointResponse` accepted `location` on write but never
+declared it as an output field, so every read returned a site with no coordinates — 200,
+no error, nothing to plot. Fixed with a GeoJSON serializer and pinned by
+`tests/test_isr_point_location.py`.
+
 ### 4.5 Non-negotiable UI rules
 
 From the audit history, to stop the portal over-claiming:
@@ -1023,7 +1068,7 @@ this project's entire audit history is the argument for that.
 | **P1** ✅ | `0006` drops the 5 orphans; `0007` adds `orgs`/`dataset_versions`/`audit_log`, links the load ledger, extends the role vocabulary; seed backfills all of it | **Done.** Schema matches reality, provenance spine populated (§5.2). `roles` tables deferred to P2 |
 | **P2** ✅ | Auth hardening, 5 roles, RLS, audit; endpoint cull 55 → 44 | **Done.** Closed an unauthenticated privilege-escalation hole (§3.0); `0008` migrated `viewer` → `citizen`; `0009` added `owner_org_id` + policies. **RLS needs the `jaldrishti_app` role switch to take effect** — see §2. Rate limiting already existed (slowapi) |
 | **P3** ✅ | Wire `POST /simulations` → `ml_pipeline`; scenarios; run persistence | **Complete.** Real physics replaces the 501; every run pins model card + artifact bundle + git SHA (§3.4); named scenarios with `/run` and `/compare` (§3.7) |
-| **P4** | React shell: Login, Map Console, Site Registry | ◀ **MVP — demoable to stakeholders** |
+| **P4** ✅ | React shell: Login, Map Console, Site Registry, Review queue | **Done — MVP line reached.** Vite + React + TS on the existing design tokens; verified end to end in a browser against the live API (§4.7) |
 | **P5** | Simulation Studio: bands, provenance drawer, **ISR Excursion panel** | Full official decision support |
 | **P6** ◐ | **Citizen surface** (C1–C4) | **Partly done early**: `GET /public/risk/districts` and `/public/risk/{district_id}` ship the C1/C2 *data* (§3.5) to close roles.md D-3. The C3 alert subscription and C4 methods page remain |
 | **P7** | Monitoring & Alerts loop (+ Redis) + Data Gap Report | Proposal deliverables complete |
