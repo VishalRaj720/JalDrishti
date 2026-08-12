@@ -1,0 +1,91 @@
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import "./styles/theme.css";
+import "./styles/layout.css";
+
+import {
+  AuthProvider, canAdmin, canAudit, canReview, canRunSim, canSubmit, isStaff, useAuth,
+} from "./auth";
+import type { Role } from "./api/client";
+import Shell from "./components/Shell";
+import Login from "./pages/Login";
+import Overview from "./pages/Overview";
+import MapConsole from "./pages/MapConsole";
+import Studio from "./pages/Studio";
+import FieldData from "./pages/FieldData";
+import DataGaps from "./pages/DataGaps";
+import Audit from "./pages/Audit";
+import Administration from "./pages/Administration";
+import PublicView from "./pages/PublicView";
+
+const qc = new QueryClient({
+  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+});
+
+/**
+ * Client-side route guard.
+ *
+ * A convenience, not a boundary: it stops a user landing on a screen that would
+ * only 403, and keeps a stray URL from rendering an empty shell. The real
+ * enforcement is the API guard and the RLS policy behind it — this cannot be
+ * the thing that protects site coordinates.
+ */
+function Guard({ allow, children }: { allow: (r?: Role) => boolean; children: React.ReactNode }) {
+  const { me } = useAuth();
+  if (!allow(me?.role)) {
+    return (
+      <div className="page">
+        <div className="banner danger">
+          <strong>Not available for your role.</strong> This section is restricted, and
+          the API would refuse the request regardless of what this page rendered.
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
+function Gate() {
+  const { me, loading } = useAuth();
+  if (loading) {
+    return <div className="login"><span className="spinner" /></div>;
+  }
+  if (!me) return <Login />;
+
+  return (
+    <Routes>
+      <Route element={<Shell />}>
+        <Route path="/overview" element={<Overview />} />
+        <Route path="/map" element={<Guard allow={isStaff}><MapConsole /></Guard>} />
+        <Route
+          path="/studio"
+          element={<Guard allow={(r) => canRunSim(r) || canReview(r)}><Studio /></Guard>}
+        />
+        <Route
+          path="/field"
+          element={<Guard allow={(r) => canSubmit(r) || canReview(r)}><FieldData /></Guard>}
+        />
+        <Route path="/data" element={<Guard allow={isStaff}><DataGaps /></Guard>} />
+        <Route path="/audit" element={<Guard allow={canAudit}><Audit /></Guard>} />
+        <Route path="/admin" element={<Guard allow={canAdmin}><Administration /></Guard>} />
+        <Route path="/public" element={<PublicView />} />
+        <Route path="*" element={<Navigate to="/overview" replace />} />
+      </Route>
+    </Routes>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={qc}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Gate />
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </React.StrictMode>,
+);

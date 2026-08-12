@@ -654,51 +654,6 @@ be told where they are looking.
 draw unreviewed or unsynced input as confirmed, which is the confusion the whole review workflow
 exists to prevent.
 
-### 4.7 P4 — what shipped
-
-`frontend/app/` — Vite + React 18 + TypeScript, TanStack Query, React Router, Leaflet.
-`npm run dev` on :5173, proxying `/api` to :8000 so the browser makes same-origin
-requests and production can sit behind the same gateway unchanged.
-
-| Screen | State |
-|---|---|
-| **1 · Login** | Email/password, session resumed from a stored token, role re-read from the server on every load. Carries the hypothetical framing (§4.5 rule 6) |
-| **2 · Map Console** | Real 24-district GeoJSON, hypothetical ISR sites, field observations in the three §4.4b states, layer toggles, search, risk badges, legend, drawer |
-| **3 · Site Registry** | Table + drawer, run a simulation, poll it, and see `extrapolation` rendered loudly (§4.5 rule 2) |
-| **Review queue** | The reviewer's screen: old/new diff, approve/reject, and the admin-only ore sync |
-
-**One deliberate deviation from §4.** The stack line says Tailwind + shadcn/ui. The app
-instead reuses `frontend/jaldrishti-tokens.css` **verbatim** — the palette, type scale,
-spacing and radii stakeholders have already seen. That file *is* the design system;
-re-expressing it in Tailwind would have created a second vocabulary for the same values
-and risked drift in exactly the identity §1.2 says to preserve. Recharts is not yet
-needed (no charts in P4).
-
-**One UI defect found and fixed during verification.** ISR sites and the amber
-"approved, pending sync" state were both `#F59E0B` and indistinguishable on the map.
-Amber belongs to the observation state, so ISR sites became **diamonds** — which is what
-the original legend used anyway. Shape now carries the distinction, colour carries state.
-
-**Verified in a real browser against the live API**, not asserted:
-
-- login → session → role chip renders `admin`
-- 24 district polygons drawn from the corrected geometry (§1.5), plus the ISR diamond
-- the tri-state cycle end to end: submit → 🔴 dashed red marker and "1 pending review" →
-  approve → 🟡 header badge flips, sync button appears → sync → 🟢 in model, with
-  `origin=added` rows landing in both ore files
-- a simulation queued from the drawer, polled, and completed in 15.3 s with its
-  provenance pinned
-- a sulfate run at Jaduguda rendering **"Outside trained support:
-  `conc:background_conc_Cb`"** — the guard from §3.6 surfacing where a user reads it
-- **the coordinate line holds**: signed in as `citizen`, the Review link is hidden, zero
-  ISR markers are drawn, and the API returns **403** for `/isr-points` and
-  `/field-observations/map` while `/public/risk/districts` returns **200**
-
-**A backend gap P4 exposed.** `IsrPointResponse` accepted `location` on write but never
-declared it as an output field, so every read returned a site with no coordinates — 200,
-no error, nothing to plot. Fixed with a GeoJSON serializer and pinned by
-`tests/test_isr_point_location.py`.
-
 ### 4.5 Non-negotiable UI rules
 
 From the audit history, to stop the portal over-claiming:
@@ -734,6 +689,104 @@ These come from [`docs/audits/ML_PIPELINE_READINESS.md`](docs/audits/ML_PIPELINE
 8. Moving the monitor ring off 100 m flags extrapolation by design.
 9. **No new datasets, models or modelling approaches** without a re-bake, retrain and re-run of the
    field coverage gate.
+
+### 4.7 P4 — what shipped
+
+`frontend/portal/` — Vite + React 18 + TypeScript, TanStack Query, React Router,
+Leaflet. `npm run dev` on :5173, proxying `/api` to :8000 so the browser makes
+same-origin requests and production can sit behind the same gateway unchanged.
+The UX specification is [`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md).
+
+**The organising decision: the portal is eight sections filtered per role, not one
+dashboard with things greyed out.** A regulator opening the portal needs a decision
+queue; a field officer needs their own submission ledger; an analyst needs scenarios;
+an admin needs system state; a citizen needs plain language and no coordinates. So
+`/overview` resolves to **five different screens**, and the nav is built from the
+signed-in role rather than filtered after the fact.
+
+| Section | admin | regulator | analyst | field officer | citizen |
+|---|:--:|:--:|:--:|:--:|:--:|
+| Overview (role-specific) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Map Console | ✅ | ✅ | ✅ | ✅ | — |
+| Simulation Studio | ✅ | ✅ | ✅ | — | — |
+| Field Data | ✅ review | ✅ review | — | ✅ submit | — |
+| Data & Gaps | ✅ +sync | ✅ | ✅ | ✅ | — |
+| Audit | ✅ | ✅ | — | — | — |
+| Administration | ✅ | — | — | — | — |
+| Public View / "My Area" | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+Route guards are **convenience, not the boundary** — a hand-typed URL renders a
+refusal instead of an empty shell, while the API guard and the RLS policy behind it
+do the actual enforcement. Both layers were tested independently (below).
+
+**Design decisions worth recording.**
+
+- **The map keeps no raster basemap.** The ml_pipeline dashboard has none either: the
+  risk ramp is the information, and tiles compete with it. District fill encodes
+  *measured* uranium, never model output.
+- **Shape carries identity, colour carries state.** ISR sites are amber **diamonds**;
+  amber circles mean "approved, not yet in the model". This was a defect found in the
+  first P4 build and it is now a rule.
+- **Simulation Studio is a numbered path** — ① site ② contaminant ③ parameters ④ run
+  ⑤ save as scenario — because an analyst's failure mode is running the wrong scenario
+  confidently, not being unable to find a control.
+- **Sliders deliberately extend past the trained envelope.** The analytical engine still
+  serves out there and the result is flagged, not refused (§3.6). The rail says so.
+- **The citizen surface shows no coordinate, no site, no band, no jargon** — the nav
+  even renames Public View to "My Area".
+
+**Nothing unsupported is faked.** Where the backend cannot serve a feature, the UI
+renders a `Planned` card naming the phase and the reason:
+
+| Marked planned | Why |
+|---|---|
+| Plume contour map, P10/P90 migration envelope | The run API persists metrics, excursion state and hydrogeology — not plume geometry (P5) |
+| Alert subscriptions | No notification service exists (P7) |
+| PDF / signed report export | No report service exists (P8) |
+| Bulk ingest upload UI | The five ingest endpoints exist and are admin-only; the upload screen is not built |
+| Organisation invitations, API keys | Organisations exist in the schema; no invitation or key endpoint does |
+
+**Five seeded accounts, one per role.** The old three-user demo set (`admin`,
+`analyst`, `viewer`) could not exercise a five-role system. `scripts/seed.py` now
+seeds one account per role and **retires** `viewer@jaldrishti.local`, deleting it if
+present so it cannot linger as an unlabelled login.
+
+**Verified in a real browser against the live API**, not asserted:
+
+- all **five logins** succeed and `/auth/me` returns the expected role for each
+- the **API authorization matrix** holds independently of the UI — citizen gets 403 on
+  `/isr-points`, `/field-observations/map`, `/dataset-sync/status`, `/audit`, `/users`
+  and `/scenarios`, and 200 only on `/public/risk/districts`; analyst and field officer
+  get 403 on `/audit` and `/users`; regulator gets 403 on `/users` alone
+- the **nav matches the matrix** for every role, and every out-of-role route renders
+  the refusal rather than a broken page
+- 24 district polygons, the ISR diamond, and 397 monitoring wells draw on the map
+- the **tri-state cycle end to end**: field officer submits → 🔴 pending with a full
+  old/new diff → regulator approves → header pill flips to 🟡 "1 not in model" →
+  admin syncs → 🟢 in model, with `origin=added` rows landing in both ore files and
+  `retrain required: false`
+- a simulation queued, polled and completed in 14.2 s, rendering P10–P90 bands, the
+  2-of-3 excursion table and its provenance triple
+- the citizen drill-down renders measured block readings in plain language with the
+  monitoring-gap caveat, and **no sync pill, coordinate or model number leaks into it**
+
+**Three defects found and fixed during this verification.**
+
+1. **The wells layer never loaded.** `/monitoring-wells` requires a `bbox` — it is
+   viewport-scoped by design — and the client called it without one, so the layer
+   silently 422'd. The query now follows the map, rounded to 4 dp to match the
+   endpoint's own cache key.
+2. **A completed run could sit on "running" forever.** The client disables
+   window-focus refetching, and a plain `refetchInterval` is paused while the tab is
+   hidden — so switching away mid-run and back stranded the row. Fixed with
+   `refetchIntervalInBackground`.
+3. **The excursion table's UCL column was always empty** while the "over" column still
+   said yes: the client read `i.ucl`, but the payload field is `upper_control_limit`.
+   A threshold-free "yes" is exactly the kind of unexplained assertion §4.5 exists to
+   prevent. The UCL rule and per-indicator units are now shown too.
+
+A fourth, smaller fix: the public explainer said "the 1 wells sampled here". It is
+read by citizens, so it now agrees in number.
 
 ---
 

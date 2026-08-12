@@ -48,19 +48,23 @@ _CACHE = "public, max-age=3600"
 
 
 def _explain(band: str, n: int) -> str:
+    # This text is read by the public, so it says "the 1 well" rather than
+    # "the 1 wells" — many blocks have a single sampled well.
+    wells = "well" if n == 1 else "wells"
     if band == "No data":
         return ("No groundwater samples have been collected here yet, so there "
                 "is nothing to report. That is a gap in monitoring, not a "
                 "clean result.")
     if band == "High concern":
-        return (f"At least one of the {n} wells sampled here measured uranium "
+        one_of = "The" if n == 1 else "At least one of the"
+        return (f"{one_of} {n} {wells} sampled here measured uranium "
                 f"at or above the {URANIUM_LIMIT_PPB:g} ppb safe limit for "
                 f"drinking water. Contact your block water office about testing.")
     if band == "Moderate concern":
-        return (f"Uranium was found in the {n} wells sampled here at more than "
+        return (f"Uranium was found in the {n} {wells} sampled here at more than "
                 f"half the {URANIUM_LIMIT_PPB:g} ppb safe limit, but below it. "
                 f"Worth watching; not currently over the limit.")
-    return (f"Uranium in the {n} wells sampled here was well below the "
+    return (f"Uranium in the {n} {wells} sampled here was well below the "
             f"{URANIUM_LIMIT_PPB:g} ppb safe limit.")
 
 

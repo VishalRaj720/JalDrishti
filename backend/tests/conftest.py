@@ -22,7 +22,7 @@ from app.database import Base, get_db
 from app.main import app
 from app.models.user import User, UserRole
 from app.services.auth import hash_password, create_access_token
-from scripts.init_db import _ENUMS, _create_enum_sql
+from scripts.init_db import _ENUMS, _create_enum_statements
 
 TEST_DB_NAME = os.getenv("TEST_DB_NAME", "groundwater_test_db")
 TEST_DB_URL = os.getenv(
@@ -65,7 +65,8 @@ def _bootstrap_test_db():
     with db.cursor() as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
         for name, values in _ENUMS.items():
-            cur.execute(_create_enum_sql(name, values))
+            for stmt in _create_enum_statements(name, values):
+                cur.execute(stmt)
     db.close()
     yield
 

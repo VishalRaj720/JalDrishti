@@ -29,34 +29,35 @@ _ENUMS = {
 }
 
 
-def _create_enum_sql(name: str, values: list[str]) -> str:
+def _create_enum_statements(name: str, values: list[str]) -> list[str]:
     """Create the enum, or reconcile it if it already exists.
 
-    The create-only version of this silently skipped databases that already had
-    the type, so when P2 added `regulator`, `field_officer` and `citizen` to
-    `UserRole`, every pre-existing database — including the test database — kept
-    the three-value enum and failed at INSERT with "invalid input value for enum
-    userrole". Creating without reconciling means `_ENUMS` deriving from the ORM
-    buys nothing after the first run.
+    ONE STATEMENT PER LIST ENTRY, deliberately. The first version of this
+    returned a single multi-statement string, which works under psycopg2
+    (autocommit, no prepare) but asyncpg REFUSES with "cannot insert multiple
+    commands into a prepared statement". `tests/conftest.py` uses psycopg2 and
+    `scripts.init_db` uses asyncpg, so the seed broke while the tests stayed
+    green.
+
+    Why reconcile at all: the create-only version silently skipped databases
+    that already had the type, so when the role model grew from three values to
+    five, every pre-existing database kept the old enum and failed at INSERT
+    with "invalid input value for enum userrole".
 
     `ADD VALUE IF NOT EXISTS` is append-only, which matches Postgres: a value
-    cannot be removed from an enum, so this reconciles additions only. Removing
-    one requires a deliberate type swap in a migration.
+    cannot be removed from an enum. Removing one needs a deliberate type swap in
+    a migration.
     """
     labels = ", ".join(f"'{v}'" for v in values)
-    adds = "\n".join(
-        f"        ALTER TYPE {name} ADD VALUE IF NOT EXISTS '{v}';"
-        for v in values
-    )
     # CREATE TYPE has no IF NOT EXISTS; guard with a catalog check.
-    return f"""
-    DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '{name}') THEN
-            CREATE TYPE {name} AS ENUM ({labels});
-        END IF;
-    END $$;
-{adds}
-    """
+    stmts = [
+        f"DO $$ BEGIN "
+        f"IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '{name}') THEN "
+        f"CREATE TYPE {name} AS ENUM ({labels}); "
+        f"END IF; END $$;"
+    ]
+    stmts += [f"ALTER TYPE {name} ADD VALUE IF NOT EXISTS '{v}';" for v in values]
+    return stmts
 
 
 def _privileged_engine():
@@ -91,7 +92,8 @@ async def _init_db_with(engine) -> None:
 
         for name, values in _ENUMS.items():
             logger.info(f"Ensuring ENUM type '{name}' ...")
-            await conn.execute(text(_create_enum_sql(name, values)))
+            for stmt in _create_enum_statements(name, values):
+                await conn.execute(text(stmt))
 
         logger.info("Creating tables (create_all) ...")
         await conn.run_sync(Base.metadata.create_all)

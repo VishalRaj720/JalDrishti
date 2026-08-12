@@ -7,7 +7,8 @@ ONE command takes an empty database all the way to a fully populated one:
 
 What it does, in order:
   0. Schema      : PostGIS extension + ENUM types + all tables (via scripts.init_db)
-  1. Users       : default RBAC users (admin / analyst / citizen)
+  1. Users       : one account per role (admin / regulator / analyst /
+                   field_officer / citizen)
   2. ISR points  : a hypothetical uranium ISR injection point near Jaduguda
   3. Geodata     : Jharkhand districts, sub-districts (blocks), aquifers,
                    groundwater-level time series, and CGWB water-quality samples
@@ -39,7 +40,30 @@ from geoalchemy2.elements import WKTElement
 from loguru import logger
 from sqlalchemy import func, select, text
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal as _AppSessionLocal
+
+
+def _session_factory():
+    """Seed as the OWNER role, not the restricted application role.
+
+    `DATABASE_URL` points at `jaldrishti_app`, which is NOSUPERUSER/NOBYPASSRLS
+    by design — so writing `isr_points` through it fails the `isr_points_write`
+    policy with "new row violates row-level security policy". Seeding is
+    owner-level work, exactly like migrations, so it uses the same privileged
+    connection they do. Falls back to the app session when the two roles have
+    not been split (a fresh clone).
+    """
+    from app.config import settings
+    if settings.MIGRATION_DATABASE_URL:
+        from sqlalchemy.ext.asyncio import (create_async_engine,
+                                            async_sessionmaker, AsyncSession)
+        engine = create_async_engine(settings.MIGRATION_DATABASE_URL)
+        return async_sessionmaker(engine, class_=AsyncSession,
+                                  expire_on_commit=False), engine
+    return _AppSessionLocal, None
+
+
+AsyncSessionLocal, _seed_engine = _session_factory()
 from app.services.auth import hash_password
 from app.services.ingestion import IngestionService
 from app.models.user import User, UserRole
@@ -64,11 +88,27 @@ TARGET_MIN_WELLS = 50
 TARGET_MIN_SAMPLES = 200
 
 
+# ONE ACCOUNT PER DESIGNED ROLE. The seed previously created three
+# (admin / analyst / viewer) while the system had five, so `regulator` and
+# `field_officer` -- the two roles that carry the review workflow -- could not be
+# exercised at all without hand-crafting a user.
+#
+# These are DEMONSTRATION credentials for a prototype. They are weak and public,
+# which is fine for a fellowship demo and is not fine anywhere else; the README
+# says so beside the table.
 SEED_USERS = [
-    {"username": "admin",   "email": "admin@jaldrishti.local",   "password": "admin123",   "role": UserRole.admin},
-    {"username": "analyst", "email": "analyst@jaldrishti.local", "password": "analyst123", "role": UserRole.analyst},
-    {"username": "citizen", "email": "citizen@jaldrishti.local", "password": "citizen123", "role": UserRole.citizen},
+    {"username": "admin",     "email": "admin@jaldrishti.local",     "password": "admin123",     "role": UserRole.admin},
+    {"username": "regulator", "email": "regulator@jaldrishti.local", "password": "regulator123", "role": UserRole.regulator},
+    {"username": "analyst",   "email": "analyst@jaldrishti.local",   "password": "analyst123",   "role": UserRole.analyst},
+    {"username": "fieldofficer", "email": "field@jaldrishti.local",  "password": "field123",     "role": UserRole.field_officer},
+    {"username": "citizen",   "email": "citizen@jaldrishti.local",   "password": "citizen123",   "role": UserRole.citizen},
 ]
+
+#: Accounts from before the five-role model that should not survive a reseed.
+#: `viewer` was migrated to the `citizen` ROLE by 0008, but the account itself
+#: lingered with its old identity; leaving it would mean two citizen logins and
+#: a stale name in the audit trail.
+RETIRED_USER_EMAILS = ["viewer@jaldrishti.local"]
 
 # A hypothetical ISR field near Jaduguda — the East Singhbhum uranium belt is the
 # only place in Jharkhand where uranium ISR would plausibly be sited. This gives
@@ -201,6 +241,24 @@ async def assign_users_to_host_org(db) -> None:
 
 
 # ----------------- 1. users -----------------
+
+async def retire_legacy_users(db) -> None:
+    """Remove pre-five-role demo accounts. Safe: FKs from audit_log and
+    field_observations are ON DELETE SET NULL / RESTRICT, so this refuses rather
+    than cascades if the account actually did something worth keeping."""
+    for email in RETIRED_USER_EMAILS:
+        existing = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if existing is None:
+            continue
+        try:
+            await db.delete(existing)
+            await db.commit()
+            logger.info(f"  [ok]   retired legacy account {email}")
+        except Exception as exc:
+            await db.rollback()
+            logger.warning(f"  [skip] {email} has dependent records, left in place: "
+                           f"{type(exc).__name__}")
+
 
 async def seed_users(db) -> None:
     logger.info("Seeding users ...")
@@ -457,6 +515,7 @@ async def run(datasets_dir: Path, report_path: Path, skip_schema: bool) -> int:
     # 0b + 1 + 2. Orgs, users and ISR points. Orgs come first: users reference them.
     async with AsyncSessionLocal() as db:
         await seed_orgs(db)
+        await retire_legacy_users(db)
         await seed_users(db)
         await assign_users_to_host_org(db)
         await seed_isr_points(db)

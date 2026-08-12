@@ -24,8 +24,8 @@ tracks what is done and what remains (P5–P8).
 | Component | State |
 |---|---|
 | `ml_pipeline/` | **The mature part.** Physics-informed ISR plume surrogate, 332 passing tests, transport kernel benchmarked against an exact solution, conformal bands validated on the serving distribution, 12-entry assumption register. Frozen — artifacts are never touched by backend work. |
-| `backend/` | FastAPI + PostgreSQL/PostGIS, JWT + 5-role RBAC with row-level security, provenance spine, audit log, field-observation review workflow. **Runs the real `ml_pipeline` engine**; every run pins the model card, artifact bundle and git SHA. 105 passing tests. |
-| `frontend/app/` | **The product SPA** (P4): Vite + React + TypeScript + Leaflet. Login, Map Console, Site Registry, Review queue. Talks to `backend/`. |
+| `backend/` | FastAPI + PostgreSQL/PostGIS, JWT + 5-role RBAC with row-level security, provenance spine, audit log, field-observation review workflow. **Runs the real `ml_pipeline` engine**; every run pins the model card, artifact bundle and git SHA. 109 passing tests. |
+| `frontend/portal/` | **The government portal SPA** (P4): Vite + React + TypeScript + Leaflet. Eight sections filtered per role — Overview, Map Console, Simulation Studio, Field Data, Data & Gaps, Audit, Administration, Public View. Talks to `backend/`. See [`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md). |
 | `frontend/` (legacy) | The original static `JalDrishti.html` prototype — kept as the visual reference its tokens came from — and `frontend/ml_pipeline/`, the surrogate's own dashboard, served by `ml_pipeline`. |
 
 ## Repository layout
@@ -35,7 +35,7 @@ JalDrishti/
 ├── ml_pipeline/          ISR plume surrogate: physics, synthetic generator, ML, dashboard API
 ├── backend/              FastAPI app (PostgreSQL/PostGIS), alembic migrations, seed, tests
 ├── frontend/
-│   ├── app/              The product SPA — Vite + React + TS + Leaflet (P4)
+│   ├── portal/           The government portal SPA — Vite + React + TS + Leaflet (P4)
 │   ├── JalDrishti.html   Original static prototype, kept as the visual reference
 │   └── ml_pipeline/      Vanilla JS + Leaflet UI for the surrogate dashboard
 ├── Datasets/             Jharkhand geology, water quality/levels, rivers, DEM, NAQUIM refs
@@ -159,16 +159,31 @@ cd backend && pytest
 Uses a dedicated `groundwater_test_db`, created automatically and isolated from the
 dev database. Override with `TEST_DATABASE_URL`.
 
-## Frontend (the product SPA)
+## Frontend (the government portal)
 
 Needs the backend running on :8000 — Vite proxies `/api` to it.
 
 ```bash
-cd frontend/app && npm install && npm run dev
+cd frontend/portal && npm install && npm run dev
 ```
 
-Open `http://localhost:5173` and sign in with a seeded account. Screens: Map Console,
-Site Registry, and (for admin/regulator) the field-observation Review queue.
+Open `http://localhost:5173` and sign in. The login screen lists all five demo
+accounts; clicking one fills the form.
+
+| Account | Password | Sees |
+|---|---|---|
+| `admin@jaldrishti.local` | `admin123` | Everything, including Administration and dataset sync |
+| `regulator@jaldrishti.local` | `regulator123` | All but Administration; owns the approve/reject queue |
+| `analyst@jaldrishti.local` | `analyst123` | Map, Simulation Studio, Data & Gaps — no review, no audit |
+| `field@jaldrishti.local` | `field123` | Map, Field Data (submit only), Data & Gaps |
+| `citizen@jaldrishti.local` | `citizen123` | Overview and My Area only — no coordinates, no model output |
+
+Nav sections are filtered by role, and a hand-typed URL for a section a role cannot
+use renders a refusal. That is convenience, not the boundary: the API and the
+Postgres row-level security policies enforce access independently.
+
+The eight sections are described in [`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md),
+which also lists what is deliberately marked **Planned** rather than faked.
 
 ### Legacy prototype
 
@@ -176,8 +191,8 @@ Site Registry, and (for admin/regulator) the field-observation Review queue.
 cd frontend && python -m http.server 4173
 ```
 
-`http://localhost:4173/JalDrishti.html` — the original static mock. Kept because
-`jaldrishti-tokens.css` is the design system the SPA reuses verbatim.
+`http://localhost:4173/JalDrishti.html` — the original static mock. Kept as the
+navigation and section reference the portal drew on.
 
 ## Docker
 
@@ -189,16 +204,25 @@ Brings up `db` (PostGIS) + `backend`.
 
 ## Seeded users
 
+`python -m scripts.seed` creates exactly one account per role, so every role can be
+signed into and checked:
+
 | Role | Email | Password |
 |---|---|---|
 | admin | `admin@jaldrishti.local` | `admin123` |
+| regulator | `regulator@jaldrishti.local` | `regulator123` |
 | analyst | `analyst@jaldrishti.local` | `analyst123` |
+| field_officer | `field@jaldrishti.local` | `field123` |
 | citizen | `citizen@jaldrishti.local` | `citizen123` |
 
-The five designed roles are `admin`, `regulator`, `analyst`, `field_officer` and
-`citizen`. `viewer` was renamed to `citizen` by migration `0008`; any pre-existing
-`viewer` account keeps its email and is moved to the `citizen` role. Only the three
-above are seeded — `regulator` and `field_officer` are created per deployment.
+`viewer` was renamed to `citizen` by migration `0008`; any pre-existing `viewer`
+account keeps its email and moves to the `citizen` role. The old
+`viewer@jaldrishti.local` demo account is **retired by the seed** — it is deleted if
+present, so it cannot linger as an unlabelled login. Passwords are demo credentials
+for a hypothetical dataset; change them before any deployment that is not local.
+
+What each role may do is specified in [`docs/roles.md`](docs/roles.md), which carries
+the role × endpoint authorization matrix.
 
 ## Known gaps
 
