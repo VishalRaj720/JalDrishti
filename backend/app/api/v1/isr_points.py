@@ -7,7 +7,10 @@ from app.database import get_db
 from app.schemas.simulation import IsrPointCreate, IsrPointUpdate, IsrPointResponse, SimulationResponse
 from app.services.isr_point import IsrPointService
 from app.services.simulation import SimulationService
-from app.dependencies import require_analyst_or_admin, require_admin, require_any_role
+from app.dependencies import (
+    require_admin, require_analyst_or_admin, require_any_role,
+    require_simulation_roles,
+)
 from app.exceptions import AppException
 from app.schemas.common import JobResponse
 
@@ -39,10 +42,13 @@ async def get_isr_point(
 async def create_isr_point(
     payload: IsrPointCreate,
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
+    # Regulators too: placing a hypothetical site is how a reviewer tests a
+    # scenario for themselves instead of accepting an analyst's chosen location.
+    current_user=Depends(require_simulation_roles),
 ):
     try:
-        return await IsrPointService(db).create(payload)
+        return await IsrPointService(db).create(
+            payload, owner_org_id=current_user.org_id)
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 

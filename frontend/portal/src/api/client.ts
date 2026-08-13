@@ -22,6 +22,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(`/api/v1${path}`, {
     ...init,
+    // `no-store`, always. The HTTP cache is keyed on the URL, not on the
+    // Authorization header, so a cached response to a role-restricted endpoint
+    // will be handed to whoever signs in next on the same browser. The API sets
+    // `Cache-Control: no-store` on those routes, but the client must not depend
+    // on the server never getting that wrong — a single mis-set header would
+    // otherwise leak site geography to a citizen on a shared machine.
+    //
+    // Nothing is lost: in-session reuse comes from TanStack Query's in-memory
+    // cache, which is per-page-load and cannot outlive a sign-out.
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -153,6 +163,53 @@ export interface AuditEntry {
 export interface PublicDistrictRisk {
   id: string; name: string; wells: number; samples: number;
   max_uranium_ppb: number | null; band: string;
+}
+
+// ── the ML engine, proxied under /api/v1/ml ──────────────────────────
+
+/** A GeoJSON FeatureCollection with properties we do not enumerate.
+ *  The pipeline owns these shapes; typing them here would be a second,
+ *  drifting copy of a contract that already has 332 tests behind it. */
+export interface FeatureCollection {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry: any;
+    properties: Record<string, any>;
+  }>;
+  [k: string]: any;
+}
+
+/** What the engine resolves at a coordinate, before anything is run. */
+export interface PinInfo {
+  lon: number; lat: number;
+  lithology?: string; regime?: string;
+  K_m_day?: number; eff_porosity?: number; thickness_m?: number;
+  gradient_i?: number; azimuth_deg?: number;
+  in_ore?: boolean; ore_name?: string | null;
+  district?: string | null;
+  [k: string]: any;
+}
+
+/** An interactive, unpersisted engine run. `persisted` is always false. */
+export interface LiveRun {
+  persisted: false;
+  persistence_note: string;
+  plume?: {
+    contours?: Array<{ level: number; polygon: [number, number][]; label?: string }>;
+    compliance_ring?: { radius_m: number; polygon: [number, number][] };
+    source_zone?: { polygon?: [number, number][]; radius_m: number; area_ha: number;
+                    conc: number; threshold: number; above_threshold: boolean };
+    peak_conc?: number; Xc_m?: number; aspect_ratio?: number;
+    radial_dominated?: boolean;
+  };
+  ml_envelope?: Record<string, [number, number][]> | null;
+  metrics?: { analytical?: Record<string, number>; ml?: Record<string, any> };
+  isr_excursion?: Record<string, any> | null;
+  extrapolation?: string[] | null;
+  hydro?: Record<string, any>;
+  ml_status?: string | null;
+  [k: string]: any;
 }
 
 export const auth = {

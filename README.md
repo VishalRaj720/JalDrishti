@@ -24,7 +24,7 @@ tracks what is done and what remains (P5–P8).
 | Component | State |
 |---|---|
 | `ml_pipeline/` | **The mature part.** Physics-informed ISR plume surrogate, 332 passing tests, transport kernel benchmarked against an exact solution, conformal bands validated on the serving distribution, 12-entry assumption register. Frozen — artifacts are never touched by backend work. |
-| `backend/` | FastAPI + PostgreSQL/PostGIS, JWT + 5-role RBAC with row-level security, provenance spine, audit log, field-observation review workflow. **Runs the real `ml_pipeline` engine**; every run pins the model card, artifact bundle and git SHA. 109 passing tests. |
+| `backend/` | FastAPI + PostgreSQL/PostGIS, JWT + 5-role RBAC with row-level security, provenance spine, audit log, field-observation review workflow. **Runs the real `ml_pipeline` engine**; every run pins the model card, artifact bundle and git SHA. The engine's own API is re-served under `/api/v1/ml` behind the portal's auth. 128 passing tests. |
 | `frontend/portal/` | **The government portal SPA** (P4): Vite + React + TypeScript + Leaflet. Eight sections filtered per role — Overview, Map Console, Simulation Studio, Field Data, Data & Gaps, Audit, Administration, Public View. Talks to `backend/`. See [`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md). |
 | `frontend/` (legacy) | The original static `JalDrishti.html` prototype — kept as the visual reference its tokens came from — and `frontend/ml_pipeline/`, the surrogate's own dashboard, served by `ml_pipeline`. |
 
@@ -145,8 +145,14 @@ uvicorn app.main:app --reload
 
 Swagger UI at `http://localhost:8000/docs`. Routes under `/api/v1`: `/auth`, `/users`,
 `/districts`, `/blocks`, `/aquifers`, `/isr-points`, `/simulations`,
-`/monitoring-stations`, `/monitoring-wells`, `/water-samples`, `/ingest`; plus
-`/health`, `/docs`, `/metrics`.
+`/monitoring-stations`, `/monitoring-wells`, `/water-samples`, `/ingest`, `/ml`,
+`/public/risk`; plus `/health`, `/docs`, `/metrics`.
+
+`/api/v1/ml/*` re-serves the `ml_pipeline` engine — reference geography (boundary, ore,
+aquifers, rivers, flow and strike fields), plus `pin` and `predict` — behind the
+portal's JWT and role guards, so the browser never talks to the pipeline's own
+unauthenticated dashboard on :8077. `predict` there is interactive and **not stored**;
+`POST /simulations/{id}` is the path that writes an auditable run.
 
 There is no Celery or Redis in this checkout. `POST /simulations` queues a real run
 against `ml_pipeline` and returns **202**; poll `GET /simulations/runs/{id}`.
@@ -181,6 +187,16 @@ accounts; clicking one fills the form.
 Nav sections are filtered by role, and a hand-typed URL for a section a role cannot
 use renders a refusal. That is convenience, not the boundary: the API and the
 Postgres row-level security policies enforce access independently.
+
+The **Map Console** is the main working surface. Three basemaps (Map / Dark /
+Satellite, light by default, all with place names) and every layer toggleable —
+districts, blocks, wells, ISR sites, field observations in their three states, plus
+the engine's own reference geography (ore, aquifers, rivers, groundwater flow,
+fracture strike). Admin, regulator and analyst can **click anywhere in Jharkhand** to
+resolve the hydrogeology there, run the engine live with the plume drawn on the map,
+and register the location as an ISR point. That live run is not stored; the Simulation
+Studio is what produces an auditable record. Citizens get their own map — district and
+block results plus monitoring wells, and no ISR site, ore or model output at all.
 
 The eight sections are described in [`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md),
 which also lists what is deliberately marked **Planned** rather than faked.

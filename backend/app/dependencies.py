@@ -131,6 +131,13 @@ require_admin = require_roles(UserRole.admin)
 require_regulator_or_admin = require_roles(UserRole.admin, UserRole.regulator)
 require_analyst_or_admin = require_roles(UserRole.admin, UserRole.analyst)
 
+#: Who may run the contaminant model and place the sites it runs at.
+#: A regulator has to be able to test a scenario themselves rather than ask an
+#: analyst to produce the number they are meant to be scrutinising. Excludes
+#: `field_officer` (collects evidence, does not model) and `citizen`.
+require_simulation_roles = require_roles(
+    UserRole.admin, UserRole.regulator, UserRole.analyst)
+
 #: Any of the four working roles. Excludes `citizen`: use this wherever a
 #: response can expose a precise ISR site location (design section 2).
 require_staff = require_roles(*STAFF_ROLES)

@@ -93,17 +93,67 @@ screen written for someone who has never heard the word "conformal".
 
 ## 5. Map experience
 
-Dark Leaflet canvas, no raster basemap — the risk ramp is the information, and tiles
-would fight it.
+The `ml_pipeline` dashboard's map, rebuilt in React and given the portal's data and
+role model. Three keyless basemaps — **Map (light, default)**, **Dark**, **Satellite**
+— all with place names, because a monitoring portal asks people to locate themselves
+and "Bundu" is not a shape. Satellite imagery carries no labels of its own, so a
+boundaries-and-places overlay rides above it on a dedicated pane.
 
-- **Districts** choropleth by measured exceedance, click → drawer
-- **ISR sites** as amber **diamonds** (shape, not colour — amber is reserved for the
-  pending-sync state)
-- **Field observations** in three deliberately separate layers: 🔴 dashed hollow (pending
-  review) · 🟡 solid amber (approved, not in model) · 🟢 solid green (in model)
-- **Monitoring network** — stations and wells, the CPS sensing layer
-- Left rail: search → layer toggles → entity list with badges. Right: detail drawer.
-- Persistent `HYPOTHETICAL` ribbon (design §4.5 rule 6).
+Light is the default: the majority use is reading a pale choropleth of measured
+groundwater on an office monitor, and a dark ground makes that harder, not easier.
+Dark remains for the control-room case where a plume is the subject.
+
+**Every layer toggles live, in two groups.**
+
+*Portal data* — districts (choropleth by measured exceedance) · blocks · monitoring
+wells · ISR sites as amber **diamonds** (shape, not colour — amber is reserved for the
+pending-sync state) · field observations in three deliberately separate layers:
+🔴 dashed hollow (pending review) · 🟡 solid amber (approved, not in model) ·
+🟢 solid green (in model).
+
+*Reference geography, served by the engine* — Jharkhand outline · uranium deposits and
+the Singhbhum belt envelope · aquifer regime · perennial rivers · groundwater-flow
+arrows · fracture-strike ticks. Each is fetched only when switched on; rivers alone is
+~1.9 MB and a map that stalls on load is a map people stop opening.
+
+**Clicking the map is the primary interaction** for admin, regulator and analyst. A
+click drops a pin, resolves what the engine knows there — lithology, regime, K,
+thickness, flow azimuth, gradient, distance to the nearest sampled well — and offers a
+run whose plume is drawn live. Outside Jharkhand the pin says so plainly rather than
+failing. A field officer gets the same map and layers with no pin and no engine: they
+collect evidence, they do not model. A citizen gets their own map (§4).
+
+Left rail: search → basemap → layer groups → district list with bands. Right: a detail
+drawer, or the engine panel when a pin is down.
+
+## 5b. Plume drawing rules, inherited not reinvented
+
+Ported from `frontend/ml_pipeline/app.js` because those rules encode decisions whose
+reasons would be lost in a rewrite:
+
+- **Colour always encodes concentration**, log-scaled and normalised within the species
+  shown. Darker = higher. The contour levels are geometric, so equal ratios get equal
+  colour steps.
+- **The BIS limit contour is distinguished by weight and a dark casing, never by hue** —
+  recolouring it would invert the ramp's meaning at the level a regulator reads first.
+- **Low levels draw first**, so a pale outer band cannot paint over the dark core.
+- **Reference lines get a white casing.** A 2 px cyan ring is invisible over a dark
+  plume fill and nearly invisible over a pale basemap; a halo fixes both at once.
+- **The leach zone is its own long-dashed layer** under the contours — ground the
+  lixiviant deliberately swept, not a prediction.
+- **ML envelope lobes are anchored down-gradient**, never centred on the pin, which
+  would draw contamination in the one direction the model says has none.
+
+## 5c. What the map refuses to imply
+
+- A **non-ore pin returns "none above the limit"** and **"no measurable migration"**,
+  with the engine's own notice explaining that it will not invent a uranium source term
+  (§4.6 rule 3, §4.5 rule 5). A bare `0 ha` would read as a measurement of safety.
+- **ML bands are replaced by the engine's `ml_status`** when the surrogate is
+  suppressed, so an absent band is explained rather than blank.
+- **Extrapolation is loud** — an amber banner naming the offending input.
+- An interactive run is labelled **not stored**; only registering the pin as an ISR
+  point and running it in the Studio produces an auditable record.
 
 ## 6. Simulation Studio
 
@@ -125,7 +175,7 @@ The portal must not imply capability it lacks:
 
 | Feature | Status shown in UI |
 |---|---|
-| Plume contour rendering | **Planned (P5)** — the run API persists metrics, excursion and hydrogeology, *not* geometry |
+| Plume contours on a **stored** run | **Planned (P5)** — the Map Console draws contours live from `POST /ml/predict`, but `POST /simulations/{id}` still persists metrics, excursion and hydrogeology *without* geometry, so a past run cannot be redrawn |
 | Alerts & subscriptions | **Planned (P7)** — no alert endpoints exist |
 | Signed PDF reports | **Planned (P8)** |
 | Live sensor feeds | **Not built** — the sensing layer is a 415-station manual network (§7) |

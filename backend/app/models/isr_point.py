@@ -1,7 +1,9 @@
 """ISR (In-Situ Recovery) point model."""
+import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Float, DateTime
+from sqlalchemy import String, Float, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from geoalchemy2 import Geometry
 from app.database import Base
@@ -18,6 +20,14 @@ class IsrPoint(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     injection_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="m3/day")
     injection_start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     injection_end_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    #: Owning organisation. Migration 0009 added the column and the
+    #: `isr_points_write` RLS policy that reads it — an analyst may only write
+    #: rows matching their own org — but the mapping was never added here, so
+    #: the ORM could not set it and every analyst insert failed the policy.
+    owner_org_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("orgs.id"), nullable=True, index=True
+    )
 
     # Relationships
     simulations: Mapped[list] = relationship("Simulation", back_populates="isr_point")

@@ -73,8 +73,25 @@ def test_payload_allowlist_contains_no_measured_chemistry():
     assert mlp.ALLOWED_PAYLOAD_KEYS == {
         "lon", "lat", "species", "operation_years", "time_years",
         "injection_rate_m3_day", "wellfield_width_m", "bleed_percent",
-        "restoration_years", "gradient", "azimuth_deg", "monitor_ring_m",
+        "restoration_years", "gradient_i", "azimuth_deg", "monitor_ring_m",
+        # Added when the interactive map gained click-to-run. Geometry and
+        # presentation, not chemistry: which regime to assume, whether to
+        # return ML bands, the calendar anchor, and the target-zone depth.
+        "regime", "mode", "start_date", "ore_depth_m", "ore_thickness_m",
     }
+
+
+def test_expert_chemistry_overrides_cannot_cross_the_boundary():
+    """The pipeline's own local dashboard exposes expert overrides for Kd, beta,
+    K and porosity. Those are precisely the hydrogeology this seam exists to
+    keep on the engine's side, so the portal must not be able to set them —
+    a hand-tuned K would produce an authoritative-looking number with no
+    provenance. Listed explicitly in the adapter so the refusal is legible."""
+    assert not (mlp.ALLOWED_PAYLOAD_KEYS & mlp.EXPERT_OVERRIDES_WITHHELD)
+    for key in ("kd_L_kg", "beta", "K_m_day", "phi_mobile",
+                "u_attenuation_k_per_yr"):
+        assert key in mlp.EXPERT_OVERRIDES_WITHHELD
+        assert key not in mlp.build_payload(lon=LON, lat=LAT, params={key: 1.0})
 
 
 def test_build_payload_drops_anything_not_allowlisted():

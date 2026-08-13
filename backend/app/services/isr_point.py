@@ -12,7 +12,8 @@ class IsrPointService:
     def __init__(self, db: AsyncSession):
         self.repo = IsrPointRepository(db)
 
-    async def create(self, data: IsrPointCreate) -> IsrPoint:
+    async def create(self, data: IsrPointCreate,
+                     owner_org_id: uuid.UUID | None = None) -> IsrPoint:
         obj_in = data.model_dump(exclude_none=True)
         # GeoJSON location → WKT for PostGIS
         if "location" in obj_in:
@@ -24,6 +25,12 @@ class IsrPointService:
             else:
                 # If invalid/empty location provided, remove it to avoid DB error or save as None if allowed
                 del obj_in["location"]
+        # The `isr_points_write` RLS policy (migration 0009) lets an analyst
+        # write only rows owned by their own org. Leaving this NULL made every
+        # analyst insert fail the WITH CHECK — a 500 that read like a server
+        # fault but was the policy doing its job against a row we built wrong.
+        if owner_org_id is not None:
+            obj_in.setdefault("owner_org_id", owner_org_id)
         return await self.repo.create(obj_in)
 
     async def get(self, isr_id: uuid.UUID) -> IsrPoint:

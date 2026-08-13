@@ -50,11 +50,26 @@ ALLOWED_PAYLOAD_KEYS = frozenset({
     "lon", "lat", "species",
     "operation_years", "time_years", "injection_rate_m3_day",
     "wellfield_width_m", "bleed_percent", "restoration_years",
-    "gradient", "azimuth_deg", "monitor_ring_m",
+    # `gradient_i`, not `gradient`: the engine's field is `gradient_i`, and the
+    # old spelling passed this allowlist only to be dropped by the engine's own
+    # model — a caller could set it and silently get the data-derived default.
+    "gradient_i", "azimuth_deg", "monitor_ring_m",
+    # Interactive map controls. Presentation and geometry, not chemistry.
+    "regime", "mode", "start_date", "ore_depth_m", "ore_thickness_m",
 })
 
 #: Sliders a caller may set. `lon`/`lat` come from the ISR point, not the body.
 CLIENT_TUNABLE = ALLOWED_PAYLOAD_KEYS - {"lon", "lat"}
+
+#: Engine inputs a portal user may NOT override, even though the pipeline's own
+#: local dashboard exposes them as "expert" fields. These are exactly the
+#: chemistry and hydrogeology this module exists to keep on the engine's side of
+#: the seam: resolved from `Datasets/` at the pin, never supplied by a caller.
+#: Listed explicitly so the refusal is legible rather than an absence.
+EXPERT_OVERRIDES_WITHHELD = frozenset({
+    "kd_L_kg", "beta", "K_m_day", "phi_mobile",
+    "downtime_fraction", "gradient_seasonal_amp", "u_attenuation_k_per_yr",
+})
 
 
 class MLPipelineError(RuntimeError):
@@ -162,6 +177,33 @@ async def predict(payload: dict[str, Any]) -> dict[str, Any]:
     if resp.status_code != 200:
         raise MLPipelineError(
             f"ml_pipeline returned {resp.status_code}: {resp.text[:300]}")
+    return resp.json()
+
+
+async def get_json(path: str, params: Optional[dict[str, Any]] = None,
+                   timeout: float = 60.0) -> Any:
+    """GET a read-only endpoint on the pipeline app and return its JSON.
+
+    Used by the `/api/v1/ml` router to serve the pipeline's reference geography
+    (boundary, ore, rivers, aquifers, flow and strike fields) to the portal
+    through one authenticated origin, instead of asking the browser to talk to
+    a second, unauthenticated service on another port.
+
+    Deliberately GET-only and path-driven by the router, never by user input:
+    these are static reference layers. Anything that runs the engine goes
+    through `predict`, which enforces the payload allowlist.
+    """
+    from httpx import ASGITransport, AsyncClient
+    try:
+        async with AsyncClient(transport=ASGITransport(app=_ml_app()),
+                               base_url="http://ml", timeout=timeout) as client:
+            resp = await client.get(path, params=params or {})
+    except Exception as exc:  # noqa: BLE001
+        raise MLPipelineError(f"ml_pipeline call failed: {exc}") from exc
+    if resp.status_code != 200:
+        raise MLPipelineError(
+            f"ml_pipeline returned {resp.status_code}: {resp.text[:300]}",
+            )
     return resp.json()
 
 

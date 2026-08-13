@@ -165,6 +165,19 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
+        # A row-level security refusal is an AUTHORIZATION outcome, not a server
+        # fault. Postgres raises insufficient_privilege (42501) when a row fails
+        # a policy's USING or WITH CHECK clause; reporting that as 500 tells the
+        # caller "we broke" when the truth is "you may not do that", and buries
+        # a working security control in the error log as if it were a defect.
+        if getattr(getattr(exc, "orig", None), "sqlstate", None) == "42501":
+            logger.warning(
+                f"RLS refused {request.method} {request.url.path}: {exc}")
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "The database's row-level security policy "
+                                   "refused this row for your role."},
+            )
         logger.exception(f"Unhandled error on {request.method} {request.url}: {exc}")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

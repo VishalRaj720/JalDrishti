@@ -721,8 +721,11 @@ do the actual enforcement. Both layers were tested independently (below).
 
 **Design decisions worth recording.**
 
-- **The map keeps no raster basemap.** The ml_pipeline dashboard has none either: the
-  risk ramp is the information, and tiles compete with it. District fill encodes
+- **The map is the ml_pipeline map, with real basemaps.** An early build drew districts
+  on a bare canvas; that reads as an abstract diagram, and a user cannot tell whether a
+  well sits beside a town or in forest. Three keyless basemaps now ship — Map (light,
+  **default**), Dark, Satellite — all carrying place names, with a labels overlay above
+  the imagery because Esri's World_Imagery has none. District fill still encodes
   *measured* uranium, never model output.
 - **Shape carries identity, colour carries state.** ISR sites are amber **diamonds**;
   amber circles mean "approved, not yet in the model". This was a defect found in the
@@ -740,7 +743,7 @@ renders a `Planned` card naming the phase and the reason:
 
 | Marked planned | Why |
 |---|---|
-| Plume contour map, P10/P90 migration envelope | The run API persists metrics, excursion state and hydrogeology — not plume geometry (P5) |
+| Plume contours on a **stored** run | The Map Console now draws contours, the leach zone, the compliance ring and the P10/P90 envelope live from `POST /ml/predict`. `POST /simulations/{id}` still persists metrics, excursion state and hydrogeology *without* geometry, so a past run cannot be redrawn (P5) |
 | Alert subscriptions | No notification service exists (P7) |
 | PDF / signed report export | No report service exists (P8) |
 | Bulk ingest upload UI | The five ingest endpoints exist and are admin-only; the upload screen is not built |
@@ -787,6 +790,97 @@ present so it cannot linger as an unlabelled login.
 
 A fourth, smaller fix: the public explainer said "the 1 wells sampled here". It is
 read by citizens, so it now agrees in number.
+
+### 4.7b P4b — the ML section, and the map made interactive
+
+**`ml_pipeline`'s API now lives under `/api/v1/ml`.** The pipeline ships its own
+FastAPI dashboard on :8077, unauthenticated by design — fine for a researcher on a
+laptop, wrong for a government portal, where the browser would be talking to a second
+origin with no session, no role check and no audit trail, and the ore-deposit and pin
+endpoints would be readable by anyone who could reach the port. Eleven endpoints
+(`health`, `assumptions`, `drift`, `boundary`, `ore`, `rivers`, `aquifers`,
+`flow-field`, `strike-field`, `pin`, `predict`) now sit behind the backend's JWT, role
+guards, rate limiter and audit middleware. Nothing re-implements the engine: every
+handler forwards in-process through `ml_pipeline_adapter`, so there is still one
+implementation of the physics and one place the artifacts are read.
+
+Two tiers: reference geography is staff-readable; `pin` and `predict` are restricted to
+the roles that may run the model at all — **admin, regulator, analyst**. A field officer
+collects evidence and a citizen reads measurements; neither runs a contaminant
+simulation. `POST /isr-points` moved to the same set, because a regulator has to be able
+to test a scenario themselves rather than ask an analyst to produce the number they are
+meant to be scrutinising.
+
+**Clicking the map runs the engine.** A click drops a pin, resolves the hydrogeology
+there, and draws a live plume — contours, leach zone, compliance ring, ML envelope.
+That run is explicitly **not persisted**; registering the pin as an ISR point and
+running it in the Studio is what produces an auditable record. The response carries
+`persisted: false` so a client cannot present one as the other by accident.
+
+**Expert chemistry overrides are withheld at the seam.** The pipeline's own dashboard
+exposes `kd_L_kg`, `beta`, `K_m_day`, `phi_mobile` and friends. Those are exactly the
+hydrogeology the adapter exists to keep on the engine's side, so the portal refuses
+them with a 422 rather than filtering silently — a hand-tuned K would produce an
+authoritative-looking number with no provenance. Pinned by
+`test_expert_chemistry_overrides_cannot_cross_the_boundary`.
+
+**Citizens got a real map.** Previously a dropdown and a table. Now district and block
+choropleths, CGWB well positions, band filters with counts, search, and the same three
+basemaps. It still shows **no ISR site, no ore, no plume, no flow field and no model
+output** — design §2 forbids the public a coordinate for a hypothetical mine, and
+everything withheld here is either that or a model artefact. What it adds is public
+government reference data, which a citizen told "moderate concern" is entitled to see
+on a map.
+
+**Four defects found while verifying this round.**
+
+1. **The map had zero width.** `.map-shell` is itself a flex item, so without an
+   explicit `flex: 1` it sized to its content — rail plus drawer — and the map between
+   them collapsed. It would have been invisible for every user, not just in testing.
+2. **A non-ore pin rendered as `0 ha`.** The engine was correctly refusing to invent a
+   uranium source term 68 km from the nearest deposit, and the UI displayed that
+   refusal as a measurement of safety. It now shows "none above the limit", "no
+   measurable migration", the engine's own notice, the nearest deposit and its
+   distance, and `ml_status` in place of an empty band (§4.5 rule 5, §4.6 rule 3).
+3. **`owner_org_id` was never mapped on `IsrPoint`.** Migration 0009 added the column
+   and the `isr_points_write` policy that reads it, but the ORM could not set it, so
+   every analyst insert failed the policy's `WITH CHECK`. Admin and regulator passed
+   because their branch does not test the org — the bug was invisible until an analyst
+   tried.
+4. **An RLS refusal surfaced as a 500.** Postgres raises `insufficient_privilege`
+   (42501) when a row fails a policy; reporting that as a server fault tells the caller
+   "we broke" when the truth is "you may not do that", and files a working security
+   control in the error log as a defect. It maps to 403 now.
+5. **The ML router leaked ore geography through the browser cache.** It shipped with
+   `Cache-Control: private, max-age=3600` on its reference layers, on the reasoning
+   that they change only when `Datasets/` does. True, and irrelevant: `private`
+   excludes shared *proxy* caches and says nothing about the browser's own, which is
+   keyed on the URL and not on the Authorization header. A citizen signing in after an
+   analyst in the same browser was served the analyst's cached `/ml/ore` and saw a
+   **200 for an endpoint the server refuses them** — the deposit map design §2 exists
+   to keep from the public, delivered from disk without a request. Found because the
+   in-browser role sweep disagreed with the same check run through curl.
+
+   Fixed at both ends: the router sends `no-store` on role-restricted routes, and the
+   API client sends `cache: "no-store"` on every request so a single mis-set header
+   cannot leak again. Nothing is lost — in-session reuse comes from TanStack Query's
+   in-memory cache, which is per-page-load and dies with the sign-out.
+   `tests/test_ml_router.py` pins the header for all six geography routes.
+
+A fifth, latent: `ALLOWED_PAYLOAD_KEYS` contained `gradient`, but the engine's field is
+`gradient_i` — the key passed the allowlist and was then dropped by the engine's own
+model, so a caller could set the hydraulic gradient and silently get the data-derived
+default.
+
+**Verified in a browser**: all three basemaps switch (satellite pulls its label layers);
+every layer toggles live and the legend follows; 5,975 vector features render with
+everything on; a click outside Jharkhand refuses clearly; a click inside resolves
+lithology, regime, K, flow azimuth and gradient; a run in the Singhbhum belt returns
+12.91 ha with ML P10–P90 10.78–16.31, flags `conc:source_conc_C0` as outside trained
+support, and states the belt's low-confidence ore assumption; registering the pin adds
+a second diamond immediately; a field officer sees every layer but gets no pin and no
+engine; the citizen map draws 421 features with zero ISR markers, and adding blocks
+adds exactly 264.
 
 ---
 

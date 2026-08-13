@@ -116,6 +116,11 @@
 .toggle[data-on="true"]::after { transform: translateX(14px); }
 .sw { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 10px; }
 .sw.diamond { transform: rotate(45deg); border-radius: 1px; }
+/* Shape carries identity where colour is already carrying state: a line layer
+   and a fill layer at the same colour must not look like the same thing. */
+.sw.line { height: 3px; border-radius: 2px; }
+.sw.hollow { background: none !important; border: 2px dashed currentColor; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
 
 .list-item {
   display: flex; align-items: center; justify-content: space-between; gap: 9px;
@@ -129,6 +134,26 @@
 
 .map-wrap { flex: 1; position: relative; min-width: 0; background: var(--bg); }
 .map { position: absolute; inset: 0; }
+
+/* The map screens are a three-column shell: rail · map · optional drawer.
+   The chrome stays dark while the basemap is light by default — the panels are
+   UI, the tiles are the subject, and a dark frame keeps the two separable. */
+/* `flex: 1` and the explicit width are load-bearing: `.map-shell` is itself a
+   flex ITEM of `.body`, so without them it sizes to its content — rail plus
+   drawer — and the map between them collapses to zero width. */
+.map-shell {
+  display: flex; flex: 1; width: 100%;
+  height: 100%; min-height: 0; min-width: 0; overflow: hidden;
+}
+.map-area { flex: 1; position: relative; min-width: 0; background: var(--bg); }
+.map-canvas { position: absolute; inset: 0; }
+.page-map { display: flex; flex: 1; width: 100%; flex-direction: column; height: 100%; min-height: 0; }
+.page-head.compact {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 12px 18px; margin: 0; border-bottom: 1px solid var(--line);
+}
+.page-head.compact h1 { margin: 0; font-size: 17px; }
+.page-head.compact p { margin: 2px 0 0; }
 .leaflet-container { background: var(--bg); font-family: inherit; }
 .leaflet-control-zoom a { background: var(--card) !important; color: var(--text) !important; border-color: var(--line) !important; }
 .leaflet-tooltip {
@@ -142,8 +167,11 @@
   border: 1px solid var(--line); border-radius: var(--r-md);
   padding: 10px 12px; font-size: 11.5px; backdrop-filter: blur(5px);
 }
-.map-ov.legend { left: 12px; bottom: 12px; min-width: 200px; }
+.map-ov.legend { left: 12px; bottom: 12px; min-width: 200px; max-width: 260px; }
 .map-ov.status { right: 12px; bottom: 12px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.map-ov.hint { top: 12px; left: 50%; transform: translateX(-50%); max-width: 420px; text-align: center; }
+.ov-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; margin-bottom: 6px; }
 .legend h5 { margin: 0 0 7px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .legend-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
 .legend-hr { height: 1px; background: var(--line); margin: 7px 0; }
@@ -163,19 +191,56 @@
   box-shadow: 0 0 0 1px rgba(255,184,77,.6);
 }
 
+/* The dropped pin. A ring rather than a teardrop: it marks a coordinate the
+   user chose, and must not resemble the ISR diamond, which marks a registered
+   site. Pulsing so it stays findable once contours are drawn over it. */
+.pin-wrap { background: none; border: none; }
+.map-pin {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: rgba(63,182,255,.35); border: 2.5px solid var(--accent);
+  box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 12px rgba(63,182,255,.7);
+  animation: pinPulse 1.8s ease-out infinite;
+}
+@keyframes pinPulse {
+  0%   { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(63,182,255,.55); }
+  70%  { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 12px rgba(63,182,255,0); }
+  100% { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(63,182,255,0); }
+}
+
+/* Leaflet tooltips for the engine layers. Wider than the default so an aquifer
+   line does not wrap after three words. */
+.plume-tip, .aq-tip { max-width: 300px; white-space: normal; line-height: 1.5; }
+
 /* ── drawer ────────────────────────────────────────────────────────── */
 
 .drawer {
   width: var(--drawer-w); flex: 0 0 var(--drawer-w); background: var(--panel);
   border-left: 1px solid var(--line); display: flex; flex-direction: column;
-  min-height: 0; animation: slideIn .16s ease-out;
+  min-height: 0; overflow-y: auto; padding-bottom: 16px;
+  animation: slideIn .16s ease-out;
 }
+/* The engine drawer carries sliders, three metric cards and a register form.
+   At the standard width those wrap into an unreadable column. */
+.drawer.wide { width: 380px; flex: 0 0 380px; }
+.drawer > *:not(.drawer-head) { padding-left: 14px; padding-right: 14px; }
 .drawer-head {
   padding: 13px 14px; border-bottom: 1px solid var(--line);
   display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  position: sticky; top: 0; background: var(--panel); z-index: 2;
 }
 .drawer-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.dh-title { font-size: 15px; font-weight: 700; }
+.dh-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .drawer-body { padding: 13px 14px; overflow-y: auto; }
+
+.sec {
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; margin: 16px 0 8px;
+}
+.metric-row { display: grid; gap: 8px; }
+.btn.block { width: 100%; justify-content: center; margin-top: 10px; }
+.seg.seg-sm button { padding: 5px 9px; font-size: 11.5px; }
+.spinner.sm { width: 12px; height: 12px; border-width: 2px; margin-left: 7px; vertical-align: -1px; }
 
 .kv { display: grid; grid-template-columns: 44% 1fr; gap: 7px 10px; font-size: 12.5px; }
 .kv dt { color: var(--muted); }

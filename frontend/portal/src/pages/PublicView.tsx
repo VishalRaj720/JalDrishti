@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type PublicDistrictRisk } from "../api/client";
 import { isStaff, useAuth } from "../auth";
 import { Loading, Planned } from "../components/bits";
+import CitizenMap from "./CitizenMap";
 
 interface BlockRisk {
   id: string; name: string; wells: number; samples: number;
@@ -36,6 +37,10 @@ const cls = (band: string) =>
 export default function PublicView() {
   const { me } = useAuth();
   const [id, setId] = useState<string>("");
+  // The map answers "is anyone testing near me" better than a dropdown does, so
+  // it leads. The list stays because a name is easier than a shape when you
+  // already know your block, and because it is the accessible path.
+  const [tab, setTab] = useState<"map" | "list">("map");
 
   const list = useQuery({
     queryKey: ["public-risk"],
@@ -47,14 +52,35 @@ export default function PublicView() {
     queryFn: () => api.get<Detail>(`/public/risk/${id}`),
   });
 
+  if (tab === "map") {
+    return (
+      <div className="page-map">
+        <div className="page-head compact">
+          <h1>Groundwater near you</h1>
+          <div className="seg seg-sm">
+            <button className="active">Map</button>
+            <button onClick={() => setTab("list")}>List</button>
+          </div>
+        </div>
+        <CitizenMap />
+      </div>
+    );
+  }
+
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>Groundwater near you</h1>
-        <p>
-          Real test results from government groundwater sampling across Jharkhand.
-          Choose your district to see what was measured, and what it means.
-        </p>
+      <div className="page-head compact">
+        <div>
+          <h1>Groundwater near you</h1>
+          <p>
+            Real test results from government groundwater sampling across Jharkhand.
+            Choose your district to see what was measured, and what it means.
+          </p>
+        </div>
+        <div className="seg seg-sm">
+          <button onClick={() => setTab("map")}>Map</button>
+          <button className="active">List</button>
+        </div>
       </div>
 
       {isStaff(me?.role) && (

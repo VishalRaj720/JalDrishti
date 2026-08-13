@@ -47,6 +47,27 @@ _BANDS = """
 _CACHE = "public, max-age=3600"
 
 
+def _collection(rows) -> dict[str, Any]:
+    """Rows carrying a `gj` GeoJSON-geometry string -> a FeatureCollection.
+
+    The geometry is serialised by PostGIS rather than round-tripped through
+    shapely: these are whole-state polygon sets, and simplifying and encoding
+    them in the database is both faster and one fewer place for the coordinate
+    order to get transposed.
+    """
+    import json
+    return {
+        "type": "FeatureCollection",
+        "safe_limit": URANIUM_LIMIT_PPB,
+        "what_this_is": _DISCLAIMER,
+        "features": [{
+            "type": "Feature",
+            "geometry": json.loads(r["gj"]),
+            "properties": {k: v for k, v in r.items() if k != "gj"},
+        } for r in rows],
+    }
+
+
 def _explain(band: str, n: int) -> str:
     # This text is read by the public, so it says "the 1 well" rather than
     # "the 1 wells" — many blocks have a single sampled well.
@@ -101,6 +122,125 @@ async def district_risk(response: Response, db: AsyncSession = Depends(get_db)):
         "unit": "ppb", "safe_limit": URANIUM_LIMIT_PPB,
         "districts": [dict(r) for r in rows],
         "what_this_is": _DISCLAIMER,
+    }
+
+
+# ── map geometry for the citizen surface ─────────────────────────────
+# Declared BEFORE `/{district_id}`: that route's path parameter is a UUID, so
+# "geojson" would not bind to it, but FastAPI matches in declaration order and
+# putting these after would turn a typo into a confusing 422 rather than a 404.
+#
+# WHY THESE EXIST AND WHAT THEY STILL WITHHOLD. Design §2 forbids the public a
+# precise coordinate for a *hypothetical ISR site*. It does not forbid the
+# public a map of their own district: administrative boundaries and CGWB
+# monitoring locations are published government reference data, and a citizen
+# being told "moderate concern" without being shown where deserves better. So
+# these serve boundaries, well positions and measured aggregates — and still no
+# ISR site, no ore polygon, no plume, no model output of any kind.
+
+@router.get("/geojson/districts")
+async def district_geojson(response: Response, db: AsyncSession = Depends(get_db)):
+    """District polygons carrying the same bands as `/districts`."""
+    rows = (await db.execute(text(f"""
+        WITH per_district AS (
+            SELECT d.id, d.name, d.geometry,
+                   count(DISTINCT w.id) AS wells,
+                   count(s.id)          AS samples,
+                   max(s.uranium_ppb)   AS max_u
+            FROM districts d
+            LEFT JOIN blocks b            ON b.district_id = d.id
+            LEFT JOIN monitoring_wells w  ON w.block_id = b.id
+            LEFT JOIN water_samples s     ON s.well_id = w.id
+            WHERE d.geometry IS NOT NULL
+            GROUP BY d.id, d.name, d.geometry
+        )
+        SELECT id::text, name, wells, samples,
+               round(max_u::numeric, 1) AS max_uranium_ppb,
+               {_BANDS} AS band,
+               ST_AsGeoJSON(ST_SimplifyPreserveTopology(geometry, 0.002)) AS gj
+        FROM per_district ORDER BY name
+    """), {"limit": URANIUM_LIMIT_PPB})).mappings().all()
+
+    response.headers["Cache-Control"] = _CACHE
+    return _collection(rows)
+
+
+@router.get("/geojson/blocks")
+async def block_geojson(response: Response, db: AsyncSession = Depends(get_db),
+                        district_id: Optional[uuid.UUID] = None):
+    """Block polygons, banded. The finest granularity the public surface offers."""
+    rows = (await db.execute(text(f"""
+        WITH per_block AS (
+            SELECT b.id, b.name, b.geometry, d.name AS district,
+                   count(DISTINCT w.id) AS wells,
+                   count(s.id)          AS samples,
+                   max(s.uranium_ppb)   AS max_u
+            FROM blocks b
+            JOIN districts d              ON d.id = b.district_id
+            LEFT JOIN monitoring_wells w  ON w.block_id = b.id
+            LEFT JOIN water_samples s     ON s.well_id = w.id
+            -- CAST(:d AS uuid), not `:d::uuid`: SQLAlchemy's text() bind
+            -- parser reads the `::` as part of the parameter name and emits
+            -- the colon literally, which Postgres then rejects.
+            WHERE b.geometry IS NOT NULL
+              AND (CAST(:d AS uuid) IS NULL OR b.district_id = CAST(:d AS uuid))
+            GROUP BY b.id, b.name, b.geometry, d.name
+        )
+        SELECT id::text, name, district, wells, samples,
+               round(max_u::numeric, 1) AS max_uranium_ppb,
+               {_BANDS} AS band,
+               ST_AsGeoJSON(ST_SimplifyPreserveTopology(geometry, 0.001)) AS gj
+        FROM per_block ORDER BY district, name
+    """), {"limit": URANIUM_LIMIT_PPB,
+           "d": str(district_id) if district_id else None})).mappings().all()
+
+    out = _collection(rows)
+    for f in out["features"]:
+        f["properties"]["what_it_means"] = _explain(
+            f["properties"]["band"], f["properties"]["wells"])
+    response.headers["Cache-Control"] = _CACHE
+    return out
+
+
+@router.get("/geojson/wells")
+async def well_geojson(response: Response, db: AsyncSession = Depends(get_db)):
+    """Monitoring-well positions with their measured result.
+
+    Deliberately reduced: position, block, and what was found. No well id, no
+    depth, no source reference — enough to answer "is anyone testing near me,
+    and what did they find", not enough to be a pivotable copy of the network.
+    """
+    rows = (await db.execute(text(f"""
+        WITH per_well AS (
+            SELECT w.id, w.name, w.latitude, w.longitude, b.name AS block,
+                   d.name AS district,
+                   count(s.id)        AS samples,
+                   max(s.uranium_ppb) AS max_u,
+                   max(s.sampled_at)  AS last_sampled
+            FROM monitoring_wells w
+            LEFT JOIN blocks b         ON b.id = w.block_id
+            LEFT JOIN districts d      ON d.id = b.district_id
+            LEFT JOIN water_samples s  ON s.well_id = w.id
+            GROUP BY w.id, w.name, w.latitude, w.longitude, b.name, d.name
+        )
+        SELECT name, latitude, longitude, block, district, samples, last_sampled,
+               round(max_u::numeric, 1) AS max_uranium_ppb,
+               {_BANDS} AS band
+        FROM per_well ORDER BY district, block
+    """), {"limit": URANIUM_LIMIT_PPB})).mappings().all()
+
+    response.headers["Cache-Control"] = _CACHE
+    return {
+        "type": "FeatureCollection",
+        "safe_limit": URANIUM_LIMIT_PPB,
+        "what_this_is": _DISCLAIMER,
+        "features": [{
+            "type": "Feature",
+            "geometry": {"type": "Point",
+                         "coordinates": [float(r["longitude"]), float(r["latitude"])]},
+            "properties": {k: v for k, v in r.items()
+                           if k not in ("latitude", "longitude")},
+        } for r in rows],
     }
 
 
