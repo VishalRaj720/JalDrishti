@@ -76,6 +76,53 @@ class MLPipelineError(RuntimeError):
     pass
 
 
+#: Site column -> engine field. Identical for most, but the mapping is written
+#: out so a rename on either side is a compile-time-ish failure here rather than
+#: a parameter that silently stops crossing.
+SITE_TO_ENGINE = {
+    "injection_rate_m3_day": "injection_rate_m3_day",
+    "bleed_percent": "bleed_percent",
+    "operation_years": "operation_years",
+    "restoration_years": "restoration_years",
+    "wellfield_width_m": "wellfield_width_m",
+    "monitor_ring_m": "monitor_ring_m",
+    "ore_depth_m": "ore_depth_m",
+    "ore_thickness_m": "ore_thickness_m",
+    "regime_override": "regime",
+    "gradient_i": "gradient_i",
+    "azimuth_deg": "azimuth_deg",
+}
+
+
+def payload_from_site(site: Any, *, overrides: Optional[dict[str, Any]] = None
+                      ) -> dict[str, Any]:
+    """Build the engine payload from a registered ISR point.
+
+    NOT a violation of this module's rule. The rule keeps *measured* values —
+    chemistry, hydrogeology, baselines, anything a field observation could
+    touch — from crossing into a model whose conformal coverage was calibrated
+    without them. These are the operator's chosen SCENARIO INPUTS: how much
+    lixiviant, over how many years, across what footprint. They are the same
+    numbers a Studio slider used to supply, now stored on the site so a run is
+    reproducible and two people mean the same thing by one name.
+
+    `overrides` is what the Studio may still vary — evaluation year and
+    restoration years — and is filtered by the same allowlist as everything
+    else.
+    """
+    from geoalchemy2.shape import to_shape
+    point = to_shape(site.location)
+    params: dict[str, Any] = {}
+    for column, field in SITE_TO_ENGINE.items():
+        value = getattr(site, column, None)
+        if value is not None:
+            params[field] = value
+    if getattr(site, "injection_start_date", None):
+        params["start_date"] = site.injection_start_date.date().isoformat()
+    params.update(overrides or {})
+    return build_payload(lon=point.x, lat=point.y, params=params)
+
+
 def build_payload(*, lon: float, lat: float,
                   params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Assemble the engine payload, dropping anything not explicitly allowed.

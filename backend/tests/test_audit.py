@@ -83,7 +83,7 @@ async def test_mutating_request_is_audited_with_actor(client, db_session, admin_
     resp = await client.post(
         "/api/v1/isr-points",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"name": "Audited Site", "injection_rate": 100.0,
+        json={"name": "Audited Site", "injection_rate_m3_day": 1000.0,
               "location": {"type": "Point", "coordinates": [85.3, 23.5]}},
     )
     assert resp.status_code == 201

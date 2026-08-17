@@ -26,7 +26,7 @@ def _tok(u):
 @pytest_asyncio.fixture()
 async def isr_id(db_session):
     rid = (await db_session.execute(text("""
-        INSERT INTO isr_points (id, name, location, injection_rate)
+        INSERT INTO isr_points (id, name, location, injection_rate_m3_day)
         VALUES (gen_random_uuid(), 'Scenario Site',
                 ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), 1000)
         RETURNING id

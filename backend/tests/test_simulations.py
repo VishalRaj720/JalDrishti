@@ -42,7 +42,7 @@ async def test_create_isr_point_and_list(client, admin_token):
         headers={"Authorization": f"Bearer {admin_token}"},
         json={
             "name": "Test ISR Site Alpha",
-            "injection_rate": 150.0,
+            "injection_rate_m3_day": 1500.0,   # >= the engine minimum of 200
             "location": {"type": "Point", "coordinates": [85.3, 23.5]},
         },
     )

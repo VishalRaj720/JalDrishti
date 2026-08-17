@@ -35,7 +35,7 @@ def _tok(u):
 @pytest_asyncio.fixture()
 async def isr_id(db_session):
     rid = (await db_session.execute(text("""
-        INSERT INTO isr_points (id, name, location, injection_rate)
+        INSERT INTO isr_points (id, name, location, injection_rate_m3_day)
         VALUES (gen_random_uuid(), 'P3 Test Site',
                 ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), 1000)
         RETURNING id
@@ -224,3 +224,93 @@ async def test_approving_field_data_does_not_change_the_model_output(
     assert second["excursion"]["indicators"] == first["excursion"]["indicators"], (
         "approved field data moved the excursion indicators")
     assert second["artifacts_sha"] == first["artifacts_sha"]
+
+
+# ── P5: a site carries its own operating parameters ──────────────────
+
+@pytest.mark.asyncio
+async def test_payload_from_site_uses_the_site_not_the_defaults(db_session):
+    """Migration 0015 moved the operation onto the ISR point so that two people
+    running one site name are running the same thing. If the payload silently
+    fell back to engine defaults, a registered 1000 m3/day site would quietly
+    be simulated at 2500."""
+    from sqlalchemy import select, text
+    from app.models.isr_point import IsrPoint
+
+    await db_session.execute(text("SELECT set_config('app.bypass_rls','on',true)"))
+    site = IsrPoint(name=f"SiteParams {uuid.uuid4().hex[:6]}",
+                    location="SRID=4326;POINT(86.36 22.65)",
+                    injection_rate_m3_day=1234.0, bleed_percent=3.5,
+                    operation_years=11.0, restoration_years=0.0,
+                    wellfield_width_m=420.0, monitor_ring_m=140.0)
+    db_session.add(site)
+    await db_session.commit()
+    # Expunge before re-reading: after commit the identity map still holds
+    # the instance with the WKT STRING we assigned, so `to_shape` would be
+    # handed a str instead of the WKBElement PostGIS returns.
+    sid = site.id
+    db_session.expunge_all()
+    site = (await db_session.execute(
+        select(IsrPoint).where(IsrPoint.id == sid))).scalar_one()
+
+    payload = mlp.payload_from_site(site)
+    assert payload["injection_rate_m3_day"] == 1234.0
+    assert payload["bleed_percent"] == 3.5
+    assert payload["operation_years"] == 11.0
+    assert payload["wellfield_width_m"] == 420.0
+    assert payload["monitor_ring_m"] == 140.0
+
+
+@pytest.mark.asyncio
+async def test_studio_overrides_beat_the_site_for_the_two_live_controls(db_session):
+    """Evaluation year and restoration years stay editable in the Studio, so a
+    reviewer can ask "what if we swept for five years" without editing — and
+    thereby redefining — the site being assessed."""
+    from sqlalchemy import select, text
+    from app.models.isr_point import IsrPoint
+
+    await db_session.execute(text("SELECT set_config('app.bypass_rls','on',true)"))
+    site = IsrPoint(name=f"Overrides {uuid.uuid4().hex[:6]}",
+                    location="SRID=4326;POINT(86.36 22.65)",
+                    restoration_years=0.0, operation_years=8.0)
+    db_session.add(site)
+    await db_session.commit()
+    # Expunge before re-reading: after commit the identity map still holds
+    # the instance with the WKT STRING we assigned, so `to_shape` would be
+    # handed a str instead of the WKBElement PostGIS returns.
+    sid = site.id
+    db_session.expunge_all()
+    site = (await db_session.execute(
+        select(IsrPoint).where(IsrPoint.id == sid))).scalar_one()
+
+    payload = mlp.payload_from_site(
+        site, overrides={"time_years": 17, "restoration_years": 5})
+    assert payload["time_years"] == 17
+    assert payload["restoration_years"] == 5
+    # the site's own operation is untouched by the override
+    assert payload["operation_years"] == 8.0
+
+
+@pytest.mark.asyncio
+async def test_a_site_cannot_smuggle_measured_chemistry_through_overrides(db_session):
+    """`payload_from_site` runs the same allowlist as everything else."""
+    from sqlalchemy import select, text
+    from app.models.isr_point import IsrPoint
+
+    await db_session.execute(text("SELECT set_config('app.bypass_rls','on',true)"))
+    site = IsrPoint(name=f"NoLeak {uuid.uuid4().hex[:6]}",
+                    location="SRID=4326;POINT(86.36 22.65)")
+    db_session.add(site)
+    await db_session.commit()
+    # Expunge before re-reading: after commit the identity map still holds
+    # the instance with the WKT STRING we assigned, so `to_shape` would be
+    # handed a str instead of the WKBElement PostGIS returns.
+    sid = site.id
+    db_session.expunge_all()
+    site = (await db_session.execute(
+        select(IsrPoint).where(IsrPoint.id == sid))).scalar_one()
+
+    payload = mlp.payload_from_site(site, overrides={
+        "uranium_ppb": 999.0, "well_id": str(uuid.uuid4()), "K_m_day": 42.0})
+    for forbidden in ("uranium_ppb", "well_id", "K_m_day"):
+        assert forbidden not in payload

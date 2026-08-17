@@ -114,7 +114,7 @@ RETIRED_USER_EMAILS = ["viewer@jaldrishti.local"]
 # only place in Jharkhand where uranium ISR would plausibly be sited. This gives
 # the simulation/spread feature a realistic default scenario to run against.
 SEED_ISR_POINTS = [
-    {"name": "Jaduguda (hypothetical ISR)", "lon": 86.36, "lat": 22.65, "injection_rate": 1000.0},
+    {"name": "Jaduguda (hypothetical ISR)", "lon": 86.36, "lat": 22.65, "injection_rate_m3_day": 1000.0},
 ]
 
 
@@ -290,7 +290,7 @@ async def seed_isr_points(db) -> None:
         db.add(IsrPoint(
             name=p["name"],
             location=WKTElement(f"POINT({p['lon']} {p['lat']})", srid=4326),
-            injection_rate=p["injection_rate"],
+            injection_rate_m3_day=p["injection_rate_m3_day"],
         ))
         logger.info(f"  [ok]   created ISR point '{p['name']}'")
     await db.commit()

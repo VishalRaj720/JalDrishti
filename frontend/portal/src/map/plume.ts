@@ -101,6 +101,15 @@ function casedRing(group: L.LayerGroup, latlngs: L.LatLngExpression[], o: {
 /** Create the two panes the plume needs. Reference geometry must never be
  *  buried under the concentration field it describes. */
 export function createPlumePanes(map: L.Map) {
+  // The outside-Jharkhand mask sits between the basemap labels (350) and the
+  // data overlays (400). Above the tiles so it dims them; below the overlays so
+  // districts, wells and the plume stay at full strength inside the state.
+  if (!map.getPane("paneMask")) {
+    map.createPane("paneMask");
+    const p = map.getPane("paneMask")!;
+    p.style.zIndex = "380";
+    p.style.pointerEvents = "none";
+  }
   if (!map.getPane("panePlume")) {
     map.createPane("panePlume");
     map.getPane("panePlume")!.style.zIndex = "420";

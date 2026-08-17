@@ -87,6 +87,22 @@ async def ml_assumptions(response: Response, _=Depends(require_staff)):
     return await _forward("/api/assumptions", response)
 
 
+@router.get("/bounds")
+async def ml_bounds(response: Response, _=Depends(require_staff)):
+    """Every slider range and default, read from the engine's own constants.
+
+    Served so the registration form and the Studio sliders cannot drift from
+    what the engine will accept. A range hard-coded in the client is a 422 the
+    user cannot act on, from a service they have never heard of.
+
+    Cacheable for a session — these change only when the pipeline's config does,
+    which means a redeploy.
+    """
+    from app.engine_bounds import as_dict
+    response.headers["Cache-Control"] = "no-store"
+    return as_dict()
+
+
 @router.get("/drift")
 async def ml_drift(response: Response, _=Depends(require_staff)):
     """Rolling analytical-vs-ML disagreement — the surrogate's own health check."""

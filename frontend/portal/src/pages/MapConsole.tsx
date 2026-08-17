@@ -27,7 +27,10 @@ import {
 import { canRunSim, useAuth } from "../auth";
 import { ErrorNote, Loading, bandOf } from "../components/bits";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
+import { lineOpacity, maskOpacity, OVERLAY, tune } from "../map/palette";
 import { createPlumePanes, drawPlume, SPECIES_NAME, SPECIES_UNIT } from "../map/plume";
+import { addScaleControl } from "../map/scale";
+import { useRail } from "../map/useRail";
 
 const CENTRE: [number, number] = [23.6, 85.3];
 
@@ -56,17 +59,18 @@ const LAYERS: LayerDef[] = [
   { key: "amber", label: "Ore · approved, not in model", colour: "#ffb84d", group: "Portal data" },
   { key: "red", label: "Observations · pending review", colour: "#ff5a5a", shape: "hollow",
     group: "Portal data" },
-  { key: "boundary", label: "Jharkhand outline", colour: "#c9d4e2", shape: "line",
-    group: "Reference geography" },
-  { key: "ore", label: "Uranium deposits", colour: "#ffd166", group: "Reference geography",
+  { key: "boundary", label: "Jharkhand outline", colour: OVERLAY.boundary, shape: "line",
+    group: "Reference geography",
+    note: "Also dims everything outside the state" },
+  { key: "ore", label: "Uranium deposits", colour: OVERLAY.oreDeposit, group: "Reference geography",
     note: "Where the engine will produce a uranium plume at all" },
-  { key: "aquifers", label: "Aquifer regime", colour: "#7fd1ae", group: "Reference geography",
-    lazy: true, note: "Fractured vs weathered/porous" },
-  { key: "rivers", label: "Perennial rivers", colour: "#3aa0ff", shape: "line",
+  { key: "aquifers", label: "Aquifer regime", colour: OVERLAY.aquiferPorous, group: "Reference geography",
+    lazy: true, note: "Fractured (orange) vs weathered/porous (blue)" },
+  { key: "rivers", label: "Perennial rivers", colour: OVERLAY.river, shape: "line",
     group: "Reference geography", lazy: true, note: "Where a plume would surface" },
-  { key: "flow", label: "Groundwater flow →", colour: "#37d39b", shape: "line",
+  { key: "flow", label: "Groundwater flow →", colour: OVERLAY.flowStations, shape: "line",
     group: "Reference geography", lazy: true, note: "Direction a plume travels" },
-  { key: "strike", label: "Fracture strike ⇔", colour: "#c79bff", shape: "line",
+  { key: "strike", label: "Fracture strike ⇔", colour: OVERLAY.strikeMid, shape: "line",
     group: "Reference geography", lazy: true, note: "What elongates a plume" },
 ];
 
@@ -104,6 +108,26 @@ function drawTick(g: L.LayerGroup, lat: number, lon: number, strike: number,
              { color: colour, weight: 1.4, opacity: 0.8 }).addTo(g);
 }
 
+/**
+ * Every linear ring of a (Multi)Polygon geometry, as Leaflet [lat, lng].
+ *
+ * Used to punch Jharkhand out of the mask rectangle. Only the OUTER ring of
+ * each polygon is taken: an inner ring here would be a hole in the state, and
+ * re-adding it as a hole in the mask would un-dim it.
+ */
+function ringsOf(geom: any): L.LatLngExpression[][] {
+  const g = geom?.type === "Feature" ? geom.geometry : geom;
+  if (!g) return [];
+  const polys: any[] =
+    g.type === "Polygon" ? [g.coordinates]
+      : g.type === "MultiPolygon" ? g.coordinates
+      : [];
+  return polys
+    .map((p) => (p?.[0] ?? []).map(([lon, lat]: [number, number]) =>
+      [lat, lon] as L.LatLngExpression))
+    .filter((r) => r.length > 2);
+}
+
 const fmt = (v: unknown, d = 2) =>
   typeof v === "number" && isFinite(v)
     ? v.toLocaleString(undefined, { maximumFractionDigits: d })
@@ -138,6 +162,7 @@ export default function MapConsole() {
   const pinMarker = useRef<L.Marker | null>(null);
   const basemapCtl = useRef<{ set: (k: BasemapKey) => void } | null>(null);
 
+  const { collapsed, toggle: toggleRail } = useRail(map);
   const [on, setOn] = useState<Record<Key, boolean>>(DEFAULT_ON);
   const [basemap, setBasemap] = useState<BasemapKey>("light");
   const [q, setQ] = useState("");
@@ -240,7 +265,7 @@ export default function MapConsole() {
     if (!el.current || map.current) return;
     const m = L.map(el.current, { center: CENTRE, zoom: 7, zoomControl: false });
     L.control.zoom({ position: "topright" }).addTo(m);
-    L.control.scale({ imperial: false, position: "bottomleft" }).addTo(m);
+    addScaleControl(m);
     createPlumePanes(m);
     basemapCtl.current = attachBasemaps(m, "light");
 
@@ -385,22 +410,40 @@ export default function MapConsole() {
     for (const w of wells.data) {
       if (w.latitude == null || w.longitude == null) continue;
       L.circleMarker([w.latitude, w.longitude], {
-        radius: 2.6, color: "#8b97a7", weight: 1, fillOpacity: 0.65,
+        radius: 2.6, color: OVERLAY.well, weight: 1, fillOpacity: 0.65,
       }).bindTooltip(w.name ?? "well", { direction: "top" }).addTo(g);
     }
   }, [wells.data, on.wells]);
 
   // ── engine reference geography ──
+  // Boundary + the inverse mask that dims everything outside the state.
+  //
+  // The mask is a world rectangle with the Jharkhand rings punched out as
+  // holes — the technique the ml_pipeline dashboard uses. It rides in its own
+  // pane *below* the data overlays, so it darkens the basemap and the
+  // neighbouring states without greying out the districts, wells and plume
+  // drawn on top of Jharkhand itself.
   useEffect(() => {
     const g = groups.current.boundary;
     if (!g) return;
     g.clearLayers();
     if (!on.boundary || !boundary.data) return;
-    L.geoJSON(boundary.data, {
-      style: { color: "#c9d4e2", weight: 2, fill: false, dashArray: "6 4" },
-      interactive: false,
-    } as any).addTo(g);
-  }, [boundary.data, on.boundary]);
+
+    const rings = ringsOf(boundary.data);
+    if (rings.length) {
+      const world: L.LatLngExpression[] = [[-85, -179], [-85, 179], [85, 179], [85, -179]];
+      L.polygon([world, ...rings], {
+        pane: "paneMask", stroke: false, fillColor: "#000",
+        fillOpacity: maskOpacity(basemap), interactive: false,
+      }).addTo(g);
+      for (const r of rings) {
+        L.polygon(r, {
+          pane: "paneMask", color: OVERLAY.boundary, weight: 1.6, fill: false,
+          opacity: lineOpacity(basemap), interactive: false,
+        }).addTo(g);
+      }
+    }
+  }, [boundary.data, on.boundary, basemap]);
 
   useEffect(() => {
     const g = groups.current.ore;
@@ -409,20 +452,27 @@ export default function MapConsole() {
     if (!on.ore || !ore.data) return;
     L.geoJSON(ore.data as any, {
       style: (f) => {
-        const belt = /belt|envelope/i.test((f?.properties as any)?.name ?? "");
-        return { color: belt ? "#b08d3a" : "#ffd166", weight: belt ? 1 : 1.6,
-                 fillColor: "#ffd166", fillOpacity: belt ? 0.05 : 0.18,
-                 dashArray: belt ? "5 5" : undefined };
+        // `tier` is the loader's own field ("deposit" | "belt"), not a guess
+        // from the name — the belt's name is configurable.
+        const belt = (f?.properties as any)?.tier !== "deposit";
+        return tune(basemap, {
+          color: belt ? OVERLAY.oreBelt : OVERLAY.oreDeposit,
+          weight: belt ? 1.2 : 1.4,
+          fillColor: belt ? OVERLAY.oreBelt : OVERLAY.oreDeposit,
+          fillOpacity: belt ? 0.05 : 0.22,
+          dashArray: belt ? "5 5" : undefined,
+        } as any, belt ? 0.06 : 0.24) as any;
       },
       onEachFeature: (f, layer) => {
         const p = f.properties as any;
         layer.bindTooltip(
-          `<b>${p.name ?? "Uranium deposit"}</b>`
+          `${p.tier === "deposit" ? "Uranium deposit" : "Prospective belt"}: `
+          + `<b>${p.name ?? "unnamed"}</b>`
           + (p.origin ? ` <span class="muted">(${p.origin})</span>` : ""),
           { sticky: true });
       },
     }).addTo(g);
-  }, [ore.data, on.ore]);
+  }, [ore.data, on.ore, basemap]);
 
   useEffect(() => {
     const g = groups.current.aquifers;
@@ -432,8 +482,10 @@ export default function MapConsole() {
     L.geoJSON(aquifers.data as any, {
       style: (f) => {
         const fr = (f?.properties as any)?.regime === "fractured";
-        return { color: fr ? "#7fd1ae" : "#d8b46a", weight: 0.6,
-                 fillColor: fr ? "#7fd1ae" : "#d8b46a", fillOpacity: 0.12 };
+        const c = fr ? OVERLAY.aquiferFractured : OVERLAY.aquiferPorous;
+        return tune(basemap,
+          { color: c, weight: 0.6, fillColor: c, fillOpacity: 0.12 } as any,
+          0.14) as any;
       },
       onEachFeature: (f, layer) => {
         const p = f.properties as any;
@@ -444,7 +496,7 @@ export default function MapConsole() {
           { className: "aq-tip", sticky: true });
       },
     }).addTo(g);
-  }, [aquifers.data, on.aquifers]);
+  }, [aquifers.data, on.aquifers, basemap]);
 
   useEffect(() => {
     const g = groups.current.rivers;
@@ -452,12 +504,12 @@ export default function MapConsole() {
     g.clearLayers();
     if (!on.rivers || !rivers.data) return;
     L.geoJSON(rivers.data as any, {
-      style: { color: "#3aa0ff", weight: 1.1, opacity: 0.7 },
+      style: { color: OVERLAY.river, weight: 1.1, opacity: lineOpacity(basemap) },
       onEachFeature: (f, l) => l.bindTooltip(
         `perennial river · ${fmt((f.properties as any)?.DIS_AV_CMS, 1)} m³/s`,
         { className: "aq-tip", sticky: true }),
     }).addTo(g);
-  }, [rivers.data, on.rivers]);
+  }, [rivers.data, on.rivers, basemap]);
 
   useEffect(() => {
     const g = groups.current.flow;
@@ -467,7 +519,8 @@ export default function MapConsole() {
     for (const f of flow.data.features) {
       const [lon, lat] = f.geometry.coordinates;
       drawArrow(g, lat, lon, f.properties.azimuth_deg,
-                f.properties.source === "stations" ? "#37d39b" : "#7f8a99", 0.02);
+                f.properties.source === "stations" ? OVERLAY.flowStations : OVERLAY.flowDem,
+                0.02);
     }
   }, [flow.data, on.flow]);
 
@@ -480,7 +533,8 @@ export default function MapConsole() {
       const [lon, lat] = f.geometry.coordinates;
       const V = f.properties.circular_variance;
       drawTick(g, lat, lon, f.properties.strike_deg,
-               V < 0.4 ? "#ffcf6f" : V > 0.65 ? "#9b7bff" : "#c79bff", 0.017);
+               V < 0.4 ? OVERLAY.strikeTight
+                 : V > 0.65 ? OVERLAY.strikeSpread : OVERLAY.strikeMid, 0.017);
     }
   }, [strike.data, on.strike]);
 
@@ -518,7 +572,13 @@ export default function MapConsole() {
   return (
     <div className="map-shell">
       {/* ── left rail ── */}
+      {!collapsed && (
       <aside className="rail">
+        <div className="rail-top">
+          <span className="t">Layers &amp; districts</span>
+          <button className="rail-btn" onClick={toggleRail}
+                  title="Collapse the panel" aria-label="Collapse the panel">‹</button>
+        </div>
         <input placeholder="Search districts…" value={q} onChange={(e) => setQ(e.target.value)} />
 
         <div className="rail-head">Basemap</div>
@@ -564,10 +624,16 @@ export default function MapConsole() {
           );
         })}
       </aside>
+      )}
 
       {/* ── map ── */}
       <div className="map-area">
         <div ref={el} className="map-canvas" />
+
+        {collapsed && (
+          <button className="rail-peek" onClick={toggleRail}
+                  title="Show the panel" aria-label="Show the panel">›</button>
+        )}
 
         <div className="map-ov legend">
           <div className="ov-title">Legend</div>

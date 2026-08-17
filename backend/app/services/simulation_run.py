@@ -58,14 +58,19 @@ class SimulationRunService:
             raise ResourceNotFoundError("ISR Point", str(isr_id))
         return obj
 
-    async def _lonlat(self, isr_id: uuid.UUID) -> tuple[float, float]:
-        row = (await self.db.execute(text(
-            "SELECT ST_X(location::geometry) AS lon, "
-            "       ST_Y(location::geometry) AS lat "
-            "FROM isr_points WHERE id = :i"), {"i": str(isr_id)})).first()
-        if row is None or row.lon is None:
+    async def _site(self, isr_id: uuid.UUID) -> IsrPoint:
+        """The whole site, not just its coordinate.
+
+        Since migration 0015 a site carries the operation it represents —
+        injection rate, bleed, footprint, monitor ring, ore depth — so the run
+        needs the row, not two floats. A site with no location cannot be run at
+        all; that is the same error it always was, raised earlier.
+        """
+        site = (await self.db.execute(
+            select(IsrPoint).where(IsrPoint.id == isr_id))).scalar_one_or_none()
+        if site is None or site.location is None:
             raise ResourceNotFoundError("ISR Point location", str(isr_id))
-        return float(row.lon), float(row.lat)
+        return site
 
     async def create(self, *, actor: User, isr_id: uuid.UUID,
                      params: dict[str, Any], ip: Optional[str] = None
@@ -111,16 +116,22 @@ class SimulationRunService:
             logger.info(f"run {run_id} is '{run.status}', not executing again")
             return
 
-        lon, lat = await self._lonlat(run.isr_point_id)
+        site = await self._site(run.isr_point_id)
         run.status = "running"
         await self._commit()
 
         started = time.perf_counter()
         try:
-            # Only the pin and the sliders cross the boundary. No database
-            # chemistry, no approved field observation — see the adapter's
-            # docstring for why that is a hard rule and not a preference.
-            payload = mlp.build_payload(lon=lon, lat=lat, params=run.request)
+            # Only the pin, the site's own operating parameters and the two
+            # Studio variables cross the boundary. No database chemistry, no
+            # approved field observation — see the adapter's docstring for why
+            # that is a hard rule and not a preference.
+            #
+            # The site supplies the operation; `run.request` carries what the
+            # Studio varied (evaluation year, restoration years) and wins where
+            # the two overlap, which is what makes "test a 5-year sweep against
+            # this site" possible without editing the site.
+            payload = mlp.payload_from_site(site, overrides=run.request or {})
             result = await mlp.predict(payload)
             prov = mlp.provenance()
 

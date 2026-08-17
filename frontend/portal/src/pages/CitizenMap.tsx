@@ -28,6 +28,8 @@ import { api, type FeatureCollection } from "../api/client";
 import { isStaff, useAuth } from "../auth";
 import { Loading } from "../components/bits";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
+import { addScaleControl } from "../map/scale";
+import { useRail } from "../map/useRail";
 
 const CENTRE: [number, number] = [23.6, 85.3];
 
@@ -50,6 +52,7 @@ export default function CitizenMap() {
   const groups = useRef<Record<Key, L.LayerGroup>>({} as never);
   const basemapCtl = useRef<{ set: (k: BasemapKey) => void } | null>(null);
 
+  const { collapsed, toggle: toggleRail } = useRail(map);
   const [on, setOn] = useState<Record<Key, boolean>>({
     districts: true, blocks: false, wells: true,
   });
@@ -83,7 +86,7 @@ export default function CitizenMap() {
     if (!el.current || map.current) return;
     const m = L.map(el.current, { center: CENTRE, zoom: 7, zoomControl: false });
     L.control.zoom({ position: "topright" }).addTo(m);
-    L.control.scale({ imperial: false, position: "bottomleft" }).addTo(m);
+    addScaleControl(m);
     basemapCtl.current = attachBasemaps(m, "light");
     for (const k of ["districts", "blocks", "wells"] as Key[]) {
       groups.current[k] = L.layerGroup().addTo(m);
@@ -204,7 +207,13 @@ export default function CitizenMap() {
 
   return (
     <div className="map-shell">
+      {!collapsed && (
       <aside className="rail">
+        <div className="rail-top">
+          <span className="t">Your area</span>
+          <button className="rail-btn" onClick={toggleRail}
+                  title="Collapse the panel" aria-label="Collapse the panel">‹</button>
+        </div>
         <div className="rail-head">Find your area</div>
         <input placeholder="District or block…" value={q}
                onChange={(e) => {
@@ -257,9 +266,15 @@ export default function CitizenMap() {
           result.
         </div>
       </aside>
+      )}
 
       <div className="map-area">
         <div ref={el} className="map-canvas" />
+
+        {collapsed && (
+          <button className="rail-peek" onClick={toggleRail}
+                  title="Show the panel" aria-label="Show the panel">›</button>
+        )}
         {districts.isLoading && (
           <div className="map-ov hint"><Loading label="Loading your area…" /></div>
         )}

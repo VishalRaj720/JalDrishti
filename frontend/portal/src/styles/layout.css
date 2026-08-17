@@ -98,7 +98,54 @@
 .rail {
   width: var(--rail-w); flex: 0 0 var(--rail-w); background: var(--panel);
   border-right: 1px solid var(--line); overflow-y: auto; padding: 12px;
+  animation: railIn .18s ease-out;
 }
+@keyframes railIn { from { opacity: 0; transform: translateX(-8px); } }
+
+/* NOTE — the rail is COLLAPSED BY UNMOUNTING IT, not by a `.collapsed` class.
+   A width-and-visibility class was tried first and could not be made to work:
+   the rail is a flex item, and a flex item's default `min-width: auto` resolves
+   to its CONTENT's minimum size. With a district list inside, it refused to go
+   below ~340px against `width: 0`, `flex-basis: 0`, an explicit `min-width: 0`,
+   and even an inline `width: 0px` — the class applied, `visibility` took
+   effect, and the element still occupied its full width. Not rendering it
+   removes the flex item entirely, which is both simpler and unambiguous.
+   `useRail` calls Leaflet's `invalidateSize()` afterwards so the map actually
+   claims the freed space. */
+
+.rail-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 10px;
+}
+.rail-top .t {
+  font-size: 10px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* The collapse control, and the strip that brings the rail back.
+   A dedicated target on purpose: the rail body is toggles, sliders and a
+   district list, so a tap-anywhere affordance would fire every time someone
+   reached for a control. */
+.rail-btn {
+  display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: var(--r-sm); border: 1px solid var(--line);
+  background: var(--card); color: var(--muted); cursor: pointer;
+  font-size: 13px; line-height: 1; transition: color .12s, border-color .12s;
+}
+.rail-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.rail-peek {
+  position: absolute; z-index: 620; left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 74px; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--line); border-left: none;
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  box-shadow: 2px 0 10px rgba(0,0,0,.35);
+  transition: color .12s, background .12s;
+}
+.rail-peek:hover { color: var(--text); background: var(--card2); }
 .rail-head { font-size: 11px; font-weight: 700; letter-spacing: .08em;
   text-transform: uppercase; color: var(--muted); margin: 14px 0 7px; }
 .rail-head:first-child { margin-top: 0; }
@@ -267,3 +314,25 @@
   font-family: inherit; font-size: 12px;
 }
 .demo-user:hover { border-color: var(--accent); }
+
+/* ── scale ─────────────────────────────────────────────────────────── */
+
+/* The representative fraction, sitting under Leaflet's distance bar. The two
+   answer different questions — "how far is that" and "what scale is this" —
+   so both are shown rather than one replacing the other. */
+.scale-ratio {
+  display: flex; align-items: baseline; gap: 6px;
+  background: rgba(14,17,22,.86); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 2px 7px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--text);
+  backdrop-filter: blur(4px);
+}
+.scale-ratio .sr-n { font-variant-numeric: tabular-nums; }
+.scale-ratio .sr-t {
+  font-family: inherit; font-size: 9px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted); cursor: help;
+}
+.leaflet-control-scale-line {
+  background: rgba(14,17,22,.86) !important; color: var(--text) !important;
+  border-color: var(--line) !important; font-size: 10.5px;
+}

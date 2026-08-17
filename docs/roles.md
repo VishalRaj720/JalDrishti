@@ -236,6 +236,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/ml/aquifers` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/assumptions` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/boundary` | ● | ● | ● | ● | · |
+| `GET /api/v1/ml/bounds` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/drift` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/flow-field` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/health` | ● | ● | ● | ● | · |
@@ -276,7 +277,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 72/81 · **regulator** 47/81 · **analyst** 54/81 · **field_officer** 43/81 · **citizen** 1/81
+Reachable endpoints per role — **admin** 73/82 · **regulator** 48/82 · **analyst** 55/82 · **field_officer** 44/82 · **citizen** 1/82
 
 <!-- END GENERATED AUTHZ MATRIX -->
 
