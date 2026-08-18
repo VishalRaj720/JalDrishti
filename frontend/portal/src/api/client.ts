@@ -63,8 +63,44 @@ export const api = {
     request<T>(p, { method: "POST", body: JSON.stringify(body ?? {}) }),
   put: <T>(p: string, body?: unknown) =>
     request<T>(p, { method: "PUT", body: JSON.stringify(body ?? {}) }),
+  patch: <T>(p: string, body?: unknown) =>
+    request<T>(p, { method: "PATCH", body: JSON.stringify(body ?? {}) }),
   del: <T>(p: string) => request<T>(p, { method: "DELETE" }),
 };
+
+// ── dataset control (admin) ──────────────────────────────────────────
+//
+// `record_source` is the column every writable dataset carries: `original` for
+// rows that shipped with the project, `added` for rows this system wrote from an
+// approved field observation. The API refuses to edit or delete an `original`
+// row with a 409; the UI mirrors that by disabling the controls, but the server
+// is the boundary, not this file.
+
+export type RecordSource = "original" | "added";
+
+export interface DatasetSummary {
+  key: string; label: string; path: string; kind: string;
+  id_column: string; governs: string;
+  rows?: number; original?: number; added?: number;
+  modified_at?: string; available: boolean; error?: string;
+}
+
+export interface DatasetRows {
+  key: string; label: string; id_column: string;
+  columns: string[]; total: number; offset: number; limit: number;
+  editable_note: string;
+  rows: Array<Record<string, unknown>>;
+}
+
+export interface StaleArtifact {
+  artifact: string; built_at: string | null; exists: boolean;
+  sources: string[]; newest_input: string | null; newest_input_at: string | null;
+  stale: boolean; requires_dem?: boolean; dem_present?: boolean; blocked?: string;
+}
+
+export interface OpsStatus {
+  artifacts: StaleArtifact[]; any_stale: boolean; message: string; note: string;
+}
 
 // ── types, mirroring the API responses actually returned ─────────────
 

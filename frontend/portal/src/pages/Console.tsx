@@ -396,23 +396,37 @@ export default function Console() {
     }
   }, [sites.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── field observations, three states ──
+  // ── field observations: only what is actually in the model ──
+  //
+  // R11. This drew three states: approved-and-synced (green), approved-but-not-
+  // synced (amber), and pending review (red). The amber and red layers existed
+  // to make the portal-vs-engine lag visible, which was the right instinct
+  // applied in the wrong place — a marker on the map reads as "the engine knows
+  // about this", and for those two states it did not. Someone reading a plume
+  // beside an amber dot would reasonably assume the dot informed it.
+  //
+  // The map now shows **only what is in `Datasets/`**, so what is drawn is what
+  // the engine used. The lag has not been hidden: it moved to where it can be
+  // acted on — the sync pill in the header, Data & Gaps, and the Dataset
+  // Manager, all of which report the count and offer the sync. That keeps the
+  // "no data is a monitoring gap, never a clean result" rule intact, because the
+  // gap is still reported; it is simply no longer reported as model input.
   useEffect(() => {
     if (!obs.data || !groups.current.green) return;
-    const paint = (k: Key, items: any[], colour: string, hollow: boolean, note: string) => {
-      const g = groups.current[k];
-      g.clearLayers();
-      for (const it of items) {
-        if (it.lon == null || it.lat == null) continue;
-        L.circleMarker([it.lat, it.lon], {
-          radius: 7, color: colour, weight: 2, fillColor: colour,
-          fillOpacity: hollow ? 0 : 0.55, dashArray: hollow ? "3 3" : undefined,
-        }).bindTooltip(`${it.name ?? "Observation"} — ${note}`, { direction: "top" }).addTo(g);
-      }
-    };
-    paint("green", obs.data.approved_in_model, "#37d39b", false, "approved · in model");
-    paint("amber", obs.data.approved_pending_sync, "#ffb84d", false, "approved · NOT yet in the model");
-    paint("red", obs.data.pending_review, "#ff5a5a", true, "pending review");
+    const g = groups.current.green;
+    g.clearLayers();
+    for (const it of obs.data.approved_in_model ?? []) {
+      if (it.lon == null || it.lat == null) continue;
+      L.circleMarker([it.lat, it.lon], {
+        radius: 7, color: "#37d39b", weight: 2, fillColor: "#37d39b",
+        fillOpacity: 0.55,
+      }).bindTooltip(`${it.name ?? "Observation"} — approved · in model`,
+                     { direction: "top" }).addTo(g);
+    }
+    // The other two groups stay registered so the layer plumbing is unchanged,
+    // but nothing is painted into them.
+    groups.current.amber?.clearLayers();
+    groups.current.red?.clearLayers();
   }, [obs.data]);
 
   // ── wells ──

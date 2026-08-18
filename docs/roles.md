@@ -274,6 +274,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/model-ops/status` | ● | ● | ● | · |
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | ● | · | · |
+| `GET /api/v1/public/risk/at` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/districts` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/geojson/blocks` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/geojson/districts` | ○ | ○ | ○ | ○ |
@@ -304,7 +305,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 89/99 · **analyst** 60/99 · **field_officer** 48/99 · **citizen** 12/99
+Reachable endpoints per role — **admin** 89/100 · **analyst** 60/100 · **field_officer** 48/100 · **citizen** 12/100
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

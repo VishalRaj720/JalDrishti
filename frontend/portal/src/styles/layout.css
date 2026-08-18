@@ -686,3 +686,24 @@ body:has(.resize-handle.on) { user-select: none; }
    already stated in the title block. */
 .report-doc.printing .no-print-controls { display: none; }
 .avoid-break { break-inside: avoid; }
+
+/* ── floating panel resize grip ──────────────────────────────────────
+   The panel is draggable by its title bar and resizable from its bottom-right
+   corner. The grip is a real element rather than `resize: both`, because the
+   native affordance cannot be pointer-captured — a fast drag outside the corner
+   drops the gesture — and does not fire on touch at all. */
+.floater { display: flex; flex-direction: column; }
+.floater .floater-body { overflow: auto; flex: 1 1 auto; min-height: 0; }
+.floater.resizing { user-select: none; }
+.floater-resize {
+  position: absolute; right: 0; bottom: 0;
+  width: 16px; height: 16px;
+  cursor: nwse-resize; touch-action: none;
+  /* Two hairlines reading as a corner, in the panel's own border colour so the
+     restyle carries it without a second token. */
+  background:
+    linear-gradient(135deg, transparent 0 45%, var(--line) 45% 55%, transparent 55% 100%),
+    linear-gradient(135deg, transparent 0 70%, var(--line) 70% 80%, transparent 80% 100%);
+  opacity: .75;
+}
+.floater-resize:hover { opacity: 1; }

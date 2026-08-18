@@ -26,7 +26,7 @@ import L from "leaflet";
 import { useQuery } from "@tanstack/react-query";
 import { api, type FeatureCollection } from "../api/client";
 import { isStaff, useAuth } from "../auth";
-import { Loading } from "../components/bits";
+import { ErrorNote, Loading } from "../components/bits";
 import { FloatingPanel, useResizableWidth } from "../components/panels";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
 import { addScaleControl } from "../map/scale";
@@ -61,6 +61,8 @@ export default function CitizenMap() {
   const [basemap, setBasemap] = useState<BasemapKey>("light");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [sel, setSel] = useState<Record<string, any> | null>(null);
+  const [pin, setPin] = useState<{ lon: number; lat: number } | null>(null);
+  const pinMarker = useRef<any>(null);
   const [q, setQ] = useState("");
 
   /**
@@ -115,6 +117,14 @@ export default function CitizenMap() {
     queryFn: () => api.get<FeatureCollection>("/citizen/advisories/geojson"),
   });
 
+  /** What is measured at the tapped point. Measurements only — never a model. */
+  const at = useQuery({
+    queryKey: ["risk-at", pin?.lon, pin?.lat],
+    enabled: !!pin,
+    queryFn: () => api.get<any>(
+      `/public/risk/at?lon=${pin!.lon.toFixed(5)}&lat=${pin!.lat.toFixed(5)}`),
+  });
+
   const visible = (band: string) => !hidden.has(band);
   const toggleBand = (b: string) =>
     setHidden((s) => {
@@ -132,9 +142,44 @@ export default function CitizenMap() {
     for (const k of ["districts", "blocks", "wells", "screenings"] as Key[]) {
       groups.current[k] = L.layerGroup().addTo(m);
     }
+    // ── tap anywhere ──
+    //
+    // Before this, only a *feature* was clickable: land on open ground, or on a
+    // gap between polygons, and nothing happened at all, which reads as a broken
+    // map rather than as "no data here". A map-level handler answers the
+    // question the resident is actually asking — "what is known about *this
+    // spot*" — from measurements only. `GET /public/risk/at` runs no model and
+    // returns no site geometry, so tapping cannot be used to discover where a
+    // hypothetical operation was placed.
+    //
+    // Leaflet fires `click` for taps too, and only when no interactive layer
+    // consumed the event, so a district click still wins over the pin.
+    m.on("click", (e: any) => {
+      if (modeRef.current !== "area") return;
+      const { lat, lng } = e.latlng;
+      setScreening(null);
+      setSel(null);
+      setDrawerHidden(false);
+      setPin({ lon: lng, lat });
+    });
+
     map.current = m;
     return () => { m.remove(); map.current = null; };
   }, []);
+
+  // The marker for the tapped point, kept out of the layer groups so a layer
+  // toggle cannot orphan it.
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    pinMarker.current?.remove();
+    pinMarker.current = null;
+    if (!pin) return;
+    pinMarker.current = L.circleMarker([pin.lat, pin.lon], {
+      radius: 7, weight: 2, color: "#3D7EFF", fillColor: "#3D7EFF",
+      fillOpacity: 0.55, interactive: false,
+    }).addTo(m);
+  }, [pin]);
 
   useEffect(() => { basemapCtl.current?.set(basemap); }, [basemap]);
 
@@ -176,7 +221,7 @@ export default function CitizenMap() {
           + `modelled area ${Number(p.footprint_ha ?? 0).toFixed(1)} ha`
           + `<br/><span class="muted">a modelled scenario, not a measurement</span>`,
           { className: "plume-tip", sticky: true });
-        layer.on("click", () => { setSel(null); setScreening(p); setDrawerHidden(false); });
+        layer.on("click", () => { setSel(null); setPin(null); setScreening(p); setDrawerHidden(false); });
       },
     }).addTo(g);
   }, [screenings.data, on.screenings, citizenMode]);
@@ -199,7 +244,7 @@ export default function CitizenMap() {
           { sticky: true });
         layer.on("click", () => {
           if (modeRef.current !== "area") return;
-          setScreening(null); setSel({ ...p, kind: "District" }); setDrawerHidden(false);
+          setScreening(null); setPin(null); setSel({ ...p, kind: "District" }); setDrawerHidden(false);
         });
       },
     }).addTo(g);
@@ -384,7 +429,7 @@ export default function CitizenMap() {
           </div>
         </div>
 
-        {drawerHidden && (sel || screening) && (
+        {drawerHidden && (sel || screening || pin) && (
           <button className="drawer-peek" onClick={() => setDrawerHidden(false)}
                   title="Show the panel" aria-label="Show the panel">‹</button>
         )}
@@ -511,6 +556,102 @@ export default function CitizenMap() {
           <div className="muted small" style={{ marginTop: 10 }}>
             No uranium mine of the type this platform models operates in
             Jharkhand. These are real test results, not predictions.
+          </div>
+        </aside>
+      ) : pin && !drawerHidden ? (
+        <aside className="drawer" style={drawer.style}>
+          {drawer.handle}
+          <div className="sheet-grip" />
+          <div className="drawer-head">
+            <div>
+              <div className="dh-title">
+                {at.data?.inside_jharkhand ? at.data.block : "This spot"}
+              </div>
+              <div className="dh-sub">
+                {at.data?.inside_jharkhand
+                  ? `${at.data.district} · tapped location`
+                  : `${pin.lat.toFixed(4)}, ${pin.lon.toFixed(4)}`}
+              </div>
+            </div>
+            <div className="row">
+              <button className="rail-btn" onClick={() => setDrawerHidden(true)}
+                      title="Hide the panel" aria-label="Hide the panel">›</button>
+              <button className="btn ghost" onClick={() => setPin(null)}>Close</button>
+            </div>
+          </div>
+
+          {at.isLoading && <Loading label="Looking up this location…" />}
+          {at.error && <ErrorNote error={at.error} />}
+
+          {at.data && !at.data.inside_jharkhand && (
+            <div className="muted" style={{ lineHeight: 1.65 }}>{at.data.message}</div>
+          )}
+
+          {at.data?.inside_jharkhand && (
+            <>
+              <div className="banner"
+                   style={{ background: `${BAND_COLOUR[at.data.band] ?? "#8b919c"}22`,
+                            borderColor: BAND_COLOUR[at.data.band] ?? "#8b919c" }}>
+                <strong>{at.data.band}</strong>
+              </div>
+
+              <div className="muted" style={{ lineHeight: 1.65, marginTop: 8 }}>
+                {at.data.what_it_means}
+              </div>
+
+              <div className="sec">What was measured here</div>
+              <dl className="kv">
+                <dt>Wells</dt><dd>{at.data.wells}</dd>
+                <dt>Samples</dt><dd>{at.data.samples}</dd>
+                <dt>Tested for uranium</dt><dd>{at.data.uranium_tests}</dd>
+                <dt>Highest reading</dt>
+                <dd>{at.data.max_uranium_ppb != null
+                      ? `${at.data.max_uranium_ppb} ppb` : "no result"}</dd>
+                <dt>Safe limit</dt><dd>{at.data.safe_limit} ppb</dd>
+              </dl>
+
+              {at.data.nearest_wells?.length > 0 && (
+                <>
+                  <div className="sec">Nearest monitoring wells</div>
+                  <ul className="plain">
+                    {at.data.nearest_wells.map((w: any, i: number) => (
+                      <li key={i}>
+                        <b>{w.name}</b>
+                        <span className="muted small">
+                          {" "}· {(Number(w.metres) / 1000).toFixed(1)} km
+                          {w.uranium_tests > 0
+                            ? ` · highest ${w.max_uranium_ppb} ppb`
+                            : " · not tested for uranium"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {at.data.advisories?.length > 0 && (
+                <>
+                  <div className="sec">Published advisories covering this spot</div>
+                  <ul className="plain">
+                    {at.data.advisories.map((a: any, i: number) => (
+                      <li key={i}>{a.headline}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {at.data.band === "High concern" && (
+                <div className="banner danger">
+                  Contact your block water office about testing your own supply.
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="muted small" style={{ marginTop: 10 }}>
+            {at.data?.what_this_is ?? (
+              "No uranium mine of the type this platform models operates in "
+              + "Jharkhand. These are real test results, not predictions.")}
           </div>
         </aside>
       ) : null}

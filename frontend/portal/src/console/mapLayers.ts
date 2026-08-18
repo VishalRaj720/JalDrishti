@@ -30,10 +30,14 @@ export const LAYERS: LayerDef[] = [
     note: "397 CGWB wells" },
   { key: "isr", label: "ISR sites (hypothetical)", colour: "#f5a524", shape: "diamond",
     group: "Portal data", note: "Click one to open it and run the engine" },
-  { key: "green", label: "Ore · in model", colour: "#3ecf8e", group: "Portal data" },
-  { key: "amber", label: "Ore · approved, not in model", colour: "#f5a524", group: "Portal data" },
-  { key: "red", label: "Observations · pending review", colour: "#f2555a", shape: "hollow",
-    group: "Portal data" },
+  // R11: one ore layer, not three. "approved but not in model" and "pending
+  // review" used to be drawn here; a marker on the map reads as "the engine
+  // knows about this", which was false for both. The unsynced count now lives on
+  // the sync pill, Data & Gaps and the Dataset Manager, where it can be acted on.
+  // `amber` and `red` stay in `Key` so the layer groups and stored toggles keep
+  // working, but they are no longer offered or painted.
+  { key: "green", label: "Ore · in model", colour: "#3ecf8e", group: "Portal data",
+    note: "Only ore that is synced into Datasets/ — what the engine actually reads" },
   { key: "boundary", label: "Jharkhand outline", colour: OVERLAY.boundary, shape: "line",
     group: "Reference geography",
     note: "Also dims everything outside the state" },
@@ -51,7 +55,7 @@ export const LAYERS: LayerDef[] = [
 
 export const DEFAULT_ON: Record<Key, boolean> = {
   districts: true, blocks: false, wells: true, isr: true,
-  green: true, amber: true, red: true,
+  green: true, amber: false, red: false,
   boundary: true, ore: true, aquifers: false, rivers: false, flow: false, strike: false,
 };
 

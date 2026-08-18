@@ -17,6 +17,7 @@ function sectionsFor(role: Role | undefined) {
   if (canSubmit(role) || canReview(role)) s.push({ to: "/field", label: "Field Data" });
   if (isStaff(role)) s.push({ to: "/data", label: "Data & Gaps" });
   if (canAudit(role)) s.push({ to: "/audit", label: "Audit" });
+  if (canAdmin(role)) s.push({ to: "/datasets", label: "Datasets" });
   if (canAdmin(role)) s.push({ to: "/admin", label: "Administration" });
   // The citizen's own sections. Staff get "Public View" so an official can see
   // exactly what a resident sees — the same screen, not a preview of it.

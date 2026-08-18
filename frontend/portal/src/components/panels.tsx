@@ -115,6 +115,10 @@ export function useResizableWidth(
   return { width, style, handle, dragging, reset };
 }
 
+/** Floor for a resized floating panel — below this a legend stops being legible. */
+const MIN_W = 180;
+const MIN_H = 120;
+
 /**
  * A floating overlay the user can drag anywhere within its container.
  *
@@ -147,6 +151,17 @@ export function FloatingPanel({
   });
   const [dragging, setDragging] = useState(false);
   const [px, setPx] = useState<{ left: number; top: number } | null>(null);
+
+  const sizeKey = `jaldrishti.panel.${storageKey}.size`;
+  const [resizing, setResizing] = useState(false);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(sizeKey);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      return typeof s?.w === "number" && typeof s?.h === "number" ? s : null;
+    } catch { return null; }
+  });
 
   useEffect(() => { sessionStorage.setItem(openKey, open ? "1" : "0"); }, [open, openKey]);
 
@@ -212,15 +227,79 @@ export function FloatingPanel({
     if (pos) sessionStorage.setItem(posKey, JSON.stringify(pos));
   }, [pos, posKey]);
 
+  /**
+   * Resize from the bottom-right corner.
+   *
+   * Size is stored in **pixels**, unlike position which is stored as a fraction
+   * of the container. Position must be fractional so a panel parked near an edge
+   * stays near that edge when the window changes; a legend's usable size is a
+   * property of its content, not of the viewport, so scaling it with the window
+   * would just make the text cramped on a small screen.
+   *
+   * Both dimensions are clamped to the container on every move, so a panel
+   * cannot be dragged or grown out of reach.
+   */
+  const onResizeDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    const parent = el?.offsetParent as HTMLElement | null;
+    if (!el || !parent) return;
+    e.preventDefault();
+    e.stopPropagation();          // never let this start a drag as well
+
+    const startX = e.clientX, startY = e.clientY;
+    const startW = el.offsetWidth, startH = el.offsetHeight;
+    const handle = e.currentTarget;
+    try { handle.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+    setResizing(true);
+
+    const move = (ev: PointerEvent) => {
+      const maxW = Math.max(parent.clientWidth - el.offsetLeft, MIN_W);
+      const maxH = Math.max(parent.clientHeight - el.offsetTop, MIN_H);
+      setSize({
+        w: Math.min(Math.max(startW + (ev.clientX - startX), MIN_W), maxW),
+        h: Math.min(Math.max(startH + (ev.clientY - startY), MIN_H), maxH),
+      });
+    };
+    const up = () => {
+      setResizing(false);
+      try { handle.releasePointerCapture?.(e.pointerId); } catch { /* already gone */ }
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  };
+
+  useEffect(() => {
+    if (size) sessionStorage.setItem(sizeKey, JSON.stringify(size));
+  }, [size, sizeKey]);
+
   return (
     <div
       ref={ref}
-      className={`map-ov floater ${className} ${pos ? "placed" : defaultCorner} ${dragging ? "dragging" : ""}`}
-      style={px ? { left: px.left, top: px.top, right: "auto", bottom: "auto" } : undefined}
+      className={`map-ov floater ${className} ${pos ? "placed" : defaultCorner} `
+        + `${dragging ? "dragging" : ""} ${resizing ? "resizing" : ""}`}
+      style={{
+        ...(px ? { left: px.left, top: px.top, right: "auto", bottom: "auto" } : {}),
+        ...(size ? { width: size.w } : {}),
+        // Height applies only while expanded: a collapsed panel is its title bar,
+        // and forcing a stored height onto it would leave an empty box.
+        ...(size && open ? { height: size.h } : {}),
+      }}
     >
       <div className="floater-bar" onPointerDown={onPointerDown}>
         <span className="floater-grip" aria-hidden="true" />
         <span className="ov-title" style={{ margin: 0 }}>{title}</span>
+        {size && (
+          <button
+            className="floater-btn"
+            onClick={() => setSize(null)}
+            title="Reset to the default size"
+            aria-label="Reset this panel to its default size"
+          >⤢</button>
+        )}
         <button
           className="floater-btn"
           onClick={() => setOpen((o) => !o)}
@@ -230,6 +309,16 @@ export function FloatingPanel({
         >{open ? "−" : "+"}</button>
       </div>
       {open && <div className="floater-body">{children}</div>}
+      {open && (
+        <div
+          className="floater-resize"
+          onPointerDown={onResizeDown}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize this panel"
+          title="Drag to resize"
+        />
+      )}
     </div>
   );
 }
