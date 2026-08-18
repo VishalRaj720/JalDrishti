@@ -66,8 +66,8 @@ const band = (m: any) =>
     ? { p10: m.p10, p90: m.p90 } : null;
 
 export default function RunResult({
-  r, extrapolation = [], compact = false,
-}: { r: any; extrapolation?: string[]; compact?: boolean }) {
+  r, extrapolation = [], compact = false, showVertical = true,
+}: { r: any; extrapolation?: string[]; compact?: boolean; showVertical?: boolean }) {
   const an = r?.metrics?.analytical;
   const ml = r?.metrics?.ml;
   const unit = SPECIES_UNIT[r?.species] ?? "";
@@ -209,8 +209,12 @@ export default function RunResult({
         </div>
       )}
 
-      {/* R2: the shallow-aquifer screening, which the portal never showed. */}
-      {!compact && <VerticalPanel v={r?.vertical} />}
+      {/* R2: the shallow-aquifer screening, which the portal never showed.
+          R10: `showVertical` exists because the REPORT rendered this twice —
+          once directly and once through here — producing two copies of the
+          same depth section. The report now places it itself, at half width
+          with its numbers beside it, and switches this copy off. */}
+      {!compact && showVertical && <VerticalPanel v={r?.vertical} />}
 
       {exc && !compact && (
         <>

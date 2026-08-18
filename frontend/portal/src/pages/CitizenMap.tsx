@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type FeatureCollection } from "../api/client";
 import { isStaff, useAuth } from "../auth";
 import { Loading } from "../components/bits";
+import { FloatingPanel, useResizableWidth } from "../components/panels";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
 import { addScaleControl } from "../map/scale";
 import { useRail } from "../map/useRail";
@@ -36,10 +37,10 @@ const CENTRE: [number, number] = [23.6, 85.3];
 /** The four public bands, and the one colour vocabulary used for all of them.
  *  Grey for "No data" on purpose: it must not read as green. */
 const BAND_COLOUR: Record<string, string> = {
-  "High concern": "#e5484d",
+  "High concern": "#f2555a",
   "Moderate concern": "#f5a524",
-  "Low concern": "#30a46c",
-  "No data": "#8b97a7",
+  "Low concern": "#3ecf8e",
+  "No data": "#8b919c",
 };
 const BANDS = ["High concern", "Moderate concern", "Low concern", "No data"];
 
@@ -61,6 +62,32 @@ export default function CitizenMap() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [sel, setSel] = useState<Record<string, any> | null>(null);
   const [q, setQ] = useState("");
+
+  /**
+   * WHAT A MAP CLICK MEANS, on the citizen surface — R10.
+   *
+   * Two things live on this map and they answer different questions: *what was
+   * measured near me* (districts, blocks, wells) and *what has been assessed
+   * near me* (published screening footprints). They were both clickable at
+   * once, into two independent pieces of state, and both drawers rendered as
+   * flex items — so selecting one of each really did put TWO COLUMNS on
+   * screen, which is the reported defect.
+   *
+   * The mode makes it one question at a time. `area` is the default because
+   * this screen exists to answer "is anyone testing near me", and a measured
+   * result is the thing a resident can act on. The footprint layer is switched
+   * to non-interactive in that mode so a click passes THROUGH it to the block
+   * underneath, rather than being silently swallowed by an overlay.
+   */
+  const [citizenMode, setCitizenMode] = useState<"area" | "assessments">("area");
+  const modeRef = useRef(citizenMode);
+  modeRef.current = citizenMode;
+
+  const [drawerHidden, setDrawerHidden] = useState(false);
+  const rail = useResizableWidth("citizen.rail",
+    { min: 240, max: 520, initial: 340, edge: "right" });
+  const drawer = useResizableWidth("citizen.drawer",
+    { min: 300, max: 640, initial: 460, edge: "left" });
 
   const districts = useQuery({
     queryKey: ["pub-geo", "districts"], staleTime: 3_600_000,
@@ -134,6 +161,10 @@ export default function CitizenMap() {
     g.clearLayers();
     if (!on.screenings || !screenings.data) return;
     L.geoJSON(screenings.data as any, {
+      // Non-interactive in area mode so the block underneath still answers a
+      // click. Rebuilt on mode change because `interactive` is fixed at
+      // construction — the layer is small enough that this is free.
+      interactive: citizenMode === "assessments",
       style: {
         color: "#a78bfa", weight: 2.4, fillColor: "#a78bfa",
         fillOpacity: 0.30, dashArray: "6 4",
@@ -145,10 +176,10 @@ export default function CitizenMap() {
           + `modelled area ${Number(p.footprint_ha ?? 0).toFixed(1)} ha`
           + `<br/><span class="muted">a modelled scenario, not a measurement</span>`,
           { className: "plume-tip", sticky: true });
-        layer.on("click", () => setScreening(p));
+        layer.on("click", () => { setSel(null); setScreening(p); setDrawerHidden(false); });
       },
     }).addTo(g);
-  }, [screenings.data, on.screenings]);
+  }, [screenings.data, on.screenings, citizenMode]);
 
   // ── districts ──
   useEffect(() => {
@@ -158,7 +189,7 @@ export default function CitizenMap() {
     L.geoJSON(districts.data as any, {
       filter: (f) => visible((f.properties as any).band),
       style: (f) => {
-        const c = BAND_COLOUR[(f?.properties as any).band] ?? "#8b97a7";
+        const c = BAND_COLOUR[(f?.properties as any).band] ?? "#8b919c";
         return { color: c, weight: 1.4, fillColor: c, fillOpacity: 0.22 };
       },
       onEachFeature: (f, layer) => {
@@ -166,7 +197,10 @@ export default function CitizenMap() {
         layer.bindTooltip(
           `<b>${p.name}</b><br/>${p.wells} well(s) tested · ${p.band}`,
           { sticky: true });
-        layer.on("click", () => setSel({ ...p, kind: "District" }));
+        layer.on("click", () => {
+          if (modeRef.current !== "area") return;
+          setScreening(null); setSel({ ...p, kind: "District" }); setDrawerHidden(false);
+        });
       },
     }).addTo(g);
   }, [districts.data, hidden]);
@@ -180,7 +214,7 @@ export default function CitizenMap() {
     L.geoJSON(blocks.data as any, {
       filter: (f) => visible((f.properties as any).band),
       style: (f) => {
-        const c = BAND_COLOUR[(f?.properties as any).band] ?? "#8b97a7";
+        const c = BAND_COLOUR[(f?.properties as any).band] ?? "#8b919c";
         return { color: c, weight: 0.8, fillColor: c, fillOpacity: 0.28 };
       },
       onEachFeature: (f, layer) => {
@@ -188,7 +222,10 @@ export default function CitizenMap() {
         layer.bindTooltip(
           `<b>${p.name}</b> <span class="muted">${p.district}</span><br/>`
           + `${p.wells} well(s) tested · ${p.band}`, { sticky: true });
-        layer.on("click", () => setSel({ ...p, kind: "Block" }));
+        layer.on("click", () => {
+          if (modeRef.current !== "area") return;
+          setScreening(null); setSel({ ...p, kind: "Block" }); setDrawerHidden(false);
+        });
       },
     }).addTo(g);
   }, [blocks.data, on.blocks, hidden]);
@@ -205,14 +242,17 @@ export default function CitizenMap() {
       const [lon, lat] = f.geometry.coordinates;
       L.circleMarker([lat, lon], {
         radius: 4.5, color: "#ffffff", weight: 1,
-        fillColor: BAND_COLOUR[p.band] ?? "#8b97a7", fillOpacity: 0.95,
+        fillColor: BAND_COLOUR[p.band] ?? "#8b919c", fillOpacity: 0.95,
       }).bindTooltip(
         `<b>${p.name}</b><br/>${p.block ?? "–"}, ${p.district ?? "–"}<br/>`
         + (p.max_uranium_ppb !== null
             ? `highest reading ${p.max_uranium_ppb} ppb — ${p.band}`
             : "no result recorded"),
         { direction: "top" })
-       .on("click", () => setSel({ ...p, kind: "Monitoring well" }))
+       .on("click", () => {
+         if (modeRef.current !== "area") return;
+         setScreening(null); setSel({ ...p, kind: "Monitoring well" }); setDrawerHidden(false);
+       })
        .addTo(g);
     }
   }, [wells.data, on.wells, hidden]);
@@ -250,7 +290,8 @@ export default function CitizenMap() {
   return (
     <div className="map-shell">
       {!collapsed && (
-      <aside className="rail">
+      <aside className="rail" style={rail.style}>
+        {rail.handle}
         <div className="rail-top">
           <span className="t">Your area</span>
           <button className="rail-btn" onClick={toggleRail}
@@ -321,14 +362,40 @@ export default function CitizenMap() {
         {districts.isLoading && (
           <div className="map-ov hint"><Loading label="Loading your area…" /></div>
         )}
-        <div className="map-ov legend">
+
+        {/* One question at a time. Switching mode closes whatever was open, so
+            the two channels can never be on screen together. */}
+        <div className="map-ov modesw">
+          <div className="seg seg-sm" role="group" aria-label="What a map click shows">
+            <button className={citizenMode === "area" ? "active" : ""}
+                    onClick={() => { setCitizenMode("area"); setScreening(null); }}>
+              Test results
+            </button>
+            <button className={citizenMode === "assessments" ? "active" : ""}
+                    onClick={() => { setCitizenMode("assessments"); setSel(null);
+                                     setOn((o) => ({ ...o, screenings: true })); }}>
+              Assessments
+            </button>
+          </div>
+          <div className="modesw-note">
+            {citizenMode === "area"
+              ? "Tap an area or a well to see what was actually measured there."
+              : "Tap a shaded area to see the published assessment behind it."}
+          </div>
+        </div>
+
+        {drawerHidden && (sel || screening) && (
+          <button className="drawer-peek" onClick={() => setDrawerHidden(false)}
+                  title="Show the panel" aria-label="Show the panel">‹</button>
+        )}
+
+        <FloatingPanel storageKey="citizen.legend" title="What the colours mean">
           {on.screenings && (
             <div className="legend-row">
               <span className="sw" style={{ background: "#a78bfa" }} />
               Published assessment (modelled)
             </div>
           )}
-          <div className="ov-title">What the colours mean</div>
           {BANDS.filter((b) => !hidden.has(b)).map((b) => (
             <div className="legend-row" key={b}>
               <span className="sw" style={{ background: BAND_COLOUR[b] }} />{b}
@@ -338,18 +405,26 @@ export default function CitizenMap() {
             Real measurements from government groundwater sampling — not
             predictions from any simulation.
           </div>
-        </div>
+        </FloatingPanel>
       </div>
 
-      {screening && (
-        <aside className="drawer">
+      {/* EXACTLY ONE DRAWER. `screening` and `sel` are cleared against each
+          other at every call site; the ternary is the belt-and-braces so a
+          future call site cannot reintroduce the two-column defect. */}
+      {screening && !drawerHidden ? (
+        <aside className="drawer" style={drawer.style}>
+          {drawer.handle}
           <div className="sheet-grip" />
           <div className="drawer-head">
             <div>
               <div className="dh-title">Published assessment</div>
               <div className="dh-sub">a modelled scenario, not a measurement</div>
             </div>
-            <button className="btn ghost" onClick={() => setScreening(null)}>Close</button>
+            <div className="row">
+              <button className="rail-btn" onClick={() => setDrawerHidden(true)}
+                      title="Hide the panel" aria-label="Hide the panel">›</button>
+              <button className="btn ghost" onClick={() => setScreening(null)}>Close</button>
+            </div>
           </div>
 
           <div className="banner warn" style={{ marginTop: 10 }}>
@@ -388,16 +463,20 @@ export default function CitizenMap() {
             monitoring wells</b>, and their colour is what was actually tested there.
           </div>
         </aside>
-      )}
-
-      {sel && (
-        <aside className="drawer">
+      ) : sel && !drawerHidden ? (
+        <aside className="drawer" style={drawer.style}>
+          {drawer.handle}
+          <div className="sheet-grip" />
           <div className="drawer-head">
             <div>
               <div className="dh-title">{sel.name}</div>
               <div className="dh-sub">{sel.kind}{sel.district ? ` · ${sel.district}` : ""}</div>
             </div>
-            <button className="btn ghost" onClick={() => setSel(null)}>Close</button>
+            <div className="row">
+              <button className="rail-btn" onClick={() => setDrawerHidden(true)}
+                      title="Hide the panel" aria-label="Hide the panel">›</button>
+              <button className="btn ghost" onClick={() => setSel(null)}>Close</button>
+            </div>
           </div>
 
           <div className="banner" style={{ background: `${BAND_COLOUR[sel.band]}22`,
@@ -434,7 +513,7 @@ export default function CitizenMap() {
             Jharkhand. These are real test results, not predictions.
           </div>
         </aside>
-      )}
+      ) : null}
 
       {isStaff(me?.role) && (
         <div className="ribbon">

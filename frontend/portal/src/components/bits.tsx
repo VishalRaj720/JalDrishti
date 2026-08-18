@@ -114,9 +114,28 @@ export type BandInfo = {
   weight: number;
 };
 
-export function bandOf(maxU: number | null | undefined): BandInfo {
+/**
+ * `samples` separates TWO DIFFERENT GAPS that a null reading conflates, and
+ * conflating them is what produced "28 wells · 28 samples · No data" on the
+ * staff district list — a line that reads as self-contradictory because it is.
+ *
+ * The CGWB quality file does not report every determinand at every well, so a
+ * district can be well sampled and still have no uranium result. That is a
+ * different gap from never having been visited, and only one of them is
+ * answered by sending a sampling team. `citizen.py` already draws this
+ * distinction for residents; this is the same rule on the staff surface.
+ *
+ * Both remain the `none` BAND — grey and dashed, never green. Neither is a
+ * clean result, which is the invariant that must not move.
+ */
+export function bandOf(
+  maxU: number | null | undefined, samples?: number | null,
+): BandInfo {
   if (maxU === null || maxU === undefined)
-    return { label: "No data", cls: "neutral", band: "none", dash: "3 4", weight: 1 };
+    return {
+      label: (samples ?? 0) > 0 ? "Not tested for uranium" : "No data",
+      cls: "neutral", band: "none", dash: "3 4", weight: 1,
+    };
   if (maxU >= 30)
     return { label: "High concern", cls: "danger", band: "high", dash: undefined, weight: 3 };
   if (maxU >= 15)
@@ -125,10 +144,12 @@ export function bandOf(maxU: number | null | undefined): BandInfo {
 }
 
 /** The band as a badge. Always prefer this over a bare coloured chip. */
-export function RiskBand({ value, label }: { value?: number | null; label?: string }) {
+export function RiskBand({
+  value, label, samples,
+}: { value?: number | null; label?: string; samples?: number | null }) {
   const b = label
     ? { band: BAND_BY_LABEL[label] ?? "none", label }
-    : bandOf(value);
+    : bandOf(value, samples);
   return <span className={`band ${b.band}`}>{b.label}</span>;
 }
 

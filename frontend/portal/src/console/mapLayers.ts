@@ -22,17 +22,17 @@ export interface LayerDef {
 }
 
 export const LAYERS: LayerDef[] = [
-  { key: "districts", label: "Districts", colour: "#3fb6ff", group: "Portal data",
+  { key: "districts", label: "Districts", colour: "#3d7eff", group: "Portal data",
     note: "Filled by highest measured uranium" },
   { key: "blocks", label: "Blocks", colour: "#6ea8d8", group: "Portal data",
     note: "Finer administrative units", lazy: true },
-  { key: "wells", label: "Monitoring wells", colour: "#8b97a7", group: "Portal data",
+  { key: "wells", label: "Monitoring wells", colour: "#8b919c", group: "Portal data",
     note: "397 CGWB wells" },
-  { key: "isr", label: "ISR sites (hypothetical)", colour: "#ffb84d", shape: "diamond",
+  { key: "isr", label: "ISR sites (hypothetical)", colour: "#f5a524", shape: "diamond",
     group: "Portal data", note: "Click one to open it and run the engine" },
-  { key: "green", label: "Ore · in model", colour: "#37d39b", group: "Portal data" },
-  { key: "amber", label: "Ore · approved, not in model", colour: "#ffb84d", group: "Portal data" },
-  { key: "red", label: "Observations · pending review", colour: "#ff5a5a", shape: "hollow",
+  { key: "green", label: "Ore · in model", colour: "#3ecf8e", group: "Portal data" },
+  { key: "amber", label: "Ore · approved, not in model", colour: "#f5a524", group: "Portal data" },
+  { key: "red", label: "Observations · pending review", colour: "#f2555a", shape: "hollow",
     group: "Portal data" },
   { key: "boundary", label: "Jharkhand outline", colour: OVERLAY.boundary, shape: "line",
     group: "Reference geography",
@@ -57,7 +57,7 @@ export const DEFAULT_ON: Record<Key, boolean> = {
 
 /** Band class → map colour. Keyed on `bandOf().cls` so one rule drives both. */
 export const RAMP: Record<string, string> = {
-  danger: "#ff5a5a", warn: "#ffb84d", ok: "#37d39b", neutral: "#8390a3",
+  danger: "#f2555a", warn: "#f5a524", ok: "#3ecf8e", neutral: "#8b919c",
 };
 
 export const SPECIES = ["uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l"];

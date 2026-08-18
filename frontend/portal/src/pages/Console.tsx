@@ -33,6 +33,7 @@ import {
 } from "../api/client";
 import { canRunSim, useAuth } from "../auth";
 import { ErrorNote, Loading, RiskBand, bandOf } from "../components/bits";
+import { FloatingPanel, useResizableWidth } from "../components/panels";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
 import { lineOpacity, maskOpacity, OVERLAY, tune } from "../map/palette";
 import {
@@ -75,6 +76,33 @@ export default function Console() {
   const [mode, setMode] = useState<"none" | "pin" | "site">("none");
   const [pin, setPin] = useState<{ lon: number; lat: number } | null>(null);
   const [siteId, setSiteId] = useState<string>("");
+
+  /**
+   * WHAT A MAP CLICK MEANS — R10.
+   *
+   * This used to be implicit and got it wrong everywhere outside the ore belt.
+   * The `districts` layer is on by default and its polygons tile the whole
+   * state, and its click handler called `L.DomEvent.stop`, so the map's own
+   * click handler — the one that drops an ISR pin — never fired. Inside the
+   * belt the `ore` polygons happen to render on top and do NOT stop
+   * propagation, so a pin dropped there and nowhere else. The symptom read as
+   * "the engine only works in the belt"; the engine was never the limit.
+   *
+   * Now the meaning of a click is explicit and the user owns it. ISR is the
+   * default, so any point in Jharkhand is usable as a hypothetical location,
+   * belt or not. Exactly one drawer is ever open.
+   */
+  const [mapMode, setMapMode] = useState<"isr" | "district">("isr");
+  // Leaflet handlers are bound once per layer build; a ref lets them read the
+  // current mode without rebuilding every polygon on each toggle.
+  const mapModeRef = useRef(mapMode);
+  mapModeRef.current = mapMode;
+
+  const [drawerHidden, setDrawerHidden] = useState(false);
+  const rail = useResizableWidth("console.rail",
+    { min: 240, max: 560, initial: 340, edge: "right" });
+  const drawer = useResizableWidth("console.drawer",
+    { min: 320, max: 720, initial: 380, edge: "left" });
 
   // Live-run controls (pin mode only).
   const [species, setSpecies] = useState("uranium_ppb");
@@ -251,11 +279,16 @@ export default function Console() {
     if (!m) return;
     const handler = (e: L.LeafletMouseEvent) => {
       if (!mayRun) return;
+      if (mapModeRef.current !== "isr") return;   // district mode: clicks mean districts
       const { lat, lng } = e.latlng;
       setPin({ lon: +lng.toFixed(5), lat: +lat.toFixed(5) });
       setMode("pin");
       setLive(null);
       setSiteId("");
+      // One drawer at a time. A district selected earlier must not leave a
+      // second column standing beside the pin.
+      setSel(null);
+      setDrawerHidden(false);
       pinMarker.current?.remove();
       pinMarker.current = L.marker([lat, lng], {
         icon: L.divIcon({ className: "pin-wrap", html: '<div class="map-pin"></div>',
@@ -299,9 +332,13 @@ export default function Console() {
           `<b>${name}</b><br/>${r ? `${r.wells} wells · max ${r.max_uranium_ppb ?? "–"} ppb · ${bandOf(r.max_uranium_ppb).label}` : "no data"}`,
           { sticky: true });
         layer.on("click", (ev) => {
-          L.DomEvent.stop(ev as any);   // a district click must not also drop a pin
+          // In ISR mode the click is DELIBERATELY allowed to bubble to the map,
+          // which is what drops the pin. Swallowing it here unconditionally is
+          // what made every point outside the ore belt unusable.
+          if (mapModeRef.current !== "district") return;
+          L.DomEvent.stop(ev as any);
           const d = districts.data?.find((x) => x.name === name);
-          if (d) { setSel(d); setMode("none"); }
+          if (d) { setSel(d); setMode("none"); setDrawerHidden(false); }
         });
       },
     }).addTo(g);
@@ -325,9 +362,17 @@ export default function Console() {
           `<b>${p.name}</b> <span class="muted">${p.district}</span><br/>`
           + `${p.wells} well(s) · max ${p.max_uranium_ppb ?? "–"} ppb · ${p.band}`,
           { sticky: true });
+        // Same contract as the district layer: in ISR mode the click belongs to
+        // the map, so a block polygon must not swallow it either.
+        layer.on("click", (ev) => {
+          if (mapModeRef.current !== "district") return;
+          L.DomEvent.stop(ev as any);
+          const d = districts.data?.find((x) => x.name === p.district);
+          if (d) { setSel(d); setMode("none"); setDrawerHidden(false); }
+        });
       },
     }).addTo(g);
-  }, [blocks.data, on.blocks]);
+  }, [blocks.data, on.blocks, districts.data]);
 
   // ── ISR sites — now CLICKABLE, which is what makes the merge work ──
   useEffect(() => {
@@ -556,6 +601,7 @@ export default function Console() {
     setMode("site");
     setRunId(null);
     setSel(null);
+    setDrawerHidden(false);
     setPin(null);
     setLive(null);
     pinMarker.current?.remove();
@@ -580,8 +626,12 @@ export default function Console() {
   }
 
   const flyTo = (d: District) => {
+    // Reaching district detail is a deliberate act: either this rail list, or
+    // switching the map into district mode. It is never what a map click means
+    // by default.
     setSel(d);
     setMode("none");
+    setDrawerHidden(false);
     const f = (geo.data?.features ?? []).find((x: any) => x.properties?.name === d.name);
     if (f && map.current) map.current.fitBounds(L.geoJSON(f).getBounds(), { maxZoom: 10 });
   };
@@ -602,7 +652,8 @@ export default function Console() {
     <div className="map-shell">
       {/* ── left rail ── */}
       {!collapsed && (
-      <aside className="rail">
+      <aside className="rail" style={rail.style}>
+        {rail.handle}
         <div className="rail-top">
           <span className="t">Sites, layers &amp; districts</span>
           <button className="rail-btn" onClick={toggleRail}
@@ -660,7 +711,7 @@ export default function Console() {
         <div className="muted small" style={{ padding: "8px 2px 2px" }}>
           {mayRun
             ? "Click the map to place a pin, or a diamond to open a registered site."
-            : "Running the model is restricted to admin, regulator and analyst. "
+            : "Running the model is restricted to admin and analyst. "
               + "You can read every layer here."}
         </div>
 
@@ -674,7 +725,7 @@ export default function Console() {
                 <div className="nm">{d.name}</div>
                 <div className="mt">{r ? `${r.wells} wells · ${r.samples} samples` : "no data"}</div>
               </div>
-              <RiskBand value={r?.max_uranium_ppb} />
+              <RiskBand value={r?.max_uranium_ppb} samples={r?.samples} />
             </button>
           );
         })}
@@ -690,8 +741,33 @@ export default function Console() {
                   title="Show the panel" aria-label="Show the panel">›</button>
         )}
 
-        <div className="map-ov legend">
-          <div className="ov-title">Legend</div>
+        {/* What a map click means. ISR is the default so that any point in
+            Jharkhand is usable as a hypothetical location; district detail is
+            a deliberate switch, not the thing that happens by accident. */}
+        {mayRun && (
+          <div className="map-ov modesw">
+            <div className="seg seg-sm" role="group" aria-label="What a map click does">
+              <button className={mapMode === "isr" ? "active" : ""}
+                      onClick={() => setMapMode("isr")}>ISR pin</button>
+              <button className={mapMode === "district" ? "active" : ""}
+                      onClick={() => { setMapMode("district"); closeDrawer(); }}>
+                District
+              </button>
+            </div>
+            <div className="modesw-note">
+              {mapMode === "isr"
+                ? "Clicking anywhere resolves the hydrogeology there and runs the engine."
+                : "Clicking a district or block opens its measured record."}
+            </div>
+          </div>
+        )}
+
+        {drawerHidden && (mode !== "none" || sel) && (
+          <button className="drawer-peek" onClick={() => setDrawerHidden(false)}
+                  title="Show the panel" aria-label="Show the panel">‹</button>
+        )}
+
+        <FloatingPanel storageKey="console.legend" title="Legend">
           {LAYERS.filter((l) => on[l.key]).map((l) => (
             <div className="legend-row" key={l.key}>
               <span className={`sw ${l.shape ?? ""}`} style={{ background: l.colour }} />
@@ -715,9 +791,9 @@ export default function Console() {
             District fill = highest <b>measured</b> uranium, never model output. Band is
             also carried by outline weight, so the ramp does not depend on colour vision.
           </div>
-        </div>
+        </FloatingPanel>
 
-        {mayRun && mode === "none" && (
+        {mayRun && mode === "none" && !sel && mapMode === "isr" && (
           <div className="map-ov hint">
             <b>Click anywhere in Jharkhand</b> to resolve the hydrogeology and run the
             engine there — or click an amber diamond to open a registered site.
@@ -726,15 +802,20 @@ export default function Console() {
       </div>
 
       {/* ── drawer: PIN mode ── */}
-      {mayRun && mode === "pin" && pin && (
-        <aside className="drawer wide">
+      {mayRun && mode === "pin" && pin && !drawerHidden && (
+        <aside className="drawer wide" style={drawer.style}>
+          {drawer.handle}
           <div className="sheet-grip" />
           <div className="drawer-head">
             <div>
               <div className="dh-title">Unregistered pin</div>
               <div className="dh-sub mono">{pin.lat.toFixed(4)} °N, {pin.lon.toFixed(4)} °E</div>
             </div>
-            <button className="btn ghost" onClick={closeDrawer}>Close</button>
+            <div className="row">
+              <button className="rail-btn" onClick={() => setDrawerHidden(true)}
+                      title="Hide the panel" aria-label="Hide the panel">›</button>
+              <button className="btn ghost" onClick={closeDrawer}>Close</button>
+            </div>
           </div>
 
           {pinInfo.isLoading && <Loading label="Resolving hydrogeology…" />}
@@ -834,8 +915,9 @@ export default function Console() {
       )}
 
       {/* ── drawer: SITE mode ── */}
-      {mode === "site" && site && (
-        <aside className="drawer wide">
+      {mode === "site" && site && !drawerHidden && (
+        <aside className="drawer wide" style={drawer.style}>
+          {drawer.handle}
           <div className="sheet-grip" />
           <div className="drawer-head">
             <div>
@@ -844,7 +926,11 @@ export default function Console() {
                 Registered site · <span className="chip warn">Hypothetical</span>
               </div>
             </div>
-            <button className="btn ghost" onClick={closeDrawer}>Close</button>
+            <div className="row">
+              <button className="rail-btn" onClick={() => setDrawerHidden(true)}
+                      title="Hide the panel" aria-label="Hide the panel">›</button>
+              <button className="btn ghost" onClick={closeDrawer}>Close</button>
+            </div>
           </div>
 
           <div className="sec">The operation — fixed for this site</div>
@@ -1066,24 +1152,41 @@ export default function Console() {
       )}
 
       {/* ── drawer: district ── */}
-      {mode === "none" && sel && (
-        <aside className="drawer">
+      {mode === "none" && sel && !drawerHidden && (
+        <aside className="drawer" style={drawer.style}>
+          {drawer.handle}
           <div className="sheet-grip" />
           <div className="drawer-head">
             <div>
               <div className="dh-title">{sel.name}</div>
               <div className="dh-sub">District</div>
             </div>
-            <button className="btn ghost" onClick={() => setSel(null)}>Close</button>
+            <div className="row">
+              <button className="rail-btn" onClick={() => setDrawerHidden(true)}
+                      title="Hide the panel" aria-label="Hide the panel">›</button>
+              <button className="btn ghost" onClick={() => setSel(null)}>Close</button>
+            </div>
           </div>
           <div className="sec">Measured groundwater</div>
           <dl className="kv">
             <dt>Wells sampled</dt><dd>{selRisk?.wells ?? "–"}</dd>
             <dt>Samples</dt><dd>{selRisk?.samples ?? "–"}</dd>
-            <dt>Max uranium</dt><dd>{selRisk?.max_uranium_ppb ?? "–"} ppb</dd>
-            <dt>Band</dt><dd><RiskBand value={selRisk?.max_uranium_ppb} /></dd>
+            <dt>Max uranium</dt>
+            <dd>{selRisk?.max_uranium_ppb != null
+                  ? `${selRisk.max_uranium_ppb} ppb` : "not analysed"}</dd>
+            <dt>Band</dt>
+            <dd><RiskBand value={selRisk?.max_uranium_ppb} samples={selRisk?.samples} /></dd>
           </dl>
-          <div className="muted small">Measurements from CGWB sampling. Not model output.</div>
+          {selRisk?.max_uranium_ppb == null && (selRisk?.samples ?? 0) > 0 && (
+            <div className="banner warn">
+              {selRisk?.samples} sample(s) from this district are in the dataset, but
+              none was analysed for uranium. That is a gap in <b>testing</b>, not a
+              clean result — and a different gap from a district nobody has visited.
+            </div>
+          )}
+          <div className="muted small" style={{ marginTop: 8 }}>
+            Measurements from CGWB sampling. Not model output.
+          </div>
         </aside>
       )}
     </div>

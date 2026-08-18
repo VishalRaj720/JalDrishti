@@ -7,7 +7,7 @@ ONE command takes an empty database all the way to a fully populated one:
 
 What it does, in order:
   0. Schema      : PostGIS extension + ENUM types + all tables (via scripts.init_db)
-  1. Users       : one account per role (admin / regulator / analyst /
+  1. Users       : one account per live role (admin / analyst /
                    field_officer / citizen)
   2. ISR points  : a hypothetical uranium ISR injection point near Jaduguda
   3. Geodata     : Jharkhand districts, sub-districts (blocks), aquifers,
@@ -98,17 +98,25 @@ TARGET_MIN_SAMPLES = 200
 # says so beside the table.
 SEED_USERS = [
     {"username": "admin",     "email": "admin@jaldrishti.local",     "password": "admin123",     "role": UserRole.admin},
-    {"username": "regulator", "email": "regulator@jaldrishti.local", "password": "regulator123", "role": UserRole.regulator},
     {"username": "analyst",   "email": "analyst@jaldrishti.local",   "password": "analyst123",   "role": UserRole.analyst},
     {"username": "fieldofficer", "email": "field@jaldrishti.local",  "password": "field123",     "role": UserRole.field_officer},
     {"username": "citizen",   "email": "citizen@jaldrishti.local",   "password": "citizen123",   "role": UserRole.citizen},
 ]
 
-#: Accounts from before the five-role model that should not survive a reseed.
+#: Accounts from earlier role models that should not survive a reseed.
+#:
 #: `viewer` was migrated to the `citizen` ROLE by 0008, but the account itself
 #: lingered with its old identity; leaving it would mean two citizen logins and
 #: a stale name in the audit trail.
-RETIRED_USER_EMAILS = ["viewer@jaldrishti.local"]
+#:
+#: `regulator` was RETIRED by R7 / migration 0019 and its powers merged into
+#: `admin`. It was still in SEED_USERS, so `python -m scripts.seed` against a
+#: fresh database MINTED A REGULATOR — reintroducing, on every clean install,
+#: exactly the role the migration removed and `tests/test_p6_roles.py` asserts
+#: cannot exist. The enum label survives in Postgres (a value cannot be dropped
+#: transactionally), which is precisely why seeding one had to stop: the label
+#: being reachable is the whole risk the test exists to catch.
+RETIRED_USER_EMAILS = ["viewer@jaldrishti.local", "regulator@jaldrishti.local"]
 
 # A hypothetical ISR field near Jaduguda — the East Singhbhum uranium belt is the
 # only place in Jharkhand where uranium ISR would plausibly be sited. This gives

@@ -43,10 +43,24 @@ const METRICS: Array<{ k: MetricKey; label: string; unit: (s: LifecycleSeries) =
     why: "Chance the contamination reaches the shallow aquifer people pump from." },
 ];
 
+/**
+ * Phase washes: red while injecting, GREEN while restoring, neutral after.
+ *
+ * This is a change of ENCODING ONLY — the boundaries still come from the
+ * engine's own `phases`, so a band can never disagree with the physics it
+ * describes. Restoration was blue, which read as merely "a different phase";
+ * green says what it is, the one stretch where somebody is actively cleaning
+ * up. Post-closure is deliberately the palest: nothing is being done then, and
+ * that is the point the chart is making.
+ *
+ * Alphas are low enough to sit under a plotted line on either a dark or a light
+ * ground, and the dashed phase boundary carries the same information without
+ * relying on the fill at all.
+ */
 const PHASE_FILL: Record<string, string> = {
-  operation: "rgba(255,90,90,.10)",
-  restoration: "rgba(63,182,255,.12)",
-  post_closure: "rgba(139,151,167,.09)",
+  operation:    "rgba(242,85,90,.13)",
+  restoration:  "rgba(62,207,142,.16)",
+  post_closure: "rgba(139,145,156,.07)",
 };
 
 const W = 460, H = 200, PAD_L = 52, PAD_B = 34, PAD_T = 18, PAD_R = 12;
@@ -54,7 +68,13 @@ const W = 460, H = 200, PAD_L = 52, PAD_B = 34, PAD_T = 18, PAD_R = 12;
 export default function LifecycleChart({ data }: { data: Lifecycle }) {
   const [metric, setMetric] = useState<MetricKey>("source_conc");
   const [speciesIdx, setSpeciesIdx] = useState(0);
+  // One piece of state for both interactions. Touch has no hover, so a tap
+  // must produce the same callout a pointer does — the value used to be written
+  // into a row BELOW the chart, which on a phone is off-screen while you are
+  // looking at the point you just touched.
   const [hover, setHover] = useState<number | null>(null);
+  const [pinned, setPinned] = useState<number | null>(null);
+  const active = pinned ?? hover;
 
   const series = data.series[speciesIdx];
   const meta = METRICS.find((m) => m.k === metric)!;
@@ -75,7 +95,7 @@ export default function LifecycleChart({ data }: { data: Lifecycle }) {
     .map((p, i) => `${i ? "L" : "M"}${px(p.year).toFixed(1)},${py(Number(p[metric])).toFixed(1)}`)
     .join(" ");
 
-  const hovered = hover !== null ? usable.find((p) => p.year === hover) ?? null : null;
+  const hovered = active !== null ? usable.find((p) => p.year === active) ?? null : null;
   const failed = (series?.points ?? []).filter((p) => p.error !== null);
 
   if (!series) return null;
@@ -168,32 +188,73 @@ export default function LifecycleChart({ data }: { data: Lifecycle }) {
         {usable.map((p) => (
           <g key={p.year}>
             <circle cx={px(p.year)} cy={py(Number(p[metric]))}
-                    r={hover === p.year ? 4.5 : 2.8}
+                    r={active === p.year ? 4.5 : 2.8}
                     fill={p.extrapolating ? "var(--bg)" : "var(--accent)"}
                     stroke={p.excursion_declared ? "var(--danger)" : "var(--accent)"}
                     strokeWidth={p.excursion_declared ? 2.2 : 1.3} />
-            <circle cx={px(p.year)} cy={py(Number(p[metric]))} r="11" fill="transparent"
+            {/* A generous invisible target: 2.8 px is a fine mark and a hopeless
+                tap target. `onPointerDown` covers touch, pen and mouse alike;
+                the focus pair keeps it reachable from the keyboard. */}
+            <circle cx={px(p.year)} cy={py(Number(p[metric]))} r="12" fill="transparent"
+                    tabIndex={0} role="button"
+                    style={{ cursor: "pointer", touchAction: "manipulation" }}
+                    aria-label={`Year ${fmt(p.year, 1)}, ${meta.label} ${
+                      metric === "shallow_impact_probability"
+                        ? `${((p[metric] as number) * 100).toFixed(0)}%`
+                        : `${fmt(p[metric], 2)} ${meta.unit(series)}`}`}
+                    onPointerDown={() => setPinned((c) => (c === p.year ? null : p.year))}
                     onMouseEnter={() => setHover(p.year)}
-                    onMouseLeave={() => setHover(null)} />
+                    onMouseLeave={() => setHover(null)}
+                    onFocus={() => setHover(p.year)}
+                    onBlur={() => setHover(null)} />
           </g>
         ))}
+
+        {/* THE CALLOUT SITS ON THE PLOT. It used to write into a row beneath the
+            chart, which on a phone is below the fold at the moment you touch the
+            point. Anchored here, and flipped to the left near the right edge so
+            it can never run off the drawing. */}
+        {hovered && (() => {
+          const cx = px(hovered.year);
+          const cy = py(Number(hovered[metric]));
+          const value = metric === "shallow_impact_probability"
+            ? `${((hovered[metric] as number) * 100).toFixed(0)}%`
+            : `${fmt(hovered[metric], 2)} ${meta.unit(series)}`;
+          const label = `Year ${fmt(hovered.year, 1)} · ${hovered.phase.replace(/_/g, "-")}`;
+          const w = Math.max(value.length, label.length) * 4.6 + 14;
+          const flip = cx + w + 14 > W;
+          const bx = flip ? cx - w - 10 : cx + 10;
+          const by = Math.min(Math.max(cy - 24, PAD_T), H - PAD_B - 34);
+          return (
+            <g pointerEvents="none">
+              <line x1={cx} y1={cy} x2={flip ? bx + w : bx} y2={by + 17}
+                    stroke="var(--accent)" strokeWidth="1" opacity=".55" />
+              <rect x={bx} y={by} width={w} height={34} rx="4"
+                    fill="var(--card)" stroke="var(--accent)" strokeWidth="1"
+                    opacity=".97" />
+              <text x={bx + 7} y={by + 13} fontSize="8" fill="var(--muted)">{label}</text>
+              <text x={bx + 7} y={by + 27} fontSize="10.5" fontWeight="700"
+                    fill="var(--text)">{value}</text>
+            </g>
+          );
+        })()}
       </svg>
 
-      {hovered && (
-        <div className="readonly-val" style={{ marginTop: 4 }}>
-          <span className="muted small">
-            Year {fmt(hovered.year, 1)} · {hovered.phase.replace(/_/g, "-")}
-          </span>
-          <span>
-            <span className="rv-v">
-              {metric === "shallow_impact_probability"
-                ? `${((hovered[metric] as number) * 100).toFixed(0)}%`
-                : fmt(hovered[metric], 2)}
-            </span>
-            <span className="rv-u"> {meta.unit(series)}</span>
-          </span>
-        </div>
-      )}
+      {/* The two things a point mark carries beyond its position. Both were
+          already drawn and neither was ever explained. */}
+      <div className="row wrap small muted" style={{ marginTop: 6, gap: "var(--s-3)" }}>
+        <span className="row" style={{ gap: 5 }}>
+          <svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="3.4"
+            fill="var(--bg)" stroke="var(--accent)" strokeWidth="1.3" /></svg>
+          hollow = outside trained support
+        </span>
+        <span className="row" style={{ gap: 5 }}>
+          <svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="3.4"
+            fill="var(--accent)" stroke="var(--danger)" strokeWidth="2.2" /></svg>
+          red ring = excursion declared
+        </span>
+        <span>{pinned != null ? "tap the point again to release" : "tap or hover a point"}</span>
+      </div>
 
       <div className="muted small" style={{ marginTop: 8, lineHeight: "var(--lh-base)" }}>
         {meta.why}
@@ -219,7 +280,7 @@ export function LifecycleNarrative({ data }: { data: Lifecycle }) {
         <div key={p.phase} style={{ marginBottom: 8 }}>
           <div className="row wrap">
             <span className={`chip ${p.phase === "operation" ? "danger"
-              : p.phase === "restoration" ? "info" : "neutral"}`}>
+              : p.phase === "restoration" ? "ok" : "neutral"}`}>
               {p.label}
             </span>
             <span className="muted small">

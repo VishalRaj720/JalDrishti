@@ -28,17 +28,17 @@ export const OVERLAY = {
   oreDeposit: "#ff2d2d",
   oreBelt: "#e8833a",
   aquiferFractured: "#e8833a",   // --frac
-  aquiferPorous: "#3f8cff",      // --porous
+  aquiferPorous: "#4a86e8",      // --porous
   boundary: "#6fd1ff",
   river: "#3aa0ff",
-  flowStations: "#37d39b",
+  flowStations: "#3ecf8e",
   flowDem: "#7f8a99",
   strikeTight: "#ffcf6f",
   strikeMid: "#c79bff",
   strikeSpread: "#9b7bff",
   monitorRing: "#2bb3ff",
   bisContour: "#8c1c24",
-  well: "#8b97a7",
+  well: "#8b919c",
 } as const;
 
 /** The mask over everything outside Jharkhand.

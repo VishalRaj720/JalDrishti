@@ -33,7 +33,30 @@ const PATHWAY_LABEL: Record<string, string> = {
   wellbore: "Leakage along a failed well casing",
 };
 
+/**
+ * R10 SPLIT THE PANEL IN TWO, and the reason is layout rather than taste.
+ *
+ * The report wants the section drawn at HALF width with its numbers beside it,
+ * and the drawer wants the same content in one narrow column. Rendering the
+ * schematic and its numbers as separate exports lets both compose the same
+ * markup without either screen forking the analysis.
+ *
+ * `VerticalPanel` remains the stacked composition, so every existing call site
+ * is unchanged.
+ */
 export default function VerticalPanel({ v }: { v: VerticalScreening | null | undefined }) {
+  if (!v) return null;
+  return (
+    <>
+      <VerticalSchematic v={v} />
+      <VerticalNumbers v={v} />
+    </>
+  );
+}
+
+export function VerticalSchematic({
+  v, heading = true,
+}: { v: VerticalScreening | null | undefined; heading?: boolean }) {
   if (!v) return null;
 
   const p = v.shallow_impact_probability;
@@ -57,13 +80,9 @@ export default function VerticalPanel({ v }: { v: VerticalScreening | null | und
   const H = 210, W = 300, TOP = 14;
   const y = (m: number) => TOP + (m / totalDepth) * (H - TOP - 10);
 
-  const pathways = Object.entries(v.pathways ?? {})
-    .filter(([, val]) => typeof val === "number")
-    .sort((a, b) => (b[1] as number) - (a[1] as number));
-
   return (
     <>
-      <div className="sec">Shallow aquifer — the water people pump</div>
+      {heading && <div className="sec">Shallow aquifer — the water people pump</div>}
 
       <div className={`banner ${tone === "danger" ? "danger" : tone === "warn" ? "warn" : "ok"}`}
            style={{ marginBottom: 10 }}>
@@ -152,7 +171,19 @@ export default function VerticalPanel({ v }: { v: VerticalScreening | null | und
           </g>
         )}
       </svg>
+    </>
+  );
+}
 
+export function VerticalNumbers({ v }: { v: VerticalScreening | null | undefined }) {
+  if (!v) return null;
+
+  const pathways = Object.entries(v.pathways ?? {})
+    .filter(([, val]) => typeof val === "number")
+    .sort((a, b) => (b[1] as number) - (a[1] as number));
+
+  return (
+    <>
       <dl className="kv">
         {v.dominant_pathway && (
           <>

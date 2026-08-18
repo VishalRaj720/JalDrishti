@@ -28,15 +28,18 @@
   position: relative; z-index: 900;
 }
 .hdr-brand { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+/* R10: the mark and the wordmark were a blue→green gradient apiece. Two
+   gradients in a 56px header is decoration doing the work identity should do,
+   and gradient-clipped text is the first thing to break in a print or a
+   screenshot. One flat accent block, one plain wordmark. */
 .hdr-mark {
-  width: 30px; height: 30px; border-radius: var(--r-md); flex: 0 0 30px;
-  background: linear-gradient(135deg, #3fb6ff, #37d39b);
-  display: grid; place-items: center; font-size: var(--fs-lg);
+  width: 28px; height: 28px; border-radius: var(--r-md); flex: 0 0 28px;
+  background: var(--accent); color: var(--on-accent);
+  display: grid; place-items: center; font-size: var(--fs-base);
 }
 .hdr-name {
-  font-size: var(--fs-lg); font-weight: 700; line-height: 1.05;
-  background: linear-gradient(90deg, #3fb6ff, #37d39b);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: var(--fs-lg); font-weight: 650; line-height: 1.05;
+  color: var(--text); letter-spacing: -.01em;
 }
 .hdr-sub { font-size: 9.5px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
 
@@ -47,7 +50,7 @@
   text-decoration: none; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
 }
 .hdr-nav a:hover { background: var(--card2); color: var(--text); }
-.hdr-nav a.active { background: rgba(63,182,255,.14); color: var(--accent); font-weight: 700; }
+.hdr-nav a.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
 
 .hdr-right { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
 
@@ -67,7 +70,7 @@
   padding: var(--s-3); border-radius: var(--r-sm); color: var(--text);
   text-decoration: none; font-size: var(--fs-md); font-weight: 500;
 }
-.nav-sheet a.active { background: rgba(63,182,255,.14); color: var(--accent); font-weight: 700; }
+.nav-sheet a.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
 
 /* The portal-vs-model lag, carried on every screen (PRODUCT_DESIGN §4.4b). */
 .sync-pill {
@@ -75,8 +78,8 @@
   padding: 5px 10px; border-radius: var(--r-pill); cursor: pointer;
   border: 1px solid; background: transparent; font-family: inherit; white-space: nowrap;
 }
-.sync-pill.amber { color: var(--warn);  border-color: rgba(255,184,77,.45); background: rgba(255,184,77,.10); }
-.sync-pill.clean { color: var(--ok);    border-color: rgba(55,211,155,.35); background: rgba(55,211,155,.08); }
+.sync-pill.amber { color: var(--warn);  border-color: rgba(245,165,36,.45); background: rgba(245,165,36,.10); }
+.sync-pill.clean { color: var(--ok);    border-color: rgba(62,207,142,.35); background: rgba(62,207,142,.08); }
 
 /* Alert bell — the citizen's whole notification channel is in-portal, so this
    is the only place an alert can surface. It must be visible on every screen
@@ -101,7 +104,7 @@
 }
 .avatar {
   width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
-  font-weight: 700; font-size: var(--fs-sm); color: #04121e; cursor: pointer; border: none;
+  font-weight: 700; font-size: var(--fs-sm); color: var(--on-accent); cursor: pointer; border: none;
   flex: 0 0 30px;
 }
 .acct-menu {
@@ -156,7 +159,7 @@
 .tile.red    .tile-n { color: var(--danger); }
 .tile.amber  .tile-n { color: var(--warn); }
 .tile.green  .tile-n { color: var(--ok); }
-.tile.blue   .tile-n { color: var(--accent); }
+.tile.blue   .tile-n { color: var(--accent-text); }
 
 /* ── rail + map ────────────────────────────────────────────────────── */
 
@@ -241,7 +244,7 @@
   background: none; color: inherit; font-family: inherit;
 }
 .list-item:hover { background: var(--card2); }
-.list-item.sel { background: rgba(63,182,255,.12); border-color: rgba(63,182,255,.35); }
+.list-item.sel { background: var(--accent-soft); border-color: var(--accent-line); }
 .list-item .nm { font-size: var(--fs-sm); font-weight: 500; }
 .list-item .mt { font-size: var(--fs-2xs); color: var(--muted); }
 
@@ -277,7 +280,7 @@
 .leaflet-tooltip::before { border-top-color: var(--line); }
 
 .map-ov {
-  position: absolute; z-index: 600; background: rgba(14,17,22,.92);
+  position: absolute; z-index: 600; background: rgba(15,16,19,.92);
   border: 1px solid var(--line); border-radius: var(--r-md);
   padding: 10px var(--s-3); font-size: var(--fs-xs); backdrop-filter: blur(5px);
 }
@@ -301,8 +304,8 @@
 
 .ribbon {
   position: absolute; top: var(--s-3); left: 50%; transform: translateX(-50%); z-index: 600;
-  background: rgba(255,184,77,.16); color: var(--warn);
-  border: 1px solid rgba(255,184,77,.45);
+  background: rgba(245,165,36,.16); color: var(--warn);
+  border: 1px solid rgba(245,165,36,.45);
   font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
   padding: 5px var(--s-4); border-radius: var(--r-pill);
 }
@@ -310,8 +313,8 @@
 .isr-pin-wrap { background: none; border: none; }
 .isr-pin {
   width: 12px; height: 12px; background: var(--warn);
-  border: 2px solid #04121e; transform: rotate(45deg);
-  box-shadow: 0 0 0 1px rgba(255,184,77,.6);
+  border: 2px solid var(--on-accent); transform: rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(245,165,36,.6);
 }
 
 /* The dropped pin. A ring rather than a teardrop: it marks a coordinate the
@@ -320,14 +323,14 @@
 .pin-wrap { background: none; border: none; }
 .map-pin {
   width: 14px; height: 14px; border-radius: 50%;
-  background: rgba(63,182,255,.35); border: 2.5px solid var(--accent);
-  box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 12px rgba(63,182,255,.7);
+  background: rgba(61,126,255,.35); border: 2.5px solid var(--accent);
+  box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 12px rgba(61,126,255,.7);
   animation: pinPulse 1.8s ease-out infinite;
 }
 @keyframes pinPulse {
-  0%   { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(63,182,255,.55); }
-  70%  { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 12px rgba(63,182,255,0); }
-  100% { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(63,182,255,0); }
+  0%   { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(61,126,255,.55); }
+  70%  { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 12px rgba(61,126,255,0); }
+  100% { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(61,126,255,0); }
 }
 
 /* Leaflet tooltips for the engine layers. Wider than the default so an aquifer
@@ -377,7 +380,7 @@
 .login {
   height: 100%; display: grid; place-items: center; overflow-y: auto;
   padding: var(--s-5) var(--s-4);
-  background: radial-gradient(1100px 560px at 50% -12%, #14202c 0%, var(--bg) 62%);
+  background: radial-gradient(900px 460px at 50% -14%, #171b22 0%, var(--bg) 60%);
 }
 .login-card {
   width: 400px; max-width: 100%; background: var(--panel); border: 1px solid var(--line);
@@ -397,7 +400,7 @@
 }
 .demo-user:hover { border-color: var(--accent); }
 .link-btn {
-  background: none; border: none; color: var(--accent); cursor: pointer;
+  background: none; border: none; color: var(--accent-text); cursor: pointer;
   font-family: inherit; font-size: var(--fs-sm); padding: 0; text-decoration: underline;
 }
 
@@ -408,7 +411,7 @@
    so both are shown rather than one replacing the other. */
 .scale-ratio {
   display: flex; align-items: baseline; gap: 6px;
-  background: rgba(14,17,22,.86); border: 1px solid var(--line);
+  background: rgba(15,16,19,.86); border: 1px solid var(--line);
   border-radius: var(--r-sm); padding: 2px 7px;
   font-family: var(--mono); font-size: var(--fs-2xs); color: var(--text);
   backdrop-filter: blur(4px);
@@ -419,7 +422,7 @@
   text-transform: uppercase; color: var(--muted); cursor: help;
 }
 .leaflet-control-scale-line {
-  background: rgba(14,17,22,.86) !important; color: var(--text) !important;
+  background: rgba(15,16,19,.86) !important; color: var(--text) !important;
   border-color: var(--line) !important; font-size: var(--fs-2xs);
 }
 
@@ -499,3 +502,187 @@
   .sync-pill span:last-child { display: none; }  /* dot only */
   .sync-pill { padding: 5px 7px; }
 }
+
+/* ── resizable panels + floating overlays (R10) ────────────────────── */
+
+/* The drag edge. `.rail` and `.drawer` are `position: static` in flow, so the
+   handle is positioned against `.map-shell`-relative stacking by making the
+   panel itself the containing block. */
+.rail, .drawer { position: relative; }
+
+.resize-handle {
+  position: absolute; top: 0; bottom: 0; width: 9px; z-index: 5;
+  cursor: col-resize; touch-action: none;
+  background: transparent; transition: background .12s;
+}
+.resize-handle.right { right: -4px; }
+.resize-handle.left  { left: -4px; }
+.resize-handle::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 1px; margin-left: -.5px; background: transparent; transition: background .12s;
+}
+.resize-handle:hover::after, .resize-handle.on::after { background: var(--accent); }
+.resize-handle.on { background: rgba(61,126,255,.08); }
+
+/* While dragging, no text anywhere should select. */
+body:has(.resize-handle.on) { user-select: none; }
+
+/* The tab that brings a hidden drawer back, mirroring `.rail-peek`. */
+.drawer-peek {
+  position: absolute; z-index: 620; right: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 74px; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--line); border-right: none;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  box-shadow: -2px 0 10px rgba(0,0,0,.35);
+  transition: color .12s, background .12s;
+}
+.drawer-peek:hover { color: var(--text); background: var(--card2); }
+
+/* Floating, draggable overlay (the legend). */
+.map-ov.floater { padding: 0; min-width: 210px; max-width: 280px; }
+.map-ov.floater.bottom-left  { left: var(--s-3); bottom: var(--s-3); }
+.map-ov.floater.bottom-right { right: var(--s-3); bottom: var(--s-3); }
+.map-ov.floater.top-left     { left: var(--s-3); top: 58px; }
+.map-ov.floater.dragging { box-shadow: 0 18px 40px rgba(0,0,0,.55); }
+
+.floater-bar {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 7px 8px 7px 6px; cursor: grab; touch-action: none;
+  border-bottom: 1px solid var(--line);
+}
+.floater.dragging .floater-bar { cursor: grabbing; }
+.floater-grip {
+  width: 9px; height: 14px; flex: 0 0 9px; opacity: .55;
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 4px 4px; color: var(--muted);
+}
+.floater-bar .ov-title { flex: 1; }
+.floater-btn {
+  width: 20px; height: 20px; flex: 0 0 20px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--card); color: var(--muted);
+  cursor: pointer; display: grid; place-items: center; font-size: var(--fs-base);
+  line-height: 1; font-family: inherit; padding: 0;
+}
+.floater-btn:hover { color: var(--text); border-color: var(--accent); }
+.floater-body {
+  padding: var(--s-2) var(--s-3) 10px;
+  max-height: 42vh; overflow-y: auto;
+}
+
+/* The map-mode switch — which of the two things a map click means. */
+.map-ov.modesw {
+  top: var(--s-3); left: var(--s-3); padding: 5px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.map-ov.modesw .seg { gap: 3px; }
+.map-ov.modesw .seg button { padding: 5px 10px; }
+.modesw-note { font-size: var(--fs-2xs); color: var(--muted); max-width: 210px;
+  padding: 0 3px 2px; line-height: var(--lh-snug); }
+
+@media (max-width: 767px) {
+  /* Resize edges are a pointer affordance; at sheet widths the panels are
+     full-bleed and there is no column to resize. */
+  .resize-handle { display: none; }
+  .map-ov.floater { max-width: 62vw; }
+  .floater-body { max-height: 34vh; }
+  .map-ov.modesw { left: var(--s-2); top: var(--s-2); }
+  .modesw-note { display: none; }
+}
+
+/* ── the ISR report as a document (R10) ────────────────────────────── */
+
+/* The report is prose and figures, not a console. It gets a measure, a title
+   block and a colophon, and it is the one screen in the product that is meant
+   to be read straight through rather than operated. */
+.report-page { max-width: 1080px; margin: 0 auto; }
+.report-doc { display: block; }
+
+.doc-head { margin-bottom: var(--s-5); }
+.doc-eyebrow {
+  font-size: var(--fs-2xs); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700;
+}
+.doc-head h1 {
+  font-size: 28px; line-height: var(--lh-tight); margin: var(--s-2) 0 var(--s-1);
+  font-weight: 700; letter-spacing: -.01em;
+}
+.doc-sub { color: var(--muted); font-size: var(--fs-md); max-width: 70ch; }
+
+/* The identity strip. A screening document that does not say which site, which
+   horizon and when it was generated is not re-checkable. */
+.doc-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s-3); margin: var(--s-4) 0 0; padding: var(--s-3) 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.doc-meta dt {
+  font-size: var(--fs-2xs); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; margin-bottom: 3px;
+}
+.doc-meta dd { margin: 0; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
+
+.doc-foot {
+  margin-top: var(--s-5); padding-top: var(--s-3); border-top: 1px solid var(--line);
+  font-size: var(--fs-xs); color: var(--muted); line-height: var(--lh-base);
+}
+
+/* A figure and its numbers, side by side. The depth schematic is the case this
+   exists for: at full width the section became a tall diagram with the numbers
+   that interpret it pushed a screen below. */
+.split-figure {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--s-4); align-items: start;
+}
+.split-figure-fig { min-width: 0; }
+.split-figure-num { min-width: 0; }
+
+.report-map {
+  height: 380px; width: 100%; border-radius: var(--r-md);
+  border: 1px solid var(--line); overflow: hidden;
+}
+
+@media (max-width: 899px) {
+  .split-figure { grid-template-columns: minmax(0, 1fr); }
+  .report-map { height: 300px; }
+  .doc-head h1 { font-size: 22px; }
+}
+
+/* ── PDF capture palette ───────────────────────────────────────────────
+   The console theme is dark; an A4 page is not. During capture the report
+   container redefines the token layer to a light document palette, so every
+   child — cards, chips, SVG charts, band glyphs — follows without knowing it is
+   being printed. Only the tokens change; no call site does.                */
+.report-doc.printing {
+  --bg:     #ffffff;
+  --panel:  #ffffff;
+  --card:   #ffffff;
+  --card2:  #f4f6f9;
+  --line:   #d3dae3;
+  --text:   #14181f;
+  --muted:  #5a6675;
+  --accent: #1d4ed8;
+  --danger: #b42318;
+  --warn:   #a15c07;
+  --ok:     #067647;
+  --scrim:  rgba(0,0,0,.4);
+  background: #ffffff;
+  color: var(--text);
+  padding: 0 4px;
+}
+.report-doc.printing .card {
+  background: #ffffff; border: 1px solid var(--line);
+  box-shadow: none; break-inside: avoid;
+}
+.report-doc.printing .banner { background: #f6f8fb; }
+.report-doc.printing .banner.warn   { background: #fdf6e8; }
+.report-doc.printing .banner.danger { background: #fdf0ee; }
+.report-doc.printing .banner.ok     { background: #eef8f2; }
+.report-doc.printing .metric { background: #fbfcfe; }
+.report-doc.printing .readonly-val { background: #f7f9fc; }
+/* Controls do not belong in a printed record; the values they chose are
+   already stated in the title block. */
+.report-doc.printing .no-print-controls { display: none; }
+.avoid-break { break-inside: avoid; }
