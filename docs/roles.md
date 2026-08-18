@@ -223,9 +223,18 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/citizen/subscriptions` | ● | ● | ● | ● |
 | `POST /api/v1/citizen/subscriptions` | ● | ● | ● | ● |
 | `DELETE /api/v1/citizen/subscriptions/{block_id}` | ● | ● | ● | ● |
+| `POST /api/v1/dataset-sync/all` | ● | · | · | · |
+| `POST /api/v1/dataset-sync/groundwater-levels` | ● | · | · | · |
 | `POST /api/v1/dataset-sync/ore` | ● | · | · | · |
 | `GET /api/v1/dataset-sync/pending` | ● | ● | ● | · |
 | `GET /api/v1/dataset-sync/status` | ● | ● | ● | · |
+| `POST /api/v1/dataset-sync/water-quality` | ● | · | · | · |
+| `GET /api/v1/datasets` | ● | ● | ● | · |
+| `GET /api/v1/datasets/{key}/backups` | ● | · | · | · |
+| `POST /api/v1/datasets/{key}/restore` | ● | · | · | · |
+| `GET /api/v1/datasets/{key}/rows` | ● | ● | ● | · |
+| `DELETE /api/v1/datasets/{key}/rows/{row_id}` | ● | · | · | · |
+| `PATCH /api/v1/datasets/{key}/rows/{row_id}` | ● | · | · | · |
 | `GET /api/v1/districts` | ● | ● | ● | · |
 | `GET /api/v1/districts/geojson` | ● | ● | ● | · |
 | `GET /api/v1/field-observations` | ● | ● | ● | · |
@@ -259,6 +268,10 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/ml/predict` | ● | ● | · | · |
 | `GET /api/v1/ml/rivers` | ● | ● | ● | · |
 | `GET /api/v1/ml/strike-field` | ● | ● | ● | · |
+| `POST /api/v1/model-ops/factory-reset` | ● | · | · | · |
+| `POST /api/v1/model-ops/rebuild-flow-field` | ● | · | · | · |
+| `POST /api/v1/model-ops/recompute-baselines` | ● | · | · | · |
+| `GET /api/v1/model-ops/status` | ● | ● | ● | · |
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | ● | · | · |
 | `GET /api/v1/public/risk/districts` | ○ | ○ | ○ | ○ |
@@ -291,7 +304,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 76/86 · **analyst** 57/86 · **field_officer** 45/86 · **citizen** 12/86
+Reachable endpoints per role — **admin** 89/99 · **analyst** 60/99 · **field_officer** 48/99 · **citizen** 12/99
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

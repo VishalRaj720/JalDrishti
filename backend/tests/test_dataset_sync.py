@@ -253,9 +253,48 @@ async def test_sync_is_audited(client, db_session, officer, reviewer,
 
 
 @pytest.mark.asyncio
-async def test_chemistry_has_no_automated_sync(client, admin_token):
-    """Only ore is exportable. Chemistry is applied by hand from the audit log,
-    and the API says so rather than silently doing nothing."""
+async def test_every_observation_type_is_syncable(client, admin_token):
+    """R11 replaced the ore-only export.
+
+    This test previously asserted `syncable_types == ["ore_presence"]` and that
+    chemistry was "applied by hand from the audit log". That was the honest
+    description of a gap, not a design: approved chemistry and level readings
+    accumulated in the database and never reached the files the engine reads, so
+    the portal reported a backlog it gave nobody a way to clear. All three types
+    now have an automated, audited, reversible path.
+    """
     H = {"Authorization": f"Bearer {admin_token}"}
     s = (await client.get("/api/v1/dataset-sync/status", headers=H)).json()
-    assert s["syncable_types"] == ["ore_presence"]
+    assert set(s["syncable_types"]) == {
+        "ore_presence", "water_sample", "groundwater_level"}
+
+
+@pytest.mark.asyncio
+async def test_derived_syncs_report_what_they_made_stale(client, admin_token):
+    """Appending a row is not the same as the engine using it.
+
+    Chemistry and levels feed derived artifacts, so their responses must name
+    what still needs rebuilding. Without this an admin sees "synced" and
+    reasonably concludes the model changed, when it has not yet.
+    """
+    H = {"Authorization": f"Bearer {admin_token}"}
+
+    r = await client.post("/api/v1/dataset-sync/water-quality?dry_run=true", headers=H)
+    assert r.status_code == 200, r.text
+    assert r.json()["stale_marks"] == ["excursion_baselines"]
+
+    r = await client.post(
+        "/api/v1/dataset-sync/groundwater-levels?dry_run=true", headers=H)
+    assert r.status_code == 200, r.text
+    assert r.json()["stale_marks"] == ["flow_field"]
+
+
+@pytest.mark.asyncio
+async def test_sync_endpoints_are_admin_only(client, analyst):
+    """An analyst runs the model; they do not rewrite what it reads."""
+    H = _tok(analyst)
+    for path in ("/api/v1/dataset-sync/water-quality",
+                 "/api/v1/dataset-sync/groundwater-levels",
+                 "/api/v1/dataset-sync/all"):
+        r = await client.post(f"{path}?dry_run=true", headers=H)
+        assert r.status_code == 403, f"{path} -> {r.status_code}"

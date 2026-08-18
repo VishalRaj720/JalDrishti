@@ -8,14 +8,14 @@ a regulator cannot defend a number that moves. The second is the right end state
 if this ever ingests sensor streams, and is heavy machinery for the handful of
 ore sightings actually expected. So: **admin-triggered, audited, reversible.**
 
-WHY ONLY ORE IS AUTOMATED HERE. An ore observation is the one field input that
-currently does nothing at all: `ore_zone_at()` reads the deposit CSV, and a pin
-in `zone == "none"` suppresses the uranium plume entirely (frozen rule #3, "the
-tool cannot invent contamination"). So an approved *"uranium ore found here"*
-leaves the simulation still reporting no plume — the exact case the field-officer
-role exists for. Chemistry and groundwater-level corrections stay manual: they
-move a feature *value* the model was already trained across, they are rare, and
-the audit log gives an admin the old/new values to apply by hand.
+ALL THREE TYPES SYNC (R11). Ore was automated first because it is the one input
+that otherwise does nothing at all: `ore_zone_at()` reads the deposit CSV, and a
+pin in `zone == "none"` suppresses the uranium plume entirely (frozen rule #3,
+"the tool cannot invent contamination"), so an approved *"uranium ore found here"*
+left the simulation still reporting no plume. Chemistry and groundwater levels
+were left manual on the argument that they only "move a feature value the model
+was already trained across" — true of the *surrogate*, but not of the serve-time
+inputs derived from those files, and the backlog simply accumulated.
 
 WHAT A SYNC TOUCHES
 
@@ -24,16 +24,26 @@ WHAT A SYNC TOUCHES
         therefore whether a uranium plume is possible at all.
     Datasets/udepo_uranium_deposits.xlsx  (header row 8)
         Drives `grade_c0_factor()` — scales the source concentration C0.
+    Datasets/waterQuality_jharkhand.csv
+        Drives the ambient excursion baselines. **Derived** — needs a baseline
+        recompute before the engine sees it.
+    Datasets/cgwb_waterlevel_jharkhand.csv
+        Drives the groundwater flow field. **Derived** — needs a flow-field
+        rebuild (which needs the GLO-30 DEM) before the engine sees it.
 
-Both gain an `origin` column, `original` for the rows that shipped with the
-project and `added` for anything a regulator approved, so a map can render the
-two differently and a reader can always tell which is which. Existing rows are
-backfilled as `original` on first sync.
+Every file gains a `record_source` column — `original` for rows that shipped with
+the project, `added` for anything an admin approved — backfilled on first touch.
+`app/services/datasets.py` owns that column and the row-level edit/delete path
+built on it, including the rule that `original` rows are immutable. It is not
+called `source` because two of these files already have a `source` column meaning
+something else entirely (collecting agency; citation).
 
 THIS DOES NOT RETRAIN ANYTHING. Adding a deposit changes a *resolved input*, not
 the model: C0 and the ore zone are read at serve time, and the surrogate was
 trained across the full Texas C0 envelope. Retraining is only required when the
-generator's assumptions change (§4.6 rule 9). The caller is told so explicitly.
+generator's assumptions change (§4.6 rule 9). What a sync CAN invalidate is a
+derived artifact, so each result carries `stale_marks` naming what to rebuild —
+see `/model-ops/status`.
 """
 from __future__ import annotations
 
@@ -55,13 +65,25 @@ ORE_CSV = REPO_ROOT / "Datasets" / "Jharkhand Ore" / "jharkhand_uranium_deposits
 UDEPO_XLSX = REPO_ROOT / "Datasets" / "udepo_uranium_deposits.xlsx"
 UDEPO_HEADER_ROW = 8          # matches ml_pipeline/data_prep/ore_grades.py
 
-ORIGIN_COL = "origin"
-ORIGIN_ORIGINAL = "original"
-ORIGIN_ADDED = "added"
+# The provenance column lives in `datasets.py`, which owns the immutability rule
+# that depends on it. Re-exported here under the old names so the ore writer
+# below reads unchanged; there is exactly one column, in one place.
+from app.services import datasets as dsx  # noqa: E402
 
-#: Only ore observations have an automated path. Everything else is reported as
-#: pending and applied by an admin from the audit log.
-SYNCABLE_TYPES = ("ore_presence",)
+ORIGIN_COL = dsx.SOURCE_COL
+ORIGIN_ORIGINAL = dsx.SOURCE_ORIGINAL
+ORIGIN_ADDED = dsx.SOURCE_ADDED
+
+#: All three observation types now have an automated path. Chemistry and
+#: groundwater levels were manual until R11 on the reasoning that they "move a
+#: feature value the model was already trained across" — true of the surrogate,
+#: but not of the serve-time inputs derived from those files. A water-quality row
+#: shifts the excursion baselines a UCL is computed against; a groundwater-level
+#: row shifts the flow field that sets gradient and azimuth at every pin. Leaving
+#: them to be applied by hand from the audit log meant the portal and the engine
+#: disagreed indefinitely, which is the split-brain the amber badge was reporting
+#: rather than fixing.
+SYNCABLE_TYPES = ("ore_presence", "water_sample", "groundwater_level")
 
 
 class DatasetSyncError(AppException):
@@ -208,6 +230,7 @@ async def sync_ore(db: AsyncSession, *, actor, dry_run: bool = False,
                       f"surveyed boundary. "
                       f"{(it['notes'] or '').strip()}").strip(),
             ORIGIN_COL: ORIGIN_ADDED,
+            dsx.REF_COL: ref,
         })
     result["skipped_duplicate_name"] = skipped
 
@@ -234,6 +257,7 @@ async def sync_ore(db: AsyncSession, *, actor, dry_run: bool = False,
             # `_parse_grade` reads a range string; a single value is valid input.
             "Grade Range": (f"{float(grade):g}" if grade is not None else ""),
             ORIGIN_COL: ORIGIN_ADDED,
+            dsx.REF_COL: ref,
         })
 
     if dry_run:
@@ -322,3 +346,244 @@ def invalidate_ml_caches() -> None:
                 cleared.append(f"{mod_name}.{attr}")
     logger.info(f"cleared {len(cleared)} ml_pipeline dataset cache(s)")
     return None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# R11 — chemistry and groundwater levels
+#
+# Both writers follow the ore path exactly: resolve the approved rows, map them
+# onto the file's real headers, back up, append with `record_source=added`, mark
+# the observations synced, clear caches, audit. What differs is that these two
+# files feed DERIVED artifacts — baselines and the flow field — so each result
+# carries `stale_marks` naming what must now be recomputed before the change is
+# visible to the engine. Appending alone is not enough for them, and saying so is
+# the difference between a sync that works and one that only looks like it did.
+# ═══════════════════════════════════════════════════════════════════════
+
+async def _unsynced_water_samples(db: AsyncSession) -> list[dict[str, Any]]:
+    """Approved chemistry, joined to the well that carries its coordinates."""
+    rows = (await db.execute(text("""
+        SELECT f.id::text AS obs_id,
+               w.name AS location, w.latitude, w.longitude,
+               d.name AS district,
+               s.sampled_at, s.ph, s.ec_us_cm, s.carbonate_mg_l, s.bicarbonate_mg_l,
+               s.chloride_mg_l, s.fluoride_mg_l, s.sulphate_mg_l, s.nitrate_mg_l,
+               s.phosphate_mg_l, s.total_hardness, s.calcium_mg_l, s.magnesium_mg_l,
+               s.sodium_mg_l, s.potassium_mg_l, s.iron_ppm, s.arsenic_ppb,
+               s.uranium_ppb
+        FROM field_observations f
+        JOIN water_samples s   ON s.id = f.target_id
+        JOIN monitoring_wells w ON w.id = s.well_id
+        LEFT JOIN blocks b     ON b.id = w.block_id
+        LEFT JOIN districts d  ON d.id = b.district_id
+        WHERE f.observation_type = 'water_sample'
+          AND f.status = 'approved'
+          AND f.synced_to_dataset_at IS NULL
+        ORDER BY f.reviewed_at
+    """))).mappings().all()
+    return [dict(r) for r in rows]
+
+
+async def _unsynced_levels(db: AsyncSession) -> list[dict[str, Any]]:
+    """Approved level readings, joined to their station."""
+    rows = (await db.execute(text("""
+        SELECT f.id::text AS obs_id,
+               st.name AS station_name, st.latitude, st.longitude,
+               d.name AS district,
+               r.recorded_at, r.groundwater_level
+        FROM field_observations f
+        JOIN groundwater_level_readings r ON r.id = f.target_id
+        JOIN monitoring_stations st       ON st.id = r.station_id
+        LEFT JOIN blocks b                ON b.id = st.block_id
+        LEFT JOIN districts d             ON d.id = b.district_id
+        WHERE f.observation_type = 'groundwater_level'
+          AND f.status = 'approved'
+          AND f.synced_to_dataset_at IS NULL
+        ORDER BY f.reviewed_at
+    """))).mappings().all()
+    return [dict(r) for r in rows]
+
+
+#: DB column -> the header as it literally appears in waterQuality_jharkhand.csv.
+#: Transcribed from the file, not guessed: "EC (µS/cm at" really is truncated
+#: mid-unit in the source, and `S. No.` carries a UTF-8 BOM on the first column.
+_WQ_MAP = {
+    "ph": "pH", "ec_us_cm": "EC (µS/cm at", "carbonate_mg_l": "CO3 (mg/L)",
+    "bicarbonate_mg_l": "HCO3", "chloride_mg_l": "Cl (mg/L)",
+    "fluoride_mg_l": "F (mg/L)", "sulphate_mg_l": "SO4", "nitrate_mg_l": "NO3",
+    "phosphate_mg_l": "PO4", "total_hardness": "Total Hardness",
+    "calcium_mg_l": "Ca (mg/L)", "magnesium_mg_l": "Mg (mg/L)",
+    "sodium_mg_l": "Na (mg/L)", "potassium_mg_l": "K (mg/L)",
+    "iron_ppm": "Fe (ppm)", "arsenic_ppb": "As (ppb)", "uranium_ppb": "U (ppb)",
+}
+
+
+async def sync_water_quality(db: AsyncSession, *, actor, dry_run: bool = False,
+                             ip: Optional[str] = None) -> dict[str, Any]:
+    """Append approved chemistry to `waterQuality_jharkhand.csv`."""
+    import pandas as pd
+
+    f = dsx.get("water_quality")
+    items = await _unsynced_water_samples(db)
+    ref = uuid.uuid4().hex[:12]
+    result: dict[str, Any] = {
+        "sync_ref": ref, "dry_run": dry_run, "count": len(items),
+        "files": [], "backups": [], "retrain_required": False,
+        "stale_marks": list(f.stale_marks),
+        "note": ("Chemistry rows set the ambient baselines an excursion UCL is "
+                 "computed against. Appending them is not enough - run "
+                 "POST /model-ops/recompute-baselines for the engine to use them."),
+    }
+    if not items:
+        result["message"] = "Nothing to sync."
+        return result
+
+    df = dsx._read(f)
+    next_no = int(pd.to_numeric(df["S. No."], errors="coerce").max() or 0) + 1
+
+    new_rows = []
+    for i, it in enumerate(items):
+        row: dict[str, Any] = {
+            "S. No.": next_no + i,
+            "State": "Jharkhand",
+            "District": it["district"] or "",
+            "Location": it["location"] or "",
+            "Longitude": round(float(it["longitude"]), 4),
+            "Latitude": round(float(it["latitude"]), 4),
+            "Year": it["sampled_at"].year if it["sampled_at"] else "",
+            # `source_table` is the file's own provenance column (which CGWB
+            # table a row came from). It is NOT record_source, and conflating
+            # them would lose the distinction between "where this measurement
+            # was published" and "did this system add it".
+            "source_table": "field_observation",
+            dsx.SOURCE_COL: dsx.SOURCE_ADDED,
+            dsx.REF_COL: ref,
+        }
+        for db_col, csv_col in _WQ_MAP.items():
+            v = it.get(db_col)
+            row[csv_col] = "" if v is None else v
+        new_rows.append(row)
+
+    if dry_run:
+        result["message"] = f"Would append {len(new_rows)} chemistry row(s)."
+        result["preview"] = new_rows[:3]
+        return result
+
+    result["backups"].append(str(dsx.backup(f.path, ref).relative_to(REPO_ROOT)))
+    dsx._write_csv(f, pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True))
+    result["files"].append(f.relpath)
+
+    await _mark_synced(db, [it["obs_id"] for it in items], ref)
+    dsx.invalidate_caches()
+    await audit.record(
+        action="dataset.sync_water_quality", entity_type="datasets", entity_id=ref,
+        actor_id=actor.id, actor_label=actor.email, ip_address=ip,
+        detail={"sync_ref": ref, "synced": len(items), "files": result["files"],
+                "backups": result["backups"], "stale_marks": result["stale_marks"]},
+    )
+    result["synced"] = len(items)
+    result["message"] = (f"Synced {len(items)} chemistry observation(s). "
+                         f"Baselines are now stale - recompute them.")
+    return result
+
+
+async def sync_groundwater_levels(db: AsyncSession, *, actor, dry_run: bool = False,
+                                  ip: Optional[str] = None) -> dict[str, Any]:
+    """Append approved level readings to `cgwb_waterlevel_jharkhand.csv`."""
+    import pandas as pd
+
+    f = dsx.get("groundwater_levels")
+    items = await _unsynced_levels(db)
+    ref = uuid.uuid4().hex[:12]
+    result: dict[str, Any] = {
+        "sync_ref": ref, "dry_run": dry_run, "count": len(items),
+        "files": [], "backups": [], "retrain_required": False,
+        "stale_marks": list(f.stale_marks),
+        "note": ("Level readings set the groundwater flow field - gradient and "
+                 "azimuth at every pin. Appending them is not enough: run "
+                 "POST /model-ops/rebuild-flow-field, which needs the GLO-30 DEM "
+                 "on disk, for the engine to use them."),
+    }
+    if not items:
+        result["message"] = "Nothing to sync."
+        return result
+
+    df = dsx._read(f)
+    next_id = int(pd.to_numeric(df["id"], errors="coerce").max() or 0) + 1
+
+    new_rows = []
+    for i, it in enumerate(items):
+        rec = it["recorded_at"]
+        new_rows.append({
+            "id": next_id + i,
+            "date": rec.date().isoformat() if rec else "",
+            "state_name": "Jharkhand", "state_code": 20,
+            "district_name": it["district"] or "", "district_code": "",
+            "station_name": it["station_name"] or "",
+            "latitude": round(float(it["latitude"]), 5),
+            "longitude": round(float(it["longitude"]), 5),
+            "basin": "", "sub_basin": "",
+            # The file's existing `source` column means the collecting agency
+            # (CGWB). A field-submitted reading is not CGWB's, so it says so.
+            "source": "FIELD",
+            "currentlevel": float(it["groundwater_level"]),
+            "level_diff": "",
+            dsx.SOURCE_COL: dsx.SOURCE_ADDED,
+            dsx.REF_COL: ref,
+        })
+
+    if dry_run:
+        result["message"] = f"Would append {len(new_rows)} level reading(s)."
+        result["preview"] = new_rows[:3]
+        return result
+
+    result["backups"].append(str(dsx.backup(f.path, ref).relative_to(REPO_ROOT)))
+    dsx._write_csv(f, pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True))
+    result["files"].append(f.relpath)
+
+    await _mark_synced(db, [it["obs_id"] for it in items], ref)
+    dsx.invalidate_caches()
+    await audit.record(
+        action="dataset.sync_groundwater_levels", entity_type="datasets",
+        entity_id=ref, actor_id=actor.id, actor_label=actor.email, ip_address=ip,
+        detail={"sync_ref": ref, "synced": len(items), "files": result["files"],
+                "backups": result["backups"], "stale_marks": result["stale_marks"]},
+    )
+    result["synced"] = len(items)
+    result["message"] = (f"Synced {len(items)} level reading(s). "
+                         f"The flow field is now stale - rebuild it.")
+    return result
+
+
+async def _mark_synced(db: AsyncSession, obs_ids: list[str], ref: str) -> None:
+    if not obs_ids:
+        return
+    stmt = text("""
+        UPDATE field_observations
+        SET synced_to_dataset_at = now(), dataset_sync_ref = :ref
+        WHERE id IN :ids
+    """).bindparams(sa_bindparam("ids", expanding=True))
+    await db.execute(stmt, {"ref": ref, "ids": [uuid.UUID(i) for i in obs_ids]})
+    await db.commit()
+
+
+async def sync_all(db: AsyncSession, *, actor, dry_run: bool = False,
+                   ip: Optional[str] = None) -> dict[str, Any]:
+    """Run every syncable type in one deliberate action."""
+    parts = {
+        "ore_presence": await sync_ore(db, actor=actor, dry_run=dry_run, ip=ip),
+        "water_sample": await sync_water_quality(db, actor=actor, dry_run=dry_run, ip=ip),
+        "groundwater_level": await sync_groundwater_levels(
+            db, actor=actor, dry_run=dry_run, ip=ip),
+    }
+    stale: set[str] = set()
+    for p in parts.values():
+        stale.update(p.get("stale_marks", []))
+    total = sum(p.get("synced", 0) for p in parts.values())
+    return {
+        "dry_run": dry_run, "synced": total, "by_type": parts,
+        "stale_marks": sorted(stale),
+        "message": (f"Synced {total} observation(s) across "
+                    f"{sum(1 for p in parts.values() if p.get('synced'))} type(s)."
+                    if total else "Nothing to sync."),
+    }
