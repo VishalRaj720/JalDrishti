@@ -4,6 +4,9 @@ The sync writes to real files under `Datasets/`, so every test that exercises it
 works on a copy and restores the originals. A test suite that mutates tracked
 data files is a test suite nobody can run twice.
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import shutil
 from pathlib import Path
 
@@ -44,9 +47,9 @@ async def officer(db_session):
 
 
 @pytest_asyncio.fixture()
-async def regulator(db_session):
+async def reviewer(db_session):
     return await _mk(db_session, "syncreg", "syncreg@example.com",
-                     UserRole.regulator)
+                     UserRole.admin)
 
 
 @pytest_asyncio.fixture()
@@ -69,13 +72,13 @@ def datasets_restored():
     ds.invalidate_ml_caches()
 
 
-async def _approved_ore(client, officer, regulator):
+async def _approved_ore(client, officer, reviewer):
     obs = await client.post("/api/v1/field-observations", headers=_tok(officer),
                             json=ORE)
     assert obs.status_code == 201, obs.text
     oid = obs.json()["id"]
     ok = await client.post(f"/api/v1/field-observations/{oid}/approve",
-                           headers=_tok(regulator), json={})
+                           headers=_tok(reviewer), json={})
     assert ok.status_code == 200, ok.text
     return oid
 
@@ -84,7 +87,7 @@ async def _approved_ore(client, officer, regulator):
 
 @pytest.mark.asyncio
 async def test_states_progress_red_amber_green(
-        client, db_session, officer, regulator, admin_token, datasets_restored):
+        client, db_session, officer, reviewer, admin_token, datasets_restored):
     H = {"Authorization": f"Bearer {admin_token}"}
 
     obs = await client.post("/api/v1/field-observations", headers=_tok(officer),
@@ -97,7 +100,7 @@ async def test_states_progress_red_amber_green(
     assert s["approved_pending_sync"] == 0
 
     await client.post(f"/api/v1/field-observations/{oid}/approve",
-                      headers=_tok(regulator), json={})
+                      headers=_tok(reviewer), json={})
 
     # AMBER — approved, authoritative here, not in the model
     s = (await client.get("/api/v1/dataset-sync/status", headers=H)).json()
@@ -119,9 +122,9 @@ async def test_states_progress_red_amber_green(
 
 @pytest.mark.asyncio
 async def test_map_separates_the_three_states(
-        client, officer, regulator, admin_token, datasets_restored):
+        client, officer, reviewer, admin_token, datasets_restored):
     H = {"Authorization": f"Bearer {admin_token}"}
-    await _approved_ore(client, officer, regulator)
+    await _approved_ore(client, officer, reviewer)
 
     m = (await client.get("/api/v1/field-observations/map", headers=H)).json()
     assert m["counts"]["approved_pending_sync"] == 1
@@ -153,11 +156,11 @@ async def test_unapproved_rows_can_never_claim_to_be_synced(db_session, officer)
 
 @pytest.mark.asyncio
 async def test_sync_appends_tagged_rows_to_both_files(
-        client, officer, regulator, admin_token, datasets_restored):
+        client, officer, reviewer, admin_token, datasets_restored):
     import pandas as pd
     H = {"Authorization": f"Bearer {admin_token}"}
     before_csv = len(pd.read_csv(ds.ORE_CSV))
-    await _approved_ore(client, officer, regulator)
+    await _approved_ore(client, officer, reviewer)
     r = (await client.post("/api/v1/dataset-sync/ore", headers=H)).json()
     assert r["synced"] == 1
 
@@ -181,9 +184,9 @@ async def test_sync_appends_tagged_rows_to_both_files(
 
 @pytest.mark.asyncio
 async def test_sync_says_no_retrain_is_required(
-        client, officer, regulator, admin_token, datasets_restored):
+        client, officer, reviewer, admin_token, datasets_restored):
     H = {"Authorization": f"Bearer {admin_token}"}
-    await _approved_ore(client, officer, regulator)
+    await _approved_ore(client, officer, reviewer)
     r = (await client.post("/api/v1/dataset-sync/ore", headers=H)).json()
     assert r["retrain_required"] is False
     assert "RESOLVED INPUT" in r["note"]
@@ -191,11 +194,11 @@ async def test_sync_says_no_retrain_is_required(
 
 @pytest.mark.asyncio
 async def test_dry_run_writes_nothing(
-        client, officer, regulator, admin_token, datasets_restored):
+        client, officer, reviewer, admin_token, datasets_restored):
     import pandas as pd
     H = {"Authorization": f"Bearer {admin_token}"}
     before = ds.ORE_CSV.read_bytes()
-    await _approved_ore(client, officer, regulator)
+    await _approved_ore(client, officer, reviewer)
     r = (await client.post("/api/v1/dataset-sync/ore?dry_run=true",
                            headers=H)).json()
     assert r["dry_run"] is True and r["count"] == 1
@@ -207,10 +210,10 @@ async def test_dry_run_writes_nothing(
 
 @pytest.mark.asyncio
 async def test_sync_is_idempotent(
-        client, officer, regulator, admin_token, datasets_restored):
+        client, officer, reviewer, admin_token, datasets_restored):
     import pandas as pd
     H = {"Authorization": f"Bearer {admin_token}"}
-    await _approved_ore(client, officer, regulator)
+    await _approved_ore(client, officer, reviewer)
     await client.post("/api/v1/dataset-sync/ore", headers=H)
     n = len(pd.read_csv(ds.ORE_CSV))
     second = (await client.post("/api/v1/dataset-sync/ore", headers=H)).json()
@@ -219,22 +222,25 @@ async def test_sync_is_idempotent(
 
 
 @pytest.mark.asyncio
-async def test_only_admin_can_sync(client, analyst, regulator, officer,
+async def test_only_admin_can_sync(client, analyst, officer,
                                    datasets_restored):
-    for user in (analyst, regulator, officer):
+    # The `reviewer` fixture is an ADMIN since R7, so it belongs on the allowed
+    # side of this test rather than the denied side. Syncing the datasets the
+    # engine reads has always been an admin-only act.
+    for user in (analyst, officer):
         r = await client.post("/api/v1/dataset-sync/ore", headers=_tok(user))
         assert r.status_code == 403, f"{user.role} reached the sync"
 
 
 @pytest.mark.asyncio
-async def test_sync_is_audited(client, db_session, officer, regulator,
+async def test_sync_is_audited(client, db_session, officer, reviewer,
                                admin_token, datasets_restored):
     from app.models.audit_log import AuditLog
     from sqlalchemy import select, delete
     await db_session.execute(delete(AuditLog))
     await db_session.commit()
     H = {"Authorization": f"Bearer {admin_token}"}
-    await _approved_ore(client, officer, regulator)
+    await _approved_ore(client, officer, reviewer)
     await client.post("/api/v1/dataset-sync/ore", headers=H)
 
     row = (await db_session.execute(

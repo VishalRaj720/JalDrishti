@@ -4,18 +4,21 @@ WHY THIS EXISTS. This is the only path in the system by which anything reaches a
 member of the public, so the properties worth pinning are about who may do it,
 what it may claim, and how far it may claim to reach.
 
-  * **Only a regulator or admin publishes.** An analyst proposes. One analyst
+  * **Only a reviewer or admin publishes.** An analyst proposes. One analyst
     should not be able to send a statement about drinking water to everyone in
     a block on their own authority.
   * **Nothing says an operation occurred.** No ISR uranium mine operates in
     Jharkhand, and the hypothetical premise is appended server-side so an author
     cannot omit it and a later template change cannot remove it from an advisory
-    a regulator already approved.
+    a reviewer already approved.
   * **The reach is measured, not assumed.** A ~13 ha footprint against a
     ~30,000 ha block must not be reported as affecting the block.
   * **A withdrawn advisory does not come back.** The public record has to
     describe what actually happened.
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import uuid
 
 import pytest
@@ -41,8 +44,8 @@ async def analyst_token(db_session):
 
 
 @pytest_asyncio.fixture()
-async def regulator_token(db_session):
-    return await _user(db_session, f"advreg{uuid.uuid4().hex[:4]}", UserRole.regulator)
+async def reviewer_token(db_session):
+    return await _user(db_session, f"advreg{uuid.uuid4().hex[:4]}", UserRole.admin)
 
 
 @pytest_asyncio.fixture()
@@ -118,19 +121,19 @@ async def test_an_analyst_proposes_but_cannot_publish(
                                headers=_tok(analyst_token),
                                json={"decision": "publish"})
     assert denied.status_code == 403, (
-        "an analyst published their own screening; publication is a regulator "
+        "an analyst published their own screening; publication is a reviewer "
         "decision precisely so one person cannot do both")
 
 
 @pytest.mark.asyncio
 async def test_a_regulator_publishes_and_is_recorded(
-        client, admin_token, analyst_token, regulator_token):
+        client, admin_token, analyst_token, reviewer_token):
     run = await _completed_run(client, admin_token)
     a = (await client.post("/api/v1/advisories", headers=_tok(analyst_token),
                            json={"run_id": run["id"], **BODY})).json()
 
     pub = await client.post(f"/api/v1/advisories/{a['id']}/decision",
-                            headers=_tok(regulator_token),
+                            headers=_tok(reviewer_token),
                             json={"decision": "publish", "note": "reviewed"})
     assert pub.status_code == 200, pub.text
     body = pub.json()
@@ -177,23 +180,23 @@ async def test_an_incomplete_run_cannot_be_published(client, admin_token):
 
 @pytest.mark.asyncio
 async def test_a_withdrawn_advisory_cannot_be_republished(
-        client, admin_token, regulator_token):
+        client, admin_token, reviewer_token):
     """The public record must describe what happened, not be rewritten."""
     run = await _completed_run(client, admin_token)
     a = (await client.post("/api/v1/advisories", headers=_tok(admin_token),
                            json={"run_id": run["id"], **BODY})).json()
 
     await client.post(f"/api/v1/advisories/{a['id']}/decision",
-                      headers=_tok(regulator_token), json={"decision": "publish"})
+                      headers=_tok(reviewer_token), json={"decision": "publish"})
     w = await client.post(f"/api/v1/advisories/{a['id']}/decision",
-                          headers=_tok(regulator_token),
+                          headers=_tok(reviewer_token),
                           json={"decision": "withdraw", "note": "superseded"})
     assert w.status_code == 200, w.text
     assert w.json()["status"] == "withdrawn"
     assert w.json()["withdrawn_at"] is not None
 
     again = await client.post(f"/api/v1/advisories/{a['id']}/decision",
-                              headers=_tok(regulator_token),
+                              headers=_tok(reviewer_token),
                               json={"decision": "publish"})
     assert again.status_code == 422
     assert "withdrawn" in again.json()["detail"].lower()
@@ -201,24 +204,24 @@ async def test_a_withdrawn_advisory_cannot_be_republished(
 
 @pytest.mark.asyncio
 async def test_an_unpublished_advisory_cannot_be_withdrawn(
-        client, admin_token, regulator_token):
+        client, admin_token, reviewer_token):
     """There is nothing public to take back."""
     run = await _completed_run(client, admin_token)
     a = (await client.post("/api/v1/advisories", headers=_tok(admin_token),
                            json={"run_id": run["id"], **BODY})).json()
     r = await client.post(f"/api/v1/advisories/{a['id']}/decision",
-                          headers=_tok(regulator_token), json={"decision": "withdraw"})
+                          headers=_tok(reviewer_token), json={"decision": "withdraw"})
     assert r.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_publishing_twice_is_refused(client, admin_token, regulator_token):
+async def test_publishing_twice_is_refused(client, admin_token, reviewer_token):
     run = await _completed_run(client, admin_token)
     a = (await client.post("/api/v1/advisories", headers=_tok(admin_token),
                            json={"run_id": run["id"], **BODY})).json()
     ok = await client.post(f"/api/v1/advisories/{a['id']}/decision",
-                           headers=_tok(regulator_token), json={"decision": "publish"})
+                           headers=_tok(reviewer_token), json={"decision": "publish"})
     assert ok.status_code == 200
     dup = await client.post(f"/api/v1/advisories/{a['id']}/decision",
-                            headers=_tok(regulator_token), json={"decision": "publish"})
+                            headers=_tok(reviewer_token), json={"decision": "publish"})
     assert dup.status_code == 422

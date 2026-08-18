@@ -28,8 +28,8 @@ import L from "leaflet";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api, type District, type EngineBounds, type FeatureCollection, type IsrPoint,
-  type LiveRun, type ObservationMap, type PinInfo, type PublicDistrictRisk,
-  type SimRun,
+  type Lifecycle, type LiveRun, type ObservationMap, type PinInfo, type PreviewRun,
+  type PublicDistrictRisk, type SimRun,
 } from "../api/client";
 import { canRunSim, useAuth } from "../auth";
 import { ErrorNote, Loading, RiskBand, bandOf } from "../components/bits";
@@ -48,6 +48,7 @@ import RegisterForm from "../console/RegisterForm";
 import RunResult from "../console/RunResult";
 import SweepChart, { type Sweep } from "../console/SweepChart";
 import ProposeAdvisory from "../console/ProposeAdvisory";
+import LifecycleChart, { LifecycleNarrative } from "../console/LifecycleChart";
 
 const CENTRE: [number, number] = [23.6, 85.3];
 
@@ -86,7 +87,12 @@ export default function Console() {
   const [runYears, setRunYears] = useState(20);
   const [runRestoration, setRunRestoration] = useState(0);
   const [runId, setRunId] = useState<string | null>(null);
-  const [sweepAxis, setSweepAxis] = useState<"restoration" | "evaluation">("restoration");
+  //
+  // R5: a run is EPHEMERAL until somebody chooses to keep it. `preview` holds
+  // the unstored result currently on screen; `runId` points at a stored one.
+  // Exploring must not fill the run history with results nobody meant to save.
+  const [preview, setPreview] = useState<PreviewRun | null>(null);
+  const [showStored, setShowStored] = useState(false);
 
   // ── data ──
   const districts = useQuery({ queryKey: ["districts"], queryFn: () => api.get<District[]>("/districts") });
@@ -148,9 +154,10 @@ export default function Console() {
   });
 
   const activeRun = useMemo(() => {
+    if (!showStored) return null;
     const list = runs.data ?? [];
     return list.find((r) => r.id === runId) ?? list[0] ?? null;
-  }, [runs.data, runId]);
+  }, [runs.data, runId, showStored]);
 
   const predict = useMutation({
     mutationFn: () => api.post<LiveRun>("/ml/predict", {
@@ -160,11 +167,33 @@ export default function Console() {
     onSuccess: (r) => setLive(r),
   });
 
-  const startRun = useMutation({
+  /** Run it and look at it. Stores nothing — synchronous, because the engine
+   *  solves in ~0.26 s and there is nothing worth queueing. */
+  const runPreview = useMutation({
+    mutationFn: () => api.post<PreviewRun>(`/simulations/${siteId}/preview`, {
+      species, time_years: runYears, restoration_years: runRestoration,
+    }),
+    onSuccess: (r) => { setPreview(r); setShowStored(false); setRunId(null); },
+  });
+
+  /** The deliberate act of keeping one. This is where the model card, artifact
+   *  bundle and code version get pinned — they only mean something for a result
+   *  somebody chose to stand behind. */
+  const saveRun = useMutation({
     mutationFn: () => api.post<SimRun>(`/simulations/${siteId}`, {
       species, time_years: runYears, restoration_years: runRestoration,
     }),
-    onSuccess: (r) => { setRunId(r.id); qc.invalidateQueries({ queryKey: ["runs", siteId] }); },
+    onSuccess: (r) => {
+      setRunId(r.id); setShowStored(true);
+      qc.invalidateQueries({ queryKey: ["runs", siteId] });
+    },
+  });
+
+  /** The whole-lifecycle trace: what happens over time at fixed inputs. */
+  const lifecycle = useMutation({
+    mutationFn: () => api.post<Lifecycle>(`/simulations/${siteId}/lifecycle`, {
+      time_years: runYears, restoration_years: runRestoration, points: 12,
+    }),
   });
 
   /**
@@ -177,12 +206,9 @@ export default function Console() {
    * look — a sweep that suffices at 20 yr need not at 50.
    */
   const sweep = useMutation({
-    mutationFn: (axis: "restoration" | "evaluation") =>
+    mutationFn: (axis: "restoration") =>
       api.post<Sweep>(`/simulations/${siteId}/sweep`, {
-        axis, species, points: 6,
-        ...(axis === "restoration"
-          ? { time_years: runYears }
-          : { restoration_years: runRestoration }),
+        axis, species, points: 6, time_years: runYears,
       }),
   });
 
@@ -473,14 +499,43 @@ export default function Console() {
   // ── the plume — one renderer, both modes ──
   const storedPlume = useMemo(
     () => (activeRun ? storedRunToPlume(activeRun) : null), [activeRun]);
+  const previewPlume = useMemo(
+    () => (preview ? storedRunToPlume(preview) : null), [preview]);
 
   useEffect(() => {
     const g = plumeGroup.current;
     if (!g) return;
-    const r = mode === "site" ? storedPlume : mode === "pin" ? live : null;
+    // One renderer, three sources: an unregistered pin, an unstored preview,
+    // and a stored run. They must never look different from each other, because
+    // a visual difference would read as a physics difference.
+    const r = mode === "pin" ? live
+      : mode === "site" ? (showStored ? storedPlume : previewPlume)
+      : null;
     if (!r) { g.clearLayers(); return; }
     drawPlume(g, r, showBands);
-  }, [mode, live, storedPlume, showBands]);
+  }, [mode, live, storedPlume, previewPlume, showStored, showBands]);
+
+  // The direction the plume travels, drawn on the map. The engine has always
+  // returned `azimuth_deg`; the portal showed it as a number for an
+  // unregistered pin only, and never as the arrow the ml_pipeline dashboard
+  // draws — so "which way does this go" was unanswerable from the map itself.
+  useEffect(() => {
+    const g = plumeGroup.current;
+    const m = map.current;
+    if (!g || !m) return;
+    const shown: any = mode === "pin" ? live
+      : mode === "site" ? (showStored ? storedPlume : preview) : null;
+    const az = shown?.azimuth_deg;
+    const coords = mode === "site"
+      ? site?.location?.coordinates
+      : pin ? [pin.lon, pin.lat] : null;
+    if (az == null || !coords) return;
+    // Scaled to the drawn extent so the arrow reads as "this way, this far"
+    // rather than a fixed decoration.
+    const reach = Math.max(Number(shown?.plume?.Xc_m ?? 0), 150);
+    drawArrow(g, coords[1], coords[0], Number(az), "#2bb3ff",
+              Math.min(0.03, Math.max(0.004, reach / 111_000 * 1.6)));
+  }, [mode, live, storedPlume, preview, showStored, site, pin]);
 
   const toggle = useCallback((k: Key) => setOn((s) => ({ ...s, [k]: !s[k] })), []);
 
@@ -508,6 +563,9 @@ export default function Console() {
     // A site's own planned sweep is the sensible starting point for the run
     // control; the run can still test a different one without editing the site.
     setRunRestoration(s.restoration_years ?? 0);
+    setPreview(null);
+    setShowStored(false);
+    lifecycle.reset();
     const c = s.location?.coordinates;
     if (c && map.current) map.current.setView([c[1], c[0]], Math.max(map.current.getZoom(), 11));
   }
@@ -702,11 +760,40 @@ export default function Console() {
               </div>
 
               <div className="sec">Try a run here</div>
+              {/* R1: outside an ore zone the engine refuses a URANIUM source
+                  term — but not sulfate or TDS, which still produce a real
+                  plume. Flagged before the run so a non-ore pin does not read
+                  as a broken map. */}
+              {pinInfo.data?.in_ore === false && (
+                <div className="banner warn" style={{ marginBottom: 8 }}>
+                  <strong>No uranium ore here.</strong> The engine will not invent a
+                  uranium source term at this location — that refusal is correct, not a
+                  failure. <b>Sulfate and TDS are still modelled</b>: an ISR operation
+                  injects lixiviant regardless of what it dissolves, so pick one of
+                  those to see how it would spread.
+                  {pinInfo.data?.ore_name && (
+                    <div className="muted small" style={{ marginTop: 4 }}>
+                      Nearest deposit: {pinInfo.data.ore_name}.
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="seg seg-sm">
-                {SPECIES.map((s) => (
-                  <button key={s} className={species === s ? "active" : ""}
-                          onClick={() => setSpecies(s)}>{SPECIES_NAME[s]}</button>
-                ))}
+                {SPECIES.map((sp) => {
+                  const suppressed = pinInfo.data?.in_ore === false
+                    && (sp === "uranium_ppb" || sp === "radium_226_mbq_l");
+                  return (
+                    <button key={sp} className={species === sp ? "active" : ""}
+                            title={suppressed
+                              ? "No source term here — the engine will return nothing "
+                                + "for this contaminant outside an ore zone."
+                              : undefined}
+                            style={suppressed ? { opacity: 0.5 } : undefined}
+                            onClick={() => setSpecies(sp)}>
+                      {SPECIES_NAME[sp]}{suppressed ? " ·" : ""}
+                    </button>
+                  );
+                })}
               </div>
               <div className="seg seg-sm" style={{ marginTop: 6 }}>
                 <button className={showBands ? "active" : ""} onClick={() => setShowBands(true)}>
@@ -778,10 +865,17 @@ export default function Console() {
 
           <div className="sec">What this run varies</div>
           <div className="seg seg-sm">
-            {SPECIES.map((s) => (
-              <button key={s} className={species === s ? "active" : ""}
-                      onClick={() => setSpecies(s)}>{SPECIES_NAME[s]}</button>
+            {SPECIES.map((sp) => (
+              <button key={sp} className={species === sp ? "active" : ""}
+                      onClick={() => { setSpecies(sp); setPreview(null); }}>
+                {SPECIES_NAME[sp]}
+              </button>
             ))}
+          </div>
+          <div className="muted small" style={{ marginTop: 6 }}>
+            Uranium and radium need an ore zone; sulfate and TDS are modelled
+            anywhere, because the operation injects lixiviant regardless of what it
+            dissolves. The lifecycle trace below covers all four at once.
           </div>
 
           <div className="slider">
@@ -792,7 +886,7 @@ export default function Console() {
           <div className="slider">
             <label>Restoration sweep <span className="u">yr</span><b>{runRestoration}</b></label>
             <input type="range" min={0} max={restMax} step={1} value={runRestoration}
-                   onChange={(e) => setRunRestoration(+e.target.value)} />
+                   onChange={(e) => { setRunRestoration(+e.target.value); setPreview(null); }} />
           </div>
           {(horizonTrained !== undefined && runYears > horizonTrained) ||
            (restTrained !== undefined && runRestoration > restTrained) ? (
@@ -805,63 +899,104 @@ export default function Console() {
 
           {canRunSim(me?.role) ? (
             <>
-              <button className="btn primary block" disabled={startRun.isPending}
-                      onClick={() => startRun.mutate()}>
-                {startRun.isPending ? "Queueing…" : "Run and store"}
+              {/* R5: running and KEEPING are different acts.
+                  Running freely is how you explore; storing is how you commit
+                  to a number. Conflating them filled the run history with
+                  results nobody meant to save. */}
+              <button className="btn primary block" disabled={runPreview.isPending}
+                      onClick={() => runPreview.mutate()}>
+                {runPreview.isPending ? "Solving…" : "Run"}
               </button>
               <div className="muted small" style={{ marginTop: 6 }}>
-                Queued and executed server-side (5–15 s), then pinned to the model card,
-                artifact bundle and code version that produced it.
+                Runs immediately and is <b>not stored</b>. Run as many as you like —
+                nothing enters the record until you save one.
               </div>
+
+              {preview && !showStored && (
+                <>
+                  <button className="btn block" disabled={saveRun.isPending}
+                          onClick={() => saveRun.mutate()}>
+                    {saveRun.isPending ? "Saving…" : "Save this run"}
+                  </button>
+                  <div className="muted small" style={{ marginTop: 6 }}>
+                    Saving pins the model card, artifact bundle and code version that
+                    produced it, so the number can be re-derived later — and makes it
+                    proposable for publication.
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <div className="muted small">
               Your role can read stored results but not start runs.
             </div>
           )}
-          <ErrorNote error={startRun.error} />
+          <ErrorNote error={runPreview.error} />
+          <ErrorNote error={saveRun.error} />
 
-          {/* ── the sweep: a shape question, not a point question ── */}
-          <div className="sec">Answer a shape question</div>
-          <div className="seg seg-sm">
-            <button className={sweepAxis === "restoration" ? "active" : ""}
-                    onClick={() => { setSweepAxis("restoration"); sweep.reset(); }}>
-              How much restoration?</button>
-            <button className={sweepAxis === "evaluation" ? "active" : ""}
-                    onClick={() => { setSweepAxis("evaluation"); sweep.reset(); }}>
-              How does it change over time?</button>
+          {preview && !showStored && (
+            <>
+              <div className="banner" style={{ marginTop: 10 }}>
+                <strong>Unsaved run.</strong> {preview.persistence_note}
+              </div>
+              <RunResult r={preview} extrapolation={preview.extrapolation ?? []} />
+            </>
+          )}
+
+          {/* ── the lifecycle: what happens over the whole operation ── */}
+          <div className="sec">Across the whole operation</div>
+          <div className="muted small" style={{ marginBottom: 7 }}>
+            Traces every contaminant through <b>{fmt(site.operation_years, 0)} yr</b> of
+            injection, <b>{runRestoration} yr</b> of restoration and the remainder of
+            the <b>{runYears} yr</b> horizon.
           </div>
+          <button className="btn block" disabled={lifecycle.isPending}
+                  onClick={() => lifecycle.mutate()}>
+            {lifecycle.isPending ? "Tracing all four contaminants…" : "Plot the lifecycle"}
+          </button>
+          <ErrorNote error={lifecycle.error} />
+          {lifecycle.data && (
+            <div style={{ marginTop: 10 }}>
+              <LifecycleChart data={lifecycle.data} />
+              <LifecycleNarrative data={lifecycle.data} />
+            </div>
+          )}
+
+          {/* ── how much restoration is enough? ──
+              The evaluation axis this control used to offer is gone: the
+              lifecycle trace above answers "how does it change over time"
+              better, with the phases marked. What remains is the question a
+              single run genuinely cannot answer — the shortest sweep that
+              clears the screening limit. */}
+          <div className="sec">How much restoration is enough?</div>
           <div className="muted small" style={{ margin: "7px 0" }}>
-            {sweepAxis === "restoration"
-              ? <>Sweeps the restoration length from 0 to {restMax} yr, holding the
-                  evaluation horizon at <b>{runYears} yr</b>, and marks the shortest
-                  sweep at which nothing remains above the screening limit.</>
-              : <>Sweeps the evaluation horizon from 0 to {horizonMax} yr, holding the
-                  restoration sweep at <b>{runRestoration} yr</b>, so you can see how
-                  the footprint develops rather than reading one year of it.</>}
+            Sweeps the restoration length from 0 to {restMax} yr, holding the
+            evaluation horizon at <b>{runYears} yr</b>, and marks the shortest sweep
+            at which nothing remains above the screening limit. The answer depends on
+            when you look, which is why the horizon is stated rather than assumed.
           </div>
           <button className="btn block" disabled={sweep.isPending}
-                  onClick={() => sweep.mutate(sweepAxis)}>
+                  onClick={() => sweep.mutate("restoration")}>
             {sweep.isPending ? "Solving 6 points…" : "Plot the curve"}
           </button>
           <ErrorNote error={sweep.error} />
-          {sweep.data && sweep.data.axis === sweepAxis && (
+          {sweep.data && (
             <div style={{ marginTop: 10 }}>
               <SweepChart
                 sweep={sweep.data}
-                picked={sweepAxis === "restoration" ? runRestoration : runYears}
+                picked={runRestoration}
                 onPick={(v) => {
                   // Clicking a point loads it into the run controls, so the
-                  // curve is a way to CHOOSE the run worth storing rather than
+                  // curve is a way to CHOOSE the run worth keeping rather than
                   // a picture to look at and retype from.
-                  if (sweepAxis === "restoration") setRunRestoration(v);
-                  else setRunYears(v);
+                  setRunRestoration(v);
+                  setPreview(null);
                 }}
               />
             </div>
           )}
 
-          {activeRun && activeRun.status !== "completed" && (
+          {showStored && activeRun && activeRun.status !== "completed" && (
             <div className="banner" style={{ marginTop: 10 }}>
               <span className="spinner" /> Run is <strong>{activeRun.status}</strong> — the
               engine is solving transport on a 200² grid.
@@ -910,7 +1045,8 @@ export default function Console() {
             <table className="grid">
               <tbody>
                 {runs.data?.map((r) => (
-                  <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => setRunId(r.id)}>
+                  <tr key={r.id} style={{ cursor: "pointer" }}
+                      onClick={() => { setRunId(r.id); setShowStored(true); }}>
                     <td>{SPECIES_NAME[r.species] ?? r.species.replace(/_/g, " ")}</td>
                     <td className="muted small">{new Date(r.created_at).toLocaleString()}</td>
                     <td>

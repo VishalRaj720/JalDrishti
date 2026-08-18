@@ -12,6 +12,9 @@ checks what that connection can actually see. If the policies are dropped, or
 the app role is granted BYPASSRLS, or `SET LOCAL` is changed to `SET`, these
 fail.
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import os
 import subprocess
 import sys
@@ -84,8 +87,13 @@ def rls_db():
                         f"TO {RLS_ROLE}")
 
             # Two orgs and one site owned by the first.
+            # `kind` is the ORGANISATION type, not a user role. Retiring the
+            # `regulator` USER role did not stop CGWB and the SPCB from being
+            # regulator BODIES, and `ck_orgs_kind` still requires one of its own
+            # four values here.
             cur.execute("INSERT INTO orgs (code, name, kind) VALUES "
-                        "('ORGA','Org A','regulator'),('ORGB','Org B','regulator') "
+                        "('ORGA','Org A','regulator'),"
+                        "('ORGB','Org B','academic') "
                         "RETURNING id, code")
             orgs = {code: oid for oid, code in cur.fetchall()}
             cur.execute(
@@ -160,7 +168,7 @@ def test_public_roles_cannot_see_isr_sites(rls_db, role):
     )
 
 
-@pytest.mark.parametrize("role", ["admin", "regulator", "analyst", "field_officer"])
+@pytest.mark.parametrize("role", ["admin", "analyst", "field_officer"])
 def test_staff_roles_can_see_isr_sites(rls_db, role):
     assert _as_role(role)[0] == 1
 

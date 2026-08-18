@@ -7,6 +7,9 @@
 `test_field_observations.py` covers the workflow itself; this file covers the
 boundary around it.
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import hashlib
 import json
 import os
@@ -176,7 +179,7 @@ def test_citizen_cannot_read_ore_observations(probe):
 
 
 def test_reviewers_see_the_whole_queue(probe):
-    for role in ("admin", "regulator", "analyst"):
+    for role in ("admin", "admin", "analyst"):
         assert _as(role, "SELECT count(*) FROM field_observations")[0] == 1, role
 
 
@@ -196,7 +199,7 @@ def test_ore_observations_are_writable_only_under_the_system_bypass(probe):
     conn = psycopg2.connect(host=settings.DB_HOST, port=settings.DB_PORT,
                             user=RLS_ROLE, password=RLS_PW, dbname=RLS_DB)
     try:
-        for role in ("admin", "regulator", "field_officer"):
+        for role in ("admin", "admin", "field_officer"):
             with conn:
                 with conn.cursor() as cur:
                     cur.execute(

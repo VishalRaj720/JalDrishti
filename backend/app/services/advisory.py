@@ -215,7 +215,7 @@ class AdvisoryService:
     async def decide(self, *, actor: User, advisory_id: uuid.UUID,
                      decision: str, note: Optional[str] = None,
                      ip: Optional[str] = None) -> Advisory:
-        """Publish, reject or withdraw. Regulator and admin only.
+        """Publish, reject or withdraw. Admin only.
 
         The role check is in the router (`require_reviewer`); what is enforced
         HERE is the state machine, because an advisory that can be published

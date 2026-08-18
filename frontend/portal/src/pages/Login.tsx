@@ -17,7 +17,6 @@ import { ROLE_COLOUR, ROLE_LABEL, useAuth } from "../auth";
  *  caption says so rather than implying these belong in a deployment. */
 const DEMO: Array<{ email: string; password: string; role: Role }> = [
   { email: "admin@jaldrishti.local", password: "admin123", role: "admin" },
-  { email: "regulator@jaldrishti.local", password: "regulator123", role: "regulator" },
   { email: "analyst@jaldrishti.local", password: "analyst123", role: "analyst" },
   { email: "field@jaldrishti.local", password: "field123", role: "field_officer" },
   { email: "citizen@jaldrishti.local", password: "citizen123", role: "citizen" },

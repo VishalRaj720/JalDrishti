@@ -359,3 +359,96 @@ export const citizen = {
     api.post<{ access_token: string; role: Role }>(
       "/citizen/register", { username, email, password }),
 };
+
+// ── R4/R5: lifecycle traces and ephemeral runs ───────────────────────
+
+export interface LifecyclePoint {
+  year: number;
+  phase: "operation" | "restoration" | "post_closure";
+  source_conc: number | null;
+  area_ha: number | null;
+  migration_m: number | null;
+  compliance_conc: number | null;
+  excursion_declared: boolean | null;
+  shallow_impact_probability: number | null;
+  extrapolating: boolean;
+  error: string | null;
+}
+
+export interface LifecycleSeries {
+  species: string;
+  unit: string;
+  threshold: number | null;
+  /** The engine's own words when it refuses a source term (a non-ore zone for
+   *  uranium). Present per species so the chart can say why one line sits at
+   *  zero while the others do not. */
+  suppressed: string | null;
+  points: LifecyclePoint[];
+}
+
+export interface Lifecycle {
+  persisted: false;
+  persistence_note: string;
+  operation_years: number;
+  restoration_years: number;
+  time_years: number;
+  phases: Array<{ phase: string; from: number; to: number; label: string; note: string }>;
+  series: LifecycleSeries[];
+  reading_note: string;
+}
+
+/** A run that was executed but deliberately not stored. Shaped like a stored
+ *  run so one renderer serves both — a preview displayed by different code
+ *  would eventually look different from the thing it previews. */
+export interface PreviewRun {
+  persisted: false;
+  persistence_note: string;
+  isr_point_id: string;
+  status: "completed";
+  species: string;
+  request: Record<string, unknown>;
+  metrics: Record<string, any> | null;
+  excursion: Record<string, any> | null;
+  extrapolation: string[];
+  hydro: Record<string, any> | null;
+  plume: Record<string, any> | null;
+  vertical: VerticalScreening | null;
+  timeline: Record<string, any> | null;
+  restoration: Record<string, any> | null;
+  containment: Record<string, any> | null;
+  notice: string | null;
+  far_field_note: string | null;
+  ore_zone: Record<string, any> | null;
+  nearest_river_km: number | null;
+  azimuth_deg: number | null;
+  azimuth_source: string | null;
+  wellfield_geometry: Record<string, any> | null;
+  threshold: number | null;
+  ml_status: string | null;
+  ml_envelope: Record<string, any> | null;
+  disagreement: Record<string, any> | null;
+}
+
+/** The 2.5D shallow-aquifer screening. Returned by the engine on every run and
+ *  rendered nowhere until R2 — it is the answer to "will the water people
+ *  actually drink be affected", which is the question the product exists for. */
+export interface VerticalScreening {
+  shallow_impact_probability: number | null;
+  risk_band: string | null;
+  years_to_vertical_breakthrough: number | null;
+  advective_breakthrough_fraction: number | null;
+  dominant_pathway: string | null;
+  pathways: Record<string, number> | null;
+  ore_depth_m?: number | null;
+  layer1_base_m?: number | null;
+  separation_m?: number | null;
+  seasonal?: {
+    water_table_wet_m: number | null;
+    water_table_dry_m: number | null;
+    seasonal_swing_m: number | null;
+    water_table_source: string | null;
+    separation_m: number | null;
+    static_deep_head?: Record<string, any>;
+  } | null;
+  [k: string]: any;
+}

@@ -13,6 +13,7 @@
  * decision made from headlines.
  */
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Advisory, type IsrPoint, type SimRun } from "../api/client";
 import { canReview, useAuth } from "../auth";
@@ -29,6 +30,7 @@ function Card({ a, sites, reviewer }: {
   a: Advisory; sites: IsrPoint[]; reviewer: boolean;
 }) {
   const qc = useQueryClient();
+  const nav = useNavigate();
   const [note, setNote] = useState("");
   const [confirming, setConfirming] = useState<"publish" | "withdraw" | null>(null);
 
@@ -53,6 +55,9 @@ function Card({ a, sites, reviewer }: {
       <div className="card-title">
         {site?.name ?? "Site"}
         <span className="spacer grow" />
+        <button className="btn ghost" onClick={() => nav(`/report/${a.isr_point_id}`)}>
+          Full report →
+        </button>
         <span className={`chip ${STATUS_CLS[a.status] ?? "neutral"}`}>{a.status}</span>
       </div>
 

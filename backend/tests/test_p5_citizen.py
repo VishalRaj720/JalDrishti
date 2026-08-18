@@ -14,6 +14,9 @@ about it.
   * Alerts are idempotent — a citizen must not meet the same warning twice
     because somebody re-ran a scan.
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import uuid
 
 import pytest
@@ -44,8 +47,8 @@ async def other_citizen(db_session):
 
 
 @pytest_asyncio.fixture()
-async def regulator_token(db_session):
-    _, tok = await _user(db_session, f"reg{uuid.uuid4().hex[:5]}", UserRole.regulator)
+async def reviewer_token(db_session):
+    _, tok = await _user(db_session, f"reg{uuid.uuid4().hex[:5]}", UserRole.admin)
     return tok
 
 
@@ -256,7 +259,7 @@ async def test_a_measured_alert_reads_as_a_measurement(
 
 @pytest.mark.asyncio
 async def test_publishing_alerts_only_the_blocks_the_footprint_reaches(
-        client, admin_token, regulator_token, db_session):
+        client, admin_token, reviewer_token, db_session):
     site = (await client.post(
         "/api/v1/isr-points", headers=_tok(admin_token),
         json={"name": f"Alert {uuid.uuid4().hex[:5]}", **FULL_SITE})).json()
@@ -273,7 +276,7 @@ async def test_publishing_alerts_only_the_blocks_the_footprint_reaches(
     before = (await db_session.execute(
         text("SELECT count(*) FROM alerts WHERE kind='published_screening'"))).scalar_one()
     pub = await client.post(f"/api/v1/advisories/{adv['id']}/decision",
-                            headers=_tok(regulator_token), json={"decision": "publish"})
+                            headers=_tok(reviewer_token), json={"decision": "publish"})
     assert pub.status_code == 200, pub.text
 
     after = (await db_session.execute(
@@ -286,7 +289,7 @@ async def test_publishing_alerts_only_the_blocks_the_footprint_reaches(
 
 @pytest.mark.asyncio
 async def test_a_screening_alert_carries_the_hypothetical_premise(
-        client, admin_token, regulator_token, db_session, a_block):
+        client, admin_token, reviewer_token, db_session, a_block):
     site = (await client.post(
         "/api/v1/isr-points", headers=_tok(admin_token),
         json={"name": f"Prem {uuid.uuid4().hex[:5]}", **FULL_SITE})).json()
@@ -298,7 +301,7 @@ async def test_a_screening_alert_carries_the_hypothetical_premise(
         "run_id": run["id"], "headline": "Screening published for this area",
         "what_it_means": "A model of what would happen if an ISR operation ran here."})).json()
     await client.post(f"/api/v1/advisories/{adv['id']}/decision",
-                      headers=_tok(regulator_token), json={"decision": "publish"})
+                      headers=_tok(reviewer_token), json={"decision": "publish"})
 
     # `a_block` covers 86.2–86.6 E / 22.4–22.9 N, which contains the pin at
     # (86.36, 22.65), so the footprint necessarily lands inside it. Without a
@@ -328,7 +331,7 @@ async def test_a_citizen_sees_only_published_advisories(
                             headers=_tok(admin_token))).json()
     adv = (await client.post("/api/v1/advisories", headers=_tok(admin_token), json={
         "run_id": run["id"], "headline": "An unapproved draft headline",
-        "what_it_means": "This has not been reviewed by a regulator yet."})).json()
+        "what_it_means": "This has not been reviewed by a reviewer yet."})).json()
 
     pub = await client.get("/api/v1/citizen/advisories", headers=_tok(tok))
     assert pub.status_code == 200

@@ -30,6 +30,7 @@ The rest of the surface is authenticated and scoped to the caller: a
 subscription is a statement about where somebody lives, and Postgres row-level
 security (migration 0018) confines it to its own user rather than to a role.
 """
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Literal, Optional
@@ -261,7 +262,8 @@ class PublicAdvisory(BaseModel):
 
 
 _WHAT_THIS_IS = (
-    "This is a modelled assessment published by a regulator. It shows what the "
+    "This is a modelled assessment published by the authority operating this "
+    "platform. It shows what the "
     "model expects would happen to groundwater if a uranium in-situ recovery "
     "operation were run at a location in this area. No such mine operates in "
     "Jharkhand — this is preparedness screening, not a report of an event."
@@ -304,6 +306,64 @@ async def published_advisories(
         )
         for a in rows
     ]
+
+
+@router.get("/advisories/geojson")
+async def published_advisory_geojson(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """The footprints of PUBLISHED screenings, for the citizen map.
+
+    R8. Residents could read that a screening covered their block but had no way
+    to see where. Telling somebody they are in an assessed area while withholding
+    where it is creates rumour without recourse — so once a screening has been
+    published, its modelled extent is shown.
+
+    WHAT IS AND IS NOT EXPOSED. The footprint polygon is, because that is the
+    published finding. The ISR point itself is **not**: design section 2 keeps a
+    precise coordinate for a hypothetical mine off the public surface, and the
+    footprint already answers the question a resident is asking ("does this
+    reach me?") without planting a pin next to a named village.
+
+    Only `status = 'published'` is ever returned. Drafts and rejected proposals
+    are internal, and this endpoint is deliberately separate from the staff list
+    so a forgotten filter cannot leak one.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    rows = (await db.execute(text("""
+        SELECT a.id::text AS id, a.headline, a.species, a.footprint_ha,
+               a.time_years, a.restoration_years, a.published_at,
+               ST_AsGeoJSON(a.footprint) AS geom
+        FROM advisories a
+        WHERE a.status = 'published' AND a.footprint IS NOT NULL
+        ORDER BY a.published_at DESC
+        LIMIT 200
+    """))).mappings().all()
+
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": json.loads(r["geom"]),
+                "properties": {
+                    "id": r["id"],
+                    "headline": r["headline"],
+                    "species": r["species"],
+                    "footprint_ha": r["footprint_ha"],
+                    "time_years": r["time_years"],
+                    "restoration_years": r["restoration_years"],
+                    "published_at": (r["published_at"].isoformat()
+                                     if r["published_at"] else None),
+                    "what_this_is": _WHAT_THIS_IS,
+                },
+            }
+            for r in rows if r["geom"]
+        ],
+        "what_this_is": _WHAT_THIS_IS,
+    }
 
 
 # ── "my area" ────────────────────────────────────────────────────────

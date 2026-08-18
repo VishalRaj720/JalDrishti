@@ -18,13 +18,21 @@ interface AuthState {
 }
 const Ctx = createContext<AuthState | null>(null);
 
-/** The four working roles. Excludes `citizen`, which design §2 forbids precise
+/** The three working roles. Excludes `citizen`, which design §2 forbids precise
  *  ISR coordinates — every site here is hypothetical, and publishing a point for
- *  a speculative mine beside a named village invites it being read as a plan. */
-export const STAFF: Role[] = ["admin", "regulator", "analyst", "field_officer"];
+ *  a speculative mine beside a named village invites it being read as a plan.
+ *
+ *  R7 retired `regulator`: every power it had, `admin` already had, so it was a
+ *  second label on one authority rather than a distinct role. Migration 0019
+ *  merged those accounts into `admin`. The separation that mattered survives —
+ *  an analyst proposes a public screening and an admin decides on it. */
+export const STAFF: Role[] = ["admin", "analyst", "field_officer"];
 
 export const isStaff    = (r?: Role) => !!r && STAFF.includes(r);
-export const canReview  = (r?: Role) => r === "admin" || r === "regulator";
+/** Reviewing field evidence and deciding on a public advisory.
+ *  Named for what it protects, not for who holds it — which is why retiring
+ *  `regulator` was a one-line change here rather than an edit at every call. */
+export const canReview  = (r?: Role) => r === "admin";
 export const canRunSim  = (r?: Role) => r === "admin" || r === "analyst";
 export const canSubmit  = (r?: Role) => r === "admin" || r === "field_officer";
 export const canSync    = (r?: Role) => r === "admin";
@@ -34,11 +42,14 @@ export const canAudit   = (r?: Role) => r === "admin" || r === "regulator";
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrator",
-  regulator: "Regulator",
   analyst: "Analyst",
-  field_officer: "Field Officer",
-  citizen: "Citizen",
-  viewer: "Citizen (legacy)",
+  // Renamed from "Field Officer": this project does no fieldwork. They submit
+  // uranium-ore occurrences from published geology, which is a different job
+  // and deserves a title that does not overstate it.
+  field_officer: "Data Submitter",
+  citizen: "Resident",
+  regulator: "Administrator (former regulator)",
+  viewer: "Resident (legacy)",
 };
 
 export const ROLE_COLOUR: Record<Role, string> = {
@@ -52,10 +63,11 @@ export const ROLE_COLOUR: Record<Role, string> = {
 
 /** One line per role explaining what this portal is *for them*. */
 export const ROLE_PURPOSE: Record<Role, string> = {
-  admin: "Operate the platform: accounts, ingestion, dataset syncs and the audit trail.",
-  regulator: "Decide: review field evidence, act on excursions, and sign off on findings.",
+  admin: "Operate and decide: accounts, ingestion, syncs, the audit trail, and what gets published to residents.",
+  regulator: "Operate and decide: accounts, ingestion, syncs, the audit trail, and what gets published to residents.",
+
   analyst: "Investigate: build scenarios, run the plume engine, and compare outcomes.",
-  field_officer: "Validate on the ground: submit observations for review.",
+  field_officer: "Contribute evidence: submit uranium-ore occurrences for review.",
   citizen: "Understand: what the groundwater near you actually measures.",
   viewer: "Understand: what the groundwater near you actually measures.",
 };

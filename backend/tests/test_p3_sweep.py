@@ -12,12 +12,15 @@ elsewhere is the queue, background-task and provenance cost of a *stored* run.
 
 The invariants worth pinning are about honesty, not arithmetic:
   * a sweep is NOT stored, and says so — otherwise twelve diagnostic rows bury
-    the runs a regulator is meant to read
+    the runs a reviewer is meant to read
   * the value held fixed on the other axis is REPORTED, because restoration
     adequacy is conditional on when you look
   * one failed point must not lose the other five
   * a site parameter cannot be smuggled in through the sweep body
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import uuid
 
 import pytest
@@ -86,7 +89,7 @@ async def test_a_sweep_is_not_stored_and_says_so(client, admin_token):
                               headers=_tok(admin_token))).json()
     assert len(after) == len(before), (
         "the sweep wrote rows into simulation_runs; twelve diagnostic rows per "
-        "question would bury the runs a regulator is meant to read")
+        "question would bury the runs a reviewer is meant to read")
 
 
 @pytest.mark.asyncio

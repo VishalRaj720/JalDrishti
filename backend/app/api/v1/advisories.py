@@ -1,4 +1,4 @@
-"""Advisories — proposing a screening, and the regulator decision on it.
+"""Advisories — proposing a screening, and the decision on it.
 
 The staff side. The citizen-facing read is in `public_risk.py`, deliberately
 separate: this router serves drafts and decisions, that one serves only what has
@@ -14,17 +14,21 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_analyst_or_admin, require_roles, require_staff
+from app.dependencies import (require_analyst_or_admin, require_reviewer,
+                              require_staff)
 from app.exceptions import AppException
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.services.advisory import AdvisoryService
 
 router = APIRouter(prefix="/advisories", tags=["Advisories"])
 
-#: Publishing is the act that reaches the public, so it sits with the roles
-#: accountable for what the institution says — not with the analyst who ran the
-#: model. Proposing is open to whoever may run it.
-require_reviewer = require_roles(UserRole.admin, UserRole.regulator)
+# Publishing is the act that reaches the public, so it sits with the role
+# accountable for what the institution says — not with the analyst who ran the
+# model. Proposing is open to whoever may run it.
+#
+# R7 retired `regulator`, so `require_reviewer` now resolves to admin alone. The
+# separation that mattered is unchanged: the proposer and the decider are still
+# different people, enforced by `ck_advisory_published_has_a_decider`.
 
 
 class AdvisoryPropose(BaseModel):
@@ -78,7 +82,7 @@ async def list_advisories(
     _: User = Depends(require_staff),
 ):
     """Every advisory, in any state. Staff only — this includes unpublished
-    drafts, which are internal until a regulator decides otherwise."""
+    drafts, which are internal until a reviewer decides otherwise."""
     response.headers["Cache-Control"] = "no-store"
     return await AdvisoryService(db).list(
         status=status, isr_point_id=isr_point_id, limit=limit)
@@ -107,7 +111,7 @@ async def propose_advisory(
 ):
     """Propose a completed run for publication.
 
-    Proposing publishes nothing. It puts the screening into a regulator's queue
+    Proposing publishes nothing. It puts the screening into a reviewer's queue
     with its footprint and the blocks that footprint actually intersects already
     resolved, so the decision is made against real numbers rather than an
     impression of how far the plume went.
@@ -129,7 +133,7 @@ async def decide_advisory(
     db: AsyncSession = Depends(get_db),
     actor: User = Depends(require_reviewer),
 ):
-    """Publish, reject or withdraw. Regulator and admin only.
+    """Publish, reject or withdraw. Admin only.
 
     This is the single point at which anything in this system becomes visible to
     a member of the public, which is why it is one endpoint with one guard

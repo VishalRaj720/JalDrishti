@@ -15,6 +15,7 @@ import Login from "./pages/Login";
 import Overview from "./pages/Overview";
 import Console from "./pages/Console";
 import Publications from "./pages/Publications";
+import IsrReport from "./pages/IsrReport";
 import MyArea from "./pages/MyArea";
 import Alerts from "./pages/Alerts";
 import Methods from "./pages/Methods";
@@ -70,6 +71,11 @@ function Gate() {
           path="/publications"
           element={<Guard allow={(r) => canRunSim(r) || canReview(r)}><Publications /></Guard>}
         />
+        {/* The full assessment record for one site. Staff-readable: it carries
+            the site's coordinates and operating parameters, which design §2
+            keeps away from the public surface. */}
+        <Route path="/report/:siteId"
+               element={<Guard allow={isStaff}><IsrReport /></Guard>} />
         <Route path="/map" element={<Navigate to="/console" replace />} />
         <Route path="/studio" element={<Navigate to="/console" replace />} />
         <Route

@@ -2,9 +2,12 @@
 
 The load-bearing test here is
 `test_approving_field_data_does_not_change_the_model_output`. Everything else
-guards the plumbing; that one guards the requirement that a regulator approving
+guards the plumbing; that one guards the requirement that a reviewer approving
 a field reading must not silently move a contamination model.
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import uuid
 
 import pytest
@@ -56,8 +59,8 @@ async def officer(db_session):
 
 
 @pytest_asyncio.fixture()
-async def regulator(db_session):
-    return await _mk(db_session, "p3reg", "p3reg@example.com", UserRole.regulator)
+async def reviewer(db_session):
+    return await _mk(db_session, "p3reg", "p3reg@example.com", UserRole.admin)
 
 
 # ── the boundary: nothing from the database may reach the engine ─────
@@ -169,10 +172,10 @@ async def test_unknown_isr_point_is_404(client, analyst):
 
 @pytest.mark.asyncio
 async def test_approving_field_data_does_not_change_the_model_output(
-        client, db_session, analyst, officer, regulator, isr_id):
+        client, db_session, analyst, officer, reviewer, isr_id):
     """Approved field data must not feed the model.
 
-    A regulator approving a water-quality reading is a data-governance act, not
+    A reviewer approving a water-quality reading is a data-governance act, not
     a model change. The surrogate's conformal bands were calibrated against a
     fixed input distribution; if approved field chemistry moved the prediction,
     the printed 80% would quietly stop meaning 80%. Changing what the model
@@ -190,7 +193,7 @@ async def test_approving_field_data_does_not_change_the_model_output(
     assert first["status"] == "completed", first.get("error_message")
 
     # A field officer submits an extreme reading right at the site, and a
-    # regulator approves it. It becomes authoritative in `water_samples`.
+    # reviewer approves it. It becomes authoritative in `water_samples`.
     well = MonitoringWell(name="P3 Well", location=f"SRID=4326;POINT({LON} {LAT})",
                           latitude=LAT, longitude=LON)
     db_session.add(well)
@@ -205,7 +208,7 @@ async def test_approving_field_data_does_not_change_the_model_output(
     assert obs.status_code == 201
     approved = await client.post(
         f"/api/v1/field-observations/{obs.json()['id']}/approve",
-        headers=_tok(regulator), json={"review_note": "verified"})
+        headers=_tok(reviewer), json={"review_note": "verified"})
     assert approved.status_code == 200
 
     in_db = (await db_session.execute(

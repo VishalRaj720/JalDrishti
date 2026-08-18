@@ -129,6 +129,6 @@ def test_citizen_is_excluded_from_the_staff_role_set():
     from app.dependencies import STAFF_ROLES
     assert UserRole.citizen not in STAFF_ROLES
     assert UserRole.viewer not in STAFF_ROLES
-    for role in (UserRole.admin, UserRole.regulator, UserRole.analyst,
-                 UserRole.field_officer):
+    # `regulator` is absent by design since R7 — see test_p6_roles.py.
+    for role in (UserRole.admin, UserRole.analyst, UserRole.field_officer):
         assert role in STAFF_ROLES

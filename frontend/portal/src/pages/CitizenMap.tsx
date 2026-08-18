@@ -43,7 +43,7 @@ const BAND_COLOUR: Record<string, string> = {
 };
 const BANDS = ["High concern", "Moderate concern", "Low concern", "No data"];
 
-type Key = "districts" | "blocks" | "wells";
+type Key = "districts" | "blocks" | "wells" | "screenings";
 
 export default function CitizenMap() {
   const { me } = useAuth();
@@ -54,8 +54,9 @@ export default function CitizenMap() {
 
   const { collapsed, toggle: toggleRail } = useRail(map);
   const [on, setOn] = useState<Record<Key, boolean>>({
-    districts: true, blocks: false, wells: true,
+    districts: true, blocks: false, wells: true, screenings: true,
   });
+  const [screening, setScreening] = useState<Record<string, any> | null>(null);
   const [basemap, setBasemap] = useState<BasemapKey>("light");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [sel, setSel] = useState<Record<string, any> | null>(null);
@@ -73,6 +74,19 @@ export default function CitizenMap() {
     queryKey: ["pub-geo", "wells"], enabled: on.wells, staleTime: 3_600_000,
     queryFn: () => api.get<FeatureCollection>("/public/risk/geojson/wells"),
   });
+  //
+  // R8: the footprints of screenings a reviewer has PUBLISHED. Residents could
+  // read that an assessment covered their block but had no way to see where —
+  // and telling somebody they are in an assessed area while withholding where
+  // creates rumour without recourse.
+  //
+  // The ISR point itself is still absent: design §2 keeps a precise coordinate
+  // for a hypothetical mine off the public map, and the footprint already
+  // answers "does this reach me?" without planting a pin beside a village.
+  const screenings = useQuery({
+    queryKey: ["pub-geo", "screenings"], enabled: on.screenings,
+    queryFn: () => api.get<FeatureCollection>("/citizen/advisories/geojson"),
+  });
 
   const visible = (band: string) => !hidden.has(band);
   const toggleBand = (b: string) =>
@@ -88,7 +102,7 @@ export default function CitizenMap() {
     L.control.zoom({ position: "topright" }).addTo(m);
     addScaleControl(m);
     basemapCtl.current = attachBasemaps(m, "light");
-    for (const k of ["districts", "blocks", "wells"] as Key[]) {
+    for (const k of ["districts", "blocks", "wells", "screenings"] as Key[]) {
       groups.current[k] = L.layerGroup().addTo(m);
     }
     map.current = m;
@@ -100,13 +114,41 @@ export default function CitizenMap() {
   useEffect(() => {
     const m = map.current;
     if (!m) return;
-    for (const k of ["districts", "blocks", "wells"] as Key[]) {
+    for (const k of ["districts", "blocks", "wells", "screenings"] as Key[]) {
       const g = groups.current[k];
       if (!g) continue;
       if (on[k]) { if (!m.hasLayer(g)) g.addTo(m); }
       else if (m.hasLayer(g)) m.removeLayer(g);
     }
   }, [on]);
+
+  // ── published screenings ──
+  //
+  // Drawn ABOVE the choropleths and in a distinct hatched violet, because a
+  // resident must never confuse "an assessment was modelled here" with "this
+  // area tested badly". Those are the two channels the whole citizen surface
+  // keeps apart, and the map is the easiest place to blur them.
+  useEffect(() => {
+    const g = groups.current.screenings;
+    if (!g) return;
+    g.clearLayers();
+    if (!on.screenings || !screenings.data) return;
+    L.geoJSON(screenings.data as any, {
+      style: {
+        color: "#a78bfa", weight: 2.4, fillColor: "#a78bfa",
+        fillOpacity: 0.30, dashArray: "6 4",
+      },
+      onEachFeature: (f, layer) => {
+        const p: any = f.properties ?? {};
+        layer.bindTooltip(
+          `<b>${p.headline ?? "Published screening"}</b><br/>`
+          + `modelled area ${Number(p.footprint_ha ?? 0).toFixed(1)} ha`
+          + `<br/><span class="muted">a modelled scenario, not a measurement</span>`,
+          { className: "plume-tip", sticky: true });
+        layer.on("click", () => setScreening(p));
+      },
+    }).addTo(g);
+  }, [screenings.data, on.screenings]);
 
   // ── districts ──
   useEffect(() => {
@@ -240,7 +282,8 @@ export default function CitizenMap() {
         </div>
 
         <div className="rail-head">Show on the map</div>
-        {([["districts", "Districts"], ["blocks", "Blocks"], ["wells", "Monitoring wells"]] as const)
+        {([["districts", "Districts"], ["blocks", "Blocks"], ["wells", "Monitoring wells"],
+           ["screenings", "Published assessments"]] as const)
           .map(([k, label]) => (
             <div className="layer-row" key={k}>
               <button className="toggle" data-on={on[k]} aria-label={`Toggle ${label}`}
@@ -279,6 +322,12 @@ export default function CitizenMap() {
           <div className="map-ov hint"><Loading label="Loading your area…" /></div>
         )}
         <div className="map-ov legend">
+          {on.screenings && (
+            <div className="legend-row">
+              <span className="sw" style={{ background: "#a78bfa" }} />
+              Published assessment (modelled)
+            </div>
+          )}
           <div className="ov-title">What the colours mean</div>
           {BANDS.filter((b) => !hidden.has(b)).map((b) => (
             <div className="legend-row" key={b}>
@@ -291,6 +340,55 @@ export default function CitizenMap() {
           </div>
         </div>
       </div>
+
+      {screening && (
+        <aside className="drawer">
+          <div className="sheet-grip" />
+          <div className="drawer-head">
+            <div>
+              <div className="dh-title">Published assessment</div>
+              <div className="dh-sub">a modelled scenario, not a measurement</div>
+            </div>
+            <button className="btn ghost" onClick={() => setScreening(null)}>Close</button>
+          </div>
+
+          <div className="banner warn" style={{ marginTop: 10 }}>
+            {screening.what_this_is}
+          </div>
+
+          <div className="sec">What was assessed</div>
+          <div className="prose" style={{ fontWeight: 600 }}>{screening.headline}</div>
+
+          <dl className="kv" style={{ marginTop: 10 }}>
+            <dt>Modelled area</dt>
+            <dd>{Number(screening.footprint_ha ?? 0).toFixed(1)} hectares</dd>
+            <dt>Looked ahead</dt>
+            <dd>{screening.time_years ?? "–"} years</dd>
+            <dt>Clean-up assumed</dt>
+            <dd>{screening.restoration_years
+              ? `${screening.restoration_years} years`
+              : "none"}</dd>
+            {screening.published_at && (
+              <>
+                <dt>Published</dt>
+                <dd>{new Date(screening.published_at).toLocaleDateString()}</dd>
+              </>
+            )}
+          </dl>
+
+          <div className="muted small prose" style={{ marginTop: 10 }}>
+            The shaded area is how far the model expects contamination to reach if an
+            operation of this kind ran here. It is drawn from the assessment a
+            reviewer published — not from anything measured in the ground, and not
+            from anything that has happened.
+          </div>
+
+          <div className="muted small prose" style={{ marginTop: 10 }}>
+            The grey dots on this map are different: those are <b>real government
+            monitoring wells</b>, and their colour is what was actually tested there.
+          </div>
+        </aside>
+      )}
 
       {sel && (
         <aside className="drawer">
