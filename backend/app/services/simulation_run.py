@@ -23,6 +23,57 @@ from app.models.user import User
 from app.services import audit, ml_pipeline_adapter as mlp
 
 
+def _plume_geometry(result: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Extract the drawable geometry from an engine response (migration 0016).
+
+    Copied out rather than storing the whole response for two reasons. The
+    response carries the metrics and excursion state that already have their own
+    columns, and duplicating them invites two answers to one question when a
+    later migration reshapes either. And it carries `hydro`, which is large and
+    already stored.
+
+    Returns None when the engine produced no drawable extent — a legitimate
+    outcome, not a failure: outside an ore zone the uranium source term is
+    refused entirely, and the honest render for that is the engine's own notice,
+    never an empty polygon presented as a measurement of safety (§4.6 rule 3).
+    """
+    plume = result.get("plume") or {}
+    contours = plume.get("contours") or []
+    source = plume.get("source_zone") or {}
+    ring = plume.get("compliance_ring") or {}
+    envelope = result.get("ml_envelope")
+
+    if not contours and not source.get("polygon") and not ring.get("polygon"):
+        return None
+
+    return {
+        "contours": contours,
+        "compliance_ring": ring,
+        "source_zone": source,
+        "ml_envelope": envelope,
+        "ml_envelope_skipped": result.get("ml_envelope_skipped") or {},
+        "azimuth_deg": result.get("azimuth_deg"),
+        "azimuth_source": result.get("azimuth_source"),
+        "peak_conc": plume.get("peak_conc"),
+        "Xc_m": plume.get("Xc_m"),
+        "aspect_ratio": plume.get("aspect_ratio"),
+        "lambda_radial": plume.get("lambda_radial"),
+        "radial_dominated": plume.get("radial_dominated"),
+        "off_scale": plume.get("off_scale"),
+        # Carried so a redraw can reproduce the caveats that were on screen when
+        # the run was read, not just its shape.
+        "notice": result.get("notice"),
+        "far_field_note": result.get("far_field_note"),
+        "ore_zone": result.get("ore_zone"),
+        "timeline": result.get("timeline"),
+        "restoration": result.get("restoration"),
+        "containment": result.get("containment"),
+        "species": result.get("species"),
+        "threshold": result.get("threshold"),
+        "ml_status": result.get("ml_status"),
+    }
+
+
 class SimulationRunService:
     """
     A NOTE ON `SET LOCAL` AND COMMITS, because it bit this service hard.
@@ -76,6 +127,19 @@ class SimulationRunService:
                      params: dict[str, Any], ip: Optional[str] = None
                      ) -> SimulationRun:
         await self._isr(isr_id)
+        # P2, second enforcement point. `RunRequest` already refuses anything
+        # outside RUN_VARIABLE, and the scenario validator refuses it at save
+        # time — but this service is also called by the scenario RUN path with a
+        # dict that was validated under an older, wider rule. Rows saved before
+        # that narrowing still exist, so filtering here is what stops a stored
+        # scenario from overriding its site's operation on its next run.
+        #
+        # Silently dropping rather than raising: the caller is replaying a
+        # scenario they saved legitimately under the old rule, and failing their
+        # run helps nobody. What they get is the site's own operation, which is
+        # the correct answer to "run this site".
+        from app.services.ml_pipeline_adapter import RUN_VARIABLE
+        params = {k: v for k, v in (params or {}).items() if k in RUN_VARIABLE}
         run = SimulationRun(
             isr_point_id=isr_id,
             status="queued",
@@ -140,6 +204,7 @@ class SimulationRunService:
             run.excursion = result.get("isr_excursion")
             run.extrapolation = list(result.get("extrapolation") or [])
             run.hydro = result.get("hydro")
+            run.plume = _plume_geometry(result)
             run.model_card_sha = prov["model_card_sha"]
             run.artifacts_sha = prov["artifacts_sha"]
             run.code_version = prov["code_version"]

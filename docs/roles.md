@@ -192,6 +192,10 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 | Endpoint | admin | regulator | analyst | field_officer | citizen |
 |---|---|---|---|---|---|
+| `GET /api/v1/advisories` | ● | ● | ● | ● | · |
+| `POST /api/v1/advisories` | ● | · | ● | · | · |
+| `GET /api/v1/advisories/{advisory_id}` | ● | ● | ● | ● | · |
+| `POST /api/v1/advisories/{advisory_id}/decision` | ● | ● | · | · | · |
 | `GET /api/v1/aquifers` | ● | ● | ● | ● | · |
 | `GET /api/v1/aquifers/{aquifer_id}` | ● | ● | ● | ● | · |
 | `GET /api/v1/audit` | ● | ● | · | · | · |
@@ -206,6 +210,18 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `PUT /api/v1/blocks/{block_id}/monitoring-stations/{station_id}` | ● | · | ● | · | · |
 | `GET /api/v1/blocks/{block_id}/monitoring-stations/{station_id}/readings` | ● | ● | ● | ● | · |
 | `POST /api/v1/blocks/{block_id}/monitoring-stations/{station_id}/readings` | ● | · | ● | · | · |
+| `GET /api/v1/citizen/advisories` | ● | ● | ● | ● | ● |
+| `GET /api/v1/citizen/alerts` | ● | ● | ● | ● | ● |
+| `POST /api/v1/citizen/alerts/read-all` | ● | ● | ● | ● | ● |
+| `POST /api/v1/citizen/alerts/scan-measured` | ● | · | · | · | · |
+| `GET /api/v1/citizen/alerts/unread-count` | ● | ● | ● | ● | ● |
+| `POST /api/v1/citizen/alerts/{alert_id}/read` | ● | ● | ● | ● | ● |
+| `GET /api/v1/citizen/blocks` | ● | ● | ● | ● | ● |
+| `GET /api/v1/citizen/my-area` | ● | ● | ● | ● | ● |
+| `POST /api/v1/citizen/register` | ○ | ○ | ○ | ○ | ○ |
+| `GET /api/v1/citizen/subscriptions` | ● | ● | ● | ● | ● |
+| `POST /api/v1/citizen/subscriptions` | ● | ● | ● | ● | ● |
+| `DELETE /api/v1/citizen/subscriptions/{block_id}` | ● | ● | ● | ● | ● |
 | `POST /api/v1/dataset-sync/ore` | ● | · | · | · | · |
 | `GET /api/v1/dataset-sync/pending` | ● | ● | ● | ● | · |
 | `GET /api/v1/dataset-sync/status` | ● | ● | ● | ● | · |
@@ -264,6 +280,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/simulations/runs` | ● | ● | ● | ● | · |
 | `GET /api/v1/simulations/runs/{run_id}` | ● | ● | ● | ● | · |
 | `POST /api/v1/simulations/{isr_id}` | ● | · | ● | · | · |
+| `POST /api/v1/simulations/{isr_id}/sweep` | ● | · | ● | · | · |
 | `GET /api/v1/simulations/{sim_id}` | ● | ● | ● | ● | · |
 | `GET /api/v1/users` | ● | · | · | · | · |
 | `POST /api/v1/users` | ● | · | · | · | · |
@@ -277,7 +294,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 73/82 · **regulator** 48/82 · **analyst** 55/82 · **field_officer** 44/82 · **citizen** 1/82
+Reachable endpoints per role — **admin** 89/99 · **regulator** 61/99 · **analyst** 69/99 · **field_officer** 56/99 · **citizen** 11/99
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

@@ -68,15 +68,24 @@ async def create_scenario(
     db: AsyncSession = Depends(get_db),
     actor: User = Depends(require_analyst_or_admin),
 ):
-    from app.services.ml_pipeline_adapter import CLIENT_TUNABLE
-    unknown = set(payload.params) - CLIENT_TUNABLE
+    # P2: narrowed from CLIENT_TUNABLE to RUN_VARIABLE. A scenario is a named
+    # set of RUN inputs against a fixed site, and a run may vary exactly three
+    # things. Validating against the wider interactive-map allowlist let a
+    # scenario carry `operation_years` or `injection_rate_m3_day` and override
+    # the registered site's own operation at run time — the same defeat of
+    # migration 0015 that cutting `RunRequest` was meant to end, reached through
+    # a different door.
+    from app.services.ml_pipeline_adapter import RUN_VARIABLE
+    unknown = set(payload.params) - RUN_VARIABLE
     if unknown:
         # Validated at save time, not at run time: a scenario that cannot run is
         # worse than one that is refused, because it looks saved.
         raise HTTPException(
             status_code=422,
-            detail=f"Unknown scenario parameters: {sorted(unknown)}. "
-                   f"Allowed: {sorted(CLIENT_TUNABLE)}")
+            detail=f"A scenario may vary only {sorted(RUN_VARIABLE)}. "
+                   f"Rejected: {sorted(unknown)}. Everything else is a property "
+                   f"of the ISR site — edit the site to change it, so that two "
+                   f"people running the same site run the same operation.")
 
     sc = Scenario(name=payload.name, description=payload.description,
                   isr_point_id=payload.isr_point_id, params=payload.params,

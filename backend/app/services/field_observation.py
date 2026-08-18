@@ -31,8 +31,8 @@ from typing import Any, Optional
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import (AppException, AuthorizationError,
-                            ResourceNotFoundError)
+from app.exceptions import (AppException, AppValidationError, AuthorizationError,
+                            ConflictError, ResourceNotFoundError)
 from app.models.field_observation import (
     ALLOWED_FIELDS, DATETIME_FIELDS, REQUIRED_FIELDS, TARGET_TABLES,
     UUID_FIELDS, FieldObservation, ObservationOperation, ObservationStatus,
@@ -44,14 +44,12 @@ from app.services import audit
 REVIEWER_ROLES = (UserRole.admin, UserRole.regulator)
 
 
-class AppValidationError(AppException):
-    def __init__(self, message: str):
-        super().__init__(message, status_code=422)
-
-
-class ConflictError(AppException):
-    def __init__(self, message: str):
-        super().__init__(message, status_code=409)
+# P4 NOTE — `AppValidationError` and `ConflictError` used to be DEFINED here and
+# now live in `app.exceptions`, imported above. A second service needed them, and
+# a shared error type defined inside one service is either imported from an
+# unrelated module or duplicated under the same name. The import above keeps
+# `field_observation.AppValidationError` resolving for existing importers, so
+# this is a move rather than a breaking change.
 
 
 def _fingerprint(payload: Optional[dict[str, Any]]) -> Optional[str]:

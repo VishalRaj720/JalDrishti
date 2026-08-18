@@ -55,3 +55,21 @@ class MLServiceError(AppException):
     """Raised when the ML microservice call fails."""
     def __init__(self, message: str = "ML service unavailable. Using stub predictions."):
         super().__init__(message, status_code=503)
+
+
+class AppValidationError(AppException):
+    """Input the caller could fix — 422.
+
+    Lived in `services/field_observation.py` until P4, when a second service
+    needed it. A shared error type defined inside one service is either imported
+    from an unrelated module or duplicated under the same name; both make the
+    error surface harder to reason about than it needs to be.
+    """
+    def __init__(self, message: str):
+        super().__init__(message, status_code=422)
+
+
+class ConflictError(AppException):
+    """The request contradicts current state — 409."""
+    def __init__(self, message: str):
+        super().__init__(message, status_code=409)

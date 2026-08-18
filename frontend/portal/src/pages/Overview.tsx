@@ -126,9 +126,9 @@ function RegulatorOverview() {
         <Tile n={pending.data?.length ?? "–"} label="Awaiting your decision" tone="red"
               sub="field observations" onClick={() => nav("/field")} />
         <Tile n={excursions.length} label="Runs declaring excursion" tone="amber"
-              sub="NUREG-1569 2-of-3" onClick={() => nav("/studio")} />
+              sub="NUREG-1569 2-of-3" onClick={() => nav("/console")} />
         <Tile n={extrapolating.length} label="Runs outside trained support" tone="amber"
-              sub="ML band not guaranteed" onClick={() => nav("/studio")} />
+              sub="ML band not guaranteed" onClick={() => nav("/console")} />
         <Tile n={sync.data?.approved_pending_sync ?? "–"} label="Approved, not in model" tone="amber"
               sub="awaiting admin sync" onClick={() => nav("/data")} />
       </div>
@@ -196,11 +196,11 @@ function AnalystOverview() {
     <div className="page">
       <Head />
       <div className="grid-4" style={{ marginBottom: 16 }}>
-        <Tile n={sites.data?.length ?? "–"} label="Hypothetical sites" tone="blue" onClick={() => nav("/map")} />
-        <Tile n={scenarios.data?.length ?? "–"} label="Saved scenarios" tone="blue" onClick={() => nav("/studio")} />
-        <Tile n={runs.data?.length ?? "–"} label="Recent runs" tone="green" onClick={() => nav("/studio")} />
+        <Tile n={sites.data?.length ?? "–"} label="Hypothetical sites" tone="blue" onClick={() => nav("/console")} />
+        <Tile n={scenarios.data?.length ?? "–"} label="Saved scenarios" tone="blue" onClick={() => nav("/console")} />
+        <Tile n={runs.data?.length ?? "–"} label="Recent runs" tone="green" onClick={() => nav("/console")} />
         <Tile n={flagged.length} label="Outside trained support" tone="amber"
-              sub="conformal band void" onClick={() => nav("/studio")} />
+              sub="conformal band void" onClick={() => nav("/console")} />
       </div>
 
       <div className="grid-2">
@@ -208,7 +208,7 @@ function AnalystOverview() {
           <div className="card-title">
             Scenarios
             <span className="spacer grow" />
-            <button className="btn primary" onClick={() => nav("/studio")}>Open Studio →</button>
+            <button className="btn primary" onClick={() => nav("/console")}>Open Console →</button>
           </div>
           {scenarios.isLoading && <Loading />}
           {scenarios.data?.length === 0 && (
@@ -218,7 +218,7 @@ function AnalystOverview() {
             </div>
           )}
           {scenarios.data?.slice(0, 6).map((s) => (
-            <div key={s.id} className="list-item" onClick={() => nav("/studio")}>
+            <div key={s.id} className="list-item" onClick={() => nav("/console")}>
               <div>
                 <div className="nm">{s.name}</div>
                 <div className="mt">{s.description ?? "no description"}</div>
@@ -233,7 +233,7 @@ function AnalystOverview() {
           {runs.isLoading && <Loading />}
           {runs.data?.length === 0 && <div className="muted small">No runs yet.</div>}
           {runs.data?.slice(0, 6).map((r) => (
-            <div key={r.id} className="list-item" onClick={() => nav("/studio")}>
+            <div key={r.id} className="list-item" onClick={() => nav("/console")}>
               <div>
                 <div className="nm">{r.species}</div>
                 <div className="mt">
@@ -348,17 +348,40 @@ function CitizenOverview() {
         <div className="card-title">
           Groundwater near you
           <span className="spacer grow" />
-          <button className="btn primary" onClick={() => nav("/public")}>Find my area →</button>
+          <button className="btn primary" onClick={() => nav("/my-area")}>My area →</button>
         </div>
-        <div className="muted small" style={{ lineHeight: 1.6 }}>
+        <div className="prose muted">
           These are real measurements from government groundwater sampling — not
-          predictions. Choose your district to see the reading for each block, what it
-          means, and who to contact.
+          predictions. Follow your block to see what was tested there, what it means,
+          and who to contact.
         </div>
       </div>
 
-      <Planned label="Get an alert when water near me changes" phase="P7"
-               why="Alert subscriptions are designed but not built — there is no notification service yet." />
+      <div className="grid-2">
+        <div className="card">
+          <div className="card-title">
+            Alerts
+            <span className="spacer grow" />
+            <button className="btn ghost" onClick={() => nav("/alerts")}>Open →</button>
+          </div>
+          <div className="prose muted">
+            You are told when a well near you tests above the safe limit, and when an
+            assessment is published for your area. Alerts appear in this portal only —
+            no SMS, no email.
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-title">
+            Data &amp; methods
+            <span className="spacer grow" />
+            <button className="btn ghost" onClick={() => nav("/methods")}>Read →</button>
+          </div>
+          <div className="prose muted">
+            Where these numbers come from, what the safe limit is, and what this
+            platform does not know.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

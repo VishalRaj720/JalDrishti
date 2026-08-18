@@ -76,10 +76,52 @@ export interface District {
   id: string; name: string; vulnerability_index: number | null;
 }
 
+/**
+ * A registered ISR site — a FULLY SPECIFIED hypothetical operation.
+ *
+ * P1 fix: this interface previously declared `injection_rate`, a field the API
+ * has never returned (it returns `injection_rate_m3_day`). The property was
+ * therefore always `undefined`, and the Map Console's registration form posted
+ * the same wrong key — which Pydantic silently dropped, so **every site ever
+ * registered through the UI took the server default of 2500 m³/day** no matter
+ * what the analyst set. Migration `0015` exists precisely so a site pins its
+ * own operating parameters; the client was quietly defeating it.
+ *
+ * All eleven parameters are listed because the Console renders them read-only
+ * on a run: the site is the operation, and only evaluation time and the
+ * restoration sweep vary per run.
+ */
 export interface IsrPoint {
-  id: string; name: string; injection_rate: number | null;
+  id: string;
+  name: string;
   location: { type: string; coordinates: [number, number] } | null;
+
+  injection_rate_m3_day: number | null;
+  bleed_percent: number | null;
+  operation_years: number | null;
+  restoration_years: number | null;
+  wellfield_width_m: number | null;
+  monitor_ring_m: number | null;
+  ore_depth_m: number | null;
+  ore_thickness_m: number | null;
+  regime_override: string | null;
+  gradient_i: number | null;
+  azimuth_deg: number | null;
+  injection_start_date: string | null;
+
+  created_at: string;
+  updated_at: string;
 }
+
+/**
+ * Every slider range and default, read from the engine's own constants via
+ * `GET /ml/bounds`. A flat mapping — `injection_rate_min`, `injection_rate_max`,
+ * `injection_rate_default`, and so on for each parameter.
+ *
+ * The form reads these rather than hard-coding ranges: a bound typed into the
+ * client is a 422 the user cannot act on, from a service they never heard of.
+ */
+export type EngineBounds = Record<string, number>;
 
 export interface SyncStatus {
   pending_review: number;
@@ -139,6 +181,10 @@ export interface SimRun {
   excursion: Record<string, any> | null;
   extrapolation: string[] | null;
   hydro: Record<string, any> | null;
+  /** Drawable plume geometry (migration 0016). `null` has two distinct causes
+   *  the UI must not conflate: the run predates geometry capture, or the engine
+   *  correctly produced no extent (a non-ore pin). */
+  plume: Record<string, any> | null;
   error_message: string | null;
   runtime_ms: number | null;
   created_at: string;
@@ -158,6 +204,38 @@ export interface AuditEntry {
   actor_id: string | null; actor_label: string | null;
   action: string; entity_type: string; entity_id: string | null;
   detail: Record<string, unknown> | null; ip_address: string | null;
+}
+
+/**
+ * A screening proposed for, or published to, the public.
+ *
+ * `affected_blocks` is resolved by real spatial intersection at proposal time
+ * and is frequently just the host block — a ~13 ha footprint does not cover a
+ * ~30,000 ha administrative block. The UI must render that honestly rather than
+ * implying the whole block is affected.
+ */
+export interface Advisory {
+  id: string;
+  isr_point_id: string;
+  run_id: string;
+  status: "proposed" | "published" | "withdrawn" | "rejected";
+  headline: string;
+  what_it_means: string;
+  what_to_do: string | null;
+  species: string;
+  time_years: number | null;
+  restoration_years: number | null;
+  footprint_ha: number | null;
+  affected_blocks: Array<{
+    id: string; name: string; district: string | null; overlap_ha: number;
+  }> | null;
+  proposed_by: string | null;
+  proposed_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  published_at: string | null;
+  withdrawn_at: string | null;
 }
 
 export interface PublicDistrictRisk {
@@ -216,4 +294,68 @@ export const auth = {
   login: (email: string, password: string) =>
     api.post<{ access_token: string }>("/auth/login", { email, password }),
   me: () => api.get<Me>("/auth/me"),
+};
+
+// ── the citizen surface ──────────────────────────────────────────────
+
+export interface Subscription {
+  id: string; name: string; district: string | null; created_at: string;
+}
+
+/**
+ * One alert, about one block.
+ *
+ * `kind` is the load-bearing field and the UI must never merge the two:
+ * `measured_exceedance` is a real CGWB laboratory result and needs no hedging;
+ * `published_screening` is a modelled assessment of a mine that does not exist.
+ * A reader who cannot tell them apart will either panic at the second or ignore
+ * the first.
+ */
+export interface CitizenAlert {
+  id: string;
+  kind: "measured_exceedance" | "published_screening";
+  headline: string;
+  body: string;
+  severity: "info" | "warning" | "high";
+  well_name: string | null;
+  measured_value: number | null;
+  measured_unit: string | null;
+  sampled_at: string | null;
+  created_at: string;
+  advisory_id: string | null;
+  block_id: string;
+  block_name: string;
+  district_name: string | null;
+  is_read: boolean;
+}
+
+export interface MyAreaBlock {
+  id: string; name: string; district: string | null;
+  wells: number; samples: number;
+  max_uranium_ppb: number | null; last_sampled: string | null;
+  band: string; what_it_means: string;
+}
+
+export interface MyArea {
+  blocks: MyAreaBlock[];
+  unread: number;
+  safe_limit_ppb?: number;
+  what_this_is: string;
+}
+
+export interface PublicAdvisory {
+  id: string;
+  headline: string;
+  what_it_means: string;
+  what_to_do: string | null;
+  published_at: string | null;
+  footprint_ha: number | null;
+  blocks: Array<{ name: string; district: string | null; overlap_ha: number }>;
+  what_this_is: string;
+}
+
+export const citizen = {
+  register: (username: string, email: string, password: string) =>
+    api.post<{ access_token: string; role: Role }>(
+      "/citizen/register", { username, email, password }),
 };

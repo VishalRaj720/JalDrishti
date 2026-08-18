@@ -83,7 +83,12 @@ async def test_mutating_request_is_audited_with_actor(client, db_session, admin_
     resp = await client.post(
         "/api/v1/isr-points",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"name": "Audited Site", "injection_rate_m3_day": 1000.0,
+        json={"name": "Audited Site",
+              # P2: registration demands the full operating parameter set.
+              "injection_rate_m3_day": 1000.0, "bleed_percent": 2.0,
+              "operation_years": 8.0, "wellfield_width_m": 300.0,
+              "monitor_ring_m": 100.0, "ore_depth_m": 150.0,
+              "ore_thickness_m": 20.0,
               "location": {"type": "Point", "coordinates": [85.3, 23.5]}},
     )
     assert resp.status_code == 201

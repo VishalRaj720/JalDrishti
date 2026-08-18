@@ -56,7 +56,13 @@ async def test_created_site_round_trips_its_location(client, admin_token):
     created = await client.post(
         "/api/v1/isr-points",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"name": f"RoundTrip {uuid.uuid4().hex[:6]}", "injection_rate_m3_day": 500,
+        json={"name": f"RoundTrip {uuid.uuid4().hex[:6]}",
+              # P2: a site is a fully specified operation, so every operating
+              # parameter is required at registration.
+              "injection_rate_m3_day": 500, "bleed_percent": 2.0,
+              "operation_years": 8.0, "wellfield_width_m": 300.0,
+              "monitor_ring_m": 100.0, "ore_depth_m": 150.0,
+              "ore_thickness_m": 20.0,
               "location": {"type": "Point", "coordinates": [85.9, 23.4]}})
     assert created.status_code == 201
     body = created.json()

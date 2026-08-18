@@ -42,7 +42,13 @@ async def test_create_isr_point_and_list(client, admin_token):
         headers={"Authorization": f"Bearer {admin_token}"},
         json={
             "name": "Test ISR Site Alpha",
+            # P2: every operating parameter is required — a site that can be
+            # created without stating the operation has whatever operation the
+            # schema happened to default to.
             "injection_rate_m3_day": 1500.0,   # >= the engine minimum of 200
+            "bleed_percent": 2.0, "operation_years": 8.0,
+            "wellfield_width_m": 300.0, "monitor_ring_m": 100.0,
+            "ore_depth_m": 150.0, "ore_thickness_m": 20.0,
             "location": {"type": "Point", "coordinates": [85.3, 23.5]},
         },
     )

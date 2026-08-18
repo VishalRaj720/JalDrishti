@@ -26,6 +26,8 @@ from app.models.dataset_version import DatasetVersion  # noqa: F401
 from app.models.audit_log import AuditLog  # noqa: F401
 from app.models.simulation_run import SimulationRun  # noqa: F401
 from app.models.scenario import Scenario  # noqa: F401
+from app.models.advisory import Advisory  # noqa: F401
+from app.models.alert import Alert, AlertRead, BlockSubscription  # noqa: F401
 from app.models.field_observation import (  # noqa: F401
     FieldObservation, OreObservation, ObservationType,
     ObservationOperation, ObservationStatus,
@@ -47,6 +49,8 @@ __all__ = [
     "AuditLog",
     "SimulationRun",
     "Scenario",
+    "Advisory",
+    "Alert", "AlertRead", "BlockSubscription",
     "FieldObservation", "OreObservation",
     "ObservationType", "ObservationOperation", "ObservationStatus",
 ]

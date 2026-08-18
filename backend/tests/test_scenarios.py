@@ -49,9 +49,12 @@ async def officer(db_session):
 @pytest.mark.asyncio
 async def test_analyst_can_save_and_run_a_scenario(client, analyst, isr_id):
     c = await client.post("/api/v1/scenarios", headers=_tok(analyst),
-                          json={"name": "Baseline 8yr", "isr_point_id": str(isr_id),
-                                "description": "default operating case",
-                                "params": {"operation_years": 8, "time_years": 20}})
+                          json={"name": "Baseline 20yr", "isr_point_id": str(isr_id),
+                                "description": "default evaluation case",
+                                # P2: a scenario names RUN inputs against a fixed
+                                # site. `operation_years` describes the operation
+                                # and belongs to the site, so it is refused here.
+                                "params": {"time_years": 20, "restoration_years": 5}})
     assert c.status_code == 201, c.text
     sid = c.json()["id"]
 
@@ -62,7 +65,8 @@ async def test_analyst_can_save_and_run_a_scenario(client, analyst, isr_id):
     run = (await client.get(f"/api/v1/simulations/runs/{run_id}",
                             headers=_tok(analyst))).json()
     assert run["status"] == "completed", run.get("error_message")
-    assert run["request"]["operation_years"] == 8
+    assert run["request"]["time_years"] == 20
+    assert run["request"]["restoration_years"] == 5
 
 
 @pytest.mark.asyncio
@@ -96,16 +100,23 @@ async def test_field_officer_cannot_create_scenarios(client, officer, isr_id):
 @pytest.mark.asyncio
 async def test_compare_attributes_the_difference_to_inputs(
         client, analyst, isr_id):
-    """Two runs, same model, different sliders — the cause must say so."""
+    """Two runs, same model, different inputs — the cause must say so.
+
+    P2 changed WHICH input varies here. This used to compare two
+    `operation_years`, but a run can no longer set that: the operation belongs
+    to the site (migration 0015), and letting a run override it meant two people
+    running one site were not running the same thing. The evaluation horizon is
+    a genuine run variable, and it exercises the same comparison logic.
+    """
     sid = (await client.post(
         "/api/v1/scenarios", headers=_tok(analyst),
         json={"name": "Cmp", "isr_point_id": str(isr_id),
-              "params": {"operation_years": 4, "time_years": 20}})).json()["id"]
+              "params": {"time_years": 4}})).json()["id"]
 
     a = (await client.post(f"/api/v1/scenarios/{sid}/run",
                            headers=_tok(analyst))).json()["run_id"]
     b = (await client.post(f"/api/v1/simulations/{isr_id}", headers=_tok(analyst),
-                           json={"operation_years": 12, "time_years": 20})).json()["id"]
+                           json={"time_years": 20})).json()["id"]
 
     cmp_ = await client.post(f"/api/v1/scenarios/{sid}/compare",
                              headers=_tok(analyst),
@@ -114,9 +125,9 @@ async def test_compare_attributes_the_difference_to_inputs(
     body = cmp_.json()
     assert body["same_model"] is True
     assert body["cause"] == "inputs differ; same model"
-    assert body["input_delta"]["operation_years"] == {"a": 4, "b": 12}
-    # a longer operation should move at least one metric
-    assert body["metric_delta"], "identical metrics for different operation years"
+    assert body["input_delta"]["time_years"] == {"a": 4, "b": 20}
+    # a longer evaluation horizon should move at least one metric
+    assert body["metric_delta"], "identical metrics for different horizons"
 
 
 @pytest.mark.asyncio
@@ -125,7 +136,7 @@ async def test_compare_reports_identical_when_nothing_changed(
     sid = (await client.post(
         "/api/v1/scenarios", headers=_tok(analyst),
         json={"name": "Same", "isr_point_id": str(isr_id),
-              "params": {"operation_years": 8}})).json()["id"]
+              "params": {"time_years": 8}})).json()["id"]
     a = (await client.post(f"/api/v1/scenarios/{sid}/run",
                            headers=_tok(analyst))).json()["run_id"]
     b = (await client.post(f"/api/v1/scenarios/{sid}/run",

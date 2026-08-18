@@ -45,14 +45,50 @@ def test_duplicate_token_endpoint_is_gone():
 
 
 @pytest.mark.asyncio
-async def test_anonymous_cannot_create_any_account(client):
-    """The property: no unauthenticated route may mint a user."""
+async def test_anonymous_cannot_create_a_privileged_account(client):
+    """The property, NARROWED in P5 — and this is the whole security argument.
+
+    It used to read "no unauthenticated route may mint a user". That could not
+    survive the product decision that citizens sign in: the alternative is an
+    administrator hand-creating an account for every resident who wants to check
+    their water, which is not a citizen product.
+
+    So the guarantee is now:
+
+        No unauthenticated route may mint a user **with any role other than
+        `citizen`**, and the role must never be read from the request.
+
+    `POST /citizen/register` is the one permitted unauthenticated creator. It
+    has no `role` field at all — not a validated one, not a defaulted one — so
+    the attack body below cannot influence it. That is asserted directly in
+    `test_p5_citizen.py::test_registration_ignores_a_role_in_the_body`; here we
+    hold the line for every OTHER path.
+    """
     for path in ("/api/v1/auth/signup", "/api/v1/users", "/api/v1/auth/register"):
         resp = await client.post(path, json=_ATTACK)
         assert resp.status_code in (401, 403, 404, 405), (
             f"POST {path} without a token returned {resp.status_code}; "
             f"an anonymous caller must never be able to create an account."
         )
+
+
+@pytest.mark.asyncio
+async def test_the_one_anonymous_creator_cannot_be_talked_into_a_role(client):
+    """`/citizen/register` is the single exception, and it is exception-proof.
+
+    Sending `role: admin` does not error — the field does not exist as far as
+    this endpoint is concerned, which is a stronger guarantee than rejecting it,
+    because there is no code path that could later start honouring it.
+    """
+    resp = await client.post("/api/v1/citizen/register", json={
+        "username": "attacker2", "email": "attacker2@example.com",
+        "password": "hunter2hunter2", "role": "admin",
+    })
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["role"] == "citizen", (
+        "an anonymous caller influenced the role of the account they created; "
+        "this is the exact hole POST /auth/signup was deleted for."
+    )
 
 
 @pytest.mark.asyncio

@@ -53,7 +53,74 @@ class IsrPointBase(BaseModel):
 
 
 class IsrPointCreate(IsrPointBase):
-    location: Optional[Dict[str, Any]] = None  # GeoJSON Point
+    """Registration demands a fully specified operation.
+
+    P2. Every operating parameter previously carried a default, so a client
+    could register a site by posting a name alone — and the portal's own map did
+    exactly that, sending a misspelled `injection_rate` that Pydantic silently
+    dropped. The result was a registry of sites that all claimed 2500 m³/day
+    because nobody had ever chosen a value.
+
+    A site is the operation (migration 0015). If it can be created without
+    stating what the operation IS, then the operation is whatever the schema
+    happened to default to, and "run the registered site" means nothing.
+
+    THE SPLIT between required and optional is deliberate and is not about
+    importance:
+
+    * **Required** — the operator's choices. There is no defensible default for
+      how much lixiviant you inject or how wide the wellfield is; a default here
+      is a fabricated decision attributed to a user.
+    * **Optional** — the three fields where `None` is a *different statement*
+      from any number: `regime_override`, `gradient_i` and `azimuth_deg` mean
+      "resolve this from the pin's own hydrogeology", which is the more honest
+      answer and usually the right one. `injection_start_date` is a presentation
+      anchor. `restoration_years` defaults to 0 because "no remediation sweep
+      planned" is a real, common answer — and the sweep is the one thing a run
+      may vary against a fixed site anyway.
+
+    `location` becomes required for the same reason: design §3.2 calls the
+    registry the heart of the product, and a site without a coordinate cannot be
+    drawn, cannot be run, and cannot be published.
+    """
+    location: Dict[str, Any] = Field(
+        ..., description="GeoJSON Point — required. A site without a coordinate "
+                         "cannot be run or drawn.")
+
+    injection_rate_m3_day: float = Field(
+        ..., ge=B.injection_rate_min, le=B.injection_rate_max)
+    bleed_percent: float = Field(..., ge=B.bleed_min, le=B.bleed_max)
+    operation_years: float = Field(
+        ..., ge=B.operation_years_min, le=B.operation_years_max)
+    wellfield_width_m: float = Field(
+        ..., ge=B.wellfield_width_min, le=B.wellfield_width_max,
+        description="DIAMETER of the circular well-pattern footprint.")
+    monitor_ring_m: float = Field(
+        ..., ge=B.monitor_ring_min, le=B.monitor_ring_max)
+    ore_depth_m: float = Field(..., ge=B.ore_depth_min, le=B.ore_depth_max)
+    ore_thickness_m: float = Field(
+        ..., ge=B.ore_thickness_min, le=B.ore_thickness_max)
+
+    @field_validator("location")
+    @classmethod
+    def _is_a_point(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        """Reject anything that is not a GeoJSON Point with two finite numbers.
+
+        Caught here rather than at the PostGIS layer because the database error
+        for a malformed geometry names a WKB parse failure, which tells the
+        analyst nothing they can act on.
+        """
+        if not isinstance(v, dict) or v.get("type") != "Point":
+            raise ValueError("location must be a GeoJSON Point")
+        coords = v.get("coordinates")
+        if (not isinstance(coords, (list, tuple)) or len(coords) != 2
+                or not all(isinstance(c, (int, float)) for c in coords)):
+            raise ValueError("location.coordinates must be [longitude, latitude]")
+        lon, lat = float(coords[0]), float(coords[1])
+        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+            raise ValueError("location.coordinates out of range; expected "
+                             "[longitude, latitude] in that order")
+        return v
 
 
 class IsrPointUpdate(BaseModel):

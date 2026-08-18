@@ -1,4 +1,21 @@
-/* Shell, navigation, map and page layout. */
+/* Shell, navigation, map and page layout.
+ *
+ * RESPONSIVE CONTRACT (P1). One codebase serves a staff console on a desktop
+ * and a citizen surface on a phone, so the breakpoints are behavioural, not
+ * cosmetic — panels change KIND, not just width:
+ *
+ *   ≥1280px  three columns: rail · map · drawer, all in flow
+ *   ≥1024px  drawer narrows; rail keeps its column
+ *   ≥768px   drawer OVERLAYS the map (absolute, right) so the map keeps width
+ *   <768px   rail becomes an off-canvas sheet over a scrim; the drawer becomes
+ *            a BOTTOM SHEET; the map goes full-bleed; header nav collapses to
+ *            a menu button
+ *   <640px   every grid collapses to one column
+ *
+ * The reason the drawer becomes a bottom sheet rather than a narrower column:
+ * at 375px a 380px right-hand column IS the screen, so the map — the thing the
+ * drawer is describing — would be entirely hidden while reading it.
+ */
 
 .shell { display: flex; flex-direction: column; height: 100%; }
 
@@ -7,87 +24,135 @@
 .hdr {
   height: var(--header-h); flex: 0 0 var(--header-h);
   background: var(--panel); border-bottom: 1px solid var(--line);
-  display: flex; align-items: center; gap: 14px; padding: 0 14px;
+  display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-3);
+  position: relative; z-index: 900;
 }
-.hdr-brand { display: flex; align-items: center; gap: 9px; min-width: 210px; }
+.hdr-brand { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
 .hdr-mark {
-  width: 30px; height: 30px; border-radius: 8px;
+  width: 30px; height: 30px; border-radius: var(--r-md); flex: 0 0 30px;
   background: linear-gradient(135deg, #3fb6ff, #37d39b);
-  display: grid; place-items: center; font-size: 15px;
+  display: grid; place-items: center; font-size: var(--fs-lg);
 }
 .hdr-name {
-  font-size: 16px; font-weight: 700; line-height: 1.05;
+  font-size: var(--fs-lg); font-weight: 700; line-height: 1.05;
   background: linear-gradient(90deg, #3fb6ff, #37d39b);
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 .hdr-sub { font-size: 9.5px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
 
-.hdr-nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+.hdr-nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.hdr-nav::-webkit-scrollbar { display: none; }
 .hdr-nav a {
-  padding: 7px 12px; border-radius: var(--r-sm); color: var(--muted);
-  text-decoration: none; font-size: 12.5px; font-weight: 500; white-space: nowrap;
+  padding: 7px var(--s-3); border-radius: var(--r-sm); color: var(--muted);
+  text-decoration: none; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
 }
 .hdr-nav a:hover { background: var(--card2); color: var(--text); }
 .hdr-nav a.active { background: rgba(63,182,255,.14); color: var(--accent); font-weight: 700; }
 
-.hdr-right { display: flex; align-items: center; gap: 10px; }
+.hdr-right { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
+
+/* Menu button — only rendered below the nav breakpoint. */
+.nav-btn {
+  display: none; width: 34px; height: 34px; border-radius: var(--r-sm);
+  background: var(--card); border: 1px solid var(--line); color: var(--text);
+  cursor: pointer; place-items: center; font-size: var(--fs-lg); line-height: 1;
+}
+.nav-sheet {
+  position: absolute; top: var(--header-h); left: 0; right: 0; z-index: 1200;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: var(--s-2); display: grid; gap: 2px;
+  box-shadow: 0 16px 34px rgba(0,0,0,.5); animation: sheetUp .16s ease-out;
+}
+.nav-sheet a {
+  padding: var(--s-3); border-radius: var(--r-sm); color: var(--text);
+  text-decoration: none; font-size: var(--fs-md); font-weight: 500;
+}
+.nav-sheet a.active { background: rgba(63,182,255,.14); color: var(--accent); font-weight: 700; }
 
 /* The portal-vs-model lag, carried on every screen (PRODUCT_DESIGN §4.4b). */
 .sync-pill {
-  display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); font-weight: 600;
   padding: 5px 10px; border-radius: var(--r-pill); cursor: pointer;
-  border: 1px solid; background: transparent; font-family: inherit;
+  border: 1px solid; background: transparent; font-family: inherit; white-space: nowrap;
 }
 .sync-pill.amber { color: var(--warn);  border-color: rgba(255,184,77,.45); background: rgba(255,184,77,.10); }
 .sync-pill.clean { color: var(--ok);    border-color: rgba(55,211,155,.35); background: rgba(55,211,155,.08); }
 
+/* Alert bell — the citizen's whole notification channel is in-portal, so this
+   is the only place an alert can surface. It must be visible on every screen
+   and at every width. */
+.bell {
+  position: relative; width: 34px; height: 34px; border-radius: var(--r-sm);
+  background: transparent; border: 1px solid var(--line); color: var(--muted);
+  cursor: pointer; display: grid; place-items: center; font-size: var(--fs-md);
+}
+.bell:hover { color: var(--text); border-color: var(--accent); }
+.bell .count {
+  position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px;
+  padding: 0 4px; border-radius: var(--r-pill); background: var(--danger);
+  color: #fff; font-size: 9.5px; font-weight: 800; display: grid; place-items: center;
+  font-variant-numeric: tabular-nums; border: 2px solid var(--panel);
+}
+
 .role-pill {
-  font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
-  padding: 4px 9px; border-radius: var(--r-pill);
-  border: 1px solid currentColor;
+  font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  padding: 4px var(--s-2); border-radius: var(--r-pill);
+  border: 1px solid currentColor; white-space: nowrap;
 }
 .avatar {
   width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
-  font-weight: 700; font-size: 12px; color: #04121e; cursor: pointer; border: none;
+  font-weight: 700; font-size: var(--fs-sm); color: #04121e; cursor: pointer; border: none;
+  flex: 0 0 30px;
 }
 .acct-menu {
-  position: absolute; right: 14px; top: calc(var(--header-h) - 4px); z-index: 1200;
+  position: absolute; right: var(--s-3); top: calc(var(--header-h) - 4px); z-index: 1200;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
   min-width: 230px; padding: 6px; box-shadow: 0 12px 34px rgba(0,0,0,.5);
 }
-.acct-menu .who { padding: 9px 10px; border-bottom: 1px solid var(--line); margin-bottom: 5px; }
+.acct-menu .who { padding: var(--s-2) 10px; border-bottom: 1px solid var(--line); margin-bottom: 5px; }
 .acct-menu button {
   width: 100%; text-align: left; background: none; border: none; color: var(--text);
-  padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; font-size: 12.5px;
+  padding: var(--s-2) 10px; border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-sm);
   font-family: inherit;
 }
 .acct-menu button:hover { background: var(--card2); color: var(--danger); }
 
 .body { flex: 1; display: flex; min-height: 0; }
 
+/* Scrim behind any off-canvas panel. Rendered only at small widths. */
+.scrim {
+  position: fixed; inset: var(--header-h) 0 0 0; z-index: 690;
+  background: var(--scrim); border: none; padding: 0;
+  animation: fadeIn .14s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } }
+
 /* ── pages ─────────────────────────────────────────────────────────── */
 
-.page { flex: 1; overflow-y: auto; padding: 20px 22px; min-width: 0; }
-.page-head { margin-bottom: 18px; }
-.page-head h1 { font-size: 21px; margin: 0 0 4px; font-weight: 700; }
-.page-head p { margin: 0; color: var(--muted); font-size: 12.5px; max-width: 78ch; line-height: 1.55; }
+.page { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); min-width: 0; }
+.page-head { margin-bottom: var(--s-5); }
+.page-head h1 { font-size: var(--fs-xl); margin: 0 0 var(--s-1); font-weight: 700; line-height: var(--lh-tight); }
+.page-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); max-width: 78ch; line-height: var(--lh-base); }
 
-.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
-@media (max-width: 1100px) { .grid-3, .grid-4 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+/* Citizen prose runs longer and is read by non-specialists. */
+.page.citizen { max-width: 860px; margin: 0 auto; }
+.page.citizen .page-head p { font-size: var(--fs-md); line-height: var(--lh-loose); }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--s-3); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--s-3); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: var(--s-3); }
 
 /* Attention tiles on the role landing pages. */
 .tile {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
-  padding: 14px; display: flex; flex-direction: column; gap: 3px;
-  text-decoration: none; color: inherit;
+  padding: var(--s-4); display: flex; flex-direction: column; gap: 3px;
+  text-decoration: none; color: inherit; text-align: left; font-family: inherit;
 }
 .tile.clickable { cursor: pointer; }
 .tile.clickable:hover { border-color: var(--accent); }
 .tile-n { font-size: 27px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.tile-l { font-size: 11.5px; color: var(--muted); }
-.tile-s { font-size: 10.5px; color: var(--muted); opacity: .8; }
+.tile-l { font-size: var(--fs-xs); color: var(--muted); }
+.tile-s { font-size: var(--fs-2xs); color: var(--muted); opacity: .8; }
 .tile.red    .tile-n { color: var(--danger); }
 .tile.amber  .tile-n { color: var(--warn); }
 .tile.green  .tile-n { color: var(--ok); }
@@ -97,7 +162,7 @@
 
 .rail {
   width: var(--rail-w); flex: 0 0 var(--rail-w); background: var(--panel);
-  border-right: 1px solid var(--line); overflow-y: auto; padding: 12px;
+  border-right: 1px solid var(--line); overflow-y: auto; padding: var(--s-3);
   animation: railIn .18s ease-out;
 }
 @keyframes railIn { from { opacity: 0; transform: translateX(-8px); } }
@@ -115,10 +180,10 @@
 
 .rail-top {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; margin-bottom: 10px;
+  gap: var(--s-2); margin-bottom: 10px;
 }
 .rail-top .t {
-  font-size: 10px; font-weight: 700; letter-spacing: .09em;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .09em;
   text-transform: uppercase; color: var(--muted);
 }
 
@@ -130,7 +195,7 @@
   display: grid; place-items: center; width: 24px; height: 24px;
   border-radius: var(--r-sm); border: 1px solid var(--line);
   background: var(--card); color: var(--muted); cursor: pointer;
-  font-size: 13px; line-height: 1; transition: color .12s, border-color .12s;
+  font-size: var(--fs-base); line-height: 1; transition: color .12s, border-color .12s;
 }
 .rail-btn:hover { color: var(--text); border-color: var(--accent); }
 
@@ -146,11 +211,11 @@
   transition: color .12s, background .12s;
 }
 .rail-peek:hover { color: var(--text); background: var(--card2); }
-.rail-head { font-size: 11px; font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--muted); margin: 14px 0 7px; }
+.rail-head { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin: var(--s-4) 0 7px; }
 .rail-head:first-child { margin-top: 0; }
 
-.layer-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 12.5px; }
+.layer-row { display: flex; align-items: center; gap: var(--s-2); padding: 6px 0; font-size: var(--fs-sm); }
 .toggle {
   width: 32px; height: 18px; border-radius: var(--r-pill); background: var(--line);
   position: relative; cursor: pointer; border: none; flex: 0 0 32px; transition: background .15s;
@@ -170,14 +235,15 @@
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
 
 .list-item {
-  display: flex; align-items: center; justify-content: space-between; gap: 9px;
-  padding: 9px 10px; border-radius: var(--r-sm); cursor: pointer;
-  border: 1px solid transparent;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  padding: var(--s-2) 10px; border-radius: var(--r-sm); cursor: pointer;
+  border: 1px solid transparent; width: 100%; text-align: left;
+  background: none; color: inherit; font-family: inherit;
 }
 .list-item:hover { background: var(--card2); }
 .list-item.sel { background: rgba(63,182,255,.12); border-color: rgba(63,182,255,.35); }
-.list-item .nm { font-size: 12.5px; font-weight: 500; }
-.list-item .mt { font-size: 10.5px; color: var(--muted); }
+.list-item .nm { font-size: var(--fs-sm); font-weight: 500; }
+.list-item .mt { font-size: var(--fs-2xs); color: var(--muted); }
 
 .map-wrap { flex: 1; position: relative; min-width: 0; background: var(--bg); }
 .map { position: absolute; inset: 0; }
@@ -190,45 +256,55 @@
    drawer — and the map between them collapses to zero width. */
 .map-shell {
   display: flex; flex: 1; width: 100%;
-  height: 100%; min-height: 0; min-width: 0; overflow: hidden;
+  height: 100%; min-height: 0; min-width: 0; overflow: hidden; position: relative;
 }
 .map-area { flex: 1; position: relative; min-width: 0; background: var(--bg); }
 .map-canvas { position: absolute; inset: 0; }
 .page-map { display: flex; flex: 1; width: 100%; flex-direction: column; height: 100%; min-height: 0; }
 .page-head.compact {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  padding: 12px 18px; margin: 0; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); margin: 0; border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
 }
-.page-head.compact h1 { margin: 0; font-size: 17px; }
+.page-head.compact h1 { margin: 0; font-size: var(--fs-lg); }
 .page-head.compact p { margin: 2px 0 0; }
 .leaflet-container { background: var(--bg); font-family: inherit; }
 .leaflet-control-zoom a { background: var(--card) !important; color: var(--text) !important; border-color: var(--line) !important; }
 .leaflet-tooltip {
   background: var(--card); color: var(--text); border: 1px solid var(--line);
-  box-shadow: none; font-size: 11.5px;
+  box-shadow: none; font-size: var(--fs-xs);
 }
 .leaflet-tooltip::before { border-top-color: var(--line); }
 
 .map-ov {
   position: absolute; z-index: 600; background: rgba(14,17,22,.92);
   border: 1px solid var(--line); border-radius: var(--r-md);
-  padding: 10px 12px; font-size: 11.5px; backdrop-filter: blur(5px);
+  padding: 10px var(--s-3); font-size: var(--fs-xs); backdrop-filter: blur(5px);
 }
-.map-ov.legend { left: 12px; bottom: 12px; min-width: 200px; max-width: 260px; }
-.map-ov.status { right: 12px; bottom: 12px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
-.map-ov.hint { top: 12px; left: 50%; transform: translateX(-50%); max-width: 420px; text-align: center; }
-.ov-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+.map-ov.legend { left: var(--s-3); bottom: var(--s-3); min-width: 200px; max-width: 260px; max-height: 46%; overflow-y: auto; }
+.map-ov.status { right: var(--s-3); bottom: var(--s-3); font-family: var(--mono); font-size: var(--fs-2xs); color: var(--muted); }
+.map-ov.hint { top: var(--s-3); left: 50%; transform: translateX(-50%); max-width: 420px; text-align: center; }
+.ov-title { font-size: var(--fs-2xs); letter-spacing: .08em; text-transform: uppercase;
   color: var(--muted); font-weight: 700; margin-bottom: 6px; }
-.legend h5 { margin: 0 0 7px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.legend-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.legend h5 { margin: 0 0 7px; font-size: var(--fs-2xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.legend-row { display: flex; align-items: center; gap: var(--s-2); padding: 2px 0; }
 .legend-hr { height: 1px; background: var(--line); margin: 7px 0; }
 
+/* A collapsible legend, so it can be folded away on a small screen where it
+   would otherwise cover a quarter of the map. */
+.legend-toggle {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-family: inherit; font-size: var(--fs-2xs); letter-spacing: .08em;
+  text-transform: uppercase; font-weight: 700; padding: 0; display: flex;
+  align-items: center; gap: 6px; width: 100%;
+}
+
 .ribbon {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 600;
+  position: absolute; top: var(--s-3); left: 50%; transform: translateX(-50%); z-index: 600;
   background: rgba(255,184,77,.16); color: var(--warn);
   border: 1px solid rgba(255,184,77,.45);
-  font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
-  padding: 5px 14px; border-radius: var(--r-pill);
+  font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  padding: 5px var(--s-4); border-radius: var(--r-pill);
 }
 
 .isr-pin-wrap { background: none; border: none; }
@@ -256,64 +332,74 @@
 
 /* Leaflet tooltips for the engine layers. Wider than the default so an aquifer
    line does not wrap after three words. */
-.plume-tip, .aq-tip { max-width: 300px; white-space: normal; line-height: 1.5; }
+.plume-tip, .aq-tip { max-width: 300px; white-space: normal; line-height: var(--lh-base); }
 
 /* ── drawer ────────────────────────────────────────────────────────── */
 
 .drawer {
   width: var(--drawer-w); flex: 0 0 var(--drawer-w); background: var(--panel);
   border-left: 1px solid var(--line); display: flex; flex-direction: column;
-  min-height: 0; overflow-y: auto; padding-bottom: 16px;
+  min-height: 0; overflow-y: auto; padding-bottom: var(--s-4);
   animation: slideIn .16s ease-out;
 }
 /* The engine drawer carries sliders, three metric cards and a register form.
    At the standard width those wrap into an unreadable column. */
 .drawer.wide { width: 380px; flex: 0 0 380px; }
-.drawer > *:not(.drawer-head) { padding-left: 14px; padding-right: 14px; }
+.drawer > *:not(.drawer-head) { padding-left: var(--s-4); padding-right: var(--s-4); }
 .drawer-head {
-  padding: 13px 14px; border-bottom: 1px solid var(--line);
+  padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--line);
   display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
   position: sticky; top: 0; background: var(--panel); z-index: 2;
 }
-.drawer-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
-.dh-title { font-size: 15px; font-weight: 700; }
-.dh-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.drawer-body { padding: 13px 14px; overflow-y: auto; }
+.drawer-head h2 { margin: 0; font-size: var(--fs-lg); font-weight: 700; }
+.dh-title { font-size: var(--fs-lg); font-weight: 700; }
+.dh-sub { font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; }
+.drawer-body { padding: var(--s-3) var(--s-4); overflow-y: auto; }
+
+/* The grab handle only appears when the drawer is a bottom sheet. */
+.sheet-grip { display: none; }
 
 .sec {
-  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--muted); font-weight: 700; margin: 16px 0 8px;
+  font-size: var(--fs-2xs); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; margin: var(--s-4) 0 var(--s-2);
 }
-.metric-row { display: grid; gap: 8px; }
+.metric-row { display: grid; gap: var(--s-2); }
 .btn.block { width: 100%; justify-content: center; margin-top: 10px; }
-.seg.seg-sm button { padding: 5px 9px; font-size: 11.5px; }
+.seg.seg-sm button { padding: 5px 9px; font-size: var(--fs-xs); }
 .spinner.sm { width: 12px; height: 12px; border-width: 2px; margin-left: 7px; vertical-align: -1px; }
 
-.kv { display: grid; grid-template-columns: 44% 1fr; gap: 7px 10px; font-size: 12.5px; }
+.kv { display: grid; grid-template-columns: 44% 1fr; gap: 7px 10px; font-size: var(--fs-sm); }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
 
 /* ── login ─────────────────────────────────────────────────────────── */
 
 .login {
-  height: 100%; display: grid; place-items: center;
+  height: 100%; display: grid; place-items: center; overflow-y: auto;
+  padding: var(--s-5) var(--s-4);
   background: radial-gradient(1100px 560px at 50% -12%, #14202c 0%, var(--bg) 62%);
 }
 .login-card {
-  width: 400px; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 14px; padding: 26px; box-shadow: 0 26px 60px rgba(0,0,0,.55);
+  width: 400px; max-width: 100%; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; padding: var(--s-6); box-shadow: 0 26px 60px rgba(0,0,0,.55);
 }
-.login-card h1 { margin: 0 0 3px; font-size: 20px; }
-.field { margin-bottom: 13px; }
-.field label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
-.demo-users { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 13px; }
+.login-card h1 { margin: 0 0 3px; font-size: var(--fs-xl); }
+.field { margin-bottom: var(--s-3); }
+.field label { display: block; font-size: var(--fs-xs); color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+.field .hint { font-size: var(--fs-2xs); color: var(--muted); margin-top: 4px; line-height: var(--lh-snug); }
+.field .err { font-size: var(--fs-2xs); color: var(--danger); margin-top: 4px; }
+.demo-users { margin-top: var(--s-5); border-top: 1px solid var(--line); padding-top: var(--s-3); }
 .demo-user {
-  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  display: flex; align-items: center; gap: var(--s-2); width: 100%; text-align: left;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm);
   padding: 7px 9px; margin-bottom: 5px; cursor: pointer; color: var(--text);
-  font-family: inherit; font-size: 12px;
+  font-family: inherit; font-size: var(--fs-sm); flex-wrap: wrap;
 }
 .demo-user:hover { border-color: var(--accent); }
+.link-btn {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font-family: inherit; font-size: var(--fs-sm); padding: 0; text-decoration: underline;
+}
 
 /* ── scale ─────────────────────────────────────────────────────────── */
 
@@ -324,7 +410,7 @@
   display: flex; align-items: baseline; gap: 6px;
   background: rgba(14,17,22,.86); border: 1px solid var(--line);
   border-radius: var(--r-sm); padding: 2px 7px;
-  font-family: var(--mono); font-size: 10.5px; color: var(--text);
+  font-family: var(--mono); font-size: var(--fs-2xs); color: var(--text);
   backdrop-filter: blur(4px);
 }
 .scale-ratio .sr-n { font-variant-numeric: tabular-nums; }
@@ -334,5 +420,82 @@
 }
 .leaflet-control-scale-line {
   background: rgba(14,17,22,.86) !important; color: var(--text) !important;
-  border-color: var(--line) !important; font-size: 10.5px;
+  border-color: var(--line) !important; font-size: var(--fs-2xs);
+}
+
+/* ══ RESPONSIVE ══════════════════════════════════════════════════════ */
+
+/* ≥768px and <1024px — the drawer stops taking a column and overlays the map
+   from the right, so the map keeps its width while a result is being read. */
+@media (max-width: 1023px) {
+  .map-shell .drawer,
+  .map-shell .drawer.wide {
+    position: absolute; inset: 0 0 0 auto; z-index: 700;
+    width: min(380px, 82vw); flex: none;
+    box-shadow: -14px 0 40px rgba(0,0,0,.45);
+  }
+  :root { --rail-w: 300px; }
+  .grid-4 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* <900px — the header nav does not fit beside the brand and the account
+   controls, so it moves into a menu. */
+@media (max-width: 899px) {
+  .hdr-nav { display: none; }
+  .nav-btn { display: grid; }
+  .hdr-brand .hdr-sub { display: none; }
+  .grid-3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* <768px — panels change kind. */
+@media (max-width: 767px) {
+  .page { padding: var(--s-4) var(--s-3); }
+  .page-head { margin-bottom: var(--s-4); }
+  .page-head h1 { font-size: var(--fs-lg); }
+
+  /* Rail → off-canvas sheet over a scrim, on map screens AND on the
+     page-with-rail screens (Console side panel). */
+  .map-shell .rail,
+  .body > .rail {
+    position: fixed; inset: var(--header-h) auto 0 0; z-index: 700;
+    width: min(88vw, var(--rail-w)); flex: none;
+    box-shadow: 14px 0 40px rgba(0,0,0,.5);
+  }
+
+  /* Drawer → bottom sheet. A right-hand column at 375px hides the map it is
+     describing; a bottom sheet leaves the top half of the map visible. */
+  .map-shell .drawer,
+  .map-shell .drawer.wide {
+    inset: auto 0 0 0; width: 100%; max-height: 76vh;
+    border-left: none; border-top: 1px solid var(--line);
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    box-shadow: 0 -14px 40px rgba(0,0,0,.5);
+    animation: sheetUp .18s ease-out;
+  }
+  .map-shell .drawer .sheet-grip {
+    display: block; width: 38px; height: 4px; border-radius: 99px;
+    background: var(--line); margin: var(--s-2) auto 0; flex: none;
+  }
+  .drawer-head { padding: var(--s-2) var(--s-3) var(--s-3); }
+
+  .map-ov.legend { max-width: 190px; font-size: var(--fs-2xs); max-height: 38%; }
+  .map-ov.hint { max-width: calc(100vw - 24px); font-size: var(--fs-2xs); }
+  .map-ov.status { display: none; }
+
+  .kv { grid-template-columns: 1fr; gap: 2px var(--s-2); }
+  .kv dt { margin-top: 6px; font-size: var(--fs-xs); }
+  .kv dd { font-size: var(--fs-base); }
+
+  .page-head.compact { padding: var(--s-2) var(--s-3); }
+  .login-card { padding: var(--s-4); }
+}
+
+/* <640px — one column everywhere. */
+@media (max-width: 639px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  .hdr { gap: var(--s-2); padding: 0 var(--s-2); }
+  .hdr-name { font-size: var(--fs-md); }
+  .role-pill { display: none; }   /* the account menu still shows the role */
+  .sync-pill span:last-child { display: none; }  /* dot only */
+  .sync-pill { padding: 5px 7px; }
 }

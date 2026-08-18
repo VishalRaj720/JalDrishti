@@ -59,7 +59,30 @@ ALLOWED_PAYLOAD_KEYS = frozenset({
 })
 
 #: Sliders a caller may set. `lon`/`lat` come from the ISR point, not the body.
+#:
+#: Still the full set, because the INTERACTIVE map path (`POST /ml/predict`) has
+#: no registered site behind it: an unpersisted pin run has to supply its own
+#: operating parameters or it has none. That path is explicitly exploratory and
+#: stores nothing.
 CLIENT_TUNABLE = ALLOWED_PAYLOAD_KEYS - {"lon", "lat"}
+
+#: What a run against a REGISTERED SITE may vary — and it is only these three.
+#:
+#: P2. A site is the operation (migration 0015), so "run this site" must mean
+#: the same thing to everyone who does it. `RunRequest` was cut to these three
+#: fields for that reason, but the schema alone was not enough: a **scenario**
+#: stores an arbitrary parameter dict, validates it against `CLIENT_TUNABLE`,
+#: and `POST /scenarios/{id}/run` feeds it straight in as run overrides —
+#: bypassing `RunRequest` entirely. `operation_years` could therefore still
+#: override the site through the scenario door after the front door was shut.
+#:
+#: So the rule lives here, next to the allowlist it narrows, and both the
+#: scenario validator and the run service enforce it. One definition, two
+#: enforcement points, no third door.
+#:
+#: `species` is included because it selects which contaminant to solve for, not
+#: how the operation is configured.
+RUN_VARIABLE = frozenset({"species", "time_years", "restoration_years"})
 
 #: Engine inputs a portal user may NOT override, even though the pipeline's own
 #: local dashboard exposes them as "expert" fields. These are exactly the
