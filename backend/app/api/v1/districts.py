@@ -48,16 +48,12 @@ async def districts_geojson(
     return {"type": "FeatureCollection", "features": features}
 
 
-@router.get("/{district_id}", response_model=DistrictResponse)
-async def get_district(
-    district_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_any_role),
-):
-    try:
-        return await DistrictService(db).get(district_id)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
+# ── No detail route ─────────────────────────────────────────────────
+# R11 deleted `GET /districts/{id}`. Nothing called it: the portal's district
+# detail comes from `GET /public/risk/{district_id}`, which returns the measured
+# summary and band a user actually needs, and `GET /districts/geojson` carries the
+# geometry. A second detail route reading the same row through a different service
+# is a second place for the "sampled but not analysed" logic to drift out of sync.
 
 # ── Reference geography is READ-ONLY ────────────────────────────────
 # P2 (PRODUCT_DESIGN.md section 3.1) deleted POST / PUT / DELETE here.

@@ -62,16 +62,9 @@ async def list_monitoring_wells(
     return payload
 
 
-@router.get("/{well_id}", response_model=MonitoringWellResponse)
-async def get_monitoring_well(
-    well_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_any_role),
-):
-    try:
-        return await MonitoringWellService(db).get(well_id)
-    except AppException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
+# R11 deleted `GET /monitoring-wells/{well_id}`. The bbox list above already
+# carries every field the popup renders, so the detail route only ever cost a
+# round trip. Wells are drawn from a bbox query, never navigated to by id.
 
 
 @router.post("", response_model=MonitoringWellResponse, status_code=201)

@@ -413,7 +413,7 @@ reads as an "excursion").
 > than read off the grid — the grid is sized to hold the disc, so its 5–13 m
 > cells quantised short plumes to zero (29 of 60 sampled scenarios read exactly
 > 0.0 m while not being immobile at all). See `review.md` findings #1 and the
-> Gate-3 record in [`docs/audits/REMEDIATION_GATE3_DECISION.md`](../docs/audits/REMEDIATION_GATE3_DECISION.md).
+> Gate-3 record in `docs/local/audit-record/REMEDIATION_GATE3_DECISION.md` (untracked).
 
 **Radial vs directional.** The diagnostic `λ = X_c / (W_eff/2)` says which
 regime you are in: λ < 1 means the source disc dominates the picture
@@ -609,7 +609,6 @@ Everything in `Datasets/` (repo root). **Real** = measured/published data;
 | `naquim_reference/naquim_vertical.csv` | Per-district NAQUIM/CGWB vertical profiles (fracture-zone depths, weathered-zone base) | D3: vertical stratification per district |
 | `District_Boundary_JH.geojson` | State/district boundaries | Hard Jharkhand boundary (422 outside), district lookup |
 | `Real_dataset/Dataset 2/*.csv` | **Texas ISR operating records** (TexasISROperations, Restoration, AquiferExemptions, DisposalVolumes, MinePermits) | Source-term signature (C0 ranges), restoration endpoint residuals + the 5.0-yr sweep anchor |
-| `Real_dataset/east_singhbhum.tif` | SRTM DEM tile (E. Singhbhum) | (spare; superseded by GLO-30) |
 
 Derived artifacts in `ml_pipeline/data_prep/artifacts/`: `flow_field.npz`
 (gridded gradient/azimuth/water-table from stations + DEM), `strike_field.npz`
@@ -874,7 +873,8 @@ ml_pipeline/
 The audit and remediation record — `QA_SWEEP_REPORT.md`, `FABLE5_QA_SWEEP_PROMPT.md`,
 `REMEDIATION_PROMPT.md`, `REMEDIATION_GATE3_DECISION.md`, `review*.md`,
 `DOMENICO_ERROR_ENVELOPE.md`, `ML_PIPELINE_READINESS.md` — moved to
-[`docs/audits/`](../docs/audits/) in the 2026-08-11 documentation reorganisation.
+`docs/local/audit-record/` (untracked) in the 2026-08-19 reorganisation. The live
+limitations register is [`docs/LIMITATIONS.md`](../docs/LIMITATIONS.md).
 The four files above stay here because they are code-coupled: `tools/sync_docs.py`
 writes §6.5 of this file, and `validation/end_to_end_audit.py` reads `README.md`
 and `JHARKHAND_FIDELITY_MATRIX.md` by path.

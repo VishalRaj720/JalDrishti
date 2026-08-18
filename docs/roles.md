@@ -206,20 +206,10 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/advisories` | ● | ● | · | · |
 | `GET /api/v1/advisories/{advisory_id}` | ● | ● | ● | · |
 | `POST /api/v1/advisories/{advisory_id}/decision` | ● | · | · | · |
-| `GET /api/v1/aquifers` | ● | ● | ● | · |
-| `GET /api/v1/aquifers/{aquifer_id}` | ● | ● | ● | · |
 | `GET /api/v1/audit` | ● | · | · | · |
 | `POST /api/v1/auth/login` | ○ | ○ | ○ | ○ |
 | `POST /api/v1/auth/logout` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/auth/me` | ● | ● | ● | ● |
-| `GET /api/v1/blocks` | ● | ● | ● | · |
-| `GET /api/v1/blocks/{block_id}/monitoring-stations` | ● | ● | ● | · |
-| `POST /api/v1/blocks/{block_id}/monitoring-stations` | ● | ● | · | · |
-| `DELETE /api/v1/blocks/{block_id}/monitoring-stations/{station_id}` | ● | · | · | · |
-| `GET /api/v1/blocks/{block_id}/monitoring-stations/{station_id}` | ● | ● | ● | · |
-| `PUT /api/v1/blocks/{block_id}/monitoring-stations/{station_id}` | ● | ● | · | · |
-| `GET /api/v1/blocks/{block_id}/monitoring-stations/{station_id}/readings` | ● | ● | ● | · |
-| `POST /api/v1/blocks/{block_id}/monitoring-stations/{station_id}/readings` | ● | ● | · | · |
 | `GET /api/v1/citizen/advisories` | ● | ● | ● | ● |
 | `GET /api/v1/citizen/advisories/geojson` | ● | ● | ● | ● |
 | `GET /api/v1/citizen/alerts` | ● | ● | ● | ● |
@@ -238,9 +228,6 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/dataset-sync/status` | ● | ● | ● | · |
 | `GET /api/v1/districts` | ● | ● | ● | · |
 | `GET /api/v1/districts/geojson` | ● | ● | ● | · |
-| `GET /api/v1/districts/{district_id}` | ● | ● | ● | · |
-| `GET /api/v1/districts/{district_id}/blocks` | ● | ● | ● | · |
-| `GET /api/v1/districts/{district_id}/blocks/{block_id}` | ● | ● | ● | · |
 | `GET /api/v1/field-observations` | ● | ● | ● | · |
 | `POST /api/v1/field-observations` | ● | · | ● | · |
 | `GET /api/v1/field-observations/map` | ● | ● | ● | · |
@@ -272,11 +259,8 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/ml/predict` | ● | ● | · | · |
 | `GET /api/v1/ml/rivers` | ● | ● | ● | · |
 | `GET /api/v1/ml/strike-field` | ● | ● | ● | · |
-| `GET /api/v1/monitoring-stations` | ● | ● | ● | · |
-| `GET /api/v1/monitoring-stations/count` | ● | ● | ● | · |
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | ● | · | · |
-| `GET /api/v1/monitoring-wells/{well_id}` | ● | ● | ● | · |
 | `GET /api/v1/public/risk/districts` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/geojson/blocks` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/geojson/districts` | ○ | ○ | ○ | ○ |
@@ -307,7 +291,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 92/102 · **analyst** 72/102 · **field_officer** 57/102 · **citizen** 12/102
+Reachable endpoints per role — **admin** 76/86 · **analyst** 57/86 · **field_officer** 45/86 · **citizen** 12/86
 
 <!-- END GENERATED AUTHZ MATRIX -->
 
