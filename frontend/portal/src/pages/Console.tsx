@@ -101,8 +101,13 @@ export default function Console() {
   const [drawerHidden, setDrawerHidden] = useState(false);
   const rail = useResizableWidth("console.rail",
     { min: 240, max: 560, initial: 340, edge: "right" });
+  // The drawer holds the lifecycle chart and the restoration sweep, and 720 px
+  // was too narrow to read either properly — the sweep in particular is a curve
+  // whose whole point is the shape and where it crosses the limit. The cap is
+  // now most of a wide screen, so the plots can be pulled out to a size worth
+  // looking at and dragged back when the map matters more.
   const drawer = useResizableWidth("console.drawer",
-    { min: 320, max: 720, initial: 380, edge: "left" });
+    { min: 320, max: 1100, initial: 420, edge: "left" });
 
   // Live-run controls (pin mode only).
   const [species, setSpecies] = useState("uranium_ppb");

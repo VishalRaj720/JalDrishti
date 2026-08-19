@@ -35,6 +35,7 @@ import {
 import { canRunSim, useAuth } from "../auth";
 import { ErrorNote, Loading, TableScroll } from "../components/bits";
 import LifecycleChart, { LifecycleNarrative } from "../console/LifecycleChart";
+import SweepChart, { type Sweep } from "../console/SweepChart";
 import ReportMap from "../console/ReportMap";
 import RunResult from "../console/RunResult";
 import { VerticalNumbers, VerticalSchematic } from "../console/VerticalPanel";
@@ -83,6 +84,20 @@ export default function IsrReport() {
       species: "uranium_ppb", time_years: horizon, restoration_years: restoration,
     }),
   });
+  /**
+   * The restoration sweep — the one Console plot the report was missing.
+   *
+   * It answers a question no single run can: *how many years of restoration is
+   * enough*. A slider gives one number with nothing to compare it against; the
+   * curve gives the shape and the year it crosses the screening limit. That is
+   * the most decision-relevant figure on this page, so a document meant to be
+   * read without the Console should carry it.
+   */
+  const sweep = useMutation({
+    mutationFn: () => api.post<Sweep>(`/simulations/${siteId}/sweep`, {
+      axis: "restoration", species: "uranium_ppb", points: 6, time_years: horizon,
+    }),
+  });
 
   // Build the report on open, and again whenever the two live inputs change —
   // the reader should not have to press a button to see the defaults.
@@ -90,6 +105,7 @@ export default function IsrReport() {
     if (!siteId || !mayRun) return;
     lifecycle.mutate();
     detail.mutate();
+    sweep.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId, horizon, restoration, mayRun]);
 
@@ -419,6 +435,24 @@ export default function IsrReport() {
                 <LifecycleNarrative data={lifecycle.data} />
               </>
             )}
+          </section>
+        )}
+
+        {/* ── how long restoration has to run ── */}
+        {mayRun && (
+          <section className="card">
+            <div className="card-title">
+              How many years of restoration are enough?
+            </div>
+            <p className="muted small">
+              Each point is a full solve at {horizon} yr with a different
+              restoration length. Restoration adequacy is <b>conditional on when
+              you look</b> — a sweep that suffices at 20 yr need not at 50 — so the
+              evaluation horizon is held fixed and stated.
+            </p>
+            {sweep.isPending && <Loading label="Solving the sweep…" />}
+            <ErrorNote error={sweep.error} />
+            {sweep.data && <SweepChart sweep={sweep.data} />}
           </section>
         )}
 
