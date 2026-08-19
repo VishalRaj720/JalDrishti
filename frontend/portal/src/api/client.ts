@@ -545,3 +545,49 @@ export interface MlDrift {
   off_scale_rate: number;
   drifting: boolean;
 }
+
+/** `POST /simulations/compare` — two runs diffed and the difference attributed.
+ *
+ *  `cause` is the load-bearing field, not the metrics: two runs can disagree
+ *  because the inputs changed or because the model did, and a delta nobody can
+ *  attribute is a delta nobody can act on. */
+export interface RunDiff {
+  run_a: string; run_b: string;
+  isr_point_a: string; isr_point_b: string;
+  same_site: boolean;
+  species: { a: string; b: string };
+  cause: string;
+  /** artifacts + model card identical */
+  same_model: boolean;
+  /** same git revision computed both — the analytical engine is code, so this
+   *  can move every number with an unchanged artifact bundle */
+  same_code: boolean;
+  /** both of the above; the only state in which a delta is safely attributable
+   *  to the inputs */
+  same_engine: boolean;
+  model: Record<"a" | "b", {
+    artifacts_sha: string | null;
+    code_version: string | null;
+    model_card_sha: string | null;
+  }>;
+  input_delta: Record<string, { a: unknown; b: unknown }>;
+  metric_delta: Record<string, { a: number | null; b: number | null; change_pct: number | null }>;
+  extrapolation: { a: string[] | null; b: string[] | null };
+  note: string;
+}
+
+/** What deleting a registered ISR site would destroy.
+ *
+ *  `simulation_runs` and `advisories` both cascade on `isr_point_id`, so a
+ *  delete silently takes the site's whole filed history — including the
+ *  provenance triple that makes a stored number defensible. The API refuses
+ *  outright when a PUBLISHED advisory exists; `deletable` reports that. */
+export interface DeletionImpact {
+  isr_point_id: string;
+  simulation_runs: number;
+  advisories: number;
+  published_advisories: number;
+  deletable: boolean;
+  cascade_warning: string;
+  blocked_reason: string | null;
+}

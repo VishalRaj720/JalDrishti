@@ -124,7 +124,10 @@ async def test_compare_attributes_the_difference_to_inputs(
     assert cmp_.status_code == 200, cmp_.text
     body = cmp_.json()
     assert body["same_model"] is True
-    assert body["cause"] == "inputs differ; same model"
+    # R11 widened this from "same model" to "same model and code": two runs can
+    # share an artifact bundle and still have been computed by different physics,
+    # because the analytical engine is code rather than a pickled model.
+    assert body["cause"] == "inputs differ; same model and code"
     assert body["input_delta"]["time_years"] == {"a": 4, "b": 20}
     # a longer evaluation horizon should move at least one metric
     assert body["metric_delta"], "identical metrics for different horizons"
@@ -144,7 +147,7 @@ async def test_compare_reports_identical_when_nothing_changed(
     body = (await client.post(f"/api/v1/scenarios/{sid}/compare",
                               headers=_tok(analyst),
                               json={"run_a": a, "run_b": b})).json()
-    assert body["cause"] == "identical inputs and model"
+    assert body["cause"] == "identical inputs, model and code"
     assert body["metric_delta"] == {}
 
 

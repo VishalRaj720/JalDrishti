@@ -11,6 +11,7 @@ import {
 function sectionsFor(role: Role | undefined) {
   const s: Array<{ to: string; label: string }> = [{ to: "/overview", label: "Overview" }];
   if (isStaff(role)) s.push({ to: "/console", label: "Console" });
+  if (canRunSim(role)) s.push({ to: "/compare", label: "Compare" });
   // Analysts propose, regulators decide — both need the queue. A field officer
   // does not run the model, so nothing here is theirs to propose or judge.
   if (canRunSim(role) || canReview(role)) s.push({ to: "/publications", label: "Publications" });

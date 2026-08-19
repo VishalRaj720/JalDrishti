@@ -30,7 +30,7 @@ from app.engine_bounds import BOUNDS as B
 from app.exceptions import AppException
 from app.models.user import User
 from app.schemas.simulation import SimulationResponse
-from app.services import audit
+from app.services import audit, run_compare as rc
 from app.services.simulation import SimulationService
 from app.services.simulation_run import SimulationRunService
 
@@ -128,6 +128,48 @@ async def _run_in_background(run_id: uuid.UUID) -> None:
         # time; the audit row records that caller as the actor.
         await set_rls_context(db, bypass=True)
         await SimulationRunService(db, system=True).execute(run_id)
+
+
+class CompareRunsRequest(BaseModel):
+    run_a: uuid.UUID
+    run_b: uuid.UUID
+
+
+# Declared BEFORE `POST /{isr_id}`: FastAPI matches in declaration order,
+# so a later registration would have "compare" parsed as an isr_id UUID.
+@router.post("/compare")
+async def compare_runs(
+    payload: CompareRunsRequest,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_staff),
+):
+    """Diff two stored runs and attribute the difference.
+
+    Works across ISR sites, which `POST /scenarios/{id}/compare` could not:
+    runs saved from the Console carry `scenario_id = NULL`, so the scenario route
+    needed a scenario id that does not exist for exactly the comparison an
+    analyst wants — this site versus that one.
+
+    Both runs must be `completed`. An incomplete run has no metrics, and saying
+    so beats returning a diff full of nulls.
+    """
+    svc = SimulationRunService(db)
+    try:
+        a = await svc.get(payload.run_a)
+        b = await svc.get(payload.run_b)
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+    for r in (a, b):
+        if r.status != "completed":
+            raise HTTPException(
+                status_code=409,
+                detail=(f"Run {r.id} is '{r.status}'; only completed runs can be "
+                        f"compared."))
+    if a.id == b.id:
+        raise HTTPException(status_code=400,
+                            detail="Pick two different runs to compare.")
+    return rc.diff(a, b)
 
 
 @router.post("/{isr_id}", response_model=RunResponse,

@@ -24,6 +24,7 @@ import DataGaps from "./pages/DataGaps";
 import Audit from "./pages/Audit";
 import Administration from "./pages/Administration";
 import Datasets from "./pages/Datasets";
+import Compare from "./pages/Compare";
 import PublicView from "./pages/PublicView";
 
 const qc = new QueryClient({
@@ -68,6 +69,7 @@ function Gate() {
             rather than 404: they were linked from the role overviews and are
             almost certainly bookmarked. */}
         <Route path="/console" element={<Guard allow={isStaff}><Console /></Guard>} />
+        <Route path="/compare" element={<Guard allow={canRunSim}><Compare /></Guard>} />
         <Route
           path="/publications"
           element={<Guard allow={(r) => canRunSim(r) || canReview(r)}><Publications /></Guard>}

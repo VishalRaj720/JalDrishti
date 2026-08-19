@@ -256,6 +256,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `DELETE /api/v1/isr-points/{isr_id}` | ● | · | · | · |
 | `GET /api/v1/isr-points/{isr_id}` | ● | ● | ● | · |
 | `PUT /api/v1/isr-points/{isr_id}` | ● | ● | · | · |
+| `GET /api/v1/isr-points/{isr_id}/deletion-impact` | ● | · | · | · |
 | `GET /api/v1/isr-points/{isr_id}/simulations` | ● | ● | ● | · |
 | `GET /api/v1/ml/aquifers` | ● | ● | ● | · |
 | `GET /api/v1/ml/assumptions` | ● | ● | ● | · |
@@ -290,6 +291,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/scenarios/{scenario_id}` | ● | ● | ● | · |
 | `POST /api/v1/scenarios/{scenario_id}/compare` | ● | ● | ● | · |
 | `POST /api/v1/scenarios/{scenario_id}/run` | ● | ● | · | · |
+| `POST /api/v1/simulations/compare` | ● | ● | ● | · |
 | `GET /api/v1/simulations/runs` | ● | ● | ● | · |
 | `GET /api/v1/simulations/runs/{run_id}` | ● | ● | ● | · |
 | `POST /api/v1/simulations/{isr_id}` | ● | ● | · | · |
@@ -309,7 +311,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 93/104 · **analyst** 62/104 · **field_officer** 50/104 · **citizen** 12/104
+Reachable endpoints per role — **admin** 95/106 · **analyst** 63/106 · **field_officer** 51/106 · **citizen** 12/106
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

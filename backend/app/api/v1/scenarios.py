@@ -26,6 +26,7 @@ from app.models.scenario import Scenario
 from app.models.simulation_run import SimulationRun
 from app.models.user import User
 from app.services import audit
+from app.services import run_compare as rc
 from app.services.simulation_run import SimulationRunService
 
 router = APIRouter(prefix="/scenarios", tags=["Scenarios"])
@@ -195,56 +196,9 @@ async def compare_runs(
                 detail=f"Run {r.id} is '{r.status}'; only completed runs can be "
                        f"compared.")
 
-    input_keys = set(a.request) | set(b.request)
-    input_delta = {k: {"a": a.request.get(k), "b": b.request.get(k)}
-                   for k in sorted(input_keys)
-                   if a.request.get(k) != b.request.get(k)}
-    same_model = (a.artifacts_sha == b.artifacts_sha
-                  and a.model_card_sha == b.model_card_sha)
-
-    if input_delta and same_model:
-        cause = "inputs differ; same model"
-    elif not input_delta and not same_model:
-        cause = "same inputs; the MODEL changed between these runs"
-    elif input_delta and not same_model:
-        cause = ("both inputs and model differ — the metric delta cannot be "
-                 "attributed to either without re-running one of them")
-    else:
-        cause = "identical inputs and model"
-
-    def _flat(m):
-        out = {}
-        for engine, block in (m or {}).items():
-            if isinstance(block, dict):
-                for k, v in block.items():
-                    if isinstance(v, (int, float)):
-                        out[f"{engine}.{k}"] = v
-        return out
-
-    fa, fb = _flat(a.metrics), _flat(b.metrics)
-    metric_delta = {}
-    for k in sorted(set(fa) | set(fb)):
-        va, vb = fa.get(k), fb.get(k)
-        if va is None or vb is None:
-            metric_delta[k] = {"a": va, "b": vb, "change_pct": None}
-        elif va != vb:
-            metric_delta[k] = {
-                "a": va, "b": vb,
-                "change_pct": (round((vb - va) / va * 100, 2) if va else None)}
-
-    return {
-        "scenario_id": str(scenario_id),
-        "run_a": str(a.id), "run_b": str(b.id),
-        "cause": cause,
-        "same_model": same_model,
-        "model": {"a": {"artifacts_sha": a.artifacts_sha,
-                        "code_version": a.code_version},
-                  "b": {"artifacts_sha": b.artifacts_sha,
-                        "code_version": b.code_version}},
-        "input_delta": input_delta,
-        "metric_delta": metric_delta,
-        "extrapolation": {"a": a.extrapolation, "b": b.extrapolation},
-    }
+    out = rc.diff(a, b)
+    out["scenario_id"] = str(scenario_id)
+    return out
 
 
 @router.delete("/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)

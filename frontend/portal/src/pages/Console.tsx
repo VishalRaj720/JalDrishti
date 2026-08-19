@@ -29,9 +29,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api, type District, type EngineBounds, type FeatureCollection, type IsrPoint,
   type Lifecycle, type LiveRun, type ObservationMap, type PinInfo, type PreviewRun,
-  type PublicDistrictRisk, type SimRun,
+  type PublicDistrictRisk, type SimRun, type DeletionImpact,
 } from "../api/client";
-import { canRunSim, useAuth } from "../auth";
+import { canAdmin, canRunSim, useAuth } from "../auth";
 import { ErrorNote, Loading, RiskBand, bandOf } from "../components/bits";
 import { FloatingPanel, useResizableWidth } from "../components/panels";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
@@ -169,6 +169,21 @@ export default function Console() {
 
   const site = useMemo(
     () => sites.data?.find((s) => s.id === siteId) ?? null, [sites.data, siteId]);
+
+  const impact = useQuery({
+    queryKey: ["deletion-impact", siteId],
+    enabled: !!siteId && mode === "site" && canAdmin(me?.role),
+    queryFn: () => api.get<DeletionImpact>(`/isr-points/${siteId}/deletion-impact`),
+  });
+  const delSite = useMutation({
+    mutationFn: (id: string) =>
+      api.del<{ message: string }>(`/isr-points/${id}?dry_run=false&confirm=DELETE`),
+    onSuccess: () => {
+      closeDrawer();
+      qc.invalidateQueries({ queryKey: ["isr-points"] });
+      qc.invalidateQueries({ queryKey: ["sites"] });
+    },
+  });
 
   const runs = useQuery({
     queryKey: ["runs", siteId], enabled: !!siteId && mode === "site",
@@ -946,6 +961,48 @@ export default function Console() {
               <button className="btn ghost" onClick={closeDrawer}>Close</button>
             </div>
           </div>
+
+          {/* Deleting a site cascades to every stored run and advisory, so the
+              impact is fetched and shown BEFORE the button is offered. A site
+              with a published advisory is refused by the API outright — that is
+              a public statement residents may have acted on, and erasing one by
+              deleting its site is not a decision to reach by clicking through a
+              dialog. */}
+          {canAdmin(me?.role) && (
+            <div className="danger-zone" style={{ margin: "8px 0" }}>
+              {impact.data && (
+                <p className="muted small">
+                  Deleting this site would also destroy{" "}
+                  <b>{impact.data.simulation_runs} stored run(s)</b> and{" "}
+                  <b>{impact.data.advisories} advisory(ies)</b>, including their
+                  provenance.
+                  {impact.data.blocked_reason && (
+                    <><br /><span className="warn-text">{impact.data.blocked_reason}</span></>
+                  )}
+                </p>
+              )}
+              <button className="btn ghost danger small"
+                disabled={!impact.data?.deletable || delSite.isPending}
+                title={impact.data?.deletable
+                  ? "Delete this site and everything filed against it"
+                  : impact.data?.blocked_reason ?? "Checking…"}
+                onClick={() => {
+                  const n = impact.data?.simulation_runs ?? 0;
+                  if (window.prompt(
+                    `Delete ${site.name}?
+
+This also destroys ${n} stored run(s) `
+                    + `and their provenance. It cannot be undone.
+
+`
+                    + `Type DELETE to confirm.`) === "DELETE") {
+                    delSite.mutate(site.id);
+                  }
+                }}>
+                Delete this site
+              </button>
+            </div>
+          )}
 
           <div className="sec">The operation — fixed for this site</div>
           <dl className="kv">
