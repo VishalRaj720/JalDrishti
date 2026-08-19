@@ -22,7 +22,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
-  api, type DatasetRows, type DatasetSummary, type OpsStatus,
+  api, type DatasetRows, type DatasetSummary, type ModelState, type OpsStatus,
 } from "../api/client";
 import { Empty, ErrorNote, Loading, TableScroll } from "../components/bits";
 
@@ -45,6 +45,10 @@ export default function Datasets() {
     queryKey: ["ops-status"],
     queryFn: () => api.get<OpsStatus>("/model-ops/status"),
   });
+  const model = useQuery({
+    queryKey: ["model-state"],
+    queryFn: () => api.get<ModelState>("/model-ops/model"),
+  });
   const rows = useQuery({
     queryKey: ["dataset-rows", key, filter, q, offset],
     enabled: !!key,
@@ -58,6 +62,7 @@ export default function Datasets() {
     qc.invalidateQueries({ queryKey: ["datasets"] });
     qc.invalidateQueries({ queryKey: ["dataset-rows"] });
     qc.invalidateQueries({ queryKey: ["ops-status"] });
+    qc.invalidateQueries({ queryKey: ["model-state"] });
     qc.invalidateQueries({ queryKey: ["sync-status"] });
   };
   const sync = useMutation({
@@ -84,6 +89,19 @@ export default function Datasets() {
     onSuccess: (r) => { setProblem(null); setBanner(r.message); refresh(); },
     onError: (e: Error) => setProblem(e.message),
   });
+  const backup = useMutation({
+    mutationFn: (label: string) =>
+      api.post<{ message: string }>(
+        `/model-ops/model-backups?label=${encodeURIComponent(label)}`),
+    onSuccess: (r) => { setProblem(null); setBanner(r.message); refresh(); },
+    onError: (e: Error) => setProblem(e.message),
+  });
+  const restoreModel = useMutation({
+    mutationFn: (name: string) => api.post<{ message: string }>(
+      `/model-ops/model-backups/${encodeURIComponent(name)}/restore`),
+    onSuccess: (r) => { setProblem(null); setBanner(r.message); refresh(); },
+    onError: (e: Error) => setProblem(e.message),
+  });
   const reset = useMutation({
     mutationFn: (dry: boolean) => api.post<{ message: string }>(
       `/model-ops/factory-reset?dry_run=${dry}` + (dry ? "" : "&confirm=RESET")),
@@ -93,7 +111,8 @@ export default function Datasets() {
 
   const sel = list.data?.datasets.find((d) => d.key === key) ?? null;
   const busy = sync.isPending || rebuild.isPending || reset.isPending
-    || del.isPending || patch.isPending;
+    || del.isPending || patch.isPending || backup.isPending
+    || restoreModel.isPending;
 
   return (
     <div className="page">
@@ -312,6 +331,62 @@ export default function Datasets() {
                 </span>
               </div>
             </>
+          )}
+        </section>
+      )}
+
+      {/* ── the trained model ── */}
+      {model.data && (
+        <section className={`card ${model.data.unprotected ? "warn" : ""}`}>
+          <h2>Trained model</h2>
+          <p>{model.data.message}</p>
+          <p className="muted small">
+            {model.data.weight_files} weight file(s) are live. <b>They are not in
+            git</b> — <code>ml.train</code> overwrites this directory in place, so a
+            snapshot is the only way back. Nothing here currently needs retraining:
+            ore zones, grades, the flow field and baselines are inputs the surrogate
+            was already trained across.
+          </p>
+          <div className="row gap">
+            <button className="btn primary" disabled={busy}
+              onClick={() => backup.mutate("manual")}>Back up the model now</button>
+          </div>
+          {model.data.backups.length > 0 && (
+            <TableScroll>
+              <table className="tbl compact">
+                <thead>
+                  <tr><th>Bundle</th><th>Created</th><th>Files</th><th>Size</th>
+                    <th>Model card</th><th /></tr>
+                </thead>
+                <tbody>
+                  {model.data.backups.map((b) => (
+                    <tr key={b.name}>
+                      <td className="mono small">{b.name}</td>
+                      <td className="muted small">
+                        {b.created_at ? new Date(b.created_at).toLocaleString() : "—"}
+                      </td>
+                      <td>{b.files}</td>
+                      <td>{b.size_mb} MB</td>
+                      <td className="mono small"
+                          title="The same hash pinned onto every run computed with it">
+                        {b.model_card_sha ? `${b.model_card_sha.slice(0, 12)}…` : "—"}
+                      </td>
+                      <td>
+                        <button className="btn ghost small" disabled={busy}
+                          onClick={() => {
+                            if (window.confirm(
+                              `Restore the model from ${b.name}?\n\n`
+                              + "The version that is live now will be snapshotted "
+                              + "first, so this is reversible.")) {
+                              restoreModel.mutate(b.name);
+                            }
+                          }}>Restore</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
           )}
         </section>
       )}

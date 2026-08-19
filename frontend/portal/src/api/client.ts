@@ -488,3 +488,17 @@ export interface VerticalScreening {
   } | null;
   [k: string]: any;
 }
+
+export interface ModelBundle {
+  name: string; created_at: string | null; files: number;
+  size_mb: number; model_card_sha: string | null; note_path: string;
+}
+
+/** The trained surrogate: what is live, and what can be rolled back to.
+ *  `unprotected` is true when no bundle exists — the weight files are not in
+ *  git, so without a bundle there is no copy of the model anywhere. */
+export interface ModelState {
+  live: boolean; files: number; weight_files: number;
+  built_at: string | null; backups: ModelBundle[];
+  unprotected: boolean; message: string;
+}

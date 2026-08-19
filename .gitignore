@@ -92,3 +92,6 @@ Datasets/HydroRIVERS_v10_as_shp/
 Datasets/phase1_sources/*.pdf
 
 ml_pipeline/outputs/
+# Model artifact bundles: 12 MB each, created by /model-ops/model-backups.
+# The live artifacts/ dir is partly tracked; its backups never should be.
+ml_pipeline/ml/artifact_bundles/

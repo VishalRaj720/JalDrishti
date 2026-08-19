@@ -269,6 +269,9 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/ml/rivers` | ● | ● | ● | · |
 | `GET /api/v1/ml/strike-field` | ● | ● | ● | · |
 | `POST /api/v1/model-ops/factory-reset` | ● | · | · | · |
+| `GET /api/v1/model-ops/model` | ● | ● | ● | · |
+| `POST /api/v1/model-ops/model-backups` | ● | · | · | · |
+| `POST /api/v1/model-ops/model-backups/{name}/restore` | ● | · | · | · |
 | `POST /api/v1/model-ops/rebuild-flow-field` | ● | · | · | · |
 | `POST /api/v1/model-ops/recompute-baselines` | ● | · | · | · |
 | `GET /api/v1/model-ops/status` | ● | ● | ● | · |
@@ -305,7 +308,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 89/100 · **analyst** 60/100 · **field_officer** 48/100 · **citizen** 12/100
+Reachable endpoints per role — **admin** 92/103 · **analyst** 61/103 · **field_officer** 49/103 · **citizen** 12/103
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

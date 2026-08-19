@@ -235,3 +235,146 @@ async def factory_reset(db: AsyncSession, *, actor, dry_run: bool = False,
         f"{unsynced} observation(s) returned to unsynced. "
         f"Derived artifacts are now stale — rebuild them.")
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Model artifact backup
+#
+# WHY THIS EXISTS. `ml_pipeline/ml/artifacts/` holds the trained surrogate: nine
+# XGBoost quantile heads, the excursion regressor, the conformal calibration and
+# the model card. Sixteen files, 12 MB — and **only five are tracked in git**
+# (the JSON metadata). All ten `.joblib` weight files are untracked, so the
+# trained model exists in exactly one copy, on one disk, with no version history
+# behind it.
+#
+# `ml.train` overwrites that directory in place, and the project README documents
+# running it from the command line. So the documented, ordinary workflow can
+# destroy the only copy of a model whose conformal coverage was hand-verified,
+# with nothing to restore from.
+#
+# This is not about retraining. Nothing here currently requires a retrain —
+# ore zones, grades, the flow field and baselines are all *serve-time inputs* the
+# surrogate was already trained across, which is why `dataset_sync` reports
+# `retrain_required: False`. It is about a single unbacked-up copy of the most
+# expensive artifact in the repo.
+#
+# Bundles live outside `artifacts/` so a restore cannot recurse into its own
+# backups, and are gitignored: 12 MB per bundle does not belong in git history.
+# ═══════════════════════════════════════════════════════════════════════
+
+MODEL_ARTIFACTS = REPO_ROOT / "ml_pipeline" / "ml" / "artifacts"
+MODEL_BUNDLES = REPO_ROOT / "ml_pipeline" / "ml" / "artifact_bundles"
+
+
+def _bundle_meta(d: Path) -> dict[str, Any]:
+    files = [f for f in d.iterdir() if f.is_file()]
+    # The SAME hash `ml_pipeline_adapter` pins onto every stored run, so a bundle
+    # can be matched against the runs that were computed with it. The card has no
+    # `model_card_sha` field of its own — the sha IS of the file.
+    card = d / "model_card.json"
+    sha = None
+    if card.exists():
+        import hashlib
+        sha = hashlib.sha256(card.read_bytes()).hexdigest()
+    return {
+        "name": d.name,
+        "created_at": _iso(_mtime(d)),
+        "files": len(files),
+        "size_mb": round(sum(f.stat().st_size for f in files) / 1_048_576, 1),
+        "model_card_sha": sha,
+        # `relative_to` raises when the bundle dir is outside the repo, which
+        # happens in tests and would happen for any operator who relocated it.
+        "note_path": (str(d.relative_to(REPO_ROOT))
+                      if d.is_relative_to(REPO_ROOT) else str(d)),
+    }
+
+
+def list_model_backups() -> list[dict[str, Any]]:
+    if not MODEL_BUNDLES.exists():
+        return []
+    return [_bundle_meta(d) for d in
+            sorted(MODEL_BUNDLES.iterdir(), key=lambda p: p.stat().st_mtime,
+                   reverse=True) if d.is_dir()]
+
+
+def backup_model(label: str = "") -> dict[str, Any]:
+    """Copy the live artifacts into a timestamped bundle."""
+    import re
+    import shutil as sh
+
+    if not MODEL_ARTIFACTS.exists():
+        raise ds.DatasetError(
+            f"nothing to back up: {MODEL_ARTIFACTS} does not exist", status_code=404)
+
+    stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # The label reaches a filesystem path, so it is reduced to a safe slug rather
+    # than trusted.
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-")[:40]
+    dest = MODEL_BUNDLES / (f"{stamp}_{slug}" if slug else stamp)
+    if dest.exists():
+        raise ds.DatasetError(f"bundle already exists: {dest.name}")
+
+    MODEL_BUNDLES.mkdir(parents=True, exist_ok=True)
+    sh.copytree(MODEL_ARTIFACTS, dest)
+    meta = _bundle_meta(dest)
+    logger.info(f"model artifacts backed up to {dest.name} "
+                f"({meta['files']} files, {meta['size_mb']} MB)")
+    return {"ok": True, **meta,
+            "message": f"Backed up {meta['files']} artifact file(s) to {dest.name}."}
+
+
+def restore_model(name: str) -> dict[str, Any]:
+    """Put a bundle back, after backing up what is currently live.
+
+    Restoring without first preserving the current state would make the restore
+    itself the unrecoverable operation, which is the bug this module exists to
+    prevent.
+    """
+    import shutil as sh
+
+    # `name` arrives from the client, and this function calls rmtree() on the
+    # live artifacts, so containment is checked before anything is destroyed.
+    #
+    # Comparing `(MODEL_BUNDLES / name).parent` against MODEL_BUNDLES is NOT
+    # enough and was the first attempt: for name="..", that path is
+    # `bundles/..`, whose `.parent` is literally `bundles` — so the check passed
+    # and the restore copied the *parent* directory over the artifacts. Resolve
+    # first, then require the result to be a direct child.
+    root = MODEL_BUNDLES.resolve()
+    src = (MODEL_BUNDLES / name).resolve()
+    if ("/" in name or "\\" in name or name in {"", ".", ".."}
+            or src.parent != root or src == root or not src.is_dir()):
+        raise ds.DatasetError(f"not a model bundle: {name!r}", status_code=404)
+
+    pre = backup_model("pre-restore")
+    sh.rmtree(MODEL_ARTIFACTS)
+    sh.copytree(src, MODEL_ARTIFACTS)
+    ds.invalidate_caches()
+    logger.info(f"model artifacts restored from {name}")
+    return {"ok": True, "restored_from": name,
+            "backup_of_previous": pre["name"],
+            "message": (f"Restored the model from {name}. The version that was "
+                        f"live is saved as {pre['name']}.")}
+
+
+def model_state() -> dict[str, Any]:
+    """What model is live, and is there anything to fall back to."""
+    live = MODEL_ARTIFACTS.exists()
+    files = ([f.name for f in MODEL_ARTIFACTS.iterdir() if f.is_file()]
+             if live else [])
+    weights = [f for f in files if f.endswith(".joblib")]
+    bundles = list_model_backups()
+    return {
+        "live": live,
+        "files": len(files),
+        "weight_files": len(weights),
+        "built_at": _iso(_mtime(MODEL_ARTIFACTS)),
+        "backups": bundles,
+        "unprotected": not bundles,
+        "message": (
+            "No backup exists. The trained model is a single copy — `ml.train` "
+            "overwrites it in place and the weight files are not in git."
+            if not bundles else
+            f"{len(bundles)} backup(s) available; the newest is "
+            f"{bundles[0]['name']}."),
+    }

@@ -97,3 +97,50 @@ async def factory_reset(
             ip=request.client.host if request.client else None)
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get("/model")
+async def model_state(_: User = Depends(require_staff)) -> dict[str, Any]:
+    """What model is live, and whether anything exists to fall back to."""
+    return mo.model_state()
+
+
+@router.post("/model-backups")
+async def create_model_backup(
+    request: Request,
+    label: str = Query("", description="Optional short label, slugified"),
+    actor: User = Depends(require_admin),
+) -> dict[str, Any]:
+    """Snapshot the trained model.
+
+    Worth doing before anything that touches `ml/artifacts/` — including running
+    `python -m ml_pipeline.ml.train` by hand, which the README documents and which
+    overwrites the directory in place.
+    """
+    try:
+        out = mo.backup_model(label)
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    await audit.record(
+        action="model_ops.backup_model", entity_type="artifacts",
+        entity_id=out["name"], actor_id=actor.id, actor_label=actor.email,
+        ip_address=request.client.host if request.client else None, detail=out)
+    return out
+
+
+@router.post("/model-backups/{name}/restore")
+async def restore_model_backup(
+    request: Request,
+    name: str,
+    actor: User = Depends(require_admin),
+) -> dict[str, Any]:
+    """Roll the model back to a bundle. The live version is snapshotted first."""
+    try:
+        out = mo.restore_model(name)
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    await audit.record(
+        action="model_ops.restore_model", entity_type="artifacts",
+        entity_id=name, actor_id=actor.id, actor_label=actor.email,
+        ip_address=request.client.host if request.client else None, detail=out)
+    return out
