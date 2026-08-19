@@ -377,12 +377,29 @@ export default function FieldData() {
                 </div>
               </div>
               <span className="spacer grow" />
-              {reviewer ? (
+              {/* Separation of duties: `ck_field_obs_no_self_review` makes
+                  `reviewed_by = submitted_by` unrepresentable in the database,
+                  and the service returns 403 before that. Offering Approve on
+                  your own submission was a button guaranteed to fail — an admin
+                  who submitted something found no way forward and no
+                  explanation. Own submissions now show the reason and the
+                  Withdraw path instead. */}
+              {reviewer && o.submitted_by !== me?.id ? (
                 <div className="row">
                   <button className="btn primary" disabled={decide.isPending}
                           onClick={() => decide.mutate({ id: o.id, verb: "approve" })}>Approve</button>
                   <button className="btn danger" disabled={decide.isPending}
                           onClick={() => decide.mutate({ id: o.id, verb: "reject" })}>Reject</button>
+                </div>
+              ) : reviewer ? (
+                <div className="row" style={{ alignItems: "center", gap: 8 }}>
+                  <span className="muted small" style={{ maxWidth: 320 }}>
+                    You submitted this, so you cannot review it — a reviewer and a
+                    submitter must be different people. Another admin can approve
+                    it, or you can withdraw it.
+                  </span>
+                  <button className="btn ghost"
+                          onClick={() => withdraw.mutate(o.id)}>Withdraw</button>
                 </div>
               ) : (
                 <button className="btn ghost" onClick={() => withdraw.mutate(o.id)}>Withdraw</button>

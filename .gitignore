@@ -95,3 +95,6 @@ ml_pipeline/outputs/
 # Model artifact bundles: 12 MB each, created by /model-ops/model-backups.
 # The live artifacts/ dir is partly tracked; its backups never should be.
 ml_pipeline/ml/artifact_bundles/
+
+# Dataset backups written by /datasets/*/restore and the sync path.
+Datasets/.backups/

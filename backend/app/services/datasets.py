@@ -35,6 +35,7 @@ backup is what makes this reversible, and `restore()` is the way back.
 """
 from __future__ import annotations
 
+import io
 import shutil
 import uuid
 from dataclasses import dataclass
@@ -151,6 +152,31 @@ def get(key: str) -> DatasetFile:
 
 # ── reading ──────────────────────────────────────────────────────────
 
+#: Byte-order mark. Written by `utf-8-sig`, and NOT present in most of these
+#: files — see `_csv_encoding`.
+_BOM = b"\xef\xbb\xbf"
+
+#: Explicit, because `csv.writer` terminates lines with CRLF on every platform
+#: regardless of the OS — which would rewrite every line of a file that shipped
+#: with LF, turning an append into a whole-file diff.
+LF = chr(10)
+
+
+def _csv_encoding(p: Path) -> str:
+    """Whatever encoding this file already uses, so a write cannot change it.
+
+    `utf-8-sig` on WRITE emits a BOM unconditionally. Using it for every file
+    added a BOM to `jharkhand_uranium_deposits.csv`, which shipped without one —
+    so the file differed from HEAD forever after the first sync, even with every
+    added row stripped back out. Only `waterQuality_jharkhand.csv` genuinely has
+    a BOM; it must keep it, and the others must not gain one.
+    """
+    try:
+        return "utf-8-sig" if p.read_bytes()[:3] == _BOM else "utf-8"
+    except OSError:
+        return "utf-8"
+
+
 def _read(df_file: DatasetFile):
     """Load a dataset into a DataFrame with `record_source` guaranteed present."""
     import pandas as pd
@@ -162,9 +188,10 @@ def _read(df_file: DatasetFile):
     if df_file.kind == "xlsx":
         df = pd.read_excel(p, header=df_file.header_row).dropna(how="all")
     else:
-        # utf-8-sig: waterQuality_jharkhand.csv carries a BOM, which would
-        # otherwise become part of the first column's name ("﻿S. No.")
-        # and break every lookup against `id_column`.
+        # Read as utf-8-sig regardless: it strips a BOM if there is one — which
+        # would otherwise become part of the first column's name ("﻿S. No.")
+        # and break every lookup against `id_column` — and is a no-op if there is
+        # not. Writing is the direction that must preserve the original.
         df = pd.read_csv(p, encoding="utf-8-sig")
 
     if SOURCE_COL not in df.columns:
@@ -178,9 +205,98 @@ def _read(df_file: DatasetFile):
     return df
 
 
+# ── raw CSV access: values byte-for-byte as written ──────────────────
+#
+# WHY NOT PANDAS FOR WRITES. Round-tripping a CSV through pandas silently
+# reformats every number: `22.7332550` came back as `22.733255`, `0.00` as
+# `0.0`, and an int column containing one blank became floats. The values are
+# numerically identical and the file is not — so after the very first sync,
+# `jharkhand_uranium_deposits.csv` differed from the committed version on 8 rows
+# nobody had touched, and stayed that way even after every added row was stripped
+# back out. On a project whose entire claim is provenance, quietly rewriting the
+# shipped evidence base is not an acceptable side effect of appending to it.
+#
+# `csv` hands back the exact strings and writes them back unchanged, so an
+# untouched row survives a write untouched. pandas is still used for the
+# READ-ONLY views (summary, paging, filtering), where reformatting is harmless.
+
+def _read_raw(f: DatasetFile) -> tuple[list[str], list[list[str]], str]:
+    """(header, rows, encoding) with every value exactly as it appears on disk."""
+    import csv as _csv
+
+    enc = _csv_encoding(f.path)
+    with io.open(f.path, "r", encoding="utf-8-sig", newline="") as fh:
+        rows = list(_csv.reader(fh))
+    if not rows:
+        raise DatasetError(f"{f.relpath} is empty", status_code=409)
+    return rows[0], rows[1:], enc
+
+
+def _write_raw(f: DatasetFile, header: list[str], rows: list[list[str]],
+               enc: str) -> None:
+    """Write header + rows back verbatim, preserving the original encoding.
+
+    csv.writer defaults to CRLF on every platform, which would rewrite every
+    line of a file that shipped with LF — hence the explicit LF terminator.
+    """
+    import csv as _csv
+
+    with io.open(f.path, "w", encoding=enc, newline="") as fh:
+        w = _csv.writer(fh, lineterminator=LF)
+        w.writerow(header)
+        w.writerows(rows)
+
+
+def _col(header: list[str], name: str) -> int:
+    """Index of a column, or -1."""
+    for i, h in enumerate(header):
+        if h.strip().lstrip("﻿") == name:
+            return i
+    return -1
+
+
+def append_rows(f: DatasetFile, new: list[dict[str, Any]], ref: str) -> int:
+    """Append rows to a CSV without touching a single existing byte.
+
+    Adds `record_source` / `record_ref` to the header on first use and backfills
+    the existing rows as `original` — that part does rewrite them, but only by
+    adding two empty fields, never by reformatting a value.
+    """
+    # Before the first byte changes, not after: taking the snapshot later
+    # captured a file that already had the provenance columns, so "restore what
+    # shipped" restored the columns too.
+    ensure_pristine(f)
+
+    header, rows, enc = _read_raw(f)
+    si, ri = _col(header, SOURCE_COL), _col(header, REF_COL)
+    if si < 0:
+        header.append(SOURCE_COL)
+        for r in rows:
+            r.append(SOURCE_ORIGINAL)
+        si = len(header) - 1
+    if ri < 0:
+        header.append(REF_COL)
+        for r in rows:
+            r.append("")
+        ri = len(header) - 1
+
+    for item in new:
+        row = [""] * len(header)
+        for k, v in item.items():
+            i = _col(header, str(k))
+            if i >= 0:
+                row[i] = "" if v is None else str(v)
+        row[si] = SOURCE_ADDED
+        row[ri] = ref
+        rows.append(row)
+
+    _write_raw(f, header, rows, enc)
+    return len(new)
+
+
 def _write_csv(df_file: DatasetFile, df) -> None:
-    """Persist a DataFrame back over a CSV. Verified round-trip-clean."""
-    df.to_csv(df_file.path, index=False, encoding="utf-8-sig")
+    """Persist a DataFrame back over a CSV, preserving its original encoding."""
+    df.to_csv(df_file.path, index=False, encoding=_csv_encoding(df_file.path))
 
 
 # ── xlsx: mutate the sheet in place, never re-dump it ─────────────────
@@ -208,6 +324,7 @@ def _xlsx_open(f: DatasetFile):
 
 def _xlsx_ensure_source(f: DatasetFile) -> None:
     """Add `record_source` to the sheet and backfill it, once."""
+    ensure_pristine(f)
     wb, ws, hrow, header = _xlsx_open(f)
     present = [str(h) for h in header if h is not None]
     if SOURCE_COL in present and REF_COL in present:
@@ -330,14 +447,56 @@ def rows(key: str, *, source: Optional[str] = None, q: Optional[str] = None,
 
 # ── writing ──────────────────────────────────────────────────────────
 
+#: Backups live here, NOT beside the original.
+#:
+#: Writing `foo.csv.<ref>.bak` next to `foo.csv` put untracked litter straight
+#: into a tracked directory: four of them accumulated in `Datasets/` during
+#: testing and showed up in every `git status`, which is exactly the noise that
+#: makes a real change hard to spot. Dot-prefixed and gitignored.
+BACKUP_DIR = DATASETS / ".backups"
+
+#: A copy of each file as it was BEFORE this system first wrote to it.
+#:
+#: Taken once, never overwritten, and used by the reset to guarantee "back to
+#: what shipped" means byte-for-byte. It exists because faithfulness cannot be
+#: assumed from the write path: the CSV writers were made byte-preserving, but
+#: `openpyxl` re-serialises an entire workbook on save — new zip member order,
+#: rewritten metadata, dropped formatting — so `udepo_uranium_deposits.xlsx`
+#: could never round-trip identically no matter how carefully rows were edited.
+#: Restoring a snapshot sidesteps the whole class of problem.
+PRISTINE_DIR = BACKUP_DIR / "pristine"
+
+
+def _pristine_path(f: DatasetFile) -> Path:
+    return PRISTINE_DIR / f.relpath
+
+
+def ensure_pristine(f: DatasetFile) -> None:
+    """Snapshot the file the first time it is about to be written. Idempotent."""
+    dest = _pristine_path(f)
+    if dest.exists() or not f.path.exists():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(f.path, dest)
+    logger.info(f"{f.relpath}: pristine snapshot taken before first write")
+
+
+def backup_file(f: DatasetFile, ref: str) -> Path:
+    """Back up a registry file, taking its pristine snapshot on the first write."""
+    ensure_pristine(f)
+    return backup(f.path, ref)
+
+
 def backup(path: Path, ref: str) -> Path:
-    """Copy beside the original before rewriting.
+    """Copy the file aside before rewriting.
 
     These are tracked data files. Any admin action that changes one should be
     trivially undoable without reaching for git, because the person undoing it
     may be doing so at speed.
     """
-    bak = path.with_suffix(path.suffix + f".{ref}.bak")
+    dest_dir = BACKUP_DIR / path.parent.relative_to(DATASETS)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    bak = dest_dir / f"{path.name}.{ref}.bak"
     shutil.copy2(path, bak)
     return bak
 
@@ -398,7 +557,7 @@ def update_row(key: str, row_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         r = _xlsx_locate(ws, hrow, header, f, row_id)
         if _xlsx_row_source(ws, r, header) != SOURCE_ADDED:
             _raise_original(f, row_id, "edit")
-        bak = backup(f.path, ref)
+        bak = backup_file(f, ref)
         before, after = {}, {}
         for col, val in patch.items():
             c = _xlsx_col_index(header, col)
@@ -415,7 +574,7 @@ def update_row(key: str, row_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         for k, v in patch.items():
             df.at[idx, k] = v
         after = {k: (None if _isna(df.at[idx, k]) else df.at[idx, k]) for k in patch}
-        bak = backup(f.path, ref)
+        bak = backup_file(f, ref)
         _write_csv(f, df)
 
     invalidate_caches()
@@ -438,7 +597,7 @@ def delete_row(key: str, row_id: str) -> dict[str, Any]:
             _raise_original(f, row_id, "delete")
         removed = {str(h): ws.cell(row=r, column=i).value
                    for i, h in enumerate(header, start=1) if h is not None}
-        bak = backup(f.path, ref)
+        bak = backup_file(f, ref)
         ws.delete_rows(r)
         wb.save(f.path)
     else:
@@ -446,7 +605,7 @@ def delete_row(key: str, row_id: str) -> dict[str, Any]:
         idx, row = _locate(df, f, row_id)
         _guard_original(row, f, row_id, "delete")
         removed = {k: (None if _isna(v) else v) for k, v in row.items()}
-        bak = backup(f.path, ref)
+        bak = backup_file(f, ref)
         _write_csv(f, df.drop(index=idx))
 
     invalidate_caches()
@@ -468,11 +627,26 @@ def strip_added(key: str, *, dry_run: bool = False) -> dict[str, Any]:
         "record_refs": sorted({str(v).strip() for v in added[REF_COL].tolist()
                                if str(v).strip()}),
     }
-    if dry_run or added.empty:
+    if dry_run:
+        return result
+
+    if added.empty:
+        # No rows to strip — but "reset to what shipped" still means the file
+        # ends up as it shipped. A file whose columns were added and whose rows
+        # were later deleted one by one has nothing left to strip and is still
+        # not pristine.
+        pristine = _pristine_path(f)
+        if pristine.exists() and f.path.read_bytes() != pristine.read_bytes():
+            backup(f.path, uuid.uuid4().hex[:12])
+            shutil.copy2(pristine, f.path)
+            invalidate_caches()
+            result["restored_from_pristine"] = True
+            result["removed"] = 0
+            logger.info(f"{f.relpath}: no added rows; restored from pristine")
         return result
 
     ref = uuid.uuid4().hex[:12]
-    result["backup"] = str(backup(f.path, ref).relative_to(REPO_ROOT))
+    result["backup"] = str(backup_file(f, ref).relative_to(REPO_ROOT))
     if f.kind == "xlsx":
         wb, ws, hrow, header = _xlsx_open(f)
         # Bottom-up: deleting a row shifts every row beneath it.
@@ -480,19 +654,66 @@ def strip_added(key: str, *, dry_run: bool = False) -> dict[str, Any]:
             (rr for rr in range(hrow + 1, ws.max_row + 1)
              if _xlsx_row_source(ws, rr, header) == SOURCE_ADDED), reverse=True):
             ws.delete_rows(r)
+        # Drop the provenance columns too — see below.
+        header = [c.value for c in ws[hrow]]
+        for name in (REF_COL, SOURCE_COL):
+            for i, h in enumerate(header, start=1):
+                if h is not None and str(h).strip() == name:
+                    ws.delete_cols(i)
+                    header = [c.value for c in ws[hrow]]
+                    break
         wb.save(f.path)
     else:
-        _write_csv(f, df[df[SOURCE_COL] != SOURCE_ADDED])
+        # Removing the rows is not enough to restore the file.
+        #
+        # `record_source` and `record_ref` are added on first write and stay
+        # forever, so a file that had every added row stripped back out STILL
+        # differed from the shipped version — two extra header columns, and a
+        # permanent `git status` entry that made it look as though the reset had
+        # not worked. It had; the file's *shape* had changed.
+        #
+        # With no added rows left there is nothing for the columns to describe,
+        # so they come off and the file goes back to exactly what shipped —
+        # byte for byte, which is why this filters raw rows rather than
+        # rewriting a DataFrame.
+        header, raw, enc = _read_raw(f)
+        si = _col(header, SOURCE_COL)
+        keep = [r for r in raw
+                if not (si >= 0 and si < len(r) and r[si] == SOURCE_ADDED)]
+        for name in (REF_COL, SOURCE_COL):
+            i = _col(header, name)
+            if i >= 0:
+                header.pop(i)
+                for r in keep:
+                    if i < len(r):
+                        r.pop(i)
+        _write_raw(f, header, keep, enc)
+    # If a pristine snapshot exists and nothing added survives, put the snapshot
+    # back. Row-filtering already produced the right CONTENT; this guarantees the
+    # right BYTES, which is what "restored to what shipped" has to mean for a
+    # project whose claim is provenance.
+    pristine = _pristine_path(f)
+    if pristine.exists():
+        shutil.copy2(pristine, f.path)
+        result["restored_from_pristine"] = True
+
     invalidate_caches()
     result["removed"] = int(len(added))
-    logger.info(f"{f.relpath}: stripped {len(added)} added row(s)")
+    result["provenance_columns_dropped"] = True
+    logger.info(f"{f.relpath}: stripped {len(added)} added row(s); "
+                f"restored byte-for-byte from the pristine snapshot"
+                if pristine.exists() else
+                f"{f.relpath}: stripped {len(added)} added row(s)")
     return result
 
 
 def list_backups(key: str) -> list[dict[str, Any]]:
     f = get(key)
     out = []
-    for b in sorted(f.path.parent.glob(f"{f.path.name}.*.bak"),
+    bdir = BACKUP_DIR / f.path.parent.relative_to(DATASETS)
+    if not bdir.exists():
+        return out
+    for b in sorted(bdir.glob(f"{f.path.name}.*.bak"),
                     key=lambda p: p.stat().st_mtime, reverse=True):
         out.append({
             "name": b.name,
@@ -507,9 +728,11 @@ def list_backups(key: str) -> list[dict[str, Any]]:
 def restore(key: str, backup_name: str) -> dict[str, Any]:
     """Put a backup back. The current file is itself backed up first."""
     f = get(key)
-    src = f.path.parent / backup_name
+    bdir = (BACKUP_DIR / f.path.parent.relative_to(DATASETS)).resolve()
+    src = (bdir / backup_name).resolve()
     # Contain the path: `backup_name` arrives from the client.
-    if src.parent.resolve() != f.path.parent.resolve() or not src.name.endswith(".bak"):
+    if (src.parent != bdir or not src.name.endswith(".bak")
+            or "/" in backup_name or "\\" in backup_name):
         raise DatasetError(f"not a backup of {f.relpath}: {backup_name!r}")
     if not src.exists():
         raise DatasetError(f"no such backup: {backup_name}", status_code=404)

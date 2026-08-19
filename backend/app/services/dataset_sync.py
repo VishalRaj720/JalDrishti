@@ -269,13 +269,15 @@ async def sync_ore(db: AsyncSession, *, actor, dry_run: bool = False,
         return result
 
     if new_csv_rows:
-        result["backups"].append(str(_backup(ORE_CSV, ref)))
-        out = pd.concat([csv_df, pd.DataFrame(new_csv_rows)], ignore_index=True)
-        out.to_csv(ORE_CSV, index=False)
+        result["backups"].append(str(dsx.backup_file(dsx.get("ore_deposits"), ref).relative_to(REPO_ROOT)))
+        # Same reason as the chemistry writer: a pandas rewrite silently turned
+        # 22.7332550 into 22.733255 on rows nobody had touched.
+        dsx.append_rows(dsx.get("ore_deposits"), new_csv_rows, ref)
         result["files"].append(str(ORE_CSV.relative_to(REPO_ROOT)))
 
     if new_xl_rows:
-        result["backups"].append(str(_backup(UDEPO_XLSX, ref)))
+        result["backups"].append(
+            str(dsx.backup_file(dsx.get("ore_grades"), ref).relative_to(REPO_ROOT)))
         out = pd.concat([xl_df, pd.DataFrame(new_xl_rows)], ignore_index=True)
         # Preserve the 8-row preamble so ore_grades.py's `header=8` still lands
         # on the real header row.
@@ -377,7 +379,19 @@ async def _unsynced_water_samples(db: AsyncSession) -> list[dict[str, Any]]:
                s.sodium_mg_l, s.potassium_mg_l, s.iron_ppm, s.arsenic_ppb,
                s.uranium_ppb
         FROM field_observations f
-        JOIN water_samples s   ON s.id = f.target_id
+        -- Join on applied_id, NOT target_id.
+        --
+        -- `ck_field_obs_target` enforces `operation = 'create' AND target_id IS
+        -- NULL`, and every field-officer submission is a create — so target_id
+        -- is ALWAYS null for exactly the rows this query exists to find. The id
+        -- of the row approval created lands in `applied_id`. Joining on
+        -- target_id matched nothing, so both syncs reported "Nothing to sync"
+        -- while /dataset-sync/status correctly counted them as pending: the
+        -- split-brain this whole feature exists to close.
+        --
+        -- COALESCE keeps the update path working, where target_id is the row
+        -- being amended and applied_id is null.
+        JOIN water_samples s   ON s.id = COALESCE(f.applied_id, f.target_id)
         JOIN monitoring_wells w ON w.id = s.well_id
         LEFT JOIN blocks b     ON b.id = w.block_id
         LEFT JOIN districts d  ON d.id = b.district_id
@@ -397,7 +411,19 @@ async def _unsynced_levels(db: AsyncSession) -> list[dict[str, Any]]:
                d.name AS district,
                r.recorded_at, r.groundwater_level
         FROM field_observations f
-        JOIN groundwater_level_readings r ON r.id = f.target_id
+        -- Join on applied_id, NOT target_id.
+        --
+        -- `ck_field_obs_target` enforces `operation = 'create' AND target_id IS
+        -- NULL`, and every field-officer submission is a create — so target_id
+        -- is ALWAYS null for exactly the rows this query exists to find. The id
+        -- of the row approval created lands in `applied_id`. Joining on
+        -- target_id matched nothing, so both syncs reported "Nothing to sync"
+        -- while /dataset-sync/status correctly counted them as pending: the
+        -- split-brain this whole feature exists to close.
+        --
+        -- COALESCE keeps the update path working, where target_id is the row
+        -- being amended and applied_id is null.
+        JOIN groundwater_level_readings r ON r.id = COALESCE(f.applied_id, f.target_id)
         JOIN monitoring_stations st       ON st.id = r.station_id
         LEFT JOIN blocks b                ON b.id = st.block_id
         LEFT JOIN districts d             ON d.id = b.district_id
@@ -477,8 +503,11 @@ async def sync_water_quality(db: AsyncSession, *, actor, dry_run: bool = False,
         result["preview"] = new_rows[:3]
         return result
 
-    result["backups"].append(str(dsx.backup(f.path, ref).relative_to(REPO_ROOT)))
-    dsx._write_csv(f, pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True))
+    result["backups"].append(str(dsx.backup_file(f, ref).relative_to(REPO_ROOT)))
+    # `append_rows`, not a pandas rewrite: round-tripping the frame reformatted
+    # every untouched number in the file (0.00 -> 0.0), so appending three rows
+    # produced a 794-line diff. See datasets.py "raw CSV access".
+    dsx.append_rows(f, new_rows, ref)
     result["files"].append(f.relpath)
 
     await _mark_synced(db, [it["obs_id"] for it in items], ref)
@@ -550,8 +579,8 @@ async def sync_groundwater_levels(db: AsyncSession, *, actor, dry_run: bool = Fa
         result["preview"] = new_rows[:3]
         return result
 
-    result["backups"].append(str(dsx.backup(f.path, ref).relative_to(REPO_ROOT)))
-    dsx._write_csv(f, pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True))
+    result["backups"].append(str(dsx.backup_file(f, ref).relative_to(REPO_ROOT)))
+    dsx.append_rows(f, new_rows, ref)
     result["files"].append(f.relpath)
 
     await _mark_synced(db, [it["obs_id"] for it in items], ref)
