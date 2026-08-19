@@ -224,6 +224,8 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/citizen/subscriptions` | ● | ● | ● | ● |
 | `POST /api/v1/citizen/subscriptions` | ● | ● | ● | ● |
 | `DELETE /api/v1/citizen/subscriptions/{block_id}` | ● | ● | ● | ● |
+| `GET /api/v1/data-gaps/matrix` | ● | ● | ● | · |
+| `GET /api/v1/data-gaps/network-plan` | ● | ● | ● | · |
 | `GET /api/v1/data-gaps/recommendations` | ● | ● | ● | · |
 | `GET /api/v1/data-gaps/recommendations/{block_id}/sites` | ● | ● | ● | · |
 | `POST /api/v1/dataset-sync/all` | ● | · | · | · |
@@ -315,7 +317,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 99/110 · **analyst** 67/110 · **field_officer** 55/110 · **citizen** 13/110
+Reachable endpoints per role — **admin** 101/112 · **analyst** 69/112 · **field_officer** 57/112 · **citizen** 13/112
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

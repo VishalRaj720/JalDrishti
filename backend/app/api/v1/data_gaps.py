@@ -64,3 +64,34 @@ async def suggested_well_sites(
         return await mg.suggested_sites(db, block_id, n=n)
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get("/network-plan")
+async def proposed_network(
+    top: int = Query(10, ge=1, le=40, description="How many blocks to plan for"),
+    per_block: int = Query(2, ge=1, le=5),
+    district: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_staff),
+):
+    """The whole proposed monitoring network, on one map.
+
+    A monitoring programme is planned across a district rather than one block at
+    a time, and a proposal is only judgeable next to what already exists — so
+    this returns the suggested sites AND the current wells together.
+    """
+    return await mg.suggested_sites_bulk(db, top=top, n=per_block, district=district)
+
+
+@router.get("/matrix")
+async def data_gap_matrix(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_staff),
+):
+    """One column per kind of data gap, one row per district.
+
+    Each column carries `blocks` (the capability it denies) and `implies` (the
+    limitation it forces this project to state), so the register in
+    LIMITATIONS.md can be read off the data rather than maintained by hand.
+    """
+    return await mg.gap_matrix(db)

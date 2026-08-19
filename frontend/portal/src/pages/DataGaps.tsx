@@ -8,8 +8,9 @@
  * model's inputs are reconciled.
  */
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Recommendations, type PublicDistrictRisk, type SyncStatus } from "../api/client";
+import { api, type GapMatrix, type Recommendations, type PublicDistrictRisk, type SyncStatus } from "../api/client";
 import { canSync, useAuth } from "../auth";
 import { ErrorNote, Loading, Planned, TableScroll, Tile } from "../components/bits";
 import SiteSuggestionMap from "../console/SiteSuggestionMap";
@@ -52,6 +53,14 @@ export default function DataGaps() {
 
   const [siteFor, setSiteFor] = useState<{ id: string; name: string } | null>(null);
 
+  /** One column per KIND of gap. Each carries the capability it denies and the
+   *  limitation it forces, so LIMITATIONS.md can be read off the data instead of
+   *  maintained by hand. */
+  const matrix = useQuery({
+    queryKey: ["gap-matrix"],
+    queryFn: () => api.get<GapMatrix>("/data-gaps/matrix"),
+  });
+
   const recs = useQuery({
     queryKey: ["gap-recommendations"],
     queryFn: () => api.get<Recommendations>("/data-gaps/recommendations?limit=20"),
@@ -67,9 +76,83 @@ export default function DataGaps() {
         </p>
       </div>
 
+      {/* ── the deficiency matrix ──
+          Counts alone are a statistic. Each column here carries what it denies
+          and what it forces the project to admit, which is what turns a gap into
+          a limitation. */}
+      {matrix.data && (
+        <section className="card">
+          <h2>Data deficiencies, by kind</h2>
+          <p className="muted small">{matrix.data.what_this_is}</p>
+
+          <TableScroll>
+            <table className="tbl compact">
+              <thead>
+                <tr>
+                  <th>District</th>
+                  <th>Blocks</th>
+                  <th>Wells</th>
+                  {matrix.data.dimensions.map((d) => (
+                    <th key={d.key} title={d.means}>{d.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ fontWeight: 600 }}>
+                  <td>ALL JHARKHAND</td>
+                  <td>{matrix.data.totals.blocks}</td>
+                  <td>{matrix.data.totals.wells}</td>
+                  {matrix.data.dimensions.map((d) => (
+                    <td key={d.key} className={matrix.data!.totals[d.key] > 0 ? "warn-text" : ""}>
+                      {matrix.data!.totals[d.key]}
+                    </td>
+                  ))}
+                </tr>
+                {matrix.data.districts.map((r) => (
+                  <tr key={r.district}>
+                    <td>{r.district}</td>
+                    <td className="muted">{r.blocks}</td>
+                    <td className="muted">{r.wells}</td>
+                    {matrix.data!.dimensions.map((d) => (
+                      <td key={d.key}
+                          className={Number(r[d.key] ?? 0) > 0 ? "warn-text" : "muted"}>
+                        {r[d.key] ?? 0}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+
+          <div className="sec">What each column limits</div>
+          <p className="muted small">
+            This is the register in <code>docs/LIMITATIONS.md</code>, derived from
+            the data rather than maintained by hand. A gap nobody can name the
+            effect of is a statistic; a gap with its effect beside it is a
+            limitation.
+          </p>
+          {matrix.data.dimensions.map((d) => (
+            <div key={d.key} className="banner" style={{ marginBottom: 8 }}>
+              <b>{d.label} — {matrix.data!.totals[d.key]}</b>
+              <div className="muted small" style={{ marginTop: 4 }}>{d.means}</div>
+              <div className="small" style={{ marginTop: 4 }}>
+                <b>Prevents:</b> {d.blocks}
+              </div>
+              <div className="small" style={{ marginTop: 4 }}>
+                <b>So the project must say:</b> {d.implies}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* ── where to sample next: the proposal's recommendation half ── */}
       <section className="card">
-        <h2>Where to sample next</h2>
+        <div className="row between">
+          <h2 style={{ margin: 0 }}>Where to sample next</h2>
+          <Link className="btn" to="/network-plan">Open the full map →</Link>
+        </div>
         <p className="muted small">
           {recs.data?.what_this_is}
         </p>

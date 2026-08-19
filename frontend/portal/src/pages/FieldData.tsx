@@ -112,6 +112,30 @@ function SubmitForm({ onDone }: { onDone: () => void }) {
     onSuccess: onDone,
   });
 
+  /** What is still missing, per type — shown beside the button so a disabled
+   *  control always says why rather than just sitting there. */
+  const missing = (() => {
+    if (type === "ore_presence") {
+      if (!f.name) return "Name the deposit or outcrop.";
+      if (!f.longitude || !f.latitude) return "Longitude and latitude are required.";
+      return "";
+    }
+    if (!f.target_id) {
+      return type === "water_sample"
+        ? "Choose the monitoring well this sample came from."
+        : "Choose the monitoring station this reading came from.";
+    }
+    if (type === "groundwater_level" && !f.groundwater_level) {
+      return "Enter the groundwater level.";
+    }
+    if (type === "water_sample"
+        && !CHEM_FIELDS.some((c) => f[c.k] !== undefined && f[c.k] !== "")) {
+      return "Enter at least one measurement.";
+    }
+    return "";
+  })();
+  const canSend = missing === "";
+
   return (
     <div className="card">
       <div className="card-title">Submit a field observation</div>
@@ -246,18 +270,25 @@ function SubmitForm({ onDone }: { onDone: () => void }) {
             </div>
           </div>
 
-          <button className="btn primary" disabled={!f.name || !f.longitude || !f.latitude || submit.isPending}
-                  onClick={() => submit.mutate()}>
-            {submit.isPending ? "Submitting…" : "Submit for review"}
-          </button>
-          <ErrorNote error={submit.error} />
-          <div className="muted small" style={{ marginTop: 8 }}>
-            This enters a <strong>pending</strong> state. It changes nothing until a
-            regulator or administrator approves it, and even then it reaches the
-            simulation engine only after a dataset sync.
-          </div>
         </>
       )}
+
+      {/* ── one submit button, for every type ──
+          It used to live INSIDE the ore branch, with a disabled check on the ore
+          fields — so the two forms added in R11 rendered with no way to send
+          them at all. Kept out here, with per-type validation, so adding a
+          fourth observation type cannot reintroduce the same bug. */}
+      <button className="btn primary" disabled={!canSend || submit.isPending}
+              onClick={() => submit.mutate()}>
+        {submit.isPending ? "Submitting…" : "Submit for review"}
+      </button>
+      {!canSend && <span className="muted small" style={{ marginLeft: 10 }}>{missing}</span>}
+      <ErrorNote error={submit.error} />
+      <div className="muted small" style={{ marginTop: 8 }}>
+        This enters a <strong>pending</strong> state. It changes nothing until an
+        administrator approves it, and even then it reaches the simulation engine
+        only after a dataset sync.
+      </div>
     </div>
   );
 }

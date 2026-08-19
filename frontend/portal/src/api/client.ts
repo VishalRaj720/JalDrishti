@@ -663,3 +663,46 @@ export interface Job {
 }
 
 export interface JobList { running: number; jobs: Job[]; note: string }
+
+/** The whole proposed monitoring network, plus the wells that already exist.
+ *
+ *  Existing wells with `uranium_tests === 0` are the important ones: the well is
+ *  drilled and the sampling round already happens, so only the analysis is
+ *  missing. They are gaps in analysis, not gaps in coverage. */
+export interface ExistingWell {
+  name: string; latitude: number; longitude: number;
+  district: string | null; uranium_tests: number; samples: number;
+}
+
+export interface PlannedBlock {
+  block_id: string; block: string; district: string;
+  score: number; reason: string; wells: number; uranium_tests: number;
+  area_km2: number | null; geometry: unknown; sites: SuggestedSite[];
+}
+
+export interface NetworkPlan {
+  blocks: PlannedBlock[];
+  proposed_total: number;
+  existing_wells: ExistingWell[];
+  existing_total: number;
+  tested_total: number;
+  weights: Record<string, { weight: number; why: string }>;
+  criterion: string; caveat: string;
+}
+
+/** One column per KIND of data gap, one row per district.
+ *
+ *  `blocks` is the capability the gap denies; `implies` is the sentence it
+ *  forces this project to state. Those two are why this exists — counts alone
+ *  are a statistic, not a limitation. */
+export interface GapDimension {
+  key: string; label: string; means: string; blocks: string; implies: string;
+}
+
+export interface GapMatrix {
+  dimensions: GapDimension[];
+  districts: Array<Record<string, string | number | null>>;
+  totals: Record<string, number>;
+  stale_years: number;
+  what_this_is: string;
+}

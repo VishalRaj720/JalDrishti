@@ -355,3 +355,190 @@ async def suggested_sites(db: AsyncSession, block_id: str, *,
             f"block returns the same suggestion every time. A recommendation that "
             f"moved between page loads could not be taken to a field team."),
     }
+
+
+async def suggested_sites_bulk(db: AsyncSession, *, top: int = 10, n: int = 2,
+                               district: Optional[str] = None) -> dict[str, Any]:
+    """Suggested well sites for the top-N blocks at once, for a statewide map.
+
+    The per-block endpoint answers "where in THIS block"; a monitoring programme
+    is planned across a district, not one block at a time, so this returns the
+    whole proposed network in one response — plus the wells that already exist,
+    so the two can be drawn together. A proposal is only judgeable next to what
+    is already there.
+
+    Kept to `top` blocks and `n` sites each because each block runs its own
+    point-sampling pass; asking for all 264 would be a slow request nobody reads.
+    """
+    ranked = await recommendations(db, limit=top, district=district)
+
+    out: list[dict[str, Any]] = []
+    for block in ranked["recommendations"]:
+        s = await suggested_sites(db, block["id"], n=n)
+        out.append({
+            "block_id": block["id"], "block": block["name"],
+            "district": block["district"], "score": block["score"],
+            "reason": block["reason"], "wells": block["wells"],
+            "uranium_tests": block["uranium_tests"],
+            "area_km2": block["area_km2"],
+            "geometry": s["geometry"], "sites": s["sites"],
+        })
+
+    existing = (await db.execute(text("""
+        SELECT w.name, w.latitude, w.longitude, d.name AS district,
+               count(s.uranium_ppb) AS uranium_tests,
+               count(s.id)          AS samples
+        FROM monitoring_wells w
+        LEFT JOIN blocks b        ON b.id = w.block_id
+        LEFT JOIN districts d     ON d.id = b.district_id
+        LEFT JOIN water_samples s ON s.well_id = w.id
+        WHERE w.latitude IS NOT NULL AND w.longitude IS NOT NULL
+        GROUP BY w.id, w.name, w.latitude, w.longitude, d.name
+    """))).mappings().all()
+
+    return {
+        "blocks": out,
+        "proposed_total": sum(len(b["sites"]) for b in out),
+        "existing_wells": [dict(w) for w in existing],
+        "existing_total": len(existing),
+        "tested_total": sum(1 for w in existing if (w["uranium_tests"] or 0) > 0),
+        "weights": ranked["weights"],
+        "criterion": (
+            "Blocks are ranked by how poorly they are observed; within each, "
+            "sites maximise distance from any existing uranium-tested well."),
+        "caveat": (
+            "Candidate coordinates to start a site visit from — NOT a survey and "
+            "NOT a drilling instruction. Land ownership, access, depth to bedrock "
+            "and local permission will decide the actual location."),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# The data-deficiency matrix
+#
+# One column per KIND of gap, one row per district. The point is not the counts
+# — it is that each column has a consequence, and those consequences are what
+# `LIMITATIONS.md` is made of. A gap nobody can name the effect of is a
+# statistic; a gap with its effect written beside it is a limitation.
+#
+# Every dimension is measured from the database, not asserted. `blocks` is the
+# capability that gap denies and `implies` is the sentence it forces the project
+# to say. Those two fields are why this is worth building rather than counting
+# wells.
+# ═══════════════════════════════════════════════════════════════════════
+
+STALE_YEARS = 3
+
+#: Gap kind -> what it means, what it stops the project doing, what it forces us
+#: to admit. `key` matches the column name produced by the SQL below.
+GAP_DIMENSIONS: list[dict[str, str]] = [
+    {
+        "key": "blocks_no_wells",
+        "label": "Blocks with no well",
+        "means": "No monitoring well has ever been installed in the block.",
+        "blocks": "Any statement at all about that block's groundwater.",
+        "implies": ("Coverage is not uniform. A district-level figure is an average "
+                    "over blocks that were measured and blocks that never were, and "
+                    "must not be read as describing the whole district."),
+    },
+    {
+        "key": "wells_never_analysed_u",
+        "label": "Wells never analysed for uranium",
+        "means": ("The well exists and has been sampled, but no sample was ever "
+                  "analysed for uranium."),
+        "blocks": "Any uranium statement for that location — including a clean one.",
+        "implies": ("'No data' on the uranium surface is a gap in ANALYSIS, not a "
+                    "clean result. The well and the sampling round already exist, so "
+                    "this is the cheapest deficiency in the register to close."),
+    },
+    {
+        "key": "wells_single_sample",
+        "label": "Wells with only one sample",
+        "means": "One measurement, one date. No repeat visit.",
+        "blocks": ("Any trend, any seasonal signal, and any statistically-derived "
+                   "control limit."),
+        "implies": ("This is why the excursion UCL is a fixed percentage above "
+                    "baseline rather than NUREG-1569's preferred statistical rule: "
+                    "that rule needs a per-well temporal series and there is none. "
+                    "Substituting regional spatial spread was tested and rejected."),
+    },
+    {
+        "key": "blocks_no_level_station",
+        "label": "Blocks with no water-level station",
+        "means": "No groundwater-level observation point in the block.",
+        "blocks": "A measured hydraulic gradient there.",
+        "implies": ("The flow field falls back to smoothed DEM topography wherever "
+                    "stations are sparse, so flow direction in those blocks is "
+                    "inferred from surface shape rather than from measured head."),
+    },
+    {
+        "key": "wells_stale",
+        "label": f"Wells not sampled in {STALE_YEARS}+ years",
+        "means": "The most recent sample predates the last three years.",
+        "blocks": "Any claim that a result is current.",
+        "implies": ("Results are historical. This platform screens and prepares; it "
+                    "does not monitor in real time, and nothing here should be "
+                    "described as live."),
+    },
+]
+
+
+async def gap_matrix(db: AsyncSession) -> dict[str, Any]:
+    """Per-district counts across every named gap dimension."""
+    rows = (await db.execute(text(f"""
+        WITH well_stats AS (
+            SELECT w.id, w.block_id,
+                   count(s.id)          AS samples,
+                   count(s.uranium_ppb) AS u_tests,
+                   max(s.sampled_at)    AS last_sampled
+            FROM monitoring_wells w
+            LEFT JOIN water_samples s ON s.well_id = w.id
+            GROUP BY w.id, w.block_id
+        ),
+        block_stats AS (
+            SELECT b.id, b.district_id,
+                   count(DISTINCT ws.id) AS wells,
+                   count(DISTINCT st.id) AS stations
+            FROM blocks b
+            LEFT JOIN well_stats ws          ON ws.block_id = b.id
+            LEFT JOIN monitoring_stations st ON st.block_id = b.id
+            GROUP BY b.id, b.district_id
+        )
+        SELECT d.name AS district,
+               count(DISTINCT bs.id)                                 AS blocks,
+               count(DISTINCT bs.id) FILTER (WHERE bs.wells = 0)     AS blocks_no_wells,
+               count(DISTINCT bs.id) FILTER (WHERE bs.stations = 0)  AS blocks_no_level_station,
+               count(DISTINCT ws.id)                                 AS wells,
+               count(DISTINCT ws.id) FILTER (WHERE ws.samples > 0
+                                               AND ws.u_tests = 0)   AS wells_never_analysed_u,
+               count(DISTINCT ws.id) FILTER (WHERE ws.samples = 1)   AS wells_single_sample,
+               count(DISTINCT ws.id) FILTER (
+                   WHERE ws.last_sampled IS NOT NULL
+                     AND ws.last_sampled < now() - interval '{STALE_YEARS} years'
+               )                                                     AS wells_stale
+        FROM districts d
+        LEFT JOIN block_stats bs ON bs.district_id = d.id
+        LEFT JOIN well_stats  ws ON ws.block_id = bs.id
+        GROUP BY d.name
+        ORDER BY d.name
+    """))).mappings().all()
+
+    districts = [dict(r) for r in rows]
+    totals: dict[str, int] = {
+        d["key"]: sum(int(r.get(d["key"]) or 0) for r in districts)
+        for d in GAP_DIMENSIONS
+    }
+    totals["blocks"] = sum(int(r["blocks"] or 0) for r in districts)
+    totals["wells"] = sum(int(r["wells"] or 0) for r in districts)
+
+    return {
+        "dimensions": GAP_DIMENSIONS,
+        "districts": districts,
+        "totals": totals,
+        "stale_years": STALE_YEARS,
+        "what_this_is": (
+            "One column per KIND of data gap, measured from the database. Each "
+            "column carries the capability it denies and the limitation it forces "
+            "this project to state — a gap nobody can name the effect of is a "
+            "statistic; a gap with its effect beside it is a limitation."),
+    }

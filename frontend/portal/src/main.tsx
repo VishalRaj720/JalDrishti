@@ -25,6 +25,7 @@ import Audit from "./pages/Audit";
 import Administration from "./pages/Administration";
 import Datasets from "./pages/Datasets";
 import Compare from "./pages/Compare";
+import NetworkPlanPage from "./pages/NetworkPlan";
 import PublicView from "./pages/PublicView";
 
 const qc = new QueryClient({
@@ -86,6 +87,7 @@ function Gate() {
           element={<Guard allow={(r) => canSubmit(r) || canReview(r)}><FieldData /></Guard>}
         />
         <Route path="/data" element={<Guard allow={isStaff}><DataGaps /></Guard>} />
+        <Route path="/network-plan" element={<Guard allow={isStaff}><NetworkPlanPage /></Guard>} />
         <Route path="/audit" element={<Guard allow={canAudit}><Audit /></Guard>} />
         <Route path="/admin" element={<Guard allow={canAdmin}><Administration /></Guard>} />
         <Route path="/datasets" element={<Guard allow={canAdmin}><Datasets /></Guard>} />
