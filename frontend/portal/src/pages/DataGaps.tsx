@@ -8,9 +8,9 @@
  * model's inputs are reconciled.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type PublicDistrictRisk, type SyncStatus } from "../api/client";
+import { api, type Recommendations, type PublicDistrictRisk, type SyncStatus } from "../api/client";
 import { canSync, useAuth } from "../auth";
-import { ErrorNote, Loading, Planned, Tile } from "../components/bits";
+import { ErrorNote, Loading, Planned, TableScroll, Tile } from "../components/bits";
 
 interface PendingItem {
   id: string; observation_type: string; operation: string;
@@ -48,6 +48,11 @@ export default function DataGaps() {
   const thin = districts.filter((d) => d.samples > 0 && d.wells < 10);
   const covered = districts.filter((d) => d.wells >= 10);
 
+  const recs = useQuery({
+    queryKey: ["gap-recommendations"],
+    queryFn: () => api.get<Recommendations>("/data-gaps/recommendations?limit=20"),
+  });
+
   return (
     <div className="page">
       <div className="page-head">
@@ -57,6 +62,62 @@ export default function DataGaps() {
           trusted — and the point at which approved field evidence reaches the model.
         </p>
       </div>
+
+      {/* ── where to sample next: the proposal's recommendation half ── */}
+      <section className="card">
+        <h2>Where to sample next</h2>
+        <p className="muted small">
+          {recs.data?.what_this_is}
+        </p>
+        {recs.isLoading && <Loading />}
+        {recs.error && <ErrorNote error={recs.error} />}
+        {recs.data && (
+          <>
+            <TableScroll>
+              <table className="tbl compact">
+                <thead>
+                  <tr>
+                    <th>#</th><th>Priority</th><th>Block</th><th>District</th>
+                    <th>Area</th><th>Wells</th><th>U tests</th><th>Why</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recs.data.recommendations.map((r, i) => (
+                    <tr key={r.id}>
+                      <td className="muted">{i + 1}</td>
+                      <td><b>{r.score.toFixed(0)}</b></td>
+                      <td>{r.name}</td>
+                      <td className="muted small">{r.district}</td>
+                      <td className="small">{r.area_km2?.toFixed(0)} km²</td>
+                      <td className={r.wells === 0 ? "warn-text" : ""}>{r.wells}</td>
+                      <td className={r.uranium_tests === 0 ? "warn-text" : ""}>
+                        {r.uranium_tests}
+                      </td>
+                      <td className="small muted">{r.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
+
+            <details style={{ marginTop: 10 }}>
+              <summary className="muted small">
+                How this is scored — these weights are a policy judgement, not a
+                measurement
+              </summary>
+              <dl className="kv" style={{ marginTop: 8 }}>
+                {Object.entries(recs.data.weights).map(([k, w]) => (
+                  <div key={k}>
+                    <dt>{k.replace(/_/g, " ")} · {w.weight}</dt>
+                    <dd className="small muted">{w.why}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="muted small">{recs.data.tie_break}</p>
+            </details>
+          </>
+        )}
+      </section>
 
       <div className="grid-4" style={{ marginBottom: 16 }}>
         <Tile n={noData.length} label="Districts with no samples" tone="red"

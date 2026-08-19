@@ -502,3 +502,22 @@ export interface ModelState {
   built_at: string | null; backups: ModelBundle[];
   unprotected: boolean; message: string;
 }
+
+/** A block ranked by how badly it needs sampling.
+ *  Observation, not prediction — deliberately carries no risk band. */
+export interface GapRecommendation {
+  id: string; name: string; district: string;
+  area_km2: number | null; wells: number; samples: number;
+  uranium_tests: number; max_uranium_ppb: number | null;
+  km_to_tested_well: number | null; km_to_isr: number | null;
+  score: number; factors: Record<string, number>; reason: string;
+}
+
+export interface Recommendations {
+  generated_for: string; count: number;
+  recommendations: GapRecommendation[];
+  weights: Record<string, { weight: number; why: string }>;
+  constants: Record<string, number>;
+  tie_break: string;
+  what_this_is: string;
+}

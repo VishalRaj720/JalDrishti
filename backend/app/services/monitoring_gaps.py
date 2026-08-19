@@ -1,0 +1,222 @@
+"""Where to sample next — the proposal's recommendation deliverable.
+
+WHY THIS EXISTS. The TEXMiN proposal asks for two things about data gaps:
+*identification* and *recommendations*. Identification was built and is strong —
+`/public/risk/*` and Data & Gaps already show which blocks have no wells, and R10
+added the distinction between "never sampled" and "sampled but never analysed for
+uranium". Nothing turned that into an ordered list of where a limited sampling
+budget should go, which is the half a person can act on. `LIMITATIONS.md` records
+it as open finding O-1.
+
+WHAT THIS IS NOT. It is not a model output. No plume is simulated, no surrogate
+is called, and the score says nothing about whether contamination is present —
+only about how badly a place is *observed*. Ranking by predicted risk would be
+circular: the model is least trustworthy exactly where there is no data, so
+letting it choose where to sample would send crews to the places the model is
+most confident about and leave the blind spots blind.
+
+THE WEIGHTS ARE A POLICY CHOICE, NOT A MEASUREMENT. There is no published
+optimal-network objective for this setting, so any weighting is a judgement. They
+are therefore module constants with a stated rationale, returned in the API
+response, and rendered on screen next to the ranking — so a reader can disagree
+with the ordering by disagreeing with a number they can see, rather than having
+to read the source. That is the same discipline `UNGROUNDED_PARAMETERS` applies
+to the physics.
+
+GROUNDING. CGWB's own network-design practice is the reference point for the two
+structural factors — coverage per unit area, and distance to the nearest
+observation. The uranium-specific factor comes from this project's own finding
+that several Singhbhum blocks have sampled wells with no uranium determination at
+all, which BIS 10500 treats as a required parameter for a drinking-water source.
+Neither is a citation for the *weights*; those remain ours.
+"""
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+#: Each factor scores 0–1, then these weights sum them to a 0–100 priority.
+#: Rationale is carried alongside because it is shown to the user.
+WEIGHTS: dict[str, dict[str, Any]] = {
+    "never_sampled": {
+        "weight": 30,
+        "why": ("A block with no monitoring well is entirely unobserved. Nothing "
+                "else in this list can be said about it, and no advisory can ever "
+                "be issued for it."),
+    },
+    "sampled_not_analysed": {
+        "weight": 30,
+        "why": ("Wells exist and have been sampled, but no sample was analysed for "
+                "uranium — so the one contaminant this platform exists to screen "
+                "for is unmeasured. Cheapest gap to close: the wells and the "
+                "sampling round already exist."),
+    },
+    "coverage": {
+        "weight": 20,
+        "why": ("Wells per 100 km². A large block with one well is thinly observed "
+                "even though it is not a blank."),
+    },
+    "distance_to_tested_well": {
+        "weight": 15,
+        "why": ("How far the block centre is from the nearest well with a uranium "
+                "result. Distance is how far an assumption has to travel before it "
+                "reaches a measurement."),
+    },
+    "near_hypothetical_site": {
+        "weight": 5,
+        "why": ("Proximity to a registered hypothetical ISR site. Deliberately the "
+                "smallest factor: no such mine exists, so letting a speculative "
+                "location dominate a real monitoring plan would be backwards."),
+    },
+}
+
+#: Above this, a block is "well covered" on the coverage factor alone.
+GOOD_COVERAGE_WELLS_PER_100KM2 = 3.0
+#: Distance at which the distance factor saturates.
+FAR_KM = 25.0
+
+
+def _clamp01(x: float) -> float:
+    return max(0.0, min(1.0, x))
+
+
+def score_block(row: dict[str, Any]) -> dict[str, Any]:
+    """Score one block 0–100. Pure, so the weighting is testable in isolation."""
+    wells = int(row.get("wells") or 0)
+    tests = int(row.get("uranium_tests") or 0)
+    samples = int(row.get("samples") or 0)
+    area = float(row.get("area_km2") or 0.0)
+
+    factors: dict[str, float] = {
+        "never_sampled": 1.0 if wells == 0 else 0.0,
+        # Only meaningful where wells exist: a blank block is already fully
+        # scored by `never_sampled` and must not be counted twice.
+        "sampled_not_analysed": 1.0 if (wells > 0 and samples > 0 and tests == 0) else 0.0,
+        "coverage": (
+            1.0 if area <= 0 or wells == 0 else
+            _clamp01(1.0 - (wells / max(area, 1.0) * 100.0) / GOOD_COVERAGE_WELLS_PER_100KM2)
+        ),
+        "distance_to_tested_well": (
+            1.0 if row.get("km_to_tested_well") is None
+            else _clamp01(float(row["km_to_tested_well"]) / FAR_KM)
+        ),
+        "near_hypothetical_site": (
+            0.0 if row.get("km_to_isr") is None
+            else _clamp01(1.0 - float(row["km_to_isr"]) / FAR_KM)
+        ),
+    }
+
+    score = sum(factors[k] * WEIGHTS[k]["weight"] for k in WEIGHTS)
+    return {"score": round(score, 1), "factors": {k: round(v, 3) for k, v in factors.items()}}
+
+
+def _reason(row: dict[str, Any], factors: dict[str, float]) -> str:
+    """One plain sentence saying why this block is where it is in the list."""
+    wells = int(row.get("wells") or 0)
+    tests = int(row.get("uranium_tests") or 0)
+    samples = int(row.get("samples") or 0)
+
+    if wells == 0:
+        return ("No monitoring well has ever been installed here. Nothing is known "
+                "about this block's groundwater.")
+    if samples > 0 and tests == 0:
+        return (f"{wells} well(s) here have been sampled {samples} time(s), but no "
+                f"sample was analysed for uranium. Adding the determination to the "
+                f"next routine round would close this gap without new drilling.")
+    if factors["coverage"] > 0.6:
+        return (f"Only {wells} well(s) across {row.get('area_km2', 0):.0f} km² — thin "
+                f"coverage for a block this size.")
+    if factors["distance_to_tested_well"] > 0.6:
+        km = row.get("km_to_tested_well")
+        return (f"The nearest uranium result is {km:.0f} km away, so conditions here "
+                f"are inferred rather than measured.")
+    return (f"{wells} well(s) with {tests} uranium result(s). Reasonably observed; "
+            f"listed for completeness.")
+
+
+async def recommendations(db: AsyncSession, *, limit: int = 25,
+                          district: Optional[str] = None) -> dict[str, Any]:
+    """Blocks ranked by how badly they need sampling."""
+    rows = (await db.execute(text("""
+        WITH per_block AS (
+            SELECT b.id, b.name, d.name AS district,
+                   b.geometry,
+                   ST_Area(b.geometry::geography) / 1e6      AS area_km2,
+                   count(DISTINCT w.id)                      AS wells,
+                   count(s.id)                               AS samples,
+                   count(s.uranium_ppb)                      AS uranium_tests,
+                   max(s.uranium_ppb)                        AS max_uranium_ppb
+            FROM blocks b
+            JOIN districts d              ON d.id = b.district_id
+            LEFT JOIN monitoring_wells w  ON w.block_id = b.id
+            LEFT JOIN water_samples s     ON s.well_id = w.id
+            WHERE b.geometry IS NOT NULL
+              AND (CAST(:district AS text) IS NULL OR d.name = CAST(:district AS text))
+            GROUP BY b.id, b.name, d.name, b.geometry
+        ),
+        tested_wells AS (
+            SELECT w.location
+            FROM monitoring_wells w
+            JOIN water_samples s ON s.well_id = w.id
+            WHERE w.location IS NOT NULL AND s.uranium_ppb IS NOT NULL
+        )
+        SELECT p.id::text, p.name, p.district,
+               round(p.area_km2::numeric, 1)        AS area_km2,
+               p.wells, p.samples, p.uranium_tests,
+               round(p.max_uranium_ppb::numeric, 1) AS max_uranium_ppb,
+               round((
+                   SELECT min(ST_DistanceSphere(
+                       ST_Centroid(p.geometry), t.location::geometry)) / 1000.0
+                   FROM tested_wells t
+               )::numeric, 1) AS km_to_tested_well,
+               round((
+                   SELECT min(ST_DistanceSphere(
+                       ST_Centroid(p.geometry), i.location::geometry)) / 1000.0
+                   FROM isr_points i WHERE i.location IS NOT NULL
+               )::numeric, 1) AS km_to_isr
+        FROM per_block p
+    """), {"district": district})).mappings().all()
+
+    scored = []
+    for r in rows:
+        d = dict(r)
+        for k in ("area_km2", "km_to_tested_well", "km_to_isr", "max_uranium_ppb"):
+            if d.get(k) is not None:
+                d[k] = float(d[k])
+        s = score_block(d)
+        d.update(s)
+        d["reason"] = _reason(d, s["factors"])
+        # `band` is deliberately absent: this list is about observation, not risk,
+        # and pairing a priority with a risk band invites reading one as the other.
+        scored.append(d)
+
+    # Area is the tie-break, not a sixth weighted factor.
+    #
+    # Blocks with no well at all legitimately score identically — they are
+    # equally unobserved, and inventing a weight to separate them would dress a
+    # sort order up as a measurement. But a 318 km² blank block is a larger gap
+    # than a 50 km² one, and a crew planning a route needs *an* order. So the
+    # score stays honest about the tie and the ordering within it is stated:
+    # larger unobserved area first, then alphabetical for stability.
+    scored.sort(key=lambda x: (-x["score"], -(x.get("area_km2") or 0.0), x["name"]))
+    return {
+        "generated_for": district or "all districts",
+        "count": len(scored),
+        "recommendations": scored[:limit],
+        "weights": WEIGHTS,
+        "constants": {
+            "good_coverage_wells_per_100km2": GOOD_COVERAGE_WELLS_PER_100KM2,
+            "far_km": FAR_KM,
+        },
+        "tie_break": (
+            "Blocks with no well at all score identically because they are equally "
+            "unobserved. Among them the larger area is listed first, then "
+            "alphabetically. That is a sort order, not a measurement."),
+        "what_this_is": (
+            "A ranking of how poorly observed each block is — not a prediction of "
+            "contamination. No simulation is run and no model is called. The "
+            "weights below are a policy judgement, not a measurement, and are "
+            "shown so the ordering can be argued with."),
+    }
