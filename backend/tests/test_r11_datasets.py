@@ -24,33 +24,56 @@ if str(REPO_ROOT) not in sys.path:
 
 @pytest.fixture
 def snapshot(tmp_path):
-    """Give each test a genuinely SHIPPED baseline, then put the tree back.
+    """Build a genuinely pristine baseline, then put the working tree back.
 
-    These tests used to run against whatever was on disk, which was fine while
-    the working tree was clean and wrong the moment a real field observation had
-    been synced: assertions like "every row is `original`" then failed because a
-    legitimate added row was present. A test must control its own fixture state
-    rather than depend on the checkout being untouched.
+    This fixture has now been wrong twice, in opposite directions, and both
+    failures were the same mistake: trusting an external source to be pristine.
 
-    The baseline comes from `git show HEAD:<path>` — the committed file — so
-    "shipped" means exactly what is committed, not merely what happens to be
-    there. Anything git cannot produce is left as-is and the test works from the
-    live file.
+      1. Reading whatever was on disk — broke the moment a real field
+         observation had been synced, because assertions like "every row is
+         `original`" then failed on legitimate data.
+      2. Reading `git show HEAD:` — broke the moment those synced datasets were
+         COMMITTED, because HEAD stopped being the shipped state and started
+         being the current one.
+
+    So the baseline is CONSTRUCTED here rather than fetched: strip every `added`
+    row and drop the provenance columns. That is the definition of "as shipped"
+    and it holds no matter what is on disk or in the history.
     """
-    import subprocess
-
-    saved, restored_from_git = {}, []
+    saved = {}
     for key, f in ds.REGISTRY.items():
         if not f.path.exists():
             continue
         saved[key] = tmp_path / f"{key}{f.path.suffix}"
         shutil.copy2(f.path, saved[key])
-        blob = subprocess.run(
-            ["git", "show", f"HEAD:{f.relpath and ('Datasets/' + f.relpath)}"],
-            cwd=ds.REPO_ROOT, capture_output=True)
-        if blob.returncode == 0 and blob.stdout:
-            f.path.write_bytes(blob.stdout)
-            restored_from_git.append(key)
+        if f.kind == "csv":
+            header, rows, enc = ds._read_raw(f)
+            si = ds._col(header, ds.SOURCE_COL)
+            keep = [r for r in rows
+                    if not (0 <= si < len(r) and r[si] == ds.SOURCE_ADDED)]
+            for name in (ds.REF_COL, ds.SOURCE_COL):
+                i = ds._col(header, name)
+                if i >= 0:
+                    header.pop(i)
+                    for r in keep:
+                        if i < len(r):
+                            r.pop(i)
+            ds._write_raw(f, header, keep, enc)
+        else:
+            # The xlsx needs normalising too, or "every row is original" cannot
+            # hold for it. Safe to rewrite: no test compares xlsx bytes against
+            # an external reference — the one that compares bytes takes its own
+            # `before` snapshot inside the test body, after this has run.
+            try:
+                ds.strip_added(key)
+            except Exception:  # noqa: BLE001 — a missing/odd file must not break setup
+                pass
+    # Normalising above went through the write path, which takes a "pristine"
+    # snapshot of the file as it was BEFORE stripping — i.e. of the un-normalised
+    # state. Leaving that behind hands the next test a snapshot that disagrees
+    # with the baseline it was just given. Cleared so each test starts with none.
+    if ds.BACKUP_DIR.exists():
+        shutil.rmtree(ds.BACKUP_DIR, ignore_errors=True)
     ds.invalidate_caches()
     yield
     for key, src in saved.items():

@@ -652,6 +652,44 @@ def delete_row(key: str, row_id: str) -> dict[str, Any]:
             "stale_marks": list(f.stale_marks)}
 
 
+def drop_provenance_columns(f: DatasetFile) -> bool:
+    """Remove `record_source` / `record_ref` if present. True if anything changed.
+
+    Split out because the columns must come off in BOTH strip paths. They used to
+    be dropped only when there was at least one `added` row to remove, so a file
+    that had gained the columns and then had its added rows deleted one at a time
+    kept them for ever — still differing from what shipped, still showing in
+    `git status`, and still failing `is_pristine_snapshot`.
+    """
+    if f.kind == "xlsx":
+        wb, ws, hrow, header = _xlsx_open(f)
+        changed = False
+        for name in (REF_COL, SOURCE_COL):
+            header = [c.value for c in ws[hrow]]
+            for i, h in enumerate(header, start=1):
+                if h is not None and str(h).strip() == name:
+                    ws.delete_cols(i)
+                    changed = True
+                    break
+        if changed:
+            wb.save(f.path)
+        return changed
+
+    header, rows, enc = _read_raw(f)
+    changed = False
+    for name in (REF_COL, SOURCE_COL):
+        i = _col(header, name)
+        if i >= 0:
+            header.pop(i)
+            for r in rows:
+                if i < len(r):
+                    r.pop(i)
+            changed = True
+    if changed:
+        _write_raw(f, header, rows, enc)
+    return changed
+
+
 def strip_added(key: str, *, dry_run: bool = False) -> dict[str, Any]:
     """Remove every `added` row — the per-file primitive behind the reset."""
     f = get(key)
@@ -679,6 +717,11 @@ def strip_added(key: str, *, dry_run: bool = False) -> dict[str, Any]:
             result["restored_from_pristine"] = True
             result["removed"] = 0
             logger.info(f"{f.relpath}: no added rows; restored from pristine")
+        elif drop_provenance_columns(f):
+            invalidate_caches()
+            result["provenance_columns_dropped"] = True
+            result["removed"] = 0
+            logger.info(f"{f.relpath}: no added rows; dropped the provenance columns")
         return result
 
     ref = uuid.uuid4().hex[:12]
@@ -690,15 +733,8 @@ def strip_added(key: str, *, dry_run: bool = False) -> dict[str, Any]:
             (rr for rr in range(hrow + 1, ws.max_row + 1)
              if _xlsx_row_source(ws, rr, header) == SOURCE_ADDED), reverse=True):
             ws.delete_rows(r)
-        # Drop the provenance columns too — see below.
-        header = [c.value for c in ws[hrow]]
-        for name in (REF_COL, SOURCE_COL):
-            for i, h in enumerate(header, start=1):
-                if h is not None and str(h).strip() == name:
-                    ws.delete_cols(i)
-                    header = [c.value for c in ws[hrow]]
-                    break
         wb.save(f.path)
+        drop_provenance_columns(f)
     else:
         # Removing the rows is not enough to restore the file.
         #
