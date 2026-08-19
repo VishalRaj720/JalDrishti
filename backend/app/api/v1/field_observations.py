@@ -161,6 +161,85 @@ async def observations_map(
     }
 
 
+@router.get("/targets")
+async def submission_targets(
+    observation_type: str = Query(..., description="water_sample | groundwater_level"),
+    q: Optional[str] = Query(None, description="filter by name or district"),
+    limit: int = Query(200, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_staff),
+):
+    """The wells / stations a submission can attach itself to.
+
+    WHY THIS EXISTS. A chemistry sample belongs to a monitoring **well** and a
+    level reading belongs to a monitoring **station**; neither can be submitted
+    without naming one. The submission form said so and stopped there — "the
+    picker is not implemented" — which is why two of the three observation types
+    were unsubmittable.
+
+    Deliberately narrow. R11 deleted the generic `/monitoring-stations` CRUD
+    because nothing reached it and it was a second write path onto reference
+    geography. This is not that returning: it is read-only, it returns only what
+    a picker needs (id, name, where it is, and how recently it was sampled), and
+    it has no create/update/delete beside it.
+
+    `last_sampled` is included because it is the field officer's own signal about
+    where a fresh sample is worth taking — the same "when did anyone last look
+    here" question the monitoring recommendations answer at block scale.
+    """
+    if observation_type == "water_sample":
+        sql = """
+            SELECT w.id::text, w.name, w.latitude, w.longitude,
+                   b.name AS block, d.name AS district,
+                   count(s.id)                          AS samples,
+                   max(s.sampled_at)                    AS last_sampled,
+                   count(s.uranium_ppb)                 AS uranium_tests
+            FROM monitoring_wells w
+            LEFT JOIN blocks b        ON b.id = w.block_id
+            LEFT JOIN districts d     ON d.id = b.district_id
+            LEFT JOIN water_samples s ON s.well_id = w.id
+            WHERE (CAST(:q AS text) IS NULL
+                   OR w.name ILIKE '%' || CAST(:q AS text) || '%'
+                   OR d.name ILIKE '%' || CAST(:q AS text) || '%')
+            GROUP BY w.id, w.name, w.latitude, w.longitude, b.name, d.name
+            ORDER BY d.name NULLS LAST, w.name
+            LIMIT :lim
+        """
+    elif observation_type == "groundwater_level":
+        sql = """
+            SELECT st.id::text, st.name, st.latitude, st.longitude,
+                   b.name AS block, d.name AS district,
+                   count(r.id)              AS samples,
+                   max(r.recorded_at)       AS last_sampled,
+                   0                        AS uranium_tests
+            FROM monitoring_stations st
+            LEFT JOIN blocks b    ON b.id = st.block_id
+            LEFT JOIN districts d ON d.id = b.district_id
+            LEFT JOIN groundwater_level_readings r ON r.station_id = st.id
+            WHERE (CAST(:q AS text) IS NULL
+                   OR st.name ILIKE '%' || CAST(:q AS text) || '%'
+                   OR d.name ILIKE '%' || CAST(:q AS text) || '%')
+            GROUP BY st.id, st.name, st.latitude, st.longitude, b.name, d.name
+            ORDER BY d.name NULLS LAST, st.name
+            LIMIT :lim
+        """
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=("targets exist only for water_sample (wells) and "
+                    "groundwater_level (stations). An ore sighting is a point on "
+                    "the map and attaches to nothing."))
+
+    rows = (await db.execute(text(sql), {"q": q, "lim": limit})).mappings().all()
+    return {
+        "observation_type": observation_type,
+        "target": "monitoring_well" if observation_type == "water_sample"
+                  else "monitoring_station",
+        "count": len(rows),
+        "items": [dict(r) for r in rows],
+    }
+
+
 @router.get("/{obs_id}", response_model=ObservationResponse)
 async def get_observation(
     obs_id: uuid.UUID,

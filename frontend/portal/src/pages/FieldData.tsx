@@ -10,7 +10,7 @@
  */
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Observation } from "../api/client";
+import { api, type Observation, type TargetList } from "../api/client";
 import { canReview, canSubmit, useAuth } from "../auth";
 import { ErrorNote, Loading } from "../components/bits";
 
@@ -20,13 +20,43 @@ const TYPES = [
   { v: "groundwater_level", label: "Groundwater level" },
 ];
 
+/** The chemistry a field officer may record, matching `ALLOWED_FIELDS` on the
+ *  backend. Uranium leads because it is the contaminant this platform screens
+ *  for and the one most often left unmeasured. */
+const CHEM_FIELDS = [
+  { k: "uranium_ppb", label: "Uranium (ppb)" },
+  { k: "ph", label: "pH" },
+  { k: "ec_us_cm", label: "EC (µS/cm)" },
+  { k: "tds_mg_l", label: "TDS (mg/L)" },
+  { k: "sulphate_mg_l", label: "Sulphate (mg/L)" },
+  { k: "chloride_mg_l", label: "Chloride (mg/L)" },
+  { k: "nitrate_mg_l", label: "Nitrate (mg/L)" },
+  { k: "fluoride_mg_l", label: "Fluoride (mg/L)" },
+  { k: "total_hardness", label: "Total hardness" },
+  { k: "iron_ppm", label: "Iron (ppm)" },
+  { k: "arsenic_ppb", label: "Arsenic (ppb)" },
+  { k: "bicarbonate_mg_l", label: "Bicarbonate (mg/L)" },
+];
+
 function SubmitForm({ onDone }: { onDone: () => void }) {
   const [type, setType] = useState("ore_presence");
   const [f, setF] = useState<Record<string, string>>({
     name: "", longitude: "", latitude: "", ore_zone: "deposit",
     uranium_grade_pct: "", notes: "",
+    target_id: "", sampled_at: "", recorded_at: "", groundwater_level: "",
   });
   const set = (k: string, v: string) => setF({ ...f, [k]: v });
+  const [targetQ, setTargetQ] = useState("");
+
+  /** The wells or stations this submission can attach to. */
+  const targets = useQuery({
+    queryKey: ["obs-targets", type, targetQ],
+    enabled: type !== "ore_presence",
+    queryFn: () => api.get<TargetList>(
+      `/field-observations/targets?observation_type=${type}`
+      + (targetQ ? `&q=${encodeURIComponent(targetQ)}` : "")),
+  });
+  const chosen = targets.data?.items.find((t) => t.id === f.target_id);
 
   const submit = useMutation({
     mutationFn: () => {
@@ -42,10 +72,42 @@ function SubmitForm({ onDone }: { onDone: () => void }) {
           },
         });
       }
-      throw new Error(
-        "Only ore-presence submissions are wired into this form. Water-quality and " +
-        "groundwater-level submissions need a well or station picker, which is not built yet.",
-      );
+      if (!f.target_id) {
+        throw new Error(
+          type === "water_sample"
+            ? "Choose the monitoring well this sample came from."
+            : "Choose the monitoring station this reading came from.");
+      }
+
+      if (type === "water_sample") {
+        // Only the fields actually filled in are sent. A blank chemistry box
+        // must NOT become 0 — a zero is a measurement, and inventing one turns
+        // "we did not test for this" into "we tested and found none", which is
+        // the exact confusion the rest of this product works to prevent.
+        const chem: Record<string, number> = {};
+        for (const k of CHEM_FIELDS.map((c) => c.k)) {
+          if (f[k] !== undefined && f[k] !== "") chem[k] = Number(f[k]);
+        }
+        return api.post("/field-observations", {
+          observation_type: "water_sample", operation: "create",
+          note: f.notes || null,
+          payload: {
+            well_id: f.target_id,
+            sampled_at: f.sampled_at ? new Date(f.sampled_at).toISOString() : now,
+            ...chem,
+          },
+        });
+      }
+
+      return api.post("/field-observations", {
+        observation_type: "groundwater_level", operation: "create",
+        note: f.notes || null,
+        payload: {
+          station_id: f.target_id,
+          recorded_at: f.recorded_at ? new Date(f.recorded_at).toISOString() : now,
+          groundwater_level: Number(f.groundwater_level),
+        },
+      });
     },
     onSuccess: onDone,
   });
@@ -63,11 +125,94 @@ function SubmitForm({ onDone }: { onDone: () => void }) {
       </div>
 
       {type !== "ore_presence" ? (
-        <div className="banner warn">
-          <strong>Form not built for this type.</strong> The API accepts it, but a
-          water-quality or level submission has to target an existing well or station,
-          and that picker is not implemented. Ore presence is fully supported below.
-        </div>
+        <>
+          {/* The picker that was missing. A sample belongs to a well and a level
+              reading to a station; neither can be submitted without one. */}
+          <div className="field">
+            <label>
+              {type === "water_sample" ? "Monitoring well" : "Monitoring station"}
+            </label>
+            <input placeholder="Search by name or district…" value={targetQ}
+              onChange={(e) => setTargetQ(e.target.value)} />
+            <select value={f.target_id} onChange={(e) => set("target_id", e.target.value)}
+              style={{ marginTop: 6 }}>
+              <option value="">
+                {targets.isLoading ? "Loading…"
+                  : `${targets.data?.count ?? 0} available — choose one…`}
+              </option>
+              {(targets.data?.items ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}{t.district ? ` · ${t.district}` : ""}
+                  {t.last_sampled
+                    ? ` · last ${new Date(t.last_sampled).getFullYear()}`
+                    : " · never sampled"}
+                </option>
+              ))}
+            </select>
+            {chosen && (
+              <div className="muted small" style={{ marginTop: 4 }}>
+                {chosen.latitude?.toFixed(4)}, {chosen.longitude?.toFixed(4)}
+                {" · "}{chosen.samples} previous reading(s)
+                {type === "water_sample" && (
+                  chosen.uranium_tests === 0
+                    ? <b className="warn-text"> · never analysed for uranium</b>
+                    : ` · ${chosen.uranium_tests} uranium result(s)`
+                )}
+              </div>
+            )}
+          </div>
+
+          {type === "water_sample" ? (
+            <>
+              <div className="field">
+                <label>Sampled at</label>
+                <input type="datetime-local" value={f.sampled_at}
+                  onChange={(e) => set("sampled_at", e.target.value)} />
+              </div>
+              <div className="muted small" style={{ margin: "4px 0 8px" }}>
+                Fill in only what was actually measured. <b>A blank box is left
+                blank</b> — it is not recorded as zero, because "not tested" and
+                "tested and found none" are different findings.
+              </div>
+              <div className="grid-2">
+                {CHEM_FIELDS.map((c) => (
+                  <div className="field" key={c.k}>
+                    <label>{c.label}</label>
+                    <input type="number" step="any" value={f[c.k] ?? ""}
+                      placeholder="not measured"
+                      onChange={(e) => set(c.k, e.target.value)} />
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="grid-2">
+              <div className="field">
+                <label>Recorded at</label>
+                <input type="datetime-local" value={f.recorded_at}
+                  onChange={(e) => set("recorded_at", e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Groundwater level (m below ground)</label>
+                <input type="number" step="any" value={f.groundwater_level}
+                  placeholder="e.g. 3.5"
+                  onChange={(e) => set("groundwater_level", e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          <div className="field">
+            <label>Notes for the reviewer</label>
+            <textarea rows={2} value={f.notes}
+              onChange={(e) => set("notes", e.target.value)} />
+          </div>
+
+          <div className="muted small">
+            Submitted observations are <b>proposals</b>. An admin reviews each one,
+            and only a sync carries an approved row into the datasets the engine
+            reads — visible on the Dataset manager.
+          </div>
+        </>
       ) : (
         <>
           <div className="grid-2">

@@ -23,6 +23,13 @@ function sectionsFor(role: Role | undefined) {
   // The citizen's own sections. Staff get "Public View" so an official can see
   // exactly what a resident sees — the same screen, not a preview of it.
   s.push({ to: "/my-area", label: isStaff(role) ? "Public View" : "My area" });
+  // R11: `/public` — the citizen MAP — was routed but appeared in no menu, for
+  // any role. It could only be reached by typing the URL, so in practice no
+  // resident had a map at all: "My area" is the district/block reading screen
+  // and contains no Leaflet. The map is the screen that answers the spatial
+  // question a resident actually has ("is anyone testing near me"), so it gets
+  // its own entry rather than being buried inside another page.
+  s.push({ to: "/public", label: isStaff(role) ? "Public map" : "Map near me" });
   if (!isStaff(role)) s.push({ to: "/alerts", label: "Alerts" });
   s.push({ to: "/methods", label: "Data & methods" });
   return s;

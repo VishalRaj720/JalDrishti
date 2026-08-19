@@ -7,7 +7,9 @@
  * site data, a third time by a Postgres row-level-security policy.
  */
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { auth, clearToken, getToken, setToken, type Me, type Role } from "./api/client";
+import {
+  auth, clearToken, getToken, setToken, tokenSecondsLeft, type Me, type Role,
+} from "./api/client";
 
 interface AuthState {
   me: Me | null;
@@ -105,6 +107,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearToken();
     setMe(null);
   };
+
+  /**
+   * Keep an active session alive (R11, finding O-9).
+   *
+   * `.env` sets a 15-minute token while `config.py` defaults to 480, and there
+   * was no refresh path at all: a 401 clears the token, so anyone reading a long
+   * report or filling in a submission form was signed out mid-task and lost what
+   * they had typed. I hit this myself while verifying a page.
+   *
+   * The timer is derived from the token's own `exp` rather than a constant,
+   * because the lifetime is server configuration and a hard-coded client value
+   * would be wrong in one deployment or the other. It fires at half of the
+   * remaining life, floored at 30 s so a very short token cannot spin, and only
+   * while a user is actually signed in — this extends an *active* session and
+   * cannot resurrect an expired one.
+   */
+  useEffect(() => {
+    if (!me) return;
+    let timer: number | undefined;
+
+    const schedule = () => {
+      const left = tokenSecondsLeft();
+      if (left === null) return;
+      if (left <= 0) { clearToken(); setMe(null); return; }
+      const delay = Math.max(30, Math.floor(left / 2));
+      timer = window.setTimeout(async () => {
+        try {
+          const { access_token } = await auth.refresh();
+          setToken(access_token);
+          schedule();
+        } catch {
+          // Refusing to loop on a dead session: the next API call will 401 and
+          // the user is sent to sign in with a message, which is honest.
+        }
+      }, delay * 1000);
+    };
+
+    schedule();
+    return () => { if (timer) window.clearTimeout(timer); };
+  }, [me]);
 
   return <Ctx.Provider value={{ me, loading, error, signIn, signOut }}>{children}</Ctx.Provider>;
 }

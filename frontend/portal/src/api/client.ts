@@ -338,7 +338,26 @@ export const auth = {
    *  a failed logout must still sign the user out of this browser, or a network
    *  blip would trap them in a session they asked to end. */
   logout: () => api.post<void>("/auth/logout").catch(() => undefined),
+  refresh: () => api.post<{ access_token: string }>("/auth/refresh"),
 };
+
+/** Seconds until the current token expires, or null if there is no usable one.
+ *
+ *  Read from the JWT's own `exp` rather than assumed, because the lifetime is
+ *  server configuration: `.env` sets 15 minutes while `config.py` defaults to
+ *  480, and a client that hard-coded either would be wrong in one deployment. */
+export function tokenSecondsLeft(): number | null {
+  const t = getToken();
+  if (!t) return null;
+  try {
+    const [, body] = t.split(".");
+    const { exp } = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
+    if (typeof exp !== "number") return null;
+    return exp - Math.floor(Date.now() / 1000);
+  } catch {
+    return null;      // malformed token: treated as no session
+  }
+}
 
 // ── the citizen surface ──────────────────────────────────────────────
 
@@ -590,4 +609,23 @@ export interface DeletionImpact {
   deletable: boolean;
   cascade_warning: string;
   blocked_reason: string | null;
+}
+
+/** A well or station a field submission can attach to.
+ *
+ *  `uranium_tests === 0` on a well with samples is the "sampled but never
+ *  analysed for uranium" case — shown in the picker so an officer can choose the
+ *  gap worth closing rather than re-sampling somewhere already covered. */
+export interface SubmissionTarget {
+  id: string; name: string;
+  latitude: number | null; longitude: number | null;
+  block: string | null; district: string | null;
+  samples: number; last_sampled: string | null; uranium_tests: number;
+}
+
+export interface TargetList {
+  observation_type: string;
+  target: "monitoring_well" | "monitoring_station";
+  count: number;
+  items: SubmissionTarget[];
 }

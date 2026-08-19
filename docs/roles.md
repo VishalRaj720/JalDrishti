@@ -210,6 +210,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/auth/login` | ○ | ○ | ○ | ○ |
 | `POST /api/v1/auth/logout` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/auth/me` | ● | ● | ● | ● |
+| `POST /api/v1/auth/refresh` | ● | ● | ● | ● |
 | `GET /api/v1/citizen/advisories` | ● | ● | ● | ● |
 | `GET /api/v1/citizen/advisories/geojson` | ● | ● | ● | ● |
 | `GET /api/v1/citizen/alerts` | ● | ● | ● | ● |
@@ -241,6 +242,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/field-observations` | ● | ● | ● | · |
 | `POST /api/v1/field-observations` | ● | · | ● | · |
 | `GET /api/v1/field-observations/map` | ● | ● | ● | · |
+| `GET /api/v1/field-observations/targets` | ● | ● | ● | · |
 | `GET /api/v1/field-observations/{obs_id}` | ● | ● | ● | · |
 | `POST /api/v1/field-observations/{obs_id}/approve` | ● | · | · | · |
 | `POST /api/v1/field-observations/{obs_id}/reject` | ● | · | · | · |
@@ -311,7 +313,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 95/106 · **analyst** 63/106 · **field_officer** 51/106 · **citizen** 12/106
+Reachable endpoints per role — **admin** 97/108 · **analyst** 65/108 · **field_officer** 53/108 · **citizen** 13/108
 
 <!-- END GENERATED AUTHZ MATRIX -->
 
