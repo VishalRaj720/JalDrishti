@@ -330,6 +330,14 @@ export const auth = {
   login: (email: string, password: string) =>
     api.post<{ access_token: string }>("/auth/login", { email, password }),
   me: () => api.get<Me>("/auth/me"),
+  /** Tell the server the session is over, then forget the token locally.
+   *
+   *  The endpoint existed and was never called: sign-out only dropped the token
+   *  from this browser, so the server never recorded that anyone had left and
+   *  the audit log showed sessions that just stopped. Deliberately best-effort —
+   *  a failed logout must still sign the user out of this browser, or a network
+   *  blip would trap them in a session they asked to end. */
+  logout: () => api.post<void>("/auth/logout").catch(() => undefined),
 };
 
 // ── the citizen surface ──────────────────────────────────────────────
@@ -520,4 +528,20 @@ export interface Recommendations {
   constants: Record<string, number>;
   tie_break: string;
   what_this_is: string;
+}
+
+/** Rolling analytical-vs-ML disagreement from `GET /ml/drift`.
+ *  In-process only: it resets on restart, which the UI states rather than
+ *  letting a low `n_requests` read as "the model is fine". */
+export interface MlDrift {
+  n_requests: number;
+  threshold_rel: number;
+  min_samples: number;
+  per_metric: Record<string, {
+    n: number; median_rel: number; p90_rel: number; drifting: boolean;
+  }>;
+  excursion_probability_median_abs: number;
+  extrapolation_rate: number;
+  off_scale_rate: number;
+  drifting: boolean;
 }

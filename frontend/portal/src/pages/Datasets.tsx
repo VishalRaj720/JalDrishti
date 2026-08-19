@@ -22,7 +22,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
-  api, type DatasetRows, type DatasetSummary, type ModelState, type OpsStatus,
+  api, type DatasetRows, type DatasetSummary, type MlDrift, type ModelState, type OpsStatus,
 } from "../api/client";
 import { Empty, ErrorNote, Loading, TableScroll } from "../components/bits";
 
@@ -49,6 +49,14 @@ export default function Datasets() {
     queryKey: ["model-state"],
     queryFn: () => api.get<ModelState>("/model-ops/model"),
   });
+  // The two endpoints that existed since P4 and were never once called by the
+  // UI. Drift is the honest answer to "does this model still agree with the
+  // engine it was trained on", which is the only question that would justify a
+  // retrain — so it belongs beside the model, not in a debug console.
+  const drift = useQuery({
+    queryKey: ["ml-drift"],
+    queryFn: () => api.get<MlDrift>("/ml/drift"),
+  });
   const rows = useQuery({
     queryKey: ["dataset-rows", key, filter, q, offset],
     enabled: !!key,
@@ -63,6 +71,7 @@ export default function Datasets() {
     qc.invalidateQueries({ queryKey: ["dataset-rows"] });
     qc.invalidateQueries({ queryKey: ["ops-status"] });
     qc.invalidateQueries({ queryKey: ["model-state"] });
+    qc.invalidateQueries({ queryKey: ["ml-drift"] });
     qc.invalidateQueries({ queryKey: ["sync-status"] });
   };
   const sync = useMutation({
@@ -351,6 +360,59 @@ export default function Datasets() {
             <button className="btn primary" disabled={busy}
               onClick={() => backup.mutate("manual")}>Back up the model now</button>
           </div>
+
+          {drift.data && (
+            <>
+              <div className="sec">Agreement with the analytical engine</div>
+              <p className="muted small">
+                The surrogate was trained on the engine's own output, so the engine
+                is the reference. This compares the two on predictions served since
+                this process started — <b>{drift.data.n_requests} so far</b>. It is
+                in-process only, so it resets on restart and says nothing about
+                runs served earlier.
+              </p>
+              <TableScroll>
+                <table className="tbl compact">
+                  <thead>
+                    <tr><th>Metric</th><th>n</th><th>Median rel. diff</th>
+                      <th>P90</th><th>State</th></tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(drift.data.per_metric).map(([k, m]) => (
+                      <tr key={k}>
+                        <td className="mono small">{k}</td>
+                        <td>{m.n}</td>
+                        <td>{(m.median_rel * 100).toFixed(1)}%</td>
+                        <td>{(m.p90_rel * 100).toFixed(1)}%</td>
+                        <td>
+                          {m.n < drift.data!.min_samples
+                            ? <span className="muted small">too few to judge</span>
+                            : m.drifting
+                              ? <span className="pill amber">⚠ drifting</span>
+                              : <span className="pill green">✓ agrees</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableScroll>
+              <dl className="kv">
+                <dt>Drift threshold</dt>
+                <dd>{(drift.data.threshold_rel * 100).toFixed(0)}% relative,
+                    after {drift.data.min_samples} samples</dd>
+                <dt>Extrapolation rate</dt>
+                <dd>{(drift.data.extrapolation_rate * 100).toFixed(1)}% — pins
+                    outside trained support, where the conformal guarantee is void</dd>
+                <dt>Off-scale rate</dt>
+                <dd>{(drift.data.off_scale_rate * 100).toFixed(1)}%</dd>
+              </dl>
+              <p className="muted small">
+                Sustained drift is the <b>only</b> signal here that would justify
+                retraining. Syncing rows does not: ore zone, grade, flow field and
+                baselines are inputs the surrogate was already trained across.
+              </p>
+            </>
+          )}
           {model.data.backups.length > 0 && (
             <TableScroll>
               <table className="tbl compact">

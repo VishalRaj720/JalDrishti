@@ -98,7 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const signOut = () => { clearToken(); setMe(null); };
+  const signOut = () => {
+    // Fire-and-forget: the local session ends immediately either way. Awaiting
+    // it would make a slow network look like a broken Sign out button.
+    void auth.logout();
+    clearToken();
+    setMe(null);
+  };
 
   return <Ctx.Provider value={{ me, loading, error, signIn, signOut }}>{children}</Ctx.Provider>;
 }

@@ -76,8 +76,8 @@ pipeline is not ready** until the two-stage head is built.
 
 | # | Issue | Status |
 |---|---|---|
-| O-1 | **No monitoring-siting recommendation.** Proposal deliverable 2 asks for gap identification *and* recommendations; only identification exists | Being built |
-| O-2 | `POST /ingest/*` admits `analyst`, so an analyst can overwrite reference geography (drift finding D-2 in `roles.md`) | Being narrowed to admin |
+| ~~O-1~~ | ~~No monitoring-siting recommendation~~ | **Resolved (R11).** `GET /data-gaps/recommendations` ranks every block by how badly it is observed, rendered on Data & Gaps with its weights shown. Ranks by *observation*, never by predicted risk — the model is least trustworthy exactly where there is no data |
+| ~~O-2~~ | ~~`POST /ingest/*` admits `analyst`~~ | **Resolved.** All five routes are `require_admin`; `roles.md`'s generated matrix confirms it. The prose in that file had gone stale, and was corrected in R11 |
 | O-3 | `react-router-dom` 6.28 — two moderate advisories; the SSR one does not apply. Fix crosses a major version | Open, deployment decision |
 | O-4 | Demo accounts with weak public passwords are listed on the login screen | Open — see `DEPLOYMENT.md` §5 |
 | O-5 | `/metrics` is unauthenticated | Open — restrict at the gateway |
@@ -113,5 +113,9 @@ Ungrounded constants are not hidden in this file. They are registered in
 `GET /api/v1/ml/assumptions`, surfaced in the portal, and test-pinned. Provenance for
 every physical constant is tracked in `ml_pipeline/JHARKHAND_FIDELITY_MATRIX.md`.
 
-Any admin override of one of those constants records who changed it, when, and the
-citation or rationale — and appears in the same assumptions register.
+**Admin editing of those constants is NOT built.** It was scoped in R11 and deliberately
+left out: an edited constant is one of the few changes that genuinely invalidates the
+trained surrogate, because every training label was generated using the old value. Building
+the editor without the retrain-and-revalidate path behind it would let someone silently put
+the model and its own constants out of step. The constants remain code, changed by a commit
+that a reviewer can see.

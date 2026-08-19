@@ -76,12 +76,12 @@ decision, not a cleanup. **All three predate the P2 cutover and none is a regres
 | # | Drift | Reality | Consequence |
 |---|---|---|---|
 | ~~**D-1**~~ | ~~`field_officer` cannot upload anything~~ | **RESOLVED 2026-08-12.** The role now has a real write path — `POST /field-observations` and `/withdraw` — through the review workflow in §3. It still holds no direct write to any authoritative table, which is the point | — |
-| **D-2** | **`analyst` can ingest** | All five `POST /ingest/*` routes admit `analyst` | §2 says analyst has "no ingest". Ingest replaces reference geography — the same objection §3.1 raises against the deleted CRUD writes: it "silently forks the scientific basis of every simulation" |
+| ~~**D-2**~~ | ~~`analyst` can ingest~~ | **RESOLVED.** All five `POST /ingest/*` routes are `require_admin`; the generated matrix below confirms it. Ingest replaces reference geography, which §3.1 objects to for the same reason it deleted the CRUD writes: it "silently forks the scientific basis of every simulation" | — |
 | ~~**D-3**~~ | ~~`citizen` can reach exactly one endpoint~~ | **RESOLVED.** The citizen surface shipped in P5/R8: `/public/risk/*`, `/citizen/blocks`, `/citizen/advisories/geojson` and the alerts routes | — |
 
-**Recommended resolution for D-2**, when the scope allows it: narrow `POST /ingest/*` to
-`require_admin`. A one-line guard change, but it alters who can overwrite reference geography, so it
-is a decision rather than a cleanup.
+D-2 was resolved by narrowing `POST /ingest/*` to `require_admin`. The prose above said it was
+open for longer than the code did — the generated matrix had already been showing admin-only,
+so this document was contradicting its own table. Corrected in R11.
 
 ---
 
@@ -321,7 +321,7 @@ regenerated with the table above — do not hand-edit them.
 - **admin** — everything except the unauthenticated routes, which are counted as `○`
   (no authentication) rather than as an admin permission.
 - **analyst** — the widest working role, and the one to watch: it can still reach the
-  ingest routes (finding D-2, still open), and it can read the review queue but not
+  ingest routes (finding D-2, now resolved), and it can read the review queue but not
   decide on it.
 - **field_officer** — reads, plus the write routes that make the role real: submit,
   withdraw, and reading back its own queue. Still zero direct writes to authoritative
