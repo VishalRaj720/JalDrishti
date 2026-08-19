@@ -144,3 +144,31 @@ def run(kind: str, *, label: str, actor: Optional[str], fn: Callable[[], Any],
 
     _wrapped.job_id = job_id  # type: ignore[attr-defined]
     return _wrapped
+
+
+def run_async(kind: str, *, label: str, actor: Optional[str],
+              coro_factory, detail: Optional[dict] = None):
+    """Async twin of `run`, for work that needs its own database session.
+
+    The request's session is closed by the time a background task runs, so a job
+    that touches the database has to open its own — which means the callable is
+    a coroutine and cannot go through `run`.
+    """
+    job_id = start(kind, label=label, actor=actor, detail=detail)
+
+    async def _wrapped() -> None:
+        try:
+            out = await coro_factory()
+            msg, extra = "", None
+            if isinstance(out, dict):
+                msg = str(out.get("message", ""))
+                extra = {k: v for k, v in out.items()
+                         if isinstance(v, (str, int, float, bool, type(None)))}
+            finish(job_id, message=msg, detail=extra)
+        except Exception as exc:  # noqa: BLE001
+            # Never re-raise: a background task that raises dies silently in the
+            # worker and the UI would show "running" for ever.
+            fail(job_id, str(exc))
+
+    _wrapped.job_id = job_id  # type: ignore[attr-defined]
+    return _wrapped

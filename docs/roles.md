@@ -282,6 +282,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/model-ops/model-backups/{name}/restore` | ● | · | · | · |
 | `POST /api/v1/model-ops/rebuild-flow-field` | ● | · | · | · |
 | `POST /api/v1/model-ops/recompute-baselines` | ● | · | · | · |
+| `POST /api/v1/model-ops/seed-database` | ● | · | · | · |
 | `GET /api/v1/model-ops/status` | ● | ● | ● | · |
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | ● | · | · |
@@ -317,7 +318,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 101/112 · **analyst** 69/112 · **field_officer** 57/112 · **citizen** 13/112
+Reachable endpoints per role — **admin** 102/113 · **analyst** 69/113 · **field_officer** 57/113 · **citizen** 13/113
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

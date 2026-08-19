@@ -195,3 +195,41 @@ async def restore_model_backup(
         entity_id=name, actor_id=actor.id, actor_label=actor.email,
         ip_address=request.client.host if request.client else None, detail=out)
     return out
+
+
+@router.post("/seed-database")
+async def seed_database(
+    request: Request,
+    background: BackgroundTasks,
+    actor: User = Depends(require_admin),
+) -> dict[str, Any]:
+    """Carry `Datasets/` into the database — the reverse of a dataset sync.
+
+    Needed after editing a dataset file directly, or replacing one through
+    /ingest: until this runs, the portal's own record (wells, samples, district
+    bands) is behind the files the engine reads.
+
+    Runs only the geodata stages, never the whole seed — that also creates demo
+    users and ISR points, and re-creating weak demo logins from a button on a
+    running system would be a security decision disguised as a refresh.
+
+    Backgrounded because a full pass re-reads a 9,583-row level series and a
+    397-row chemistry file.
+    """
+    task = jobs.run_async(
+        "seed_database", label="Updating the database from Datasets/",
+        actor=actor.email, coro_factory=mo.seed_database_from_datasets,
+        detail={"stages": "districts, sub-districts, aquifers, levels, chemistry"})
+    background.add_task(task)
+
+    await audit.record(
+        action="model_ops.seed_database", entity_type="database",
+        entity_id="geodata", actor_id=actor.id, actor_label=actor.email,
+        ip_address=request.client.host if request.client else None,
+        detail={"job_id": task.job_id, "started": True})
+    return {
+        "started": True, "job_id": task.job_id,
+        "message": ("Update started. Rows are matched on their natural keys, so "
+                    "running this repeatedly adds nothing — watch it under "
+                    "Activity."),
+    }

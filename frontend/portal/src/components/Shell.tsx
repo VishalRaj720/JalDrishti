@@ -7,33 +7,65 @@ import {
   canSubmit, isStaff, useAuth,
 } from "../auth";
 
-/** Section list, filtered by role — the `roleReq` pattern from the prototype. */
-function sectionsFor(role: Role | undefined) {
-  const s: Array<{ to: string; label: string }> = [{ to: "/overview", label: "Overview" }];
-  if (isStaff(role)) s.push({ to: "/console", label: "Console" });
-  if (canRunSim(role)) s.push({ to: "/compare", label: "Compare" });
-  // Analysts propose, regulators decide — both need the queue. A field officer
-  // does not run the model, so nothing here is theirs to propose or judge.
-  if (canRunSim(role) || canReview(role)) s.push({ to: "/publications", label: "Publications" });
-  if (canSubmit(role) || canReview(role)) s.push({ to: "/field", label: "Field Data" });
-  if (isStaff(role)) s.push({ to: "/data", label: "Data & Gaps" });
-  if (canAudit(role)) s.push({ to: "/audit", label: "Audit" });
-  if (canAdmin(role)) s.push({ to: "/datasets", label: "Datasets" });
-  if (canAdmin(role)) s.push({ to: "/admin", label: "Administration" });
-  // The citizen's own sections. Staff get "Public View" so an official can see
-  // exactly what a resident sees — the same screen, not a preview of it.
-  s.push({ to: "/my-area", label: isStaff(role) ? "Public View" : "My area" });
-  // R11: `/public` — the citizen MAP — was routed but appeared in no menu, for
-  // any role. It could only be reached by typing the URL, so in practice no
-  // resident had a map at all: "My area" is the district/block reading screen
-  // and contains no Leaflet. The map is the screen that answers the spatial
-  // question a resident actually has ("is anyone testing near me"), so it gets
-  // its own entry rather than being buried inside another page.
-  s.push({ to: "/public", label: isStaff(role) ? "Public map" : "Map near me" });
-  if (!isStaff(role)) s.push({ to: "/alerts", label: "Alerts" });
-  s.push({ to: "/methods", label: "Data & methods" });
-  return s;
+/**
+ * The nav, grouped.
+ *
+ * An admin sees eleven destinations. As a flat row of links they overflowed the
+ * header and collided with the sync pill and the account controls — horizontal
+ * space is the one thing a top bar cannot buy more of, and every section added
+ * since P4 made it worse.
+ *
+ * Grouping trades one click for a header that fits: five stable top-level items
+ * whose width does not change as sections are added. The grouping is by QUESTION
+ * being asked, not by permission — "where is the data" and "what has been
+ * decided" are different jobs, and a menu that mirrors the role matrix would
+ * just be the permission model leaking into the furniture.
+ *
+ * Overview stays a plain link because it is the landing page, and a dropdown
+ * containing one thing is a worse button.
+ */
+type NavItem = { to: string; label: string };
+type NavGroup = { label: string; items: NavItem[] };
+
+function sectionsFor(role: Role | undefined): NavGroup[] {
+  const groups: NavGroup[] = [];
+  const add = (label: string, items: (NavItem | false)[]) => {
+    const kept = items.filter(Boolean) as NavItem[];
+    if (kept.length) groups.push({ label, items: kept });
+  };
+
+  add("Overview", [{ to: "/overview", label: "Overview" }]);
+
+  add("Map", [
+    isStaff(role) && { to: "/console", label: "Console" },
+    canRunSim(role) && { to: "/compare", label: "Compare sites" },
+  ]);
+
+  add("Data", [
+    (canSubmit(role) || canReview(role)) && { to: "/field", label: "Field data" },
+    isStaff(role) && { to: "/data", label: "Data & gaps" },
+    isStaff(role) && { to: "/network-plan", label: "Monitoring plan" },
+    canAdmin(role) && { to: "/datasets", label: "Dataset manager" },
+  ]);
+
+  add("Decisions", [
+    // Analysts propose, admins decide — both need the queue. A field officer
+    // does not run the model, so nothing here is theirs to propose or judge.
+    (canRunSim(role) || canReview(role)) && { to: "/publications", label: "Publications" },
+    canAudit(role) && { to: "/audit", label: "Audit log" },
+    canAdmin(role) && { to: "/admin", label: "Administration" },
+  ]);
+
+  add("Public", [
+    { to: "/my-area", label: isStaff(role) ? "Public view" : "My area" },
+    { to: "/public", label: isStaff(role) ? "Public map" : "Map near me" },
+    !isStaff(role) && { to: "/alerts", label: "Alerts" },
+    { to: "/methods", label: "Data & methods" },
+  ]);
+
+  return groups;
 }
+
 
 /**
  * The portal-vs-model lag, in the header on every screen.
@@ -94,13 +126,31 @@ export default function Shell() {
   const { me, signOut } = useAuth();
   const [menu, setMenu] = useState(false);
   const [nav, setNav] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const loc = useLocation();
+  const here = loc.pathname;
   const colour = me ? ROLE_COLOUR[me.role] : "var(--muted)";
   const sections = sectionsFor(me?.role);
 
-  // Navigating closes the mobile menu. Without this the sheet stays open over
-  // the screen it just navigated to, which reads as a stuck overlay.
-  useEffect(() => { setNav(false); setMenu(false); }, [loc.pathname]);
+  // Navigating closes every menu. Without this the sheet stays open over the
+  // screen it just navigated to, which reads as a stuck overlay.
+  useEffect(() => { setNav(false); setMenu(false); setOpenGroup(null); }, [here]);
+
+  // A dropdown must close on a click elsewhere and on Escape, or it behaves
+  // like a panel that will not go away.
+  useEffect(() => {
+    if (!openGroup) return;
+    const away = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".nav-group")) setOpenGroup(null);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpenGroup(null); };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [openGroup]);
 
   return (
     <div className="shell">
@@ -117,10 +167,35 @@ export default function Shell() {
         </div>
 
         <nav className="hdr-nav">
-          {sections.map((s) => (
-            <NavLink key={s.to} to={s.to} className={({ isActive }) => (isActive ? "active" : "")}>
-              {s.label}
-            </NavLink>
+          {sections.map((g) => (
+            g.items.length === 1 ? (
+              <NavLink key={g.label} to={g.items[0].to}
+                       className={({ isActive }) => (isActive ? "active" : "")}>
+                {g.items[0].label}
+              </NavLink>
+            ) : (
+              <div key={g.label} className="nav-group">
+                <button
+                  className={`nav-group-btn ${
+                    g.items.some((i) => here.startsWith(i.to)) ? "active" : ""}`}
+                  onClick={() => setOpenGroup(openGroup === g.label ? null : g.label)}
+                  aria-expanded={openGroup === g.label}
+                  aria-haspopup="true"
+                >
+                  {g.label}<span className="caret" aria-hidden>▾</span>
+                </button>
+                {openGroup === g.label && (
+                  <div className="nav-drop" role="menu">
+                    {g.items.map((i) => (
+                      <NavLink key={i.to} to={i.to} role="menuitem"
+                               className={({ isActive }) => (isActive ? "active" : "")}>
+                        {i.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
           ))}
         </nav>
 
@@ -142,10 +217,16 @@ export default function Shell() {
 
         {nav && (
           <nav className="nav-sheet">
-            {sections.map((s) => (
-              <NavLink key={s.to} to={s.to} className={({ isActive }) => (isActive ? "active" : "")}>
-                {s.label}
-              </NavLink>
+            {sections.map((g) => (
+              <div key={g.label}>
+                {g.items.length > 1 && <div className="nav-sheet-head">{g.label}</div>}
+                {g.items.map((i) => (
+                  <NavLink key={i.to} to={i.to}
+                           className={({ isActive }) => (isActive ? "active" : "")}>
+                    {i.label}
+                  </NavLink>
+                ))}
+              </div>
             ))}
           </nav>
         )}

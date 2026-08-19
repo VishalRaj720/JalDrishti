@@ -378,3 +378,57 @@ def model_state() -> dict[str, Any]:
             f"{len(bundles)} backup(s) available; the newest is "
             f"{bundles[0]['name']}."),
     }
+
+
+async def seed_database_from_datasets() -> dict[str, Any]:
+    """Carry `Datasets/` INTO the database — the reverse of a dataset sync.
+
+    `dataset_sync` moves approved observations DB -> Datasets/. This is the other
+    direction, and it is what an admin needs after editing a dataset file
+    directly through the Dataset Manager or replacing one via /ingest: until it
+    runs, the portal's own record (wells, samples, district bands) is behind the
+    files the engine reads.
+
+    Only the GEODATA stages run — districts, sub-districts, aquifers,
+    groundwater levels, water quality. Deliberately NOT the whole seed: that
+    also creates demo users, organisations and ISR points, and re-creating weak
+    demo logins from a button on a running system would be a security decision
+    disguised as a refresh.
+
+    Safe to run repeatedly. Districts and blocks upsert by name, wells by
+    lat/lon, level readings by (station, timestamp), and water samples by
+    (well, sampled_at) — the last of which was a blind insert until R11 and
+    duplicated all 397 rows on any re-seed after an edit.
+
+    The ore files are absent on purpose: `ore_zone_at()` and `grade_c0_factor()`
+    read their CSV/XLSX straight off disk, so an ore edit needs no database
+    round trip at all.
+    """
+    import sys
+
+    from app.database import AsyncSessionLocal
+
+    if str(REPO_ROOT / "backend") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "backend"))
+    from scripts.seed import seed_geodata
+
+    async with AsyncSessionLocal() as db:
+        stages = await seed_geodata(db, ds.DATASETS)
+
+    wq = stages.get("water_quality", {}) or {}
+    gwl = stages.get("groundwater_levels", {}) or {}
+    parts = []
+    if wq.get("samples_inserted"):
+        parts.append(f"{wq['samples_inserted']} new sample(s)")
+    if wq.get("samples_updated"):
+        parts.append(f"{wq['samples_updated']} updated")
+    if gwl.get("readings_inserted"):
+        parts.append(f"{gwl['readings_inserted']} new level reading(s)")
+
+    return {
+        "ok": True,
+        "stages": stages,
+        "message": ("Database updated from Datasets/: " + ", ".join(parts)
+                    if parts else
+                    "Database already matches Datasets/ — nothing to change."),
+    }

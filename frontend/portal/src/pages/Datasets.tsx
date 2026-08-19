@@ -120,6 +120,11 @@ export default function Datasets() {
     onSuccess: (r) => { setProblem(null); setBanner(r.message); refresh(); },
     onError: (e: Error) => setProblem(e.message),
   });
+  const seedDb = useMutation({
+    mutationFn: () => api.post<{ message: string }>("/model-ops/seed-database"),
+    onSuccess: (r) => { setProblem(null); setBanner(r.message); refresh(); },
+    onError: (e: Error) => setProblem(e.message),
+  });
   const reset = useMutation({
     mutationFn: (dry: boolean) => api.post<{ message: string }>(
       `/model-ops/factory-reset?dry_run=${dry}` + (dry ? "" : "&confirm=RESET")),
@@ -130,7 +135,7 @@ export default function Datasets() {
   const sel = list.data?.datasets.find((d) => d.key === key) ?? null;
   const busy = sync.isPending || rebuild.isPending || reset.isPending
     || del.isPending || patch.isPending || backup.isPending
-    || restoreModel.isPending;
+    || restoreModel.isPending || seedDb.isPending;
 
   return (
     <div className="page">
@@ -235,15 +240,20 @@ export default function Datasets() {
         </section>
       )}
 
-      {/* ── sync ── */}
+      {/* ── the two directions ──
+          These move data opposite ways and were easy to confuse when only one
+          existed, so they are labelled by direction rather than by verb. */}
       <section className="card">
-        <h2>Bring approved observations in</h2>
+        <h2>Database ↔ Datasets</h2>
+
+        <div className="sec">Database → Datasets/ &nbsp;<span className="muted small">
+          (carry approved observations into the files the engine reads)</span></div>
         <p className="muted small">
           Each sync backs the file up first, tags new rows <code>added</code>, and
           records the batch in the audit log. Chemistry and level syncs leave a
           derived artifact stale — rebuild it above afterwards.
         </p>
-        <div className="row gap">
+        <div className="row gap wrap">
           <button className="btn" disabled={busy} onClick={() => sync.mutate("ore")}>
             Sync ore
           </button>
@@ -253,6 +263,25 @@ export default function Datasets() {
             onClick={() => sync.mutate("groundwater-levels")}>Sync levels</button>
           <button className="btn primary" disabled={busy}
             onClick={() => sync.mutate("all")}>Sync everything</button>
+        </div>
+
+        <div className="sec" style={{ marginTop: 14 }}>
+          Datasets/ → Database &nbsp;<span className="muted small">
+          (bring the portal’s own record up to date)</span>
+        </div>
+        <p className="muted small">
+          Needed after you <b>edit a dataset row above</b>, or replace a file
+          through ingest: until this runs, the portal’s wells, samples and
+          district bands are behind the files. Matched on natural keys — a well by
+          position, a sample by well and date — so running it repeatedly adds
+          nothing and a corrected value updates in place.
+          <br />
+          The <b>ore files need no update</b>: the engine reads them straight off
+          disk, so an ore edit takes effect immediately.
+        </p>
+        <div className="row gap">
+          <button className="btn" disabled={busy}
+            onClick={() => seedDb.mutate()}>Update database from Datasets/</button>
         </div>
       </section>
 
