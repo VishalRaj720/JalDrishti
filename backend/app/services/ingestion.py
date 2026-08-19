@@ -388,6 +388,24 @@ class IngestionService:
 
     # ----------------- groundwater level timeseries (JSON) -----------------
 
+    async def _find_sample(self, well_id, sampled_at):
+        """One sample for a well at a timestamp, or None.
+
+        The natural key for this dataset: CGWB sampled each well once per year
+        and `sampled_at` is derived from the Year column. Without this lookup a
+        re-seed after any edit duplicates every row in the file.
+        """
+        from sqlalchemy import select
+
+        from app.models.water_sample import WaterSample
+
+        res = await self.db.execute(
+            select(WaterSample).where(
+                WaterSample.well_id == well_id,
+                WaterSample.sampled_at == sampled_at,
+            ).limit(1))
+        return res.scalar_one_or_none()
+
     async def ingest_json_groundwater_levels(
         self, station_json: Dict[str, Any], file_name: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -503,6 +521,7 @@ class IngestionService:
             }
 
         wells_created, wells_reused, samples_inserted, skipped = 0, 0, 0, 0
+        samples_updated, samples_unchanged = 0, 0
         for _, row in df.iterrows():
             lat = _safe_float(row.get(col("Latitude")))
             lon = _safe_float(row.get(col("Longitude")))
@@ -560,17 +579,51 @@ class IngestionService:
                 "sodium_mg_l": _safe_float(row.get(col("Na"))),
                 "potassium_mg_l": _safe_float(row.get(col("K"))),
             }
-            await self.sample_repo.create(sample)
-            samples_inserted += 1
+            # UPSERT on (well_id, sampled_at), never a blind insert.
+            #
+            # `sample_repo.create` was called unconditionally. That was invisible
+            # while the file never changed — the checksum guard above skips an
+            # untouched file wholesale — but the moment an admin edits
+            # waterQuality_jharkhand.csv the checksum differs, ingestion proceeds,
+            # and every one of the 397 existing samples is inserted a SECOND
+            # time. Re-seeding after an edit therefore doubled the measured
+            # record, which is the one thing a groundwater platform must not do
+            # quietly: district bands are computed from max(uranium_ppb) over
+            # these rows.
+            #
+            # (well_id, sampled_at) is the natural key for this dataset — CGWB
+            # sampled each well once per year, and `sampled_at` is derived from
+            # the Year column. An existing row is UPDATED when a value actually
+            # changed, so a corrected measurement lands rather than being skipped.
+            existing_sample = await self._find_sample(well.id, sampled_at)
+            if existing_sample is None:
+                await self.sample_repo.create(sample)
+                samples_inserted += 1
+            else:
+                changed = {
+                    k: v for k, v in sample.items()
+                    if k not in ("well_id", "source_id", "sampled_at")
+                    and getattr(existing_sample, k, None) != v
+                }
+                if changed:
+                    for k, v in changed.items():
+                        setattr(existing_sample, k, v)
+                    existing_sample.source_id = source_id
+                    samples_updated += 1
+                else:
+                    samples_unchanged += 1
 
         logger.info(
             f"Water quality CSV: wells created={wells_created} reused={wells_reused} "
-            f"samples_inserted={samples_inserted} skipped={skipped}"
+            f"samples inserted={samples_inserted} updated={samples_updated} "
+            f"unchanged={samples_unchanged} skipped={skipped}"
         )
         return {
             "wells_created": wells_created,
             "wells_reused": wells_reused,
             "samples_inserted": samples_inserted,
+            "samples_updated": samples_updated,
+            "samples_unchanged": samples_unchanged,
             "skipped": skipped,
             "source_id": str(source_id),
         }
