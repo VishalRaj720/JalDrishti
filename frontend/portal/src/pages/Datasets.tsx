@@ -22,7 +22,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
-  api, type DatasetRows, type DatasetSummary, type MlDrift, type ModelState, type OpsStatus,
+  api, type DatasetRows, type DatasetSummary, type JobList, type MlDrift, type ModelState, type OpsStatus,
 } from "../api/client";
 import { Empty, ErrorNote, Loading, TableScroll } from "../components/bits";
 
@@ -45,6 +45,14 @@ export default function Datasets() {
     queryKey: ["ops-status"],
     queryFn: () => api.get<OpsStatus>("/model-ops/status"),
   });
+  /** Work started from this screen. Polled only while something is running, so
+   *  an idle admin screen is not making a request every two seconds. */
+  const activity = useQuery({
+    queryKey: ["ops-jobs"],
+    queryFn: () => api.get<JobList>("/model-ops/jobs"),
+    refetchInterval: (q) => ((q.state.data?.running ?? 0) > 0 ? 2000 : false),
+  });
+
   const model = useQuery({
     queryKey: ["model-state"],
     queryFn: () => api.get<ModelState>("/model-ops/model"),
@@ -72,6 +80,7 @@ export default function Datasets() {
     qc.invalidateQueries({ queryKey: ["ops-status"] });
     qc.invalidateQueries({ queryKey: ["model-state"] });
     qc.invalidateQueries({ queryKey: ["ml-drift"] });
+    qc.invalidateQueries({ queryKey: ["ops-jobs"] });
     qc.invalidateQueries({ queryKey: ["sync-status"] });
   };
   const sync = useMutation({
@@ -137,6 +146,53 @@ export default function Datasets() {
 
       {banner && <div className="note ok" role="status">{banner}</div>}
       {problem && <ErrorNote error={problem} />}
+
+      {/* ── activity ──
+          Several actions here take real time — the flow-field rebuild reads a
+          671 MB raster. Without this the screen said nothing while they ran, and
+          a button pressed for forty seconds with no feedback is
+          indistinguishable from a button that did nothing. */}
+      {activity.data && activity.data.jobs.length > 0 && (
+        <section className={`card ${activity.data.running > 0 ? "warn" : ""}`}>
+          <h2>
+            Activity
+            {activity.data.running > 0 && (
+              <span className="pill amber" style={{ marginLeft: 8 }}>
+                {activity.data.running} running
+              </span>
+            )}
+          </h2>
+          <TableScroll>
+            <table className="tbl compact">
+              <thead>
+                <tr><th>Task</th><th>Started</th><th>Took</th><th>State</th><th>Result</th></tr>
+              </thead>
+              <tbody>
+                {activity.data.jobs.slice(0, 8).map((j) => (
+                  <tr key={j.id}>
+                    <td>{j.label}</td>
+                    <td className="muted small">
+                      {new Date(j.started_at).toLocaleTimeString()}
+                    </td>
+                    <td className="small">
+                      {j.duration_s != null ? `${j.duration_s}s` : "—"}
+                    </td>
+                    <td>
+                      {j.status === "running"
+                        ? <span className="pill amber">● running</span>
+                        : j.status === "failed"
+                          ? <span className="pill red">✕ failed</span>
+                          : <span className="pill green">✓ done</span>}
+                    </td>
+                    <td className="small muted">{j.error ?? j.message ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+          <p className="muted small">{activity.data.note}</p>
+        </section>
+      )}
 
       {/* ── staleness: the thing most likely to be missed ── */}
       {ops.data && (

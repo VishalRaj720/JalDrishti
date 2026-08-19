@@ -39,3 +39,28 @@ async def sampling_recommendations(
     """
     response.headers["Cache-Control"] = "no-store"
     return await mg.recommendations(db, limit=limit, district=district)
+
+
+@router.get("/recommendations/{block_id}/sites")
+async def suggested_well_sites(
+    block_id: str,
+    n: int = Query(3, ge=1, le=10),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_staff),
+):
+    """Candidate coordinates for a new monitoring well inside one block.
+
+    The ranking says *which block*; this says *where in it*, because a block is
+    200-900 km2 and nobody can act on that. The criterion is geometric — maximum
+    distance from any existing uranium-tested well — and deliberately not
+    predictive: choosing sites by predicted concentration would send crews to
+    where the model is already confident.
+
+    Deterministic: the same block always returns the same coordinates.
+    """
+    from app.exceptions import AppException
+    from fastapi import HTTPException
+    try:
+        return await mg.suggested_sites(db, block_id, n=n)
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)

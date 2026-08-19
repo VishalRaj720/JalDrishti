@@ -220,3 +220,138 @@ async def recommendations(db: AsyncSession, *, limit: int = 25,
             "weights below are a policy judgement, not a measurement, and are "
             "shown so the ordering can be argued with."),
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Where inside a block to actually put the well
+#
+# The ranking above answers "which block", which is as far as a priority list
+# can go. The next question a person asks is "where do I send the drilling rig",
+# and a block is 200-900 km2 — far too coarse to act on.
+#
+# THE CRITERION: maximise distance from every existing uranium-tested well,
+# subject to staying inside the block. That is standard coverage-based sampling
+# design — a new observation is worth most where the nearest existing one is
+# furthest, because that is where the interpolated value is currently least
+# constrained by data. It is a *geometric* criterion and makes no claim about
+# where contamination is; ranking candidate sites by predicted concentration
+# would be circular in exactly the way the block ranking already avoids.
+#
+# Points are sampled deterministically (fixed seed) so the same block returns
+# the same suggestion every time. A siting recommendation that moved between
+# page loads could not be taken to a field team.
+#
+# WHAT THIS IS NOT: a survey. Land ownership, access, drilling feasibility,
+# depth to bedrock and local permission are all unknown here, and every response
+# says so. These are candidate coordinates to start a site visit from, not
+# instructions to drill.
+# ═══════════════════════════════════════════════════════════════════════
+
+#: Candidate points sampled inside a block before scoring. Enough to resolve a
+#: few hundred metres in a typical 250 km2 block; more just costs time.
+CANDIDATE_POINTS = 400
+#: Deterministic sampling — see above.
+CANDIDATE_SEED = 20260819
+#: Suggested sites are spread at least this far apart, so three suggestions are
+#: three genuinely different places rather than one place three times.
+MIN_SEPARATION_KM = 2.0
+
+
+async def suggested_sites(db: AsyncSession, block_id: str, *,
+                          n: int = 3) -> dict[str, Any]:
+    """Candidate well coordinates inside one block, best-covered-gap first."""
+    meta = (await db.execute(text("""
+        SELECT b.name, d.name AS district,
+               round((ST_Area(b.geometry::geography) / 1e6)::numeric, 1) AS area_km2,
+               ST_AsGeoJSON(ST_SimplifyPreserveTopology(b.geometry, 0.001)) AS gj
+        FROM blocks b JOIN districts d ON d.id = b.district_id
+        WHERE b.id = CAST(:id AS uuid) AND b.geometry IS NOT NULL
+    """), {"id": block_id})).mappings().first()
+    if meta is None:
+        from app.exceptions import AppException
+        raise AppException("no such block, or it has no geometry", status_code=404)
+
+    rows = (await db.execute(text("""
+        WITH b AS (
+            SELECT geometry FROM blocks WHERE id = CAST(:id AS uuid)
+        ),
+        candidates AS (
+            SELECT (ST_Dump(ST_GeneratePoints(geometry, :n_pts, :seed))).geom AS pt
+            FROM b
+        ),
+        tested AS (
+            SELECT w.location::geometry AS g
+            FROM monitoring_wells w
+            JOIN water_samples s ON s.well_id = w.id
+            WHERE w.location IS NOT NULL AND s.uranium_ppb IS NOT NULL
+        ),
+        any_well AS (
+            SELECT w.location::geometry AS g
+            FROM monitoring_wells w WHERE w.location IS NOT NULL
+        )
+        SELECT ST_X(c.pt) AS lon, ST_Y(c.pt) AS lat,
+               COALESCE((SELECT min(ST_DistanceSphere(c.pt, t.g)) FROM tested t),
+                        999999) / 1000.0 AS km_to_tested,
+               COALESCE((SELECT min(ST_DistanceSphere(c.pt, a.g)) FROM any_well a),
+                        999999) / 1000.0 AS km_to_any_well
+        FROM candidates c
+        ORDER BY km_to_tested DESC
+    """), {"id": block_id, "n_pts": CANDIDATE_POINTS,
+           "seed": CANDIDATE_SEED})).mappings().all()
+
+    import math
+
+    def km_apart(a: dict, b: dict) -> float:
+        dlat = (a["lat"] - b["lat"]) * 111.32
+        dlon = ((a["lon"] - b["lon"]) * 111.32
+                * math.cos(math.radians((a["lat"] + b["lat"]) / 2)))
+        return math.hypot(dlat, dlon)
+
+    picked: list[dict[str, Any]] = []
+    for r in rows:
+        cand = {k: (float(v) if v is not None else None) for k, v in r.items()}
+        # Greedy, with a separation floor: without it the top three candidates
+        # are almost always the same corner of the block, which is one
+        # suggestion printed three times.
+        if any(km_apart(cand, p) < MIN_SEPARATION_KM for p in picked):
+            continue
+        picked.append(cand)
+        if len(picked) >= n:
+            break
+
+    import json
+    for i, p in enumerate(picked, start=1):
+        p["rank"] = i
+        p["km_to_tested_well"] = round(p.pop("km_to_tested"), 1)
+        p["km_to_nearest_well"] = round(p.pop("km_to_any_well"), 1)
+        p["lat"] = round(p["lat"], 5)
+        p["lon"] = round(p["lon"], 5)
+        p["why"] = (
+            f"The nearest well with a uranium result is "
+            f"{p['km_to_tested_well']} km away — the least-observed part of this "
+            f"block." if p["km_to_tested_well"] < 900 else
+            "No well anywhere has a uranium result to measure distance from, so "
+            "any point in this block is equally unobserved.")
+
+    return {
+        "block_id": block_id,
+        "block": meta["name"],
+        "district": meta["district"],
+        "area_km2": float(meta["area_km2"]),
+        "geometry": json.loads(meta["gj"]),
+        "sites": picked,
+        "criterion": (
+            "Maximum distance from any existing uranium-tested well, inside the "
+            "block. A new observation is worth most where the nearest existing "
+            "one is furthest, because that is where the value is least "
+            "constrained by data."),
+        "caveat": (
+            "These are candidate coordinates to start a site visit from — NOT a "
+            "survey and NOT a drilling instruction. Land ownership, access, "
+            "depth to bedrock, drilling feasibility and local permission are all "
+            "unknown to this system and will decide the actual location."),
+        "determinism": (
+            f"Candidates are sampled with a fixed seed ({CANDIDATE_SEED}), so this "
+            f"block returns the same suggestion every time. A recommendation that "
+            f"moved between page loads could not be taken to a field team."),
+    }

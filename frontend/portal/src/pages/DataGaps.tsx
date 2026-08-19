@@ -7,10 +7,12 @@
  * the dataset sync, because the sync is the moment the portal's record and the
  * model's inputs are reconciled.
  */
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Recommendations, type PublicDistrictRisk, type SyncStatus } from "../api/client";
 import { canSync, useAuth } from "../auth";
 import { ErrorNote, Loading, Planned, TableScroll, Tile } from "../components/bits";
+import SiteSuggestionMap from "../console/SiteSuggestionMap";
 
 interface PendingItem {
   id: string; observation_type: string; operation: string;
@@ -48,6 +50,8 @@ export default function DataGaps() {
   const thin = districts.filter((d) => d.samples > 0 && d.wells < 10);
   const covered = districts.filter((d) => d.wells >= 10);
 
+  const [siteFor, setSiteFor] = useState<{ id: string; name: string } | null>(null);
+
   const recs = useQuery({
     queryKey: ["gap-recommendations"],
     queryFn: () => api.get<Recommendations>("/data-gaps/recommendations?limit=20"),
@@ -78,7 +82,7 @@ export default function DataGaps() {
                 <thead>
                   <tr>
                     <th>#</th><th>Priority</th><th>Block</th><th>District</th>
-                    <th>Area</th><th>Wells</th><th>U tests</th><th>Why</th>
+                    <th>Area</th><th>Wells</th><th>U tests</th><th>Why</th><th />
                   </tr>
                 </thead>
                 <tbody>
@@ -94,11 +98,30 @@ export default function DataGaps() {
                         {r.uranium_tests}
                       </td>
                       <td className="small muted">{r.reason}</td>
+                      <td>
+                        <button className="btn ghost small"
+                          onClick={() => setSiteFor(
+                            siteFor?.id === r.id ? null : { id: r.id, name: r.name })}>
+                          {siteFor?.id === r.id ? "Hide" : "Where exactly?"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </TableScroll>
+
+            {siteFor && (
+              <div className="card" style={{ marginTop: 12 }}>
+                <div className="row between">
+                  <div className="sec" style={{ margin: 0 }}>
+                    Where to put a well in {siteFor.name}
+                  </div>
+                  <button className="btn ghost" onClick={() => setSiteFor(null)}>Close</button>
+                </div>
+                <SiteSuggestionMap blockId={siteFor.id} />
+              </div>
+            )}
 
             <details style={{ marginTop: 10 }}>
               <summary className="muted small">

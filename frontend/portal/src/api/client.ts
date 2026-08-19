@@ -629,3 +629,37 @@ export interface TargetList {
   count: number;
   items: SubmissionTarget[];
 }
+
+/** Candidate coordinates for a new monitoring well inside one block.
+ *
+ *  Geometric, not predictive: maximum distance from any existing
+ *  uranium-tested well. Siting by predicted concentration would send crews to
+ *  where the model is already confident and leave the blind spots blind. */
+export interface SuggestedSite {
+  rank: number; lat: number; lon: number;
+  km_to_tested_well: number; km_to_nearest_well: number; why: string;
+}
+
+export interface SuggestedSites {
+  block_id: string; block: string; district: string; area_km2: number;
+  geometry: unknown;
+  sites: SuggestedSite[];
+  criterion: string; caveat: string; determinism: string;
+}
+
+/** One admin task, running or recently finished.
+ *
+ *  In-process and empty after a restart, which the API states rather than
+ *  leaving to be discovered. It is the progress view, not the record — every
+ *  action here also writes to the append-only audit log. */
+export interface Job {
+  id: string; kind: string; label: string;
+  status: "running" | "succeeded" | "failed";
+  actor: string | null;
+  started_at: string; finished_at: string | null;
+  duration_s: number | null;
+  message: string | null; error: string | null;
+  detail: Record<string, unknown>;
+}
+
+export interface JobList { running: number; jobs: Job[]; note: string }

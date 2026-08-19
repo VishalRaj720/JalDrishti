@@ -707,3 +707,15 @@ body:has(.resize-handle.on) { user-select: none; }
   opacity: .75;
 }
 .floater-resize:hover { opacity: 1; }
+
+/* ── suggested well sites ────────────────────────────────────────────
+   Hollow and numbered, so a candidate reads as a proposal rather than as a
+   well that already exists. The numbers tie each marker to its table row. */
+.suggest-pin-wrap { background: none; border: none; }
+.suggest-pin {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px dashed var(--accent, #3D7EFF);
+  background: color-mix(in srgb, var(--accent, #3D7EFF) 18%, transparent);
+  color: var(--accent-text, #3D7EFF);
+  font-size: 12px; font-weight: 700; line-height: 18px; text-align: center;
+}

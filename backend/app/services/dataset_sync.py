@@ -58,7 +58,7 @@ from sqlalchemy import bindparam as sa_bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import AppException
-from app.services import audit
+from app.services import audit, jobs
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ORE_CSV = REPO_ROOT / "Datasets" / "Jharkhand Ore" / "jharkhand_uranium_deposits.csv"
@@ -201,6 +201,9 @@ async def sync_ore(db: AsyncSession, *, actor, dry_run: bool = False,
         result["message"] = "Nothing to sync."
         return result
 
+    job_id = None if dry_run else jobs.start(
+        "sync_ore", label="Syncing approved ore observations", actor=getattr(actor, "email", None))
+
     for p in (ORE_CSV, UDEPO_XLSX):
         if not p.exists():
             raise DatasetSyncError(f"dataset file missing: {p}")
@@ -317,6 +320,8 @@ async def sync_ore(db: AsyncSession, *, actor, dry_run: bool = False,
     result["synced"] = len(synced_ids)
     result["message"] = (f"Synced {len(synced_ids)} ore observation(s) into "
                          f"{len(result['files'])} dataset file(s).")
+    if job_id:
+        jobs.finish(job_id, message=result["message"])
     return result
 
 
@@ -438,6 +443,9 @@ async def sync_water_quality(db: AsyncSession, *, actor, dry_run: bool = False,
         result["message"] = "Nothing to sync."
         return result
 
+    job_id = None if dry_run else jobs.start(
+        "sync_water_quality", label="Syncing approved chemistry", actor=getattr(actor, "email", None))
+
     df = dsx._read(f)
     next_no = int(pd.to_numeric(df["S. No."], errors="coerce").max() or 0) + 1
 
@@ -484,6 +492,8 @@ async def sync_water_quality(db: AsyncSession, *, actor, dry_run: bool = False,
     result["synced"] = len(items)
     result["message"] = (f"Synced {len(items)} chemistry observation(s). "
                          f"Baselines are now stale - recompute them.")
+    if job_id:
+        jobs.finish(job_id, message=result["message"])
     return result
 
 
@@ -507,6 +517,9 @@ async def sync_groundwater_levels(db: AsyncSession, *, actor, dry_run: bool = Fa
     if not items:
         result["message"] = "Nothing to sync."
         return result
+
+    job_id = None if dry_run else jobs.start(
+        "sync_groundwater_levels", label="Syncing approved level readings", actor=getattr(actor, "email", None))
 
     df = dsx._read(f)
     next_id = int(pd.to_numeric(df["id"], errors="coerce").max() or 0) + 1
@@ -552,6 +565,8 @@ async def sync_groundwater_levels(db: AsyncSession, *, actor, dry_run: bool = Fa
     result["synced"] = len(items)
     result["message"] = (f"Synced {len(items)} level reading(s). "
                          f"The flow field is now stale - rebuild it.")
+    if job_id:
+        jobs.finish(job_id, message=result["message"])
     return result
 
 

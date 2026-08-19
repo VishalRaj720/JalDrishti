@@ -225,6 +225,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/citizen/subscriptions` | ● | ● | ● | ● |
 | `DELETE /api/v1/citizen/subscriptions/{block_id}` | ● | ● | ● | ● |
 | `GET /api/v1/data-gaps/recommendations` | ● | ● | ● | · |
+| `GET /api/v1/data-gaps/recommendations/{block_id}/sites` | ● | ● | ● | · |
 | `POST /api/v1/dataset-sync/all` | ● | · | · | · |
 | `POST /api/v1/dataset-sync/groundwater-levels` | ● | · | · | · |
 | `POST /api/v1/dataset-sync/ore` | ● | · | · | · |
@@ -273,6 +274,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/ml/rivers` | ● | ● | ● | · |
 | `GET /api/v1/ml/strike-field` | ● | ● | ● | · |
 | `POST /api/v1/model-ops/factory-reset` | ● | · | · | · |
+| `GET /api/v1/model-ops/jobs` | ● | ● | ● | · |
 | `GET /api/v1/model-ops/model` | ● | ● | ● | · |
 | `POST /api/v1/model-ops/model-backups` | ● | · | · | · |
 | `POST /api/v1/model-ops/model-backups/{name}/restore` | ● | · | · | · |
@@ -313,7 +315,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 97/108 · **analyst** 65/108 · **field_officer** 53/108 · **citizen** 13/108
+Reachable endpoints per role — **admin** 99/110 · **analyst** 67/110 · **field_officer** 55/110 · **citizen** 13/110
 
 <!-- END GENERATED AUTHZ MATRIX -->
 
