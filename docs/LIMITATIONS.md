@@ -42,6 +42,47 @@ pipeline is not ready** until the two-stage head is built.
 
 ---
 
+## 1b. Open — the vertical breakthrough headline is too slow
+
+**Reported by the project owner from the UI, then reproduced arithmetically.**
+
+The shallow-aquifer panel shows a single headline breakthrough time computed at
+the **annual-mean** water table, beside a seasonal band that can disagree with it
+by 5×. On one real run: headline **54.4 yr**, dry season **10.6 yr**, wet season
+*"not expected"*. That combination is not self-consistent.
+
+The upward velocity is linear in gradient, `v = Kv·max(i,0)/φ`, and the code
+**floors the gradient at zero** — correctly, because a reversed gradient stops
+upward transport rather than reversing the front. But the headline then evaluates
+travel time at `max(mean i, 0)` instead of averaging `max(i(t), 0)` over the
+year. Where the seasonal swing crosses zero — as it does here — those are
+different numbers, and the clamp is exactly what makes them differ.
+
+Reproduced with the engine's own constants (separation 130 m, water table
+3.22–7.20 m, baseline gradient 0.0037, half-swing 0.0153):
+
+| Basis | Gradient used | Breakthrough |
+|---|---|---|
+| Headline, mean gradient | 0.00370 | **54.4 yr** |
+| Dry season | 0.01901 | 10.6 yr |
+| Wet season | −0.01160 → clamped to 0 | never |
+| **Duty-cycle, mean of max(i,0)** | **0.00687** | **≈29 yr** |
+
+The pathway is open ~58 % of the year. A quarterly step model matching the
+engine's own season map gives 30.5 yr, so the result is not an artefact of
+assuming a sinusoid.
+
+**The headline therefore overstates the time to breakthrough by about 1.9× —
+it understates the hazard.** It is not wrong about the physics of any single
+season; it is wrong to summarise a clamped, swinging quantity by its mean.
+
+**Not fixed here.** Changing a headline number changes every stored run's
+meaning and the model card behind it, and `ml_pipeline/` is frozen. Recorded as
+an open finding for an explicit decision rather than patched quietly. The
+seasonal band shown beside it is correct and already brackets the true value.
+
+---
+
 ## 2. Permanently blocked — no data exists
 
 | Item | Why it cannot be closed |

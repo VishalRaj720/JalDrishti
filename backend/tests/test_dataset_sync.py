@@ -159,7 +159,11 @@ async def test_sync_appends_tagged_rows_to_both_files(
         client, officer, reviewer, admin_token, datasets_restored):
     import pandas as pd
     H = {"Authorization": f"Bearer {admin_token}"}
-    before_csv = len(pd.read_csv(ds.ORE_CSV))
+    _pre = pd.read_csv(ds.ORE_CSV)
+    before_csv = len(_pre)
+    before_sources = (list(_pre[ds.ORIGIN_COL])
+                      if ds.ORIGIN_COL in _pre.columns
+                      else [ds.ORIGIN_ORIGINAL] * before_csv)
     await _approved_ore(client, officer, reviewer)
     r = (await client.post("/api/v1/dataset-sync/ore", headers=H)).json()
     assert r["synced"] == 1
@@ -168,11 +172,17 @@ async def test_sync_appends_tagged_rows_to_both_files(
     assert len(csv) == before_csv + 1
     assert ds.ORIGIN_COL in csv.columns
     # existing rows are backfilled, the new one is tagged
-    assert (csv[ds.ORIGIN_COL].head(before_csv) == ds.ORIGIN_ORIGINAL).all()
+    # Asserted as "the rows that were there are unchanged", not "they are all
+    # original": a real field observation may already have been synced into this
+    # file, and a test that assumes a pristine checkout fails on a working
+    # database for a reason that has nothing to do with what it is testing.
+    assert list(csv[ds.ORIGIN_COL].head(before_csv)) == before_sources
+    assert csv[ds.ORIGIN_COL].iloc[-1] == ds.ORIGIN_ADDED
     added = csv[csv[ds.ORIGIN_COL] == ds.ORIGIN_ADDED]
-    assert len(added) == 1
-    assert added.iloc[0]["name"] == "Sync Test Deposit"
-    assert added.iloc[0]["geometry_wkt"].startswith("POLYGON((")
+    assert len(added) == before_sources.count(ds.ORIGIN_ADDED) + 1
+    assert "Sync Test Deposit" in set(added["name"])
+    mine_csv = added[added["name"] == "Sync Test Deposit"].iloc[0]
+    assert mine_csv["geometry_wkt"].startswith("POLYGON((")
 
     xl = pd.read_excel(ds.UDEPO_XLSX, header=ds.UDEPO_HEADER_ROW).dropna(how="all")
     assert ds.ORIGIN_COL in xl.columns

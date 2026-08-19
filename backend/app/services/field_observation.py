@@ -133,6 +133,19 @@ class FieldObservationService:
             if grade is not None and not (0 <= float(grade) <= 100):
                 raise AppValidationError(
                     "uranium_grade_pct must be between 0 and 100")
+            # Checked HERE as well as by `ck_ore_obs_radius_sane`, because the
+            # database constraint only fires when a reviewer approves. Without
+            # this, a 50 km radius was accepted into the queue and failed hours
+            # later in front of somebody who had not typed it — the submitter is
+            # the only person who can correct it, so they are the one who must be
+            # told. The bound is generous: the largest shipped deposit outline is
+            # well under 5 km across.
+            radius = payload.get("radius_m")
+            if radius is not None and not (0 < float(radius) <= 20000):
+                raise AppValidationError(
+                    "radius_m must be greater than 0 and at most 20000 m "
+                    "(20 km). A sighting wider than that is a data-entry slip, "
+                    "not an observation.")
 
         # Parse timestamps and ids now so a malformed value is the submitter's
         # error, not something the reviewer discovers at approval time.

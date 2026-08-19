@@ -24,25 +24,40 @@ if str(REPO_ROOT) not in sys.path:
 
 @pytest.fixture
 def snapshot(tmp_path):
-    """Copy every registry file aside, and put it back afterwards.
+    """Give each test a genuinely SHIPPED baseline, then put the tree back.
 
-    Also sweeps the `.bak` files the service writes, so a test run leaves no
-    litter in Datasets/.
+    These tests used to run against whatever was on disk, which was fine while
+    the working tree was clean and wrong the moment a real field observation had
+    been synced: assertions like "every row is `original`" then failed because a
+    legitimate added row was present. A test must control its own fixture state
+    rather than depend on the checkout being untouched.
+
+    The baseline comes from `git show HEAD:<path>` — the committed file — so
+    "shipped" means exactly what is committed, not merely what happens to be
+    there. Anything git cannot produce is left as-is and the test works from the
+    live file.
     """
-    saved: dict[str, Path] = {}
+    import subprocess
+
+    saved, restored_from_git = {}, []
     for key, f in ds.REGISTRY.items():
-        if f.path.exists():
-            dst = tmp_path / f"{key}{f.path.suffix}"
-            shutil.copy2(f.path, dst)
-            saved[key] = dst
+        if not f.path.exists():
+            continue
+        saved[key] = tmp_path / f"{key}{f.path.suffix}"
+        shutil.copy2(f.path, saved[key])
+        blob = subprocess.run(
+            ["git", "show", f"HEAD:{f.relpath and ('Datasets/' + f.relpath)}"],
+            cwd=ds.REPO_ROOT, capture_output=True)
+        if blob.returncode == 0 and blob.stdout:
+            f.path.write_bytes(blob.stdout)
+            restored_from_git.append(key)
+    ds.invalidate_caches()
     yield
     for key, src in saved.items():
-        f = ds.REGISTRY[key]
-        shutil.copy2(src, f.path)
-        for b in f.path.parent.glob(f"{f.path.name}.*.bak"):
-            b.unlink()
+        shutil.copy2(src, ds.REGISTRY[key].path)
+    if ds.BACKUP_DIR.exists():
+        shutil.rmtree(ds.BACKUP_DIR, ignore_errors=True)
     ds.invalidate_caches()
-
 
 def _add_row(key: str, **values) -> str:
     """Append one `added` row directly, standing in for a completed sync."""

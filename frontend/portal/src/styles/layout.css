@@ -781,3 +781,20 @@ body:has(.resize-handle.on) { user-select: none; }
   padding: 10px 12px 4px; font-size: var(--fs-xs, 11px); font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
 }
+
+/* ── citizen block summary ───────────────────────────────────────────
+   Six counts, and the two "unknown" ones carry the same visual weight as the
+   rest. Greying them out would repeat the mistake the copy exists to prevent. */
+.blk-summary { padding: 0 var(--s-3) var(--s-2); }
+.blk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.blk-cell {
+  background: var(--card2); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 7px 9px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.blk-cell b { font-size: var(--fs-lg); line-height: 1.1; color: var(--text); }
+.blk-cell span { font-size: 11px; color: var(--muted); line-height: 1.25; }
+.blk-cell.danger b { color: #f2555a; }
+.blk-cell.warn   b { color: #f5a524; }
+.blk-cell.ok     b { color: #3ecf8e; }
+.blk-cell.grey   b { color: #8b919c; }

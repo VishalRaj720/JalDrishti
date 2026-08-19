@@ -232,6 +232,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/dataset-sync/groundwater-levels` | ● | · | · | · |
 | `POST /api/v1/dataset-sync/ore` | ● | · | · | · |
 | `GET /api/v1/dataset-sync/pending` | ● | ● | ● | · |
+| `POST /api/v1/dataset-sync/reconcile` | ● | · | · | · |
 | `GET /api/v1/dataset-sync/status` | ● | ● | ● | · |
 | `POST /api/v1/dataset-sync/water-quality` | ● | · | · | · |
 | `GET /api/v1/datasets` | ● | ● | ● | · |
@@ -287,6 +288,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | ● | · | · |
 | `GET /api/v1/public/risk/at` | ○ | ○ | ○ | ○ |
+| `GET /api/v1/public/risk/blocks/summary` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/districts` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/geojson/blocks` | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/geojson/districts` | ○ | ○ | ○ | ○ |
@@ -318,7 +320,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 102/113 · **analyst** 69/113 · **field_officer** 57/113 · **citizen** 13/113
+Reachable endpoints per role — **admin** 103/115 · **analyst** 69/115 · **field_officer** 57/115 · **citizen** 13/115
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

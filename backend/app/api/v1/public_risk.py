@@ -356,6 +356,71 @@ async def risk_at_point(
     }
 
 
+@router.get("/blocks/summary")
+async def block_summary(response: Response, db: AsyncSession = Depends(get_db)):
+    """How many blocks are safe, unsafe, and unknown — statewide.
+
+    THE COUNT THAT MATTERS IS THE THIRD ONE. Two numbers ("safe" / "unsafe")
+    invite the reader to divide one by the other and conclude the state is mostly
+    fine. The honest denominator includes every block nobody has measured, and
+    those are not evidence of safety — they are the absence of evidence, which is
+    why they are reported as their own category and never folded into "safe".
+
+    A block is:
+      unsafe    at least one sample at or above the BIS/WHO limit
+      watch     highest result over half the limit but under it
+      safe      sampled, analysed for uranium, and all results well under
+      untested  wells sampled, but no sample ever analysed for uranium
+      no data   no groundwater sample at all
+
+    `untested` is split out from `no data` because they are different failures
+    with different fixes: one needs a lab determination on a sample that already
+    exists, the other needs a well.
+    """
+    row = (await db.execute(text("""
+        WITH per_block AS (
+            SELECT b.id,
+                   count(s.id)          AS samples,
+                   count(s.uranium_ppb) AS u_tests,
+                   max(s.uranium_ppb)   AS max_u
+            FROM blocks b
+            LEFT JOIN monitoring_wells w ON w.block_id = b.id
+            LEFT JOIN water_samples s    ON s.well_id = w.id
+            GROUP BY b.id
+        )
+        SELECT count(*)                                                AS total,
+               count(*) FILTER (WHERE u_tests > 0 AND max_u >= :limit)  AS unsafe,
+               count(*) FILTER (WHERE u_tests > 0
+                                  AND max_u >= :limit * 0.5
+                                  AND max_u <  :limit)                  AS watch,
+               count(*) FILTER (WHERE u_tests > 0 AND max_u < :limit * 0.5) AS safe,
+               count(*) FILTER (WHERE samples > 0 AND u_tests = 0)       AS untested,
+               count(*) FILTER (WHERE samples = 0)                       AS no_data
+        FROM per_block
+    """), {"limit": URANIUM_LIMIT_PPB})).mappings().one()
+
+    d = {k: int(v or 0) for k, v in row.items()}
+    measured = d["unsafe"] + d["watch"] + d["safe"]
+    unknown = d["untested"] + d["no_data"]
+
+    response.headers["Cache-Control"] = _CACHE
+    return {
+        **d,
+        "measured": measured,
+        "unknown": unknown,
+        "safe_limit_ppb": URANIUM_LIMIT_PPB,
+        "coverage_pct": round(100.0 * measured / d["total"], 1) if d["total"] else 0.0,
+        "headline": (
+            f"{measured} of {d['total']} blocks have a uranium result. "
+            f"{unknown} do not."),
+        "what_unknown_means": (
+            "A block with no uranium result is not a safe block. It is a place "
+            "nobody has measured, and it is counted separately here so it cannot "
+            "be mistaken for a clean one."),
+        "what_this_is": _DISCLAIMER,
+    }
+
+
 @router.get("/{district_id}")
 async def district_detail(district_id: uuid.UUID, response: Response,
                           db: AsyncSession = Depends(get_db)):

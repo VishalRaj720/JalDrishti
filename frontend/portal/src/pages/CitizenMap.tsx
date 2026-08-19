@@ -24,7 +24,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { useQuery } from "@tanstack/react-query";
-import { api, type FeatureCollection } from "../api/client";
+import { api, type BlockSummary, type FeatureCollection } from "../api/client";
 import { isStaff, useAuth } from "../auth";
 import { ErrorNote, Loading } from "../components/bits";
 import { FloatingPanel, useResizableWidth } from "../components/panels";
@@ -112,6 +112,17 @@ export default function CitizenMap() {
   // The ISR point itself is still absent: design §2 keeps a precise coordinate
   // for a hypothetical mine off the public map, and the footprint already
   // answers "does this reach me?" without planting a pin beside a village.
+  /** How many blocks are measured, and how many nobody has looked at.
+   *
+   *  The third number is the one that matters: two categories invite the reader
+   *  to divide safe by unsafe and conclude the state is mostly fine, when the
+   *  honest denominator includes every block nobody has measured. */
+  const summary = useQuery({
+    queryKey: ["block-summary"],
+    queryFn: () => api.get<BlockSummary>("/public/risk/blocks/summary"),
+    staleTime: 3_600_000,
+  });
+
   const screenings = useQuery({
     queryKey: ["pub-geo", "screenings"], enabled: on.screenings,
     queryFn: () => api.get<FeatureCollection>("/citizen/advisories/geojson"),
@@ -342,6 +353,41 @@ export default function CitizenMap() {
           <button className="rail-btn" onClick={toggleRail}
                   title="Collapse the panel" aria-label="Collapse the panel">‹</button>
         </div>
+        {/* ── how much of the state is actually measured ──
+            The unknown count is deliberately given equal weight. Reporting only
+            safe and unsafe invites dividing one by the other and concluding the
+            state is mostly fine, when the honest denominator includes every
+            block nobody has looked at. */}
+        {summary.data && (
+          <div className="blk-summary">
+            <div className="rail-head" style={{ marginTop: 0 }}>Jharkhand at a glance</div>
+            <div className="blk-grid">
+              <div className="blk-cell">
+                <b>{summary.data.total}</b><span>blocks</span>
+              </div>
+              <div className="blk-cell danger">
+                <b>{summary.data.unsafe}</b><span>over the limit</span>
+              </div>
+              <div className="blk-cell warn">
+                <b>{summary.data.watch}</b><span>worth watching</span>
+              </div>
+              <div className="blk-cell ok">
+                <b>{summary.data.safe}</b><span>well under</span>
+              </div>
+              <div className="blk-cell grey">
+                <b>{summary.data.untested}</b><span>sampled, not tested for uranium</span>
+              </div>
+              <div className="blk-cell grey">
+                <b>{summary.data.no_data}</b><span>never sampled</span>
+              </div>
+            </div>
+            <p className="muted small" style={{ margin: "6px 0 0" }}>
+              <b>{summary.data.unknown} of {summary.data.total}</b> blocks have no
+              uranium result. {summary.data.what_unknown_means}
+            </p>
+          </div>
+        )}
+
         <div className="rail-head">Find your area</div>
         <input placeholder="District or block…" value={q}
                onChange={(e) => {

@@ -1,7 +1,7 @@
 /**
  * Proposing a completed run for publication.
  *
- * The analyst writes what a resident would read; a regulator decides whether it
+ * The analyst writes what a resident would read; an admin decides whether it
  * is published. That split is the point — an analyst dropping a pin should not
  * be able to send a notification to everyone in a block.
  *
@@ -18,10 +18,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Advisory, type SimRun } from "../api/client";
+import { canAdmin, useAuth } from "../auth";
 import { ErrorNote, Field } from "../components/bits";
 import { fmt } from "./mapLayers";
 
 export default function ProposeAdvisory({ run }: { run: SimRun }) {
+  const { me } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [headline, setHeadline] = useState("");
@@ -78,7 +80,7 @@ export default function ProposeAdvisory({ run }: { run: SimRun }) {
         <>
           <div className="banner warn" style={{ marginBottom: 10 }}>
             This does not publish anything. It puts the screening in a
-            <b> regulator's</b> queue. Write for someone who has never heard the word
+            <b> reviewer's</b> queue. Write for someone who has never heard the word
             “conformal” — no P10/P90, no species codes, no model jargon.
           </div>
 
@@ -106,7 +108,12 @@ export default function ProposeAdvisory({ run }: { run: SimRun }) {
           <div className="row" style={{ gap: 6 }}>
             <button className="btn primary grow" disabled={!ok || propose.isPending}
                     onClick={() => propose.mutate()}>
-              {propose.isPending ? "Submitting…" : "Send to regulator"}
+              {/* R11: said "Send to regulator" after the role was retired in R7,
+                  so it named a queue nobody could be in. An admin reviewing their
+                  own proposal sees what actually happens next. */}
+              {propose.isPending ? "Submitting…"
+                : canAdmin(me?.role) ? "Propose for publication"
+                : "Send for review"}
             </button>
             <button className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
           </div>
@@ -121,7 +128,7 @@ export default function ProposeAdvisory({ run }: { run: SimRun }) {
       )}
 
       <div className="muted small" style={{ marginTop: 8 }}>
-        Publication is a regulator decision. The footprint and the blocks it actually
+        Publication is an administrator's decision. The footprint and the blocks it actually
         reaches are computed when you propose, so the reviewer decides against a real
         extent — which for a run of this kind is usually a few hectares inside one
         block, not the block itself.

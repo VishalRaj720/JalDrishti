@@ -143,3 +143,23 @@ async def sync_all(
         return await ds.sync_all(db, actor=actor, dry_run=dry_run, ip=_ip(request))
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/reconcile")
+async def reconcile(
+    request: Request,
+    dry_run: bool = Query(True, description="Defaults to TRUE. Pass false to apply."),
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_admin),
+):
+    """Clear approved observations that can never sync.
+
+    Their applied row was deleted, so the sync joins to nothing and reports
+    "Nothing to sync" while the status counts them as pending — permanently.
+    A queue that cannot be emptied trains people to ignore the number.
+    """
+    try:
+        return await ds.reconcile_orphans(
+            db, actor=actor, dry_run=dry_run, ip=_ip(request))
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)

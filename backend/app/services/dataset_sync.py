@@ -122,6 +122,28 @@ async def pending_summary(db: AsyncSession) -> dict[str, Any]:
         GROUP BY observation_type
     """))).mappings().all()
 
+    # ORPHANS: approved, unsynced, and the row approval created no longer
+    # exists. The sync joins to that row, so it matches nothing and reports
+    # "Nothing to sync" — for ever — while this summary keeps counting the
+    # observation as pending. That is a permanently stuck split-brain, and it is
+    # exactly the state the sync status exists to make impossible.
+    orphan_rows = (await db.execute(text("""
+        SELECT f.observation_type, count(*) AS n
+        FROM field_observations f
+        WHERE f.status = 'approved' AND f.synced_to_dataset_at IS NULL
+          AND CASE f.observation_type
+                WHEN 'water_sample' THEN
+                  NOT EXISTS (SELECT 1 FROM water_samples w
+                              WHERE w.id = COALESCE(f.applied_id, f.target_id))
+                WHEN 'groundwater_level' THEN
+                  NOT EXISTS (SELECT 1 FROM groundwater_level_readings r
+                              WHERE r.id = COALESCE(f.applied_id, f.target_id))
+                ELSE false END
+        GROUP BY f.observation_type
+    """))).mappings().all()
+    orphans = {r["observation_type"]: int(r["n"]) for r in orphan_rows}
+    orphan_total = sum(orphans.values())
+
     by_type = {r["observation_type"]: dict(r) for r in rows}
     total_unsynced = sum(r["approved_unsynced"] for r in rows)
     total_pending = sum(r["pending_review"] for r in rows)
@@ -132,10 +154,21 @@ async def pending_summary(db: AsyncSession) -> dict[str, Any]:
         "approved_pending_sync": total_unsynced,
         "approved_in_model": total_in_model,
         "by_type": by_type,
+        "orphaned": orphan_total,
+        "orphaned_by_type": orphans,
+        "orphan_note": (
+            f"{orphan_total} approved observation(s) can no longer be synced: the "
+            f"record they created has since been deleted, so there is nothing left "
+            f"to carry into the datasets. They will never clear on their own — "
+            f"resolve them with POST /dataset-sync/reconcile, then re-submit if "
+            f"the observation is still wanted."
+            if orphan_total else None),
         "syncable_types": list(SYNCABLE_TYPES),
         # The sentence the UI shows verbatim.
         "message": (
-            f"{total_unsynced} approved observation(s) are not yet in the model."
+            (f"{total_unsynced - orphan_total} approved observation(s) are not yet "
+             f"in the model" + (f"; {orphan_total} more cannot be synced at all."
+                                if orphan_total else "."))
             if total_unsynced else
             "All approved observations are reflected in the model."),
         "note": ("Approved observations are authoritative in the portal "
@@ -150,7 +183,7 @@ async def _unsynced_ore(db: AsyncSession) -> list[dict[str, Any]]:
         SELECT f.id::text            AS obs_id,
                o.id::text            AS ore_id,
                o.name, o.ore_zone, o.uranium_grade_pct, o.depth_m,
-               o.notes, o.observed_at,
+               o.radius_m, o.notes, o.observed_at,
                ST_X(o.location::geometry) AS lon,
                ST_Y(o.location::geometry) AS lat
         FROM field_observations f
@@ -227,10 +260,14 @@ async def sync_ore(db: AsyncSession, *, actor, dry_run: bool = False,
             "center_lat": round(float(it["lat"]), 6),
             "center_lon": round(float(it["lon"]), 6),
             "status": "Field-observed",
-            "geometry_wkt": _radius_polygon_wkt(float(it["lon"]), float(it["lat"])),
+            "geometry_wkt": _radius_polygon_wkt(
+                float(it["lon"]), float(it["lat"]),
+                radius_m=float(it["radius_m"]) if it.get("radius_m") else 400.0),
             "notes": (f"Field observation approved {it['observed_at']}. "
-                      f"Outline is a 400 m radius around the sighting, NOT a "
-                      f"surveyed boundary. "
+                      f"Outline is a "
+                      f"{float(it['radius_m']) if it.get('radius_m') else 400.0:g} m "
+                      f"radius {'as reported by the submitter' if it.get('radius_m') else 'DEFAULT — no extent was reported'}"
+                      f", NOT a surveyed boundary. "
                       f"{(it['notes'] or '').strip()}").strip(),
             ORIGIN_COL: ORIGIN_ADDED,
             dsx.REF_COL: ref,
@@ -631,3 +668,82 @@ async def sync_all(db: AsyncSession, *, actor, dry_run: bool = False,
                     f"{sum(1 for p in parts.values() if p.get('synced'))} type(s)."
                     if total else "Nothing to sync."),
     }
+
+
+async def reconcile_orphans(db: AsyncSession, *, actor, dry_run: bool = False,
+                            ip: Optional[str] = None) -> dict[str, Any]:
+    """Resolve approved observations whose applied row no longer exists.
+
+    These can never sync: the sync joins to the row approval created, and that
+    row is gone — so the endpoint reports "Nothing to sync" while the status
+    keeps counting them as pending, for ever. A queue that cannot be emptied is
+    worse than a full one, because it trains people to ignore the number.
+
+    Marked `rejected` with a review note stating exactly why, rather than
+    silently marked synced: they never reached the datasets, and recording that
+    they did would be a lie told to the audit log. Re-submitting is the way to
+    get the observation back.
+    """
+    rows = (await db.execute(text("""
+        SELECT f.id::text, f.observation_type, f.submitted_by::text,
+               f.applied_id::text, f.note
+        FROM field_observations f
+        WHERE f.status = 'approved' AND f.synced_to_dataset_at IS NULL
+          AND CASE f.observation_type
+                WHEN 'water_sample' THEN
+                  NOT EXISTS (SELECT 1 FROM water_samples w
+                              WHERE w.id = COALESCE(f.applied_id, f.target_id))
+                WHEN 'groundwater_level' THEN
+                  NOT EXISTS (SELECT 1 FROM groundwater_level_readings r
+                              WHERE r.id = COALESCE(f.applied_id, f.target_id))
+                ELSE false END
+    """))).mappings().all()
+
+    items = [dict(r) for r in rows]
+    result: dict[str, Any] = {
+        "dry_run": dry_run,
+        "count": len(items),
+        "items": items,
+        "note": ("Marked rejected, not synced: these never reached the datasets, "
+                 "and recording that they did would put a false statement in the "
+                 "audit log. Re-submit if the observation is still wanted."),
+    }
+    if dry_run or not items:
+        result["message"] = (
+            f"{len(items)} observation(s) can no longer be synced."
+            if items else "Nothing to reconcile — every approved observation is "
+                          "either synced or still syncable.")
+        return result
+
+    # `applied_id` must be cleared alongside the status change: the constraint
+    # `ck_field_obs_applied` is `applied_id IS NULL OR status = 'approved'`, so
+    # rejecting while the pointer still dangles fails outright. Clearing it is
+    # also the honest record — it points at a row that no longer exists.
+    stmt = text("""
+        UPDATE field_observations
+        SET status = 'rejected',
+            reviewed_at = now(),
+            applied_id = NULL,
+            review_note = :why
+        WHERE id IN :ids
+    """).bindparams(sa_bindparam("ids", expanding=True))
+    await db.execute(stmt, {
+        "why": ("Cannot be synced: the record this created was deleted, so there "
+                "is nothing left to carry into the datasets. Re-submit if still "
+                "needed."),
+        "ids": [uuid.UUID(i["id"]) for i in items],
+    })
+    await db.commit()
+
+    await audit.record(
+        action="dataset.reconcile_orphans", entity_type="field_observations",
+        entity_id="orphans", actor_id=actor.id, actor_label=actor.email,
+        ip_address=ip,
+        detail={"count": len(items),
+                "ids": [i["id"] for i in items],
+                "types": sorted({i["observation_type"] for i in items})},
+    )
+    result["message"] = (
+        f"Resolved {len(items)} observation(s) that could never sync. The queue "
+        f"now reflects only work that can actually be done.")
+    return result

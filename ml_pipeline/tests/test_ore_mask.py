@@ -145,3 +145,81 @@ def test_radium_has_a_source_footprint_but_does_not_migrate():
     far = _predict(*RANCHI, species="radium_226_mbq_l")
     assert far["ore_zone"]["zone"] == "none"
     assert far["metrics"]["analytical"]["area_ha"] == 0.0
+
+
+def test_a_field_added_deposit_does_not_enlarge_the_regional_belt():
+    """R11. The bug this pins was reported from a real screenshot.
+
+    `raw_deposits` feeds the convex hull the belt is unioned with. That was safe
+    while every row was a surveyed GSI deposit inside the Singhbhum cluster, but
+    once approved field observations began syncing into the same CSV, one
+    sighting anywhere in Jharkhand stretched the hull from the cluster to that
+    point. Measured on the real file: an added deposit at Jharia took the hull
+    from 200.6 km2 to 1,586.2 km2 — a 7.9x expansion, and ~1,386 km2 of country
+    in which the engine would produce a uranium plume with no geology behind it.
+
+    A field sighting is evidence of ore AT THAT SPOT. It is not evidence that the
+    regional structure extends there.
+    """
+    import csv
+
+    from shapely import wkt
+    from shapely.ops import unary_union
+
+    from ml_pipeline.config import parameters as P
+    from ml_pipeline.data_prep.ore_loader import ORE_CSV, _ore
+
+    with ORE_CSV.open(encoding="utf-8-sig") as fh:
+        rows = list(csv.DictReader(fh))
+
+    originals, added = [], []
+    for r in rows:
+        if r["name"].strip() == P.ORE_BELT_NAME:
+            continue
+        g = wkt.loads(r["geometry_wkt"]).buffer(0)
+        (added if (r.get("record_source") or "original").strip() == "added"
+         else originals).append(g)
+
+    if not added:
+        import pytest
+        pytest.skip("no field-added deposits in the current CSV")
+
+    # The hull must be the one over ORIGINAL deposits — adding the field rows
+    # must not move it at all.
+    hull_original = unary_union(originals).convex_hull
+    hull_with_added = unary_union(originals + added).convex_hull
+    assert hull_with_added.area > hull_original.area, (
+        "fixture assumption: the added deposit should lie outside the original hull")
+
+    _, belt = _ore()
+    geom, _prep = belt
+    # The belt may exceed the original hull (arc + taper buffers) but must not
+    # reach the inflated hull the added deposit would have produced.
+    assert not geom.covers(hull_with_added), (
+        "the belt grew to cover the hull an added deposit would have created — "
+        "one field sighting has redrawn the regional geology")
+
+
+def test_a_field_added_deposit_still_gets_its_own_local_zone():
+    """Excluding it from the hull must not make it inert.
+
+    It is a real ore zone locally — that is the whole point of submitting it —
+    and it keeps a taper-width halo so C0 ramps down rather than stepping off a
+    cliff at its 500 m buffer.
+    """
+    from ml_pipeline.data_prep.ore_loader import _ore, added_deposit_names, ore_zone_at
+
+    names = added_deposit_names()
+    if not names:
+        import pytest
+        pytest.skip("no field-added deposits in the current CSV")
+
+    deposits, _ = _ore()
+    for name, poly, _p in deposits:
+        if name in names:
+            c = poly.centroid
+            zone = ore_zone_at(c.x, c.y)["zone"]
+            assert zone in ("deposit", "belt"), (
+                f"added deposit {name!r} resolves to {zone!r} at its own centre — "
+                f"the submission has no effect at all")
+            break

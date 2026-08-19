@@ -706,3 +706,16 @@ export interface GapMatrix {
   stale_years: number;
   what_this_is: string;
 }
+
+/** Statewide block counts for the citizen map.
+ *
+ *  `untested` and `no_data` are separate from `safe` on purpose: a block nobody
+ *  measured is the absence of evidence, not evidence of safety, and folding it
+ *  into "safe" is the single most misleading thing this surface could do. */
+export interface BlockSummary {
+  total: number; unsafe: number; watch: number; safe: number;
+  untested: number; no_data: number;
+  measured: number; unknown: number;
+  safe_limit_ppb: number; coverage_pct: number;
+  headline: string; what_unknown_means: string; what_this_is: string;
+}

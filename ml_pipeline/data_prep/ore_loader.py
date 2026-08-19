@@ -60,16 +60,43 @@ def _ore():
     belt:     (polygon, prepared) for the regional envelope, or None.
     """
     deposits, belt, raw_deposits = [], None, []
-    with ORE_CSV.open(encoding="utf-8") as fh:
+    added_deposits, added_names = [], set()
+    with ORE_CSV.open(encoding="utf-8-sig") as fh:
         for row in csv.DictReader(fh):
             geom = wkt.loads(row["geometry_wkt"]).buffer(0)
             name = row["name"].strip()
             if name == P.ORE_BELT_NAME:
                 belt = geom
-            else:
+                continue
+
+            # A FIELD-ADDED DEPOSIT MUST NOT REDRAW THE REGIONAL BELT (R11).
+            #
+            # `raw_deposits` feeds the convex hull that the belt envelope is
+            # unioned with, below. That was safe while every row was a surveyed
+            # GSI deposit inside the Singhbhum cluster. Once approved field
+            # observations began syncing into this file, a single sighting
+            # anywhere in Jharkhand stretched the hull from the cluster to that
+            # point — turning one local report into a belt spanning tens of
+            # kilometres of country with no geological basis, inside which the
+            # engine will produce a uranium plume.
+            #
+            # The belt is a REGIONAL STRUCTURE from published mapping. One field
+            # sighting is evidence of ore at that spot; it is not evidence that
+            # the structure extends there. So an `added` row still gets its own
+            # deposit polygon — the local zone works exactly as intended — but it
+            # is kept out of the hull.
+            #
+            # `record_source` is written by `backend/app/services/datasets.py`.
+            # Rows that predate the column, and the shipped rows, have no value
+            # and are treated as `original`.
+            if (row.get("record_source") or "original").strip() != "added":
                 raw_deposits.append(geom)
-                buffered = geom.buffer(P.ORE_DEPOSIT_BUFFER_DEG)
-                deposits.append((name, buffered, prep(buffered)))
+            else:
+                added_deposits.append(geom)
+                added_names.add(name)
+
+            buffered = geom.buffer(P.ORE_DEPOSIT_BUFFER_DEG)
+            deposits.append((name, buffered, prep(buffered)))
 
     # ------------------------------------------------------------------ #
     # BELT REGISTRATION FIX (2026-08-04)
@@ -112,8 +139,41 @@ def _ore():
         extra = [merged.convex_hull, merged.buffer(taper_deg)]
         belt = unary_union(extra if belt is None else [belt, *extra])
 
+    # A field-added deposit gets a LOCAL halo, never a share of the hull.
+    #
+    # Excluding it from the hull alone would leave it with no belt around it, so
+    # the 3.6b taper would have nowhere to act and C0 would fall off a cliff at
+    # its 500 m buffer — the exact hard step that fix removed. Buffering each
+    # added deposit on its own restores the ramp locally while keeping the
+    # regional envelope where the published mapping put it.
+    #
+    # Measured on the real file: one added deposit at Jharia stretched the hull
+    # from 200.6 km2 to 1,586.2 km2 — a 7.9x expansion, ~1,386 km2 of country in
+    # which the engine would have produced a uranium plume with no geological
+    # basis behind it.
+    if added_deposits:
+        taper_deg = P.ORE_DEPOSIT_BUFFER_DEG + float(P.ORE_TAPER_KM) / _DEG_TO_KM
+        local = [g.buffer(taper_deg) for g in added_deposits]
+        belt = unary_union(local if belt is None else [belt, *local])
+
     belt_pair = (belt, prep(belt)) if belt is not None else None
     return deposits, belt_pair
+
+
+@functools.lru_cache(maxsize=1)
+def added_deposit_names() -> frozenset:
+    """Deposits that came from an approved field observation, not from mapping.
+
+    They are real ore zones locally, but they carry no regional-structure claim —
+    see `_ore`. Exposed so callers and tests can tell the two apart without
+    re-reading the CSV.
+    """
+    _ore()
+    import csv as _csv
+    with ORE_CSV.open(encoding="utf-8-sig") as fh:
+        return frozenset(
+            r["name"].strip() for r in _csv.DictReader(fh)
+            if (r.get("record_source") or "original").strip() == "added")
 
 
 def ore_zone_at(lon: float, lat: float) -> dict:

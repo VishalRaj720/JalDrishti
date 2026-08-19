@@ -471,6 +471,42 @@ def _pristine_path(f: DatasetFile) -> Path:
     return PRISTINE_DIR / f.relpath
 
 
+def is_pristine_snapshot(f: DatasetFile) -> bool:
+    """Is the stored snapshot genuinely the shipped file?
+
+    A snapshot is only meaningful if it was taken BEFORE this system ever wrote.
+    On a database that had already synced before snapshotting existed, the first
+    `ensure_pristine` captures a file that already carries added rows and the
+    provenance columns — and restoring THAT undoes a reset instead of completing
+    it. (Observed: `strip_added` removed the rows, then the tail restored the
+    snapshot and put them straight back.)
+
+    So a snapshot is trusted only if it looks like something that shipped: no
+    provenance columns, and therefore no added rows.
+    """
+    p = _pristine_path(f)
+    if not p.exists():
+        return False
+    if f.kind == "xlsx":
+        # Cheap structural check; the workbook is re-serialised on any write, so
+        # the presence of the column is the reliable signal.
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(p, read_only=True)
+            ws = wb[wb.sheetnames[0]]
+            header = [c.value for c in next(ws.iter_rows(
+                min_row=f.header_row + 1, max_row=f.header_row + 1))]
+            return SOURCE_COL not in [str(h) for h in header if h is not None]
+        except Exception:  # noqa: BLE001
+            return False
+    try:
+        with io.open(p, "r", encoding="utf-8-sig", newline="") as fh:
+            first = fh.readline()
+        return SOURCE_COL not in first
+    except OSError:
+        return False
+
+
 def ensure_pristine(f: DatasetFile) -> None:
     """Snapshot the file the first time it is about to be written. Idempotent."""
     dest = _pristine_path(f)
@@ -636,7 +672,7 @@ def strip_added(key: str, *, dry_run: bool = False) -> dict[str, Any]:
         # were later deleted one by one has nothing left to strip and is still
         # not pristine.
         pristine = _pristine_path(f)
-        if pristine.exists() and f.path.read_bytes() != pristine.read_bytes():
+        if is_pristine_snapshot(f) and f.path.read_bytes() != pristine.read_bytes():
             backup(f.path, uuid.uuid4().hex[:12])
             shutil.copy2(pristine, f.path)
             invalidate_caches()
@@ -692,18 +728,16 @@ def strip_added(key: str, *, dry_run: bool = False) -> dict[str, Any]:
     # back. Row-filtering already produced the right CONTENT; this guarantees the
     # right BYTES, which is what "restored to what shipped" has to mean for a
     # project whose claim is provenance.
-    pristine = _pristine_path(f)
-    if pristine.exists():
-        shutil.copy2(pristine, f.path)
+    if is_pristine_snapshot(f):
+        shutil.copy2(_pristine_path(f), f.path)
         result["restored_from_pristine"] = True
 
     invalidate_caches()
     result["removed"] = int(len(added))
     result["provenance_columns_dropped"] = True
-    logger.info(f"{f.relpath}: stripped {len(added)} added row(s); "
-                f"restored byte-for-byte from the pristine snapshot"
-                if pristine.exists() else
-                f"{f.relpath}: stripped {len(added)} added row(s)")
+    logger.info(f"{f.relpath}: stripped {len(added)} added row(s)"
+                + ("; restored byte-for-byte from the pristine snapshot"
+                   if result.get("restored_from_pristine") else ""))
     return result
 
 

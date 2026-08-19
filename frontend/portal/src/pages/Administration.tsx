@@ -13,7 +13,12 @@ import { ROLE_COLOUR, ROLE_LABEL } from "../auth";
 import { ErrorNote, Loading, Planned , TableScroll } from "../components/bits";
 
 interface U { id: string; username: string; email: string; role: Role }
-const ROLES: Role[] = ["admin", "regulator", "analyst", "field_officer", "citizen"];
+// `regulator` is NOT offered. R7 retired it — every power it had, admin already
+// had — and leaving it selectable let an operator assign a role the application
+// no longer recognises, whose label ("Administrator (former regulator)") was
+// itself an admission that it should not exist. The enum value survives in
+// Postgres only because a value cannot be dropped transactionally.
+const ROLES: Role[] = ["admin", "analyst", "field_officer", "citizen"];
 
 
 /**
