@@ -43,8 +43,19 @@
 }
 .hdr-sub { font-size: 9.5px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
 
-.hdr-nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
-.hdr-nav::-webkit-scrollbar { display: none; }
+/* NO `overflow-x: auto` here.
+ *
+ * It was a scroll container to cope with eleven flat links, and it silently
+ * broke the grouped nav that replaced them: an overflow container CLIPS its
+ * absolutely-positioned descendants, and CSS forces `overflow-y` to `auto` as
+ * soon as `overflow-x` is set — so every dropdown was cut off below a 44px-tall
+ * strip and could not be clicked at all. The button toggled correctly and the
+ * menu was simply invisible, which is why a `getBoundingClientRect()` check
+ * passed: a clipped element still reports its full box.
+ *
+ * Five groups do not need to scroll, so the container goes. `min-width: 0` lets
+ * the nav shrink rather than push the account controls off the edge. */
+.hdr-nav { display: flex; gap: 2px; flex: 1; min-width: 0; flex-wrap: nowrap; }
 .hdr-nav a {
   padding: 7px var(--s-3); border-radius: var(--r-sm); color: var(--muted);
   text-decoration: none; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
