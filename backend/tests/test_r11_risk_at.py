@@ -54,18 +54,21 @@ async def test_response_carries_no_model_output_or_site_geometry(client):
 
 
 @pytest.mark.asyncio
-async def test_sampled_but_untested_is_a_gap_not_a_clean_result(client, db_session):
+async def test_sampled_but_untested_is_a_gap_not_a_clean_result(
+        client, db_session, seeded_block):
     """Seed a block whose wells were sampled with uranium NULL, then tap it."""
+    # This used to look for any block with geometry and skip when it found none
+    # — which, in a database built from ORM metadata, was always. One of the
+    # project's load-bearing rules ("no data is a monitoring gap, never a clean
+    # result") was being checked by a test that never executed.
     row = (await db_session.execute(text("""
         SELECT b.id::text AS bid,
                ST_X(ST_Centroid(b.geometry)) AS lon,
                ST_Y(ST_Centroid(b.geometry)) AS lat
         FROM blocks b
-        WHERE b.geometry IS NOT NULL
-        LIMIT 1
-    """))).mappings().first()
-    if row is None:
-        pytest.skip("no blocks with geometry seeded in the test database")
+        WHERE b.id = CAST(:bid AS uuid)
+    """), {"bid": seeded_block["block_id"]})).mappings().first()
+    assert row is not None, "the seeded_block fixture did not produce a block"
 
     await db_session.execute(text("""
         INSERT INTO monitoring_wells (id, name, block_id, location, latitude, longitude)

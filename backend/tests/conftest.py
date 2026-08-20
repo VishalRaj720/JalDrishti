@@ -137,3 +137,48 @@ async def admin_user(db_session):
 @pytest_asyncio.fixture()
 def admin_token(admin_user):
     return create_access_token(str(admin_user.id), admin_user.role)
+
+
+@pytest_asyncio.fixture()
+async def seeded_block(db_session):
+    """A district and a block with real geometry, inside Jharkhand.
+
+    WHY THIS EXISTS. The test database is built from ORM metadata, not from the
+    seed script, so it has no geography at all. Several tests responded by
+    calling `pytest.skip("no blocks in the test database")` — which turns a red
+    test into a green one without changing anything it was written to check.
+    Two of the project's own rules were being "verified" that way: that a
+    sampled-but-untested well reads as a monitoring gap rather than a clean
+    result, and that re-seeding water samples upserts instead of duplicating.
+
+    That is not hypothetical. A test in `test_r11_publish_and_alerts.py` took
+    exactly this shape — with no blocks, an advisory reached none, so the
+    assertion took its "alerts nobody" branch and passed while the insert path
+    that was broken in production never ran once.
+
+    A ~0.25 deg box around Jaduguda: inside the ore belt, and big enough that a
+    modelled footprint lands within it.
+
+    Returns the ids plus the centroid, since point-in-polygon callers need a
+    coordinate that is guaranteed to be inside.
+    """
+    from sqlalchemy import text as _text
+
+    from app.models.block import Block
+    from app.models.district import District
+
+    await db_session.execute(
+        _text("SELECT set_config('app.bypass_rls','on',true)"))
+    d = District(name=f"TestDistrict {uuid.uuid4().hex[:6]}")
+    db_session.add(d)
+    await db_session.flush()
+    b = Block(name=f"TestBlock {uuid.uuid4().hex[:6]}", district_id=d.id,
+              geometry=("SRID=4326;MULTIPOLYGON(((86.25 22.55, 86.50 22.55, "
+                        "86.50 22.80, 86.25 22.80, 86.25 22.55)))"))
+    db_session.add(b)
+    await db_session.commit()
+    await db_session.execute(
+        _text("SELECT set_config('app.bypass_rls','on',true)"))
+    return {"district_id": str(d.id), "district_name": d.name,
+            "block_id": str(b.id), "block_name": b.name,
+            "lon": 86.375, "lat": 22.675}

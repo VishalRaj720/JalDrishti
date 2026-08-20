@@ -242,7 +242,17 @@ async def scan_measured(
     cron job that silently stops is worse than a button nobody pressed, because
     the button's absence is visible.
     """
-    return await AlertService(db).scan_measured_exceedances()
+    # Own session with the system context, for the same reason as
+    # `alerts.raise_for_advisory`: the `alerts_write` RLS policy requires
+    # `app.bypass_rls = 'on'`, and this request's session carries the admin's
+    # identity with bypass OFF. Every insert here was refused — which is part of
+    # why the `alerts` table was empty despite eight published advisories.
+    # Raising alerts is system work the admin authorised, not a privilege the
+    # admin's own session should carry.
+    from app.database import AsyncSessionLocal, set_rls_context
+    async with AsyncSessionLocal() as adb:
+        await set_rls_context(adb, bypass=True)
+        return await AlertService(adb).scan_measured_exceedances()
 
 
 # ── published screenings, as a citizen sees them ─────────────────────

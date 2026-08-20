@@ -204,6 +204,21 @@ class SimulationRunService:
             run.excursion = result.get("isr_excursion")
             run.extrapolation = list(result.get("extrapolation") or [])
             run.hydro = result.get("hydro")
+
+            # R11: the shallow-aquifer screening was computed on every run and
+            # then thrown away. It is returned at the top level of the engine
+            # payload, not inside `hydro`, so assigning `hydro` alone dropped it
+            # — and the breakthrough time a user reads on screen came from the
+            # live preview and existed nowhere afterwards. A published advisory
+            # that says a pathway to the drinking-water aquifer exists has to be
+            # able to point at the run that said so.
+            #
+            # `hydro` is a JSON column, so this needs no migration. Runs stored
+            # before this carry no `vertical` key, and readers must treat its
+            # absence as "not recorded" rather than "no pathway".
+            vertical = result.get("vertical")
+            if vertical and isinstance(run.hydro, dict):
+                run.hydro = {**run.hydro, "vertical": vertical}
             run.plume = _plume_geometry(result)
             run.model_card_sha = prov["model_card_sha"]
             run.artifacts_sha = prov["artifacts_sha"]

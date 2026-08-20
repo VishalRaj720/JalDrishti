@@ -77,7 +77,8 @@ class AlertService:
                 INSERT INTO alerts (kind, block_id, advisory_id, headline, body, severity)
                 VALUES ('published_screening', :block_id, :advisory_id,
                         :headline, :body, 'info')
-                ON CONFLICT (advisory_id, block_id) WHERE advisory_id IS NOT NULL
+                ON CONFLICT (advisory_id, block_id, kind)
+                    WHERE advisory_id IS NOT NULL
                 DO NOTHING
                 RETURNING id
             """), {"block_id": b["id"], "advisory_id": str(advisory.id),
@@ -219,6 +220,16 @@ class AlertService:
             -- leaves the first one unsubstituted, producing a syntax error at
             -- the colon. The explicit CAST is unambiguous.
             WHERE (CAST(:kind AS text) IS NULL OR a.kind = :kind)
+            -- R11: an alert outlives the advisory that raised it unless this
+            -- filter exists. Withdrawal is the act of TAKING A PUBLIC STATEMENT
+            -- BACK, and the notification that reached people is the most public
+            -- part of it — leaving it in the inbox makes withdrawal cosmetic.
+            -- Measured-exceedance alerts have no advisory and are unaffected:
+            -- a laboratory result is not withdrawn by anybody's decision.
+              AND (a.advisory_id IS NULL
+                   OR EXISTS (SELECT 1 FROM advisories ad
+                              WHERE ad.id = a.advisory_id
+                                AND ad.status = 'published'))
             ORDER BY a.created_at DESC
             LIMIT :cap
         """), {"uid": str(user_id), "kind": kind, "cap": limit})).mappings().all()
@@ -232,6 +243,16 @@ class AlertService:
               ON bs.block_id = a.block_id AND bs.user_id = :uid
             LEFT JOIN alert_reads ar ON ar.alert_id = a.id AND ar.user_id = :uid
             WHERE ar.user_id IS NULL
+            -- R11: an alert outlives the advisory that raised it unless this
+            -- filter exists. Withdrawal is the act of TAKING A PUBLIC STATEMENT
+            -- BACK, and the notification that reached people is the most public
+            -- part of it — leaving it in the inbox makes withdrawal cosmetic.
+            -- Measured-exceedance alerts have no advisory and are unaffected:
+            -- a laboratory result is not withdrawn by anybody's decision.
+              AND (a.advisory_id IS NULL
+                   OR EXISTS (SELECT 1 FROM advisories ad
+                              WHERE ad.id = a.advisory_id
+                                AND ad.status = 'published'))
         """), {"uid": str(user_id)})).scalar_one())
 
     async def mark_read(self, user_id: uuid.UUID, alert_id: uuid.UUID) -> None:
@@ -248,12 +269,282 @@ class AlertService:
             FROM alerts a
             JOIN block_subscriptions bs
               ON bs.block_id = a.block_id AND bs.user_id = :uid
+            WHERE true
+            -- R11: an alert outlives the advisory that raised it unless this
+            -- filter exists. Withdrawal is the act of TAKING A PUBLIC STATEMENT
+            -- BACK, and the notification that reached people is the most public
+            -- part of it — leaving it in the inbox makes withdrawal cosmetic.
+            -- Measured-exceedance alerts have no advisory and are unaffected:
+            -- a laboratory result is not withdrawn by anybody's decision.
+              AND (a.advisory_id IS NULL
+                   OR EXISTS (SELECT 1 FROM advisories ad
+                              WHERE ad.id = a.advisory_id
+                                AND ad.status = 'published'))
             ON CONFLICT (alert_id, user_id) DO NOTHING
         """), {"uid": str(user_id)})
         await self.db.commit()
         return res.rowcount or 0
 
 
+    # ── the vertical pathway: who else drinks from that aquifer ──────
+
+    #: A hypothetical operation cannot warn the whole state. The Basement
+    #: Gneissic Complex covers 48,047 km², over half of Jharkhand, so "every
+    #: block touching the aquifer" is not a reach — it is an abdication. The
+    #: bound below is advective travel in the SHALLOW aquifer over the run's own
+    #: evaluation horizon, which is a distance the engine's own numbers imply
+    #: rather than one chosen for comfort.
+    AQUIFER_REACH_CAP_KM = 25.0
+
+    async def announce_aquifer_reach(self, advisory: Advisory,
+                                     run: Any) -> dict[str, Any]:
+        """Alert the blocks the SHALLOW aquifer carries this to, if any.
+
+        WHY THIS IS A SEPARATE CLAIM. The footprint alert says "the modelled
+        plume covers N hectares of your block". This one says something else
+        entirely: that a pathway exists from the deep ore zone up into the
+        shallow aquifer people actually drink from, and that the same aquifer
+        extends under blocks the footprint never touches. Conflating the two
+        would either under-warn the second group or tell the first group their
+        drinking water is contaminated, and neither is what the model says.
+
+        THE THREE GATES, in order, because each one alone would over-claim:
+
+        1. **Breakthrough must be credible within the horizon.** If the vertical
+           screening reports no breakthrough, or one beyond the years the run
+           was evaluated over, nothing is raised. A pathway that opens after the
+           period modelled is not a finding about that period.
+        2. **The aquifer must be the one under the site.** Resolved by
+           point-in-polygon, not by name.
+        3. **The reach is bounded by advective travel**, v = K*i/phi over the
+           horizon, capped at `AQUIFER_REACH_CAP_KM`. Shallow transport after
+           breakthrough is NOT modelled by this product — there is no shallow
+           plume solution here — so this is a screening radius for *who should
+           be told*, never a predicted extent. It is stated in those words in
+           the alert body.
+
+        Returns a dict rather than a count because the reasons for raising
+        nothing are the interesting part, and a bare 0 hides them.
+        """
+        v = ((run.hydro or {}).get("vertical") or {}) if run is not None else {}
+        if not v:
+            return {"alerts": 0, "reason": "no_vertical_screening",
+                    "note": ("This run stored no shallow-aquifer screening. Runs "
+                             "saved before R11 did not keep one — that is a gap "
+                             "in the record, not a finding of no pathway.")}
+
+        yrs = v.get("years_to_vertical_breakthrough")
+        horizon = float((run.request or {}).get("time_years") or 0) or None
+        if yrs is None:
+            return {"alerts": 0, "reason": "no_breakthrough",
+                    "note": ("The screening found no upward pathway to the "
+                             "shallow aquifer, so there is nobody beyond the "
+                             "footprint to tell.")}
+        if horizon is not None and float(yrs) > horizon:
+            return {"alerts": 0, "reason": "breakthrough_beyond_horizon",
+                    "years_to_breakthrough": yrs, "horizon_years": horizon,
+                    "note": (f"Breakthrough is estimated at {yrs} yr, beyond the "
+                             f"{horizon:g}-year period this run evaluated. "
+                             f"Raising an alert would state as a finding of this "
+                             f"run something it did not model.")}
+
+        # Shallow advective reach. `gradient_i` and K come from the run's own
+        # resolved hydrogeology, so the radius is derived, not decreed.
+        flow = (run.hydro or {}).get("flow") or {}
+        i = float(flow.get("gradient_i") or 0.0)
+        row = (await self.db.execute(text("""
+            SELECT a.id, a.name, a.hydraulic_conductivity, a.porosity
+            FROM aquifers a
+            JOIN isr_points p ON ST_Contains(a.geometry, p.location)
+            WHERE p.id = :pid AND a.geometry IS NOT NULL
+            ORDER BY a.min_depth NULLS LAST
+            LIMIT 1
+        """), {"pid": str(advisory.isr_point_id)})).mappings().first()
+        if row is None:
+            return {"alerts": 0, "reason": "no_aquifer_polygon",
+                    "note": ("No mapped aquifer polygon contains this site, so "
+                             "there is no defensible way to say who shares its "
+                             "water. That is a data gap, not an all-clear.")}
+
+        K = float(row["hydraulic_conductivity"] or 0.0)
+        phi = float(row["porosity"] or 0.0)
+        if K <= 0 or phi <= 0 or i <= 0:
+            return {"alerts": 0, "reason": "no_flow_parameters",
+                    "aquifer": row["name"],
+                    "note": ("The shallow aquifer's conductivity, porosity or "
+                             "gradient is unknown here, so travel distance "
+                             "cannot be derived. Guessing one would invent the "
+                             "reach this alert exists to bound.")}
+
+        years = horizon or float(yrs)
+        reach_m = min(K * i / phi * years * 365.0,
+                      self.AQUIFER_REACH_CAP_KM * 1000.0)
+        capped = reach_m >= self.AQUIFER_REACH_CAP_KM * 1000.0
+
+        # Blocks inside BOTH the aquifer polygon and the travel radius, minus
+        # the ones the footprint alert already covered — nobody is told twice.
+        already = {str(b.get("id")) for b in (advisory.affected_blocks or [])}
+        blocks = (await self.db.execute(text("""
+            SELECT b.id::text AS id, b.name, d.name AS district,
+                   ROUND(ST_Distance(p.location::geography,
+                                     b.geometry::geography)::numeric / 1000.0, 1)
+                       AS distance_km
+            FROM blocks b
+            JOIN isr_points p ON p.id = :pid
+            JOIN aquifers a ON a.id = :aid
+            LEFT JOIN districts d ON d.id = b.district_id
+            WHERE b.geometry IS NOT NULL
+              AND ST_Intersects(b.geometry, a.geometry)
+              AND ST_DWithin(p.location::geography, b.geometry::geography, :reach)
+            ORDER BY distance_km
+        """), {"pid": str(advisory.isr_point_id), "aid": str(row["id"]),
+               "reach": reach_m})).mappings().all()
+
+        # Context, never a trigger. Shallow groundwater in Jharkhand's hard rock
+        # moves on the order of 1.5 m/yr (Phyllite: K 0.08 m/day, phi 0.04,
+        # i 0.0021), and even the state's fastest unit — Older Alluvium, K 5.0,
+        # phi 0.3 — reaches only ~255 m in twenty years. So this alert will
+        # usually add nobody, and that is the finding rather than a failure:
+        # lateral shallow transport does not carry this to the next block within
+        # any period the run modelled. The count of blocks sharing the FORMATION
+        # is reported so the difference between "shares a rock unit" and "is
+        # reached by anything" stays visible, and it is deliberately not a basis
+        # for alerting: the Basement Gneissic Complex alone spans over half the
+        # state.
+        shared = (await self.db.execute(text("""
+            SELECT count(*) FROM blocks b
+            WHERE b.geometry IS NOT NULL
+              AND ST_Intersects(b.geometry, (SELECT geometry FROM aquifers
+                                             WHERE id = :aid))
+        """), {"aid": str(row["id"])})).scalar()
+
+        targets = [b for b in blocks if b["id"] not in already]
+        if not targets:
+            return {"alerts": 0, "reason": "no_additional_blocks",
+                    "aquifer": row["name"], "reach_km": round(reach_m / 1000, 1),
+                    "reach_m": round(reach_m, 1),
+                    "blocks_sharing_formation": shared,
+                    "note": (f"Shallow groundwater travels about "
+                             f"{reach_m:.0f} m here in {years:g} years, so every "
+                             f"block within that distance was already alerted by "
+                             f"the footprint. {shared} blocks sit on the same "
+                             f"{row['name']} formation, which is a shared rock "
+                             f"unit and not a shared exposure — nothing the "
+                             f"model produced reaches them.")}
+
+        made = 0
+        reach_km = round(reach_m / 1000.0, 1)
+        for b in targets:
+            dist = b["distance_km"]
+            name = b["name"]
+            body = (
+                f"A groundwater screening for a hypothetical uranium in-situ "
+                f"recovery operation about {dist} km away estimates that "
+                f"lixiviant could reach the shallow aquifer within {yrs:g} "
+                f"years. {name} block draws on the same shallow aquifer "
+                f"({row['name']}).\n\n"
+                f"This is not a finding that your water is affected, and "
+                f"nothing has been measured in your block as part of this. It "
+                f"is a statement that you share the water body a modelled "
+                f"pathway would enter. The {reach_km} km distance is how far "
+                f"shallow groundwater travels here in {years:g} years — it "
+                f"marks who should be told, not how far anything has spread. "
+                f"Movement within the shallow aquifer is not modelled by this "
+                f"system.\n\n"
+                f"{advisory.what_it_means}"
+            )
+            if advisory.what_to_do:
+                body += f"\n\nWhat to do: {advisory.what_to_do}"
+
+            res = await self.db.execute(text("""
+                INSERT INTO alerts (kind, block_id, advisory_id, headline, body,
+                                    severity)
+                VALUES ('aquifer_pathway', :block_id, :advisory_id, :headline,
+                        :body, 'warning')
+                ON CONFLICT (advisory_id, block_id, kind)
+                    WHERE advisory_id IS NOT NULL
+                DO NOTHING
+                RETURNING id
+            """), {"block_id": b["id"], "advisory_id": str(advisory.id),
+                   "headline": (f"Shallow aquifer shared with a screened area "
+                                f"— {name}"),
+                   "body": body})
+            if res.first():
+                made += 1
+
+        await self.db.commit()
+        logger.info(f"advisory {advisory.id}: {made} aquifer-pathway alert(s) "
+                    f"across {row['name']} within {reach_km} km")
+        return {"alerts": made, "reason": "raised", "aquifer": row["name"],
+                "reach_km": reach_km, "reach_m": round(reach_m, 1),
+                "blocks_sharing_formation": shared,
+                "reach_was_capped": capped,
+                "years_to_breakthrough": yrs,
+                "blocks": [dict(b) for b in targets]}
+
+
+# ── the entry point publication uses ─────────────────────────────────
+
+
+async def raise_for_advisory(advisory_id: uuid.UUID) -> dict[str, Any]:
+    """Raise every alert a newly-published advisory warrants. Own session.
+
+    THE BUG THIS EXISTS TO FIX, found in R11: eight advisories had been
+    published and the `alerts` table was EMPTY. Not under-populated — empty.
+    Every insert had been rejected by the `alerts_write` RLS policy, which
+    requires `app.bypass_rls = 'on'`, and `decide()` wrapped the call in a broad
+    `except Exception` that logged the failure and let the publication stand. So
+    the product reported a successful publication, showed the advisory to
+    citizens, and notified nobody — and the log line that said so scrolled past
+    once per publication.
+
+    WHY THE POLICY WAS RIGHT AND THE CALL WAS WRONG. `set_rls_context` uses
+    `SET LOCAL`, which Postgres discards at COMMIT — deliberately, so a pooled
+    connection cannot leak one request's identity into the next. `decide()`
+    commits the decision and *then* raises alerts, so by that point the session
+    has no context at all and `bypass_rls` reads as 'off'. Alerting is system
+    work authorised by a decision that has already been made and recorded; it
+    is not the caller's privilege. So it gets its own session with the system
+    context, which is exactly what `audit.record` already does and for the same
+    reason.
+
+    Nothing crosses a session boundary: the advisory and its run are re-loaded
+    here rather than handed in, so there is no detached instance to lazy-load
+    at the worst moment.
+    """
+    from app.database import AsyncSessionLocal, set_rls_context
+    from app.models.simulation_run import SimulationRun
+
+    async with AsyncSessionLocal() as db:
+        await set_rls_context(db, bypass=True)
+        adv = (await db.execute(
+            select(Advisory).where(Advisory.id == advisory_id)
+        )).scalar_one_or_none()
+        if adv is None:
+            return {"footprint_alerts": 0, "aquifer_reach": None,
+                    "error": f"advisory {advisory_id} not found"}
+
+        run = (await db.execute(
+            select(SimulationRun).where(SimulationRun.id == adv.run_id)
+        )).scalar_one_or_none()
+
+        svc = AlertService(db)
+        footprint = await svc.announce_advisory(adv)
+
+        # `announce_advisory` commits, and COMMIT discards `SET LOCAL` — so the
+        # system context set above is gone by now and every RLS-protected table
+        # reads as empty. The first symptom was `announce_aquifer_reach`
+        # reporting "no mapped aquifer polygon contains this site" for a site
+        # that provably sits inside one: the JOIN to `isr_points` returned
+        # nothing because the session had become anonymous mid-function.
+        #
+        # This is the same failure as the one in `decide()` one level up, and it
+        # will recur anywhere a commit is followed by more queries. The rule:
+        # after any commit, the context is gone until it is set again.
+        await set_rls_context(db, bypass=True)
+        aquifer = await svc.announce_aquifer_reach(adv, run)
+        return {"footprint_alerts": footprint, "aquifer_reach": aquifer}
+
 # Re-exported so importers do not need the model module for a type check.
-__all__ = ["AlertService", "Alert", "AlertRead", "BlockSubscription",
-           "URANIUM_LIMIT_PPB"]
+__all__ = ["AlertService", "raise_for_advisory", "Alert", "AlertRead",
+           "BlockSubscription", "URANIUM_LIMIT_PPB"]

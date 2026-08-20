@@ -265,18 +265,47 @@ class AdvisoryService:
         # already committed to: the advisory is public either way, and a lost
         # notification is recoverable (the block list is stored) while a
         # rolled-back decision is confusing. So it is logged, not raised.
+        aquifer_reach: Optional[dict] = None
         if decision == "publish":
+            # Raised in their OWN session with the system context. This used to
+            # run on `self.db`, which the commit above had just stripped of its
+            # RLS context — so every insert was refused by the `alerts_write`
+            # policy and the `except` below turned that into a log line. Eight
+            # advisories were published to an empty `alerts` table before anyone
+            # looked. See `alerts.raise_for_advisory`.
+            #
+            # Two kinds are raised: the footprint blocks, and the blocks that
+            # share the shallow aquifer a modelled pathway would reach. They are
+            # different claims about different areas and are worded as such.
+            from app.services.alerts import raise_for_advisory
             try:
-                from app.services.alerts import AlertService
-                await AlertService(self.db).announce_advisory(adv)
+                outcome = await raise_for_advisory(adv.id)
+                aquifer_reach = outcome.get("aquifer_reach")
+                from loguru import logger
+                logger.info(
+                    f"advisory {adv.id}: {outcome.get('footprint_alerts')} "
+                    f"footprint alert(s), aquifer reach {aquifer_reach}")
             except Exception as exc:  # noqa: BLE001
+                # Still not fatal — a published advisory a citizen can already
+                # read must not be rolled back because a notification failed.
+                # But it is now loud, and `aquifer_reach` records the failure in
+                # the audit entry rather than leaving it only in a log.
                 from loguru import logger
                 logger.exception(
                     f"advisory {adv.id} published but alerts failed: {exc}")
+                aquifer_reach = {"alerts": 0, "reason": "alerting_failed",
+                                 "error": str(exc)}
 
+        detail: dict[str, Any] = {"status": adv.status, "note": adv.decision_note}
+        if aquifer_reach is not None:
+            # Recorded even when it raised nothing: "we decided not to warn the
+            # wider aquifer, and here is why" is exactly the kind of decision an
+            # audit log exists to hold.
+            detail["aquifer_reach"] = {
+                k: v for k, v in aquifer_reach.items() if k != "blocks"}
         await audit.record(
             action=f"advisory.{decision}", entity_type="advisories",
             entity_id=str(adv.id), actor_id=actor.id, actor_label=actor.email,
-            ip_address=ip, detail={"status": adv.status, "note": adv.decision_note},
+            ip_address=ip, detail=detail,
         )
         return adv

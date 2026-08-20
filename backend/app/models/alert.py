@@ -87,8 +87,10 @@ class Alert(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
-        CheckConstraint("kind IN ('measured_exceedance','published_screening')",
-                        name="ck_alert_kind"),
+        CheckConstraint(
+            "kind IN ('measured_exceedance','published_screening',"
+            "'aquifer_pathway')",
+            name="ck_alert_kind"),
         CheckConstraint("severity IN ('info','warning','high')",
                         name="ck_alert_severity"),
         CheckConstraint("kind <> 'published_screening' OR advisory_id IS NOT NULL",
@@ -106,7 +108,13 @@ class Alert(Base):
         # would either error or put the same warning in front of a citizen
         # twice. They must therefore live here as well as in migration 0018,
         # because the test database is built from this metadata.
-        Index("uq_alert_screening", "advisory_id", "block_id", unique=True,
+        # `kind` is part of the key (migration 0021). A block can legitimately
+        # receive both the footprint alert and the aquifer-pathway alert from
+        # one advisory — they are different claims about different areas. Keyed
+        # on (advisory, block) alone, the second insert would have hit
+        # ON CONFLICT DO NOTHING and vanished with no error to notice.
+        Index("uq_alert_screening", "advisory_id", "block_id", "kind",
+              unique=True,
               postgresql_where=text("advisory_id IS NOT NULL")),
         Index("uq_alert_measured", "block_id", "well_name", "sampled_at",
               unique=True,

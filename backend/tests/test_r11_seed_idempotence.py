@@ -23,7 +23,7 @@ from sqlalchemy import text
 
 
 @pytest.mark.asyncio
-async def test_water_samples_upsert_on_well_and_date(db_session):
+async def test_water_samples_upsert_on_well_and_date(db_session, seeded_block):
     """Insert once, update in place, never duplicate.
 
     Exercises the service directly rather than the CLI so the property is pinned
@@ -33,10 +33,10 @@ async def test_water_samples_upsert_on_well_and_date(db_session):
 
     svc = IngestionService(db_session)
 
-    block = (await db_session.execute(text(
-        "SELECT id FROM blocks LIMIT 1"))).scalar()
-    if block is None:
-        pytest.skip("no blocks in the test database")
+    # Was `SELECT id FROM blocks LIMIT 1` with a skip when empty — and the test
+    # database has no geography, so this never ran. A test that skips is not a
+    # test that passes.
+    block = seeded_block["block_id"]
 
     well_id = uuid.uuid4()
     await db_session.execute(text("""
