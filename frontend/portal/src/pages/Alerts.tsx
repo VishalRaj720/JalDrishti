@@ -24,7 +24,8 @@ import { useNavigate } from "react-router-dom";
 import { api, type CitizenAlert } from "../api/client";
 import { Empty, ErrorNote, Loading } from "../components/bits";
 
-type Filter = "all" | "measured_exceedance" | "published_screening";
+type Filter = "all" | "measured_exceedance" | "published_screening"
+  | "aquifer_pathway";
 
 const KIND = {
   measured_exceedance: {
@@ -37,7 +38,20 @@ const KIND = {
     chip: "warn",
     lead: "A modelled scenario",
   },
+  // R11. Deliberately worded as sharing a water body rather than as a result:
+  // this alert goes to blocks the modelled plume never touches, and reading it
+  // as "your water is affected" would be exactly the over-claim it is bounded
+  // to avoid.
+  aquifer_pathway: {
+    label: "Shared aquifer",
+    chip: "warn",
+    lead: "A modelled pathway into water this area shares",
+  },
 } as const;
+
+/** Never index `KIND` blind: an unknown kind from a newer backend must not
+ *  white-screen the page a resident opens to check their water. */
+const UNKNOWN = { label: "Notice", chip: "neutral", lead: "" } as const;
 
 export default function Alerts() {
   const nav = useNavigate();
@@ -91,6 +105,7 @@ export default function Alerts() {
           ["all", "Everything"],
           ["measured_exceedance", "Measured results"],
           ["published_screening", "Assessments"],
+          ["aquifer_pathway", "Shared aquifer"],
         ] as Array<[Filter, string]>).map(([v, l]) => (
           <button key={v} className={filter === v ? "active" : ""}
                   onClick={() => setFilter(v)}>{l}</button>
@@ -118,7 +133,7 @@ export default function Alerts() {
       )}
 
       {alerts.map((a) => {
-        const k = KIND[a.kind];
+        const k = KIND[a.kind as keyof typeof KIND] ?? UNKNOWN;
         const isOpen = open === a.id;
         return (
           <div className="card" key={a.id}

@@ -204,6 +204,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 |---|---|---|---|---|
 | `GET /api/v1/advisories` | ● | ● | ● | · |
 | `POST /api/v1/advisories` | ● | ● | · | · |
+| `POST /api/v1/advisories/publish-run` | ● | ● | · | · |
 | `GET /api/v1/advisories/{advisory_id}` | ● | ● | ● | · |
 | `POST /api/v1/advisories/{advisory_id}/decision` | ● | · | · | · |
 | `GET /api/v1/audit` | ● | · | · | · |
@@ -320,7 +321,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 103/115 · **analyst** 69/115 · **field_officer** 57/115 · **citizen** 13/115
+Reachable endpoints per role — **admin** 104/116 · **analyst** 70/116 · **field_officer** 57/116 · **citizen** 13/116
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

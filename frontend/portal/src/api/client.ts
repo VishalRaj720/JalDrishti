@@ -201,6 +201,9 @@ export interface Observation {
   reviewed_at: string | null;
   review_note: string | null;
   applied_id: string | null;
+  /** Null while approved-but-not-yet-in-the-model. See ObservationDetail. */
+  synced_to_dataset_at: string | null;
+  dataset_sync_ref: string | null;
 }
 
 export interface SimRun {
@@ -376,7 +379,7 @@ export interface Subscription {
  */
 export interface CitizenAlert {
   id: string;
-  kind: "measured_exceedance" | "published_screening";
+  kind: "measured_exceedance" | "published_screening" | "aquifer_pathway";
   headline: string;
   body: string;
   severity: "info" | "warning" | "high";

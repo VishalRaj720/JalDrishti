@@ -49,6 +49,7 @@ import RegisterForm from "../console/RegisterForm";
 import RunResult from "../console/RunResult";
 import SweepChart, { type Sweep } from "../console/SweepChart";
 import ProposeAdvisory from "../console/ProposeAdvisory";
+import PublishFromPreview from "../console/PublishFromPreview";
 import LifecycleChart, { LifecycleNarrative } from "../console/LifecycleChart";
 
 const CENTRE: [number, number] = [23.6, 85.3];
@@ -1082,9 +1083,18 @@ This also destroys ${n} stored run(s) `
                   </button>
                   <div className="muted small" style={{ marginTop: 6 }}>
                     Saving pins the model card, artifact bundle and code version that
-                    produced it, so the number can be re-derived later — and makes it
-                    proposable for publication.
+                    produced it, so the number can be re-derived later. Use this to
+                    keep a run you are <b>not</b> publishing — publishing saves it
+                    for you.
                   </div>
+
+                  {/* R11: publication no longer waits on a separate save.
+                      The save still happens — it is done by the publish call —
+                      so an advisory still cites a stored, re-derivable run. */}
+                  <PublishFromPreview
+                    siteId={siteId} species={species}
+                    timeYears={runYears} restorationYears={runRestoration}
+                    onSaved={(id) => { setRunId(id); setShowStored(true); }} />
                 </>
               )}
             </>

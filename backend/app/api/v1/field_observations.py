@@ -67,6 +67,15 @@ class ObservationResponse(BaseModel):
     review_note: Optional[str]
     applied_id: Optional[uuid.UUID]
 
+    # R11: an approved observation is not yet in the model. The distinction
+    # already existed in the database and on the map's amber/green split, but
+    # the record itself did not carry it — so "approved" was the last thing the
+    # submitter saw, and the natural reading of that is "it counts now". It does
+    # not count until it has been written into `Datasets/`, which is what the
+    # engine actually reads. Surfaced here so an entry can say which it is.
+    synced_to_dataset_at: Optional[datetime] = None
+    dataset_sync_ref: Optional[str] = None
+
 
 def _ip(request: Request) -> Optional[str]:
     return request.client.host if request.client else None

@@ -8,11 +8,12 @@
  * officer who cannot approve. Both are enforced again by the API, and the
  * "cannot review your own" rule is a database CHECK constraint.
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Observation, type TargetList } from "../api/client";
 import { canReview, canSubmit, useAuth } from "../auth";
 import { ErrorNote, Loading } from "../components/bits";
+import ObservationDetail from "../components/ObservationDetail";
 
 const TYPES = [
   { v: "ore_presence", label: "Uranium ore presence" },
@@ -293,30 +294,21 @@ function SubmitForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-function Diff({ o }: { o: Observation }) {
-  return (
-    <div className="grid-2" style={{ marginTop: 11 }}>
-      <div>
-        <div className="muted small" style={{ marginBottom: 4 }}>Current</div>
-        <pre className="mono" style={{ margin: 0, whiteSpace: "pre-wrap", color: "var(--muted)" }}>
-          {o.previous ? JSON.stringify(o.previous, null, 1) : "— new record —"}
-        </pre>
-      </div>
-      <div>
-        <div className="muted small" style={{ marginBottom: 4 }}>Proposed</div>
-        <pre className="mono" style={{ margin: 0, whiteSpace: "pre-wrap", color: "var(--ok)" }}>
-          {o.proposed ? JSON.stringify(o.proposed, null, 1) : "— deletion —"}
-        </pre>
-      </div>
-    </div>
-  );
-}
-
 export default function FieldData() {
   const { me } = useAuth();
   const qc = useQueryClient();
   const [note, setNote] = useState("");
   const reviewer = canReview(me?.role);
+
+  /** Which entries are expanded. A Set, not a single id: comparing two
+   *  submissions side by side is the common reason to open one at all. */
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const isOpen = (id: string) => openIds.has(id);
+  const toggle = (id: string) => setOpenIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   // RLS scopes this: a field officer receives only their own submissions, so
   // there is no client-side filter to forget.
@@ -368,14 +360,21 @@ export default function FieldData() {
         {pending.map((o) => (
           <div key={o.id} className="card" style={{ background: "var(--card2)" }}>
             <div className="row">
-              <div>
-                <strong>{o.operation} · {o.observation_type.replace(/_/g, " ")}</strong>
+              {/* R11: the entry itself is the control. The detail used to be a
+                  permanently-open JSON dump, which made a list of five
+                  submissions unscannable and still did not say what any of them
+                  claimed. Clicking opens it in words. */}
+              <button className="btn ghost" aria-expanded={isOpen(o.id)}
+                      onClick={() => toggle(o.id)}
+                      style={{ textAlign: "left", padding: "2px 6px" }}>
+                <strong>{isOpen(o.id) ? "▾" : "▸"} {o.operation} ·{" "}
+                  {o.observation_type.replace(/_/g, " ")}</strong>
                 <div className="muted small">
                   into <span className="mono">{o.target_table}</span> ·{" "}
                   {new Date(o.submitted_at).toLocaleString()}
                   {o.note ? ` · “${o.note}”` : ""}
                 </div>
-              </div>
+              </button>
               <span className="spacer grow" />
               {/* Separation of duties: `ck_field_obs_no_self_review` makes
                   `reviewed_by = submitted_by` unrepresentable in the database,
@@ -405,7 +404,7 @@ export default function FieldData() {
                 <button className="btn ghost" onClick={() => withdraw.mutate(o.id)}>Withdraw</button>
               )}
             </div>
-            <Diff o={o} />
+            {isOpen(o.id) && <ObservationDetail o={o} />}
           </div>
         ))}
 
@@ -425,20 +424,37 @@ export default function FieldData() {
         <table className="grid">
           <tbody>
             {decided.map((o) => (
-              <tr key={o.id}>
-                <td>{o.observation_type.replace(/_/g, " ")}</td>
-                <td className="muted">{new Date(o.submitted_at).toLocaleDateString()}</td>
-                <td className="muted small">{o.review_note ?? ""}</td>
-                <td>
-                  {o.status === "approved" ? (
-                    <span className="chip ok">approved</span>
-                  ) : o.status === "rejected" ? (
-                    <span className="chip danger">rejected</span>
-                  ) : (
-                    <span className="chip neutral">{o.status}</span>
-                  )}
-                </td>
-              </tr>
+              /* Two rows per entry: the scannable line, and the detail it opens.
+                 A decided submission used to be a dead end — type, date, status
+                 and nothing about what was actually measured, which is the one
+                 thing the person who measured it wants to check. */
+              <Fragment key={o.id}>
+                <tr onClick={() => toggle(o.id)}
+                    style={{ cursor: "pointer" }}>
+                  <td>{isOpen(o.id) ? "▾" : "▸"}{" "}
+                      {o.observation_type.replace(/_/g, " ")}</td>
+                  <td className="muted">{new Date(o.submitted_at).toLocaleDateString()}</td>
+                  <td className="muted small">{o.review_note ?? ""}</td>
+                  <td>
+                    {o.status === "approved" ? (
+                      <span className={`chip ${o.synced_to_dataset_at ? "ok" : "warn"}`}>
+                        {o.synced_to_dataset_at ? "in model" : "approved, not synced"}
+                      </span>
+                    ) : o.status === "rejected" ? (
+                      <span className="chip danger">rejected</span>
+                    ) : (
+                      <span className="chip neutral">{o.status}</span>
+                    )}
+                  </td>
+                </tr>
+                {isOpen(o.id) && (
+                  <tr>
+                    <td colSpan={4} style={{ background: "var(--card2)" }}>
+                      <ObservationDetail o={o} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>
