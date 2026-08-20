@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node tests/no-credentials-in-bundle.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:bundle": "node tests/no-credentials-in-bundle.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.7",

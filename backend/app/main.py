@@ -34,6 +34,38 @@ logger.add(
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"])
 
 
+def _rls_verdict(*, user: str, is_super: bool, bypasses: bool, n_policies: int,
+                 app_env: str, allow_inert: bool) -> tuple[str, str]:
+    """Decide what to do about the RLS posture. Pure, so it is testable.
+
+    Returns `(level, message)` with level in "ok" | "warn" | "critical" | "fatal".
+
+    Split out of the query because the case that matters — a bypassing role in
+    production — cannot be produced by pointing at a correctly configured
+    database, and a test that first requires a deliberately broken deployment is
+    a test nobody runs. This one is a function call.
+    """
+    if not n_policies or not (is_super or bypasses):
+        return "ok", (f"Row-level security active: {n_policies} policies, "
+                      f"connected as '{user}' (no bypass).")
+
+    message = (
+        f"ROW-LEVEL SECURITY IS INERT: connected as '{user}' "
+        f"(superuser={is_super}, bypassrls={bypasses}), so the "
+        f"{n_policies} policies in this database DO NOT APPLY. Run "
+        f"`python -m scripts.create_app_role` and point DATABASE_URL at "
+        f"jaldrishti_app. Until then, access control is application-layer only."
+    )
+    if app_env.lower() not in ("production", "prod"):
+        return "warn", message
+    if allow_inert:
+        return "critical", (f"{message} Started anyway because ALLOW_INERT_RLS "
+                            f"is set.")
+    return "fatal", (
+        f"{message} Refusing to start with APP_ENV=production. Set "
+        f"ALLOW_INERT_RLS=true to override this deliberately.")
+
+
 async def _warn_if_rls_is_inert() -> None:
     """Refuse to let RLS be security theatre without saying so.
 
@@ -59,17 +91,27 @@ async def _warn_if_rls_is_inert() -> None:
     if row is None:
         return
     user, is_super, bypasses = row
-    if n_policies and (is_super or bypasses):
-        logger.warning(
-            f"ROW-LEVEL SECURITY IS INERT: connected as '{user}' "
-            f"(superuser={is_super}, bypassrls={bypasses}), so the "
-            f"{n_policies} policies in this database DO NOT APPLY. Run "
-            f"`python -m scripts.create_app_role` and point DATABASE_URL at "
-            f"jaldrishti_app. Until then, access control is application-layer only."
-        )
-    elif n_policies:
-        logger.info(f"Row-level security active: {n_policies} policies, "
-                    f"connected as '{user}' (no bypass).")
+    level, message = _rls_verdict(
+        user=user, is_super=is_super, bypasses=bypasses, n_policies=n_policies,
+        app_env=settings.APP_ENV, allow_inert=settings.ALLOW_INERT_RLS)
+
+    # DEPLOYMENT AUDIT F-4. This used to warn and start regardless. The
+    # deployment most likely to get the roles wrong is the first production one,
+    # and the symptom is one startup log line in a process whose output nobody
+    # reads after the first minute — a live system that believes it has
+    # row-level security and does not. `DEPLOYMENT.md` §2.2 already says "get
+    # this right or RLS is silently inert"; refusing to start is what makes that
+    # sentence true. Development still only warns, because a laptop connecting
+    # as `postgres` is the normal case and blocking it would help nobody.
+    if level == "fatal":
+        logger.critical(message)
+        raise RuntimeError(message)
+    if level == "critical":
+        logger.critical(message)
+    elif level == "warn":
+        logger.warning(message)
+    else:
+        logger.info(message)
 
 
 @asynccontextmanager
@@ -111,6 +153,25 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # ── Cache policy (deployment audit F-5) ───────────────────────
+    #
+    # `no-store` was set by hand in 4 of 21 routers, so `/audit`, `/users`,
+    # `/isr-points`, `/field-observations`, `/datasets` and a dozen more sent no
+    # Cache-Control at all. The project already holds this principle and tests
+    # it in `test_ml_router.py`: "`private, max-age` is not per-user. Only
+    # `no-store` keeps a citizen from being handed an analyst's cached response
+    # by their own browser." It applies at least as strongly to the audit log.
+    #
+    # Default-deny is the right shape: a new router is safe on the day it is
+    # written, and the handful of genuinely public, genuinely cacheable layers
+    # opt out by setting their own header, which this will not overwrite.
+    @app.middleware("http")
+    async def cache_policy(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/")                 and "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     # ── Audit trail ───────────────────────────────────────────────
     # Records every mutating request and every authorisation denial. Registered
     # AFTER CORS so it sees the real request, and it never fails the response:
@@ -147,13 +208,54 @@ def create_app() -> FastAPI:
         )
         return response
 
-    # ── Prometheus metrics (optional) ─────────────────────────────
-    try:
-        from prometheus_fastapi_instrumentator import Instrumentator
-        Instrumentator().instrument(app).expose(app, endpoint="/metrics")
-        logger.info("Prometheus metrics exposed at /metrics")
-    except ImportError:
-        pass
+    # ── Prometheus metrics (optional, and not world-readable) ─────
+    #
+    # DEPLOYMENT AUDIT F-2. This used to be `.expose(app, endpoint="/metrics")`
+    # with no guard at all: `curl http://host/metrics` returned the full
+    # Prometheus dump to anyone. Metrics leak the route inventory, request
+    # volumes and latencies — reconnaissance that costs an attacker nothing.
+    #
+    # Three states now, and the production default is the safe one:
+    #   token set        -> exposed, requires `Authorization: Bearer <token>`
+    #   dev, no token    -> exposed openly (a token on a laptop protects nothing)
+    #   production, none -> NOT MOUNTED, and says so at startup
+    _is_prod = settings.APP_ENV.lower() in ("production", "prod")
+    if not settings.METRICS_ENABLED:
+        logger.info("Prometheus metrics disabled by METRICS_ENABLED=false")
+    elif _is_prod and not settings.METRICS_TOKEN:
+        logger.warning(
+            "Prometheus metrics NOT exposed: APP_ENV is production and "
+            "METRICS_TOKEN is unset. Set METRICS_TOKEN to enable an "
+            "authenticated /metrics, or METRICS_ENABLED=false to silence this.")
+    else:
+        try:
+            from prometheus_fastapi_instrumentator import Instrumentator
+
+            if settings.METRICS_TOKEN:
+                @app.middleware("http")
+                async def _guard_metrics(request: Request, call_next):
+                    if request.url.path == "/metrics":
+                        # `Bearer <token>` is what a Prometheus scrape config
+                        # sends; compared with compare_digest so the check does
+                        # not leak the token's prefix through timing.
+                        import hmac
+                        sent = request.headers.get("authorization", "")
+                        prefix = "Bearer "
+                        ok = sent.startswith(prefix) and hmac.compare_digest(
+                            sent[len(prefix):], settings.METRICS_TOKEN)
+                        if not ok:
+                            return JSONResponse(
+                                status_code=401,
+                                content={"detail": "Metrics require a bearer token."})
+                    return await call_next(request)
+
+            Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+            logger.info(
+                "Prometheus metrics exposed at /metrics "
+                + ("(bearer token required)" if settings.METRICS_TOKEN
+                   else "(OPEN - development only)"))
+        except ImportError:
+            pass
 
     # ── Global exception handlers ─────────────────────────────────
     @app.exception_handler(AppException)

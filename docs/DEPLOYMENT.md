@@ -312,18 +312,61 @@ often cap storage below what the seeded geodata needs — check before committin
 
 ## 9. Known issues to weigh before shipping
 
-- **`react-router-dom` 6.28** carries two moderate advisories (open redirect via
-  backslash in `<Link>`/`useNavigate`; constructor injection in SSR hydration —
-  the latter does not apply, this app does not use SSR). Upgrading crosses a
-  major version, so it is a deliberate change, not a patch. Decide before a
-  public deployment.
+Rewritten 2026-08-20 after the deployment readiness audit
+(`docs/local/audit-record/DEPLOYMENT_AUDIT_2026-08-20.md`). Four entries that
+used to live here are now **enforced by the code** rather than left to whoever
+reads this file.
+
+### Closed by the audit — but still needs one action from you
+
+- **Demo accounts (F-1).** `Login.tsx` listed four working accounts, admin
+  included, and Vite compiled them into the production bundle — a working admin
+  password readable by anyone who viewed source. They are now behind
+  `import.meta.env.DEV`, so a production build eliminates them, and
+  `npm run build` fails if any credential survives into `dist/`.
+  **You must still delete or rotate those four accounts in any deployed
+  database** — removing them from the bundle does not disable them. See §5.
+- **`/metrics` (F-2).** No longer open by default. Set `METRICS_TOKEN` and the
+  endpoint requires `Authorization: Bearer <token>`, which is what a Prometheus
+  scrape config sends. With `APP_ENV=production` and no token, it is **not
+  mounted at all**. Development is unchanged.
+- **Row-level security (F-4).** §2.2 has always warned that RLS is "silently
+  inert" if the roles are wrong. With `APP_ENV=production` the API now **refuses
+  to start** when it is connected as a superuser or a `BYPASSRLS` role.
+  `ALLOW_INERT_RLS=true` overrides it deliberately and still logs CRITICAL.
+- **Cache headers (F-5).** Every `/api/` response now defaults to
+  `Cache-Control: no-store`; the deliberately public layers set their own header
+  and keep it. Previously only 4 of 21 routers set it, so `/audit` and `/users`
+  sent nothing.
+- **Concurrent dataset writes (F-3).** The syncs and the factory reset rewrite
+  whole files inline in the request handler with no lock, so two at once lost
+  one of them silently. They now take a Postgres advisory lock and a second
+  writer gets a `409` naming the operation already running. Dry runs do not
+  contend.
+
+### Still open — decide before a public deployment
+
+- **`react-router-dom` 6.28** carries two moderate advisories. **Neither is
+  reachable in this app:** the SSR hydration one needs SSR, which this SPA does
+  not use, and the open redirect needs a user-controlled navigation target —
+  every `navigate()` call here takes a string literal or an internal UUID.
+  Upgrading crosses a major version, so treat it as routine maintenance rather
+  than a blocker.
 - **The five `POST /ingest/*` routes admit `analyst`** (finding D-2 in
   `docs/roles.md`), meaning an analyst can overwrite reference geography. On a
   multi-user deployment, narrow them to `require_admin` first.
-- **`/metrics` is unauthenticated** (Prometheus). Do not expose it publicly;
-  restrict it at the gateway.
-- **There is no token refresh.** `JWT_REFRESH_SECRET` and
-  `REFRESH_TOKEN_EXPIRE_DAYS` exist in `.env` but nothing implements them: the
-  backend exposes no `/auth/refresh`, and the frontend clears the token on any
-  401. Session length is therefore exactly `ACCESS_TOKEN_EXPIRE_MINUTES`, with a
-  hard sign-out at the end of it. See the note in §3.
+- **Backups are not defined anywhere.** `Datasets/` is the evidence base and
+  `audit_log` is append-only and irreplaceable. Write the backup and restore
+  procedure, and **test a restore**, before go-live. The audit could not verify
+  this because it does not exist.
+- **PDF export pagination has never been visually confirmed** (`O-8`). Generate
+  one and look at it.
+- **Simulations run as in-process background tasks with no queue.** A restart
+  mid-run should leave a `queued`/`running` row orphaned; no reaper exists.
+- **The engine rate limit is per client host** (`ML_PIPELINE_RATE_LIMIT_PER_MIN`,
+  default 240). Behind a gateway every user shares one bucket. Size it for real
+  concurrency or key it per user.
+- **Token refresh now exists** (`POST /auth/refresh`, and the client uses it),
+  so the hard sign-out described in older revisions of this file is gone. But
+  `.env` sets `ACCESS_TOKEN_EXPIRE_MINUTES=15` against a code default of 480 —
+  pick one deliberately. See §3.

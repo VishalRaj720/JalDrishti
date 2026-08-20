@@ -165,9 +165,9 @@ it at the source level instead, and says so.
 |---|---|---|
 | ~~O-1~~ | ~~No monitoring-siting recommendation~~ | **Resolved (R11).** `GET /data-gaps/recommendations` ranks every block by how badly it is observed, rendered on Data & Gaps with its weights shown. Ranks by *observation*, never by predicted risk — the model is least trustworthy exactly where there is no data |
 | ~~O-2~~ | ~~`POST /ingest/*` admits `analyst`~~ | **Resolved.** All five routes are `require_admin`; `roles.md`'s generated matrix confirms it. The prose in that file had gone stale, and was corrected in R11 |
-| O-3 | `react-router-dom` 6.28 — two moderate advisories; the SSR one does not apply. Fix crosses a major version | Open, deployment decision |
-| O-4 | Demo accounts with weak public passwords are listed on the login screen | Open — see `DEPLOYMENT.md` §5 |
-| O-5 | `/metrics` is unauthenticated | Open — restrict at the gateway |
+| ~~O-3~~ | ~~`react-router-dom` 6.28 advisories~~ | **Downgraded (2026-08-20).** Neither is reachable: the SSR one needs SSR (this is an SPA), and the open redirect needs a user-controlled navigation target — every `navigate()` call takes a string literal or an internal UUID. Routine upgrade, not a blocker |
+| ~~O-4~~ | ~~Demo accounts with weak public passwords on the login screen~~ | **Resolved in code (2026-08-20), one action outstanding.** They were worse than listed: Vite compiled them into the production bundle, so a working *admin* password was readable by anyone who viewed source. Now behind `import.meta.env.DEV`, and `npm run build` fails if a credential reaches `dist/`. **The four accounts must still be deleted or rotated in any deployed database** |
+| ~~O-5~~ | ~~`/metrics` is unauthenticated~~ | **Resolved (2026-08-20).** `METRICS_TOKEN` gates it with a bearer token; with `APP_ENV=production` and no token it is not mounted at all |
 | O-8 | PDF export is wired but **pagination has never been visually confirmed** — the test harness cannot open a generated PDF | Open, verify by hand |
 | O-9 | **Sessions expire in 15 minutes with no refresh path.** `.env` sets `ACCESS_TOKEN_EXPIRE_MINUTES=15`, code defaults to 480, and no `/auth/refresh` exists — a 401 clears the token | Open, deployment decision |
 
@@ -217,6 +217,37 @@ Now stored at `hydro.vertical`. Older runs carry no `vertical` key, and readers
 must treat its absence as **"not recorded"**, never as "no pathway" —
 `announce_aquifer_reach` returns `reason: no_vertical_screening` and says so
 rather than reporting a clean result.
+
+---
+
+## 4c. Closed (2026-08-20) — five deployment findings
+
+From `docs/local/audit-record/DEPLOYMENT_AUDIT_2026-08-20.md`. The audit's verdict was
+**NO-GO**, and the reason was worth recording: none of the blockers were product defects.
+The application logic passed every P0 check — an unpublished advisory could not reach a
+citizen by any of four routes, the citizen surface carried no site or model internals,
+and role separation held. What blocked deployment was configuration nobody had been
+forced to get right.
+
+| # | Finding | Fix |
+|---|---|---|
+| F-1 | Working **admin** credentials compiled into the production bundle | Behind `import.meta.env.DEV`; a build-time guard greps `dist/` and fails the build |
+| F-2 | `/metrics` served Prometheus output to anyone | Bearer token via `METRICS_TOKEN`; not mounted in production without one |
+| F-3 | Dataset writes had **no lock** — two concurrent syncs silently lost one | Postgres advisory lock, `409` on contention, dry runs exempt |
+| F-4 | Inert row-level security logged a warning and started anyway | Refuses to start with `APP_ENV=production` unless `ALLOW_INERT_RLS` is set |
+| F-5 | `Cache-Control: no-store` on 4 of 21 routers | Default for every `/api/` response; public layers keep their own header |
+
+**One correction, recorded because the mistake is instructive.** The audit first stated
+that the development database connects as `postgres` and that RLS was therefore inert
+locally. That was wrong — it was read from the default in `config.py` rather than queried
+from the live connection, which is precisely the failure the audit's own opening rule
+warns against. The API connects as `jaldrishti_app`: no superuser, no `BYPASSRLS`, 19
+policies, **RLS genuinely in force**. The blind spot is real only for the *test* database,
+which is built from ORM metadata and has no policies at all.
+
+**Still open after this pass:** backups are undefined and no restore has ever been tested;
+PDF pagination is unconfirmed; simulations have no reaper for runs orphaned by a restart;
+and the engine rate limit is per host, so every user behind a gateway shares one bucket.
 
 ---
 

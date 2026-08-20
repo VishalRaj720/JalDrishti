@@ -12,15 +12,33 @@ import { useState, type FormEvent } from "react";
 import { citizen, setToken, type Role } from "../api/client";
 import { ROLE_COLOUR, ROLE_LABEL, useAuth } from "../auth";
 
-/** Demonstration accounts, one per role. Listed so a reviewer can walk every
- *  role's portal without hunting for credentials. Weak on purpose, and the
- *  caption says so rather than implying these belong in a deployment. */
-const DEMO: Array<{ email: string; password: string; role: Role }> = [
-  { email: "admin@jaldrishti.local", password: "admin123", role: "admin" },
-  { email: "analyst@jaldrishti.local", password: "analyst123", role: "analyst" },
-  { email: "field@jaldrishti.local", password: "field123", role: "field_officer" },
-  { email: "citizen@jaldrishti.local", password: "citizen123", role: "citizen" },
-];
+/**
+ * Demonstration accounts, one per role, for local development ONLY.
+ *
+ * DEPLOYMENT AUDIT F-1 (P0). These used to be a plain module-level constant, so
+ * they were compiled into the production bundle: `grep admin123 dist/assets/*.js`
+ * returned a hit, and with it a working **admin** password for anyone who
+ * viewed source. Admin can publish advisories to residents, run the factory
+ * reset, rewrite datasets and read the audit log. That is total compromise, and
+ * it shipped as a convenience for reviewers.
+ *
+ * `import.meta.env.DEV` is a compile-time constant in Vite, not a runtime flag.
+ * A production build substitutes `false`, so the whole branch — the strings
+ * included — is removed by dead-code elimination rather than merely hidden. A
+ * runtime check would have kept the passwords in the bundle, which is the bug.
+ *
+ * Guarded by `tests/no-credentials-in-bundle.mjs`, which greps the built
+ * artifact and fails the build if any of them survives.
+ */
+const DEMO: Array<{ email: string; password: string; role: Role }> =
+  import.meta.env.DEV
+    ? [
+        { email: "admin@jaldrishti.local", password: "admin123", role: "admin" },
+        { email: "analyst@jaldrishti.local", password: "analyst123", role: "analyst" },
+        { email: "field@jaldrishti.local", password: "field123", role: "field_officer" },
+        { email: "citizen@jaldrishti.local", password: "citizen123", role: "citizen" },
+      ]
+    : [];
 
 export default function Login() {
   const { signIn, error } = useAuth();
@@ -117,7 +135,7 @@ export default function Login() {
             : (mode === "in" ? "Sign in" : "Create account")}
         </button>
 
-        {mode === "in" && (
+        {mode === "in" && DEMO.length > 0 && (
           <div className="demo-users">
             <div className="muted small" style={{ marginBottom: 7 }}>
               Demonstration accounts — one per role. Click to fill.

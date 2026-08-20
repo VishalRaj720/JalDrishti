@@ -33,6 +33,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services import audit, datasets as ds
+from app.services.dataset_lock import with_dataset_lock
 
 REPO_ROOT = ds.REPO_ROOT
 FLOW_FIELD_NPZ = REPO_ROOT / "ml_pipeline" / "data_prep" / "artifacts" / "flow_field.npz"
@@ -175,6 +176,7 @@ def rebuild_flow_field() -> dict[str, Any]:
             "message": "Flow field rebuilt from CGWB levels and the GLO-30 DEM."}
 
 
+@with_dataset_lock("factory reset")
 async def factory_reset(db: AsyncSession, *, actor, dry_run: bool = False,
                         ip: Optional[str] = None) -> dict[str, Any]:
     """Strip every `added` row from every dataset and free its observation.

@@ -69,6 +69,7 @@ UDEPO_HEADER_ROW = 8          # matches ml_pipeline/data_prep/ore_grades.py
 # that depends on it. Re-exported here under the old names so the ore writer
 # below reads unchanged; there is exactly one column, in one place.
 from app.services import datasets as dsx  # noqa: E402
+from app.services.dataset_lock import with_dataset_lock
 
 ORIGIN_COL = dsx.SOURCE_COL
 ORIGIN_ORIGINAL = dsx.SOURCE_ORIGINAL
@@ -213,6 +214,7 @@ def _backup(path: Path, ref: str) -> Path:
     return bak
 
 
+@with_dataset_lock("sync ore deposits")
 async def sync_ore(db: AsyncSession, *, actor, dry_run: bool = False,
                    ip: Optional[str] = None) -> dict[str, Any]:
     """Append approved ore observations to both dataset files."""
@@ -486,6 +488,7 @@ _WQ_MAP = {
 }
 
 
+@with_dataset_lock("sync water quality")
 async def sync_water_quality(db: AsyncSession, *, actor, dry_run: bool = False,
                              ip: Optional[str] = None) -> dict[str, Any]:
     """Append approved chemistry to `waterQuality_jharkhand.csv`."""
@@ -563,6 +566,7 @@ async def sync_water_quality(db: AsyncSession, *, actor, dry_run: bool = False,
     return result
 
 
+@with_dataset_lock("sync groundwater levels")
 async def sync_groundwater_levels(db: AsyncSession, *, actor, dry_run: bool = False,
                                   ip: Optional[str] = None) -> dict[str, Any]:
     """Append approved level readings to `cgwb_waterlevel_jharkhand.csv`."""
@@ -648,6 +652,7 @@ async def _mark_synced(db: AsyncSession, obs_ids: list[str], ref: str) -> None:
     await db.commit()
 
 
+@with_dataset_lock("sync everything")
 async def sync_all(db: AsyncSession, *, actor, dry_run: bool = False,
                    ip: Optional[str] = None) -> dict[str, Any]:
     """Run every syncable type in one deliberate action."""
@@ -670,6 +675,7 @@ async def sync_all(db: AsyncSession, *, actor, dry_run: bool = False,
     }
 
 
+@with_dataset_lock("reconcile orphaned observations")
 async def reconcile_orphans(db: AsyncSession, *, actor, dry_run: bool = False,
                             ip: Optional[str] = None) -> dict[str, Any]:
     """Resolve approved observations whose applied row no longer exists.

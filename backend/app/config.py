@@ -14,6 +14,29 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     PORT: int = 8000
 
+    # ── Metrics (deployment audit F-2) ────────────────────────────────
+    # `/metrics` served Prometheus output to anyone, unauthenticated: route
+    # inventory, request volumes and timings, free reconnaissance on which
+    # endpoints exist and how busy the deployment is.
+    #
+    # `METRICS_TOKEN` is the intended production control — set it and the
+    # endpoint requires `Authorization: Bearer <token>`, which is what a
+    # Prometheus scrape config supplies. Leave it empty in development and the
+    # endpoint stays open, because a token on a laptop protects nothing and
+    # makes `curl /metrics` annoying.
+    #
+    # With APP_ENV=production and no token set, metrics are NOT exposed at all.
+    # Failing closed is the right default for a surface nobody notices is open.
+    METRICS_ENABLED: bool = True
+    METRICS_TOKEN: str = ""
+
+    # ── RLS enforcement (deployment audit F-4) ────────────────────────
+    # With APP_ENV=production the API refuses to start if it is connected as a
+    # role that bypasses row-level security, because every policy would exist,
+    # review cleanly and enforce nothing. Set this only to override that
+    # deliberately, and write down why.
+    ALLOW_INERT_RLS: bool = False
+
     # Database
     # DATABASE_URL is what the RUNNING API connects as. Since the P2 cutover
     # that is `jaldrishti_app`: NOSUPERUSER, NOBYPASSRLS, DML only. Row-level
