@@ -9,7 +9,9 @@ no DELETE either — an audit log a user can edit is not an audit log. P2 leaves
 append-only as a convention enforced by the absence of endpoints; the Postgres
 policy that enforces it at the database is tracked with the rest of RLS.
 
-Restricted to `admin` and `regulator`. Analysts and field officers appear IN the
+Restricted to `admin`. A regulator's decisions are WRITTEN here by the
+service, but reading everyone's history is an operator power. Analysts and
+field officers appear IN the
 log and cannot read it, which is the point.
 """
 import uuid
@@ -22,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_regulator_or_admin
+from app.dependencies import require_audit_reader
 from app.models.audit_log import AuditLog
 
 router = APIRouter(prefix="/audit", tags=["Audit"])
@@ -53,7 +55,7 @@ async def list_audit(
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_regulator_or_admin),
+    _=Depends(require_audit_reader),
 ):
     """Most recent first."""
     stmt = select(AuditLog).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())

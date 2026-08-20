@@ -16,7 +16,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Advisory, type IsrPoint, type SimRun } from "../api/client";
-import { canReview, useAuth } from "../auth";
+import { canPublish, useAuth } from "../auth";
 import { Empty, ErrorNote, Field, Loading } from "../components/bits";
 import { AffectedBlocks } from "../console/ProposeAdvisory";
 import { fmt } from "../console/mapLayers";
@@ -177,7 +177,10 @@ function Card({ a, sites, reviewer }: {
 
 export default function Publications() {
   const { me } = useAuth();
-  const reviewer = canReview(me?.role);
+  // canPublish, not canReview: R12 gave `regulator` the power to decide on a
+  // field submission, NOT to announce a screening to residents. Showing the
+  // decision controls to a regulator would be a button guaranteed to 403.
+  const reviewer = canPublish(me?.role);
   const [filter, setFilter] = useState<string>("proposed");
 
   const advisories = useQuery({

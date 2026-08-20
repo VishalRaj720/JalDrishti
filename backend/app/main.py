@@ -31,7 +31,45 @@ logger.add(
 )
 
 # ── Rate limiter ──────────────────────────────────────────────────
-limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"])
+
+
+def _rate_limit_key(request: Request) -> str:
+    """Per USER when we know who they are, per IP when we do not.
+
+    DEPLOYMENT AUDIT. `get_remote_address` reads `request.client.host`, which
+    behind a reverse proxy is the PROXY — so every authenticated user shared one
+    bucket and the first busy user locked out everybody else. That is not a
+    tuning problem, it is the limiter measuring the wrong thing.
+
+    The subject claim is taken from the bearer token WITHOUT verifying it: this
+    is a bucket key, not an authorisation decision, and a forged token still has
+    to pass `get_current_user` before it reaches anything. The worst a bad token
+    can do here is give itself its own bucket, which is what an unauthenticated
+    caller gets anyway.
+
+    Anonymous traffic still keys on the address — so for the public surface,
+    `--proxy-headers --forwarded-allow-ips=<gateway>` on uvicorn remains
+    necessary or all of it shares one bucket. `docs/DEPLOYMENT.md` §6 says so.
+    """
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:]
+        parts = token.split(".")
+        if len(parts) == 3:
+            import base64
+            import json as _json
+            try:
+                pad = parts[1] + "=" * (-len(parts[1]) % 4)
+                sub = _json.loads(base64.urlsafe_b64decode(pad)).get("sub")
+                if sub:
+                    return f"user:{sub}"
+            except Exception:  # noqa: BLE001 — malformed token, fall through to IP
+                pass
+    return f"ip:{get_remote_address(request)}"
+
+
+limiter = Limiter(key_func=_rate_limit_key,
+                  default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"])
 
 
 def _rls_verdict(*, user: str, is_super: bool, bypasses: bool, n_policies: int,
@@ -114,11 +152,35 @@ async def _warn_if_rls_is_inert() -> None:
         logger.info(message)
 
 
+async def _reap_orphaned_runs() -> None:
+    """Clear simulations abandoned by a previous restart.
+
+    Runs execute as in-process background tasks, so a restart ends whatever was
+    in flight and leaves the row at `queued` for ever — a spinner nobody can
+    clear. The audit found three real ones from the previous day.
+
+    Never blocks startup: if this fails the API still serves, it just leaves the
+    corpses for the next boot or for `POST /simulations/reap`.
+    """
+    from app.database import AsyncSessionLocal, set_rls_context
+    from app.services.simulation_run import reap_orphaned_runs
+    try:
+        async with AsyncSessionLocal() as db:
+            await set_rls_context(db, bypass=True)
+            out = await reap_orphaned_runs(db)
+        if out["reaped"]:
+            logger.warning(f"startup: failed {out['reaped']} simulation run(s) "
+                           f"abandoned by an earlier restart")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"Could not reap orphaned simulation runs: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown events."""
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION} [{settings.APP_ENV}]")
     await _warn_if_rls_is_inert()
+    await _reap_orphaned_runs()
     yield
     logger.info("Shutting down.")
 

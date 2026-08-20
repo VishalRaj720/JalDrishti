@@ -24,23 +24,30 @@ const Ctx = createContext<AuthState | null>(null);
  *  ISR coordinates — every site here is hypothetical, and publishing a point for
  *  a speculative mine beside a named village invites it being read as a plan.
  *
- *  R7 retired `regulator`: every power it had, `admin` already had, so it was a
- *  second label on one authority rather than a distinct role. Migration 0019
- *  merged those accounts into `admin`. The separation that mattered survives —
- *  an analyst proposes a public screening and an admin decides on it. */
-export const STAFF: Role[] = ["admin", "analyst", "field_officer"];
+ *  R12 restored `regulator` with a narrower job than it had before R7:
+ *  reviewing what a field officer submits, and nothing else. It is staff
+ *  because the review queue is staff-only, and it is deliberately excluded from
+ *  every dataset, model and account capability below — a regulator accepts
+ *  evidence into the record, an admin operates the pipeline that consumes it.
+ *
+ *  There is exactly ONE admin and there may be MANY regulators. */
+export const STAFF: Role[] = ["admin", "analyst", "field_officer", "regulator"];
 
 export const isStaff    = (r?: Role) => !!r && STAFF.includes(r);
-/** Reviewing field evidence and deciding on a public advisory.
- *  Named for what it protects, not for who holds it — which is why retiring
- *  `regulator` was a one-line change here rather than an edit at every call. */
-export const canReview  = (r?: Role) => r === "admin";
+/** Deciding on a FIELD OFFICER'S SUBMISSION — approve or reject. */
+export const canReview  = (r?: Role) => r === "admin" || r === "regulator";
+/** Deciding whether a screening reaches residents. Admin only, deliberately:
+ *  accepting evidence and announcing a modelled result to a village are
+ *  different decisions, and R12 restored only the first to the regulator. */
+export const canPublish = (r?: Role) => r === "admin";
 export const canRunSim  = (r?: Role) => r === "admin" || r === "analyst";
 export const canSubmit  = (r?: Role) => r === "admin" || r === "field_officer";
 export const canSync    = (r?: Role) => r === "admin";
 export const canIngest  = (r?: Role) => r === "admin";
 export const canAdmin   = (r?: Role) => r === "admin";
-export const canAudit   = (r?: Role) => r === "admin" || r === "regulator";
+/** Reading everyone's history is an operator power. A regulator's own
+ *  decisions are written to the trail, but they do not read it. */
+export const canAudit   = (r?: Role) => r === "admin";
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrator",
@@ -50,7 +57,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   // and deserves a title that does not overstate it.
   field_officer: "Data Submitter",
   citizen: "Resident",
-  regulator: "Administrator (former regulator)",
+  regulator: "Regulator",
   viewer: "Resident (legacy)",
 };
 
@@ -66,7 +73,7 @@ export const ROLE_COLOUR: Record<Role, string> = {
 /** One line per role explaining what this portal is *for them*. */
 export const ROLE_PURPOSE: Record<Role, string> = {
   admin: "Operate and decide: accounts, ingestion, syncs, the audit trail, and what gets published to residents.",
-  regulator: "Operate and decide: accounts, ingestion, syncs, the audit trail, and what gets published to residents.",
+  regulator: "Review: decide whether a data submitter's finding is accepted into the record.",
 
   analyst: "Investigate: build scenarios, run the plume engine, and compare outcomes.",
   field_officer: "Contribute evidence: submit uranium-ore occurrences for review.",

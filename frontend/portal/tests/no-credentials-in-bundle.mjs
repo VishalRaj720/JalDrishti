@@ -25,10 +25,23 @@ const DIST = join(process.cwd(), "dist");
 const FORBIDDEN = [
   "admin123",
   "analyst123",
+  "regulator123",
   "field123",
   "citizen123",
   "@jaldrishti.local",
 ];
+
+/**
+ * NOTE ON SCOPE. This guards the BUNDLE, not the database.
+ *
+ * The single production administrator is a real account that must exist in a
+ * deployed database, and its argon2 hash living there is correct — that is
+ * where a credential belongs. What must never happen is a working password
+ * reaching a built artifact, which is what did happen and what this catches.
+ *
+ * So the list above is the DEMO credentials only. The production admin password
+ * is not here, because it is not known to this repository and never should be.
+ */
 
 if (!existsSync(DIST)) {
   console.error("no dist/ — run `npm run build` first");

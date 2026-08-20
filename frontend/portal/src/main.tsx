@@ -7,7 +7,8 @@ import "./styles/theme.css";
 import "./styles/layout.css";
 
 import {
-  AuthProvider, canAdmin, canAudit, canReview, canRunSim, canSubmit, isStaff, useAuth,
+  AuthProvider, canAdmin, canAudit, canPublish, canReview, canRunSim, canSubmit,
+  isStaff, useAuth,
 } from "./auth";
 import type { Role } from "./api/client";
 import Shell from "./components/Shell";
@@ -73,7 +74,7 @@ function Gate() {
         <Route path="/compare" element={<Guard allow={canRunSim}><Compare /></Guard>} />
         <Route
           path="/publications"
-          element={<Guard allow={(r) => canRunSim(r) || canReview(r)}><Publications /></Guard>}
+          element={<Guard allow={(r) => canRunSim(r) || canPublish(r)}><Publications /></Guard>}
         />
         {/* The full assessment record for one site. Staff-readable: it carries
             the site's coordinates and operating parameters, which design §2

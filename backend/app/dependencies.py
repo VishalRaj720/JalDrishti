@@ -127,35 +127,75 @@ def require_roles(*roles: UserRole):
 # ── Role sets ────────────────────────────────────────────────────────
 # Named for what they protect, not for who happens to be in them today.
 
-#: R7 retired `regulator`: every power it had, `admin` already had, so it was a
-#: second label on one authority rather than a distinct role. Migration 0019
-#: merges those accounts into `admin`. The enum LABEL survives in Postgres
-#: (an enum value cannot be dropped transactionally) but is retired from the
-#: application vocabulary here — which is what makes it unmintable.
-STAFF_ROLES = (UserRole.admin, UserRole.analyst, UserRole.field_officer)
+#: `regulator` was retired in R7 and RESTORED in R12 with a narrower, real job:
+#: reviewing what a field officer submits and deciding whether it is accepted.
+#: That is a genuinely different authority from `admin`, which is why merging
+#: them was wrong — the person who accepts evidence into the record should not
+#: also be the person who operates the pipeline that consumes it.
+#:
+#: A regulator is staff: they must see the submission queue, and the queue lives
+#: behind `require_staff`. They are deliberately NOT given any dataset, model or
+#: account power — those all sit behind `require_admin`, and a regulator hits
+#: exactly the same 403 a citizen would.
+STAFF_ROLES = (UserRole.admin, UserRole.analyst, UserRole.field_officer,
+               UserRole.regulator)
 PUBLIC_ROLES = (UserRole.citizen, UserRole.viewer)
 ALL_ROLES = STAFF_ROLES + PUBLIC_ROLES
 
 require_admin = require_roles(UserRole.admin)
 require_analyst_or_admin = require_roles(UserRole.admin, UserRole.analyst)
 
-#: Reviewing field evidence and deciding on a public advisory.
-#: Kept as its own name even though it now resolves to admin alone: these are
-#: DOMAIN decisions, and naming them after what they protect rather than after
-#: who currently holds them is what let the regulator merge be a one-line change
-#: here instead of an edit at every call site.
+#: Deciding whether a SCREENING reaches residents. Admin only, unchanged.
+#: Publication is the act that speaks to the public in the institution's name,
+#: and R12 deliberately did NOT hand it to `regulator`: a regulator accepts
+#: evidence into the record, which is a different decision from announcing a
+#: modelled result to a village.
 require_reviewer = require_roles(UserRole.admin)
 
-#: Backwards-compatible alias. Retired name, same meaning.
-require_regulator_or_admin = require_reviewer
+#: Deciding on a FIELD OFFICER'S SUBMISSION — approve or reject. This is the
+#: regulator's whole purpose, and admin retains it because admin retains
+#: everything it had before R12.
+#:
+#: Note what this guard does NOT imply: approving an observation records a
+#: decision and nothing else. Writing that observation into `Datasets/` is a
+#: separate, admin-only operation (`/dataset-sync/*`), and keeping the two apart
+#: is the point of the split — see `services/field_observation.py`.
+require_field_reviewer = require_roles(UserRole.admin, UserRole.regulator)
+
+#: Reading the audit trail. Admin only — a regulator's decisions are WRITTEN to
+#: it (automatically, by the service) but reading everyone's history is an
+#: operator power, not a reviewer's.
+require_audit_reader = require_roles(UserRole.admin)
+
+#: Deprecated name from the R7 merge, when it meant "admin". Kept so nothing
+#: breaks on import, but it is ambiguous now that `regulator` is real again:
+#: prefer `require_field_reviewer` or `require_audit_reader`.
+require_regulator_or_admin = require_audit_reader
 
 #: Who may run the contaminant model and place the sites it runs at.
 #: Excludes `field_officer` (collects evidence, does not model) and `citizen`.
 require_simulation_roles = require_roles(UserRole.admin, UserRole.analyst)
 
-#: Any of the three working roles. Excludes `citizen`: use this wherever a
-#: response can expose a precise ISR site location (design section 2).
+#: Any staff role. Excludes `citizen`: use this wherever a response can expose
+#: a precise ISR site location (design section 2). Includes `regulator` since
+#: R12, which is what lets a regulator see the queue it decides on.
 require_staff = require_roles(*STAFF_ROLES)
+
+#: Staff who OPERATE the data pipeline — the pre-R12 staff set, deliberately
+#: preserved as its own name rather than left as a coincidence.
+#:
+#: R12 added `regulator` to `STAFF_ROLES`, and that silently widened every
+#: `require_staff` route. Most of them are fine — reference geography, the
+#: submission queue — but the Dataset Manager listing, the sync status and the
+#: model-ops status are the read side of admin tooling, and a reviewer has no
+#: workflow that needs them.
+#:
+#: Narrowing those routes to `require_admin` was the obvious move and the wrong
+#: one: it would have removed access from `analyst` and `field_officer`, whose
+#: behaviour R12 is explicitly not allowed to change. This keeps them exactly as
+#: they were and excludes only the new role.
+require_pipeline_staff = require_roles(UserRole.admin, UserRole.analyst,
+                                       UserRole.field_officer)
 
 #: Any authenticated account, citizens included. Only for aggregate or
 #: reference data that is safe to show a member of the public.

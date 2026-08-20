@@ -310,6 +310,84 @@ often cap storage below what the seeded geodata needs — check before committin
 
 ---
 
+## 8b. The administrator, and the regulator (R12)
+
+**There is exactly one administrator.** It is your account. It operates the
+dataset pipeline, the factory reset, the model and account management, and a
+second one is not a convenience — it is a second person who can rewrite the
+evidence base. `UserService._refuse_second_admin` returns 422 on create and on
+promotion, and the `uq_single_admin` partial index in migration `0022` refuses
+it again below the application, because an application check is a race between
+two requests and an index is not.
+
+**The seed does not create an admin.** `scripts/seed.py` creates one demo
+account per *assignable* role — regulator, analyst, field officer, citizen — and
+those credentials are weak, public, and excluded from the production frontend
+bundle by `import.meta.env.DEV`. The administrator is created separately:
+
+```bash
+python -m scripts.bootstrap_admin --email you@example.com
+```
+
+The password is **never** taken from an argument — command lines reach shell
+history and `ps` output. It is prompted for, or read from
+`ADMIN_BOOTSTRAP_PASSWORD` for an automated deploy where the value comes from a
+secret store. Only the argon2 hash is written; nothing echoes it back. Run it
+again with the same address to reset the password — that is the recovery path.
+
+Migration `0022` converges an existing multi-admin database to one, choosing in
+this order: `PRODUCTION_ADMIN_EMAIL` if set, else the oldest admin whose address
+is not a seeded `@jaldrishti.local` demo account, else the oldest. Everyone else
+is demoted to `analyst` — nobody is deleted and no password changes.
+
+**`regulator` is a real role again**, with a narrower remit than it had before
+R7: review the submission queue, approve, reject. It cannot sync or seed
+`Datasets/`, factory reset, run model operations, read the audit log, publish an
+advisory, or create an admin. **There may be as many regulators as you need** —
+that is the role to give a second operator. Approving a submission records a
+decision and nothing else; writing it into `Datasets/` stays a separate,
+deliberate, admin-only act.
+
+---
+
+## 8c. Backups — and a restore that has actually been run
+
+`scripts/backup.py` covers the two things that cannot be regenerated: the
+`Datasets/` evidence base (only its `original` rows are recoverable from git;
+every `added` row came from an approved submission and exists nowhere else) and
+PostgreSQL, above all the append-only audit log.
+
+```bash
+python -m scripts.backup --verify
+```
+
+`--verify` restores the dump into a scratch database, compares row counts table
+by table, confirms the row-level security policies came back, and drops the
+scratch database. A backup that has never been restored is a hypothesis.
+
+**Result of running it on 2026-08-21:** every table matched — users 6,
+audit_log 1685, field_observations 33, advisories 17, alerts 7,
+simulation_runs 45, water_samples 397, monitoring_wells 397, districts 24,
+blocks 264 — and 21 RLS policies were restored.
+
+Requires `pg_dump` / `pg_restore` / `psql` on PATH, at a major version >= the
+server's.
+
+**`backups/` is gitignored, and that matters more than it looks.** The dump
+contains every argon2 password hash and the entire audit log; this repository is
+public. `Datasets.before-restore-*` — the tree `--restore` moves aside rather
+than deleting — is ignored for the same reason.
+
+The dump is taken with `--no-owner --no-acl`, so it restores as any superuser.
+Policies are part of the schema and come back; **the `jaldrishti_app` role does
+not**. After restoring onto a fresh server run `python -m scripts.create_app_role`
+or RLS will be inert and the API will refuse to start (§2.2, F-4).
+
+Schedule it however your host schedules things — cron, a systemd timer, a
+managed snapshot alongside it. Nothing here schedules itself.
+
+---
+
 ## 9. Known issues to weigh before shipping
 
 Rewritten 2026-08-20 after the deployment readiness audit
@@ -361,11 +439,22 @@ reads this file.
   this because it does not exist.
 - **PDF export pagination has never been visually confirmed** (`O-8`). Generate
   one and look at it.
-- **Simulations run as in-process background tasks with no queue.** A restart
-  mid-run should leave a `queued`/`running` row orphaned; no reaper exists.
-- **The engine rate limit is per client host** (`ML_PIPELINE_RATE_LIMIT_PER_MIN`,
-  default 240). Behind a gateway every user shares one bucket. Size it for real
-  concurrency or key it per user.
+- ~~**Orphaned simulation runs.**~~ **Fixed.** Runs are in-process background
+  tasks, so a restart abandoned whatever was in flight and left the row at
+  `queued` for ever — three real ones were found sitting from the previous day.
+  They are now failed at startup and by `POST /simulations/reap`, with a message
+  naming the restart. The sweep only touches runs older than 30 minutes, so
+  under `--workers N` one worker's startup cannot kill another's live run.
+- ~~**API rate limiting behind a gateway.**~~ **Fixed.** `get_remote_address`
+  reads `request.client.host`, which behind a proxy is the PROXY — every
+  authenticated user shared one bucket and the first busy user locked out the
+  rest. The limiter now keys on the token subject, falling back to the address.
+  **Anonymous traffic still keys on the address**, so run uvicorn with
+  `--proxy-headers --forwarded-allow-ips=<gateway-ip>` or the whole public
+  surface shares one bucket.
+- **The ENGINE rate limit is still per client host**
+  (`ML_PIPELINE_RATE_LIMIT_PER_MIN`, default 240) and is not keyed per user.
+  Size it for real concurrency.
 - **Token refresh now exists** (`POST /auth/refresh`, and the client uses it),
   so the hard sign-out described in older revisions of this file is gone. But
   `.env` sets `ACCESS_TOKEN_EXPIRE_MINUTES=15` against a code default of 480 —

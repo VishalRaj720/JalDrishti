@@ -32,7 +32,10 @@ END = "<!-- END GENERATED AUTHZ MATRIX -->"
 # (`test_regulator_is_not_a_staff_role`). Generating a column for it published a
 # reachability figure — "regulator 12/102" — for a role that cannot sign in,
 # which is the most persuasive possible argument for bringing it back.
-ROLE_ORDER = [UserRole.admin, UserRole.analyst,
+# R12 restored `regulator`, so the matrix needs a column for it — without one
+# the generated table showed `approve`/`reject` as admin-only, which is exactly
+# the stale-documentation failure this file exists to prevent.
+ROLE_ORDER = [UserRole.admin, UserRole.regulator, UserRole.analyst,
               UserRole.field_officer, UserRole.citizen]
 
 # Not part of the product's role model.

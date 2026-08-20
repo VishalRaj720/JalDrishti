@@ -155,6 +155,8 @@
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--s-3); }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--s-3); }
 .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: var(--s-3); }
+/* R12: five role tiles on Administration — admin is counted but not assignable. */
+.grid-5 { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: var(--s-3); }
 
 /* Attention tiles on the role landing pages. */
 .tile {
@@ -449,7 +451,7 @@
     box-shadow: -14px 0 40px rgba(0,0,0,.45);
   }
   :root { --rail-w: 300px; }
-  .grid-4 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .grid-4, .grid-5 { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 
 /* <900px — the header nav does not fit beside the brand and the account
@@ -506,7 +508,7 @@
 
 /* <640px — one column everywhere. */
 @media (max-width: 639px) {
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: minmax(0, 1fr); }
   .hdr { gap: var(--s-2); padding: 0 var(--s-2); }
   .hdr-name { font-size: var(--fs-md); }
   .role-pill { display: none; }   /* the account menu still shows the role */

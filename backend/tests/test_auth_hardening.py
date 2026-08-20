@@ -102,13 +102,28 @@ async def test_admin_creating_a_user_cannot_be_reached_anonymously(client):
 async def test_role_escalation_via_user_create_requires_admin(client, admin_token):
     """An admin may set a role; that is the point of the endpoint. The guard is
     that the caller had to prove they were an admin to get here at all."""
+    # R12: `_ATTACK` carries role=admin, which is the point in the tests above —
+    # an anonymous caller must not be able to mint one. Here the subject is WHO
+    # may assign a role, not which, so this uses a role that is assignable at
+    # all. There is exactly one admin by design and even an admin cannot create
+    # a second; that is asserted immediately below rather than left implicit.
     resp = await client.post(
         "/api/v1/users",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={**_ATTACK, "email": "made-by-admin@example.com"},
+        json={**_ATTACK, "email": "made-by-admin@example.com",
+              "role": "regulator"},
     )
-    assert resp.status_code == 201
-    assert resp.json()["role"] == "admin"
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["role"] == "regulator"
+
+    second_admin = await client.post(
+        "/api/v1/users",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={**_ATTACK, "email": "second-admin@example.com",
+              "username": "second-admin"},
+    )
+    assert second_admin.status_code == 422, (
+        "an admin minted a second admin; there is exactly one by design")
 
 
 @pytest.mark.asyncio
@@ -129,6 +144,6 @@ def test_citizen_is_excluded_from_the_staff_role_set():
     from app.dependencies import STAFF_ROLES
     assert UserRole.citizen not in STAFF_ROLES
     assert UserRole.viewer not in STAFF_ROLES
-    # `regulator` is absent by design since R7 — see test_p6_roles.py.
+    # `regulator` is present again since R12 — see test_p6_roles.py.
     for role in (UserRole.admin, UserRole.analyst, UserRole.field_officer):
         assert role in STAFF_ROLES

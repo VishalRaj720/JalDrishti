@@ -88,17 +88,30 @@ TARGET_MIN_WELLS = 50
 TARGET_MIN_SAMPLES = 200
 
 
-# ONE ACCOUNT PER DESIGNED ROLE. The seed previously created three
-# (admin / analyst / viewer) while the system had five, so `regulator` and
-# `field_officer` -- the two roles that carry the review workflow -- could not be
-# exercised at all without hand-crafting a user.
+# ONE DEMONSTRATION ACCOUNT PER ASSIGNABLE ROLE — AND NO ADMIN.
+#
+# R12. `admin` is deliberately absent from this list. There is exactly one
+# administrator in a deployment, it is the product owner's own account, and its
+# password must never be a value committed to this repository. Seeding a demo
+# admin also now collides with the `uq_single_admin` partial index from
+# migration 0022, so a reseed against a real deployment would fail outright —
+# which is the correct outcome, but a confusing way to learn the rule.
+#
+# Create the real administrator with:
+#
+#     python -m scripts.bootstrap_admin --email you@example.com
+#
+# `regulator` is back in the list. R7 retired it and R12 restored it with a
+# narrower job — reviewing what a field officer submits — so the review workflow
+# again needs an account to exercise it.
 #
 # These are DEMONSTRATION credentials for a prototype. They are weak and public,
 # which is fine for a fellowship demo and is not fine anywhere else; the README
-# says so beside the table.
+# says so beside the table, and `import.meta.env.DEV` keeps them out of the
+# production frontend bundle.
 SEED_USERS = [
-    {"username": "admin",     "email": "admin@jaldrishti.local",     "password": "admin123",     "role": UserRole.admin},
     {"username": "analyst",   "email": "analyst@jaldrishti.local",   "password": "analyst123",   "role": UserRole.analyst},
+    {"username": "regulator", "email": "regulator@jaldrishti.local", "password": "regulator123", "role": UserRole.regulator},
     {"username": "fieldofficer", "email": "field@jaldrishti.local",  "password": "field123",     "role": UserRole.field_officer},
     {"username": "citizen",   "email": "citizen@jaldrishti.local",   "password": "citizen123",   "role": UserRole.citizen},
 ]
@@ -109,14 +122,14 @@ SEED_USERS = [
 #: lingered with its old identity; leaving it would mean two citizen logins and
 #: a stale name in the audit trail.
 #:
-#: `regulator` was RETIRED by R7 / migration 0019 and its powers merged into
-#: `admin`. It was still in SEED_USERS, so `python -m scripts.seed` against a
-#: fresh database MINTED A REGULATOR — reintroducing, on every clean install,
-#: exactly the role the migration removed and `tests/test_p6_roles.py` asserts
-#: cannot exist. The enum label survives in Postgres (a value cannot be dropped
-#: transactionally), which is precisely why seeding one had to stop: the label
-#: being reachable is the whole risk the test exists to catch.
-RETIRED_USER_EMAILS = ["viewer@jaldrishti.local", "regulator@jaldrishti.local"]
+#: `regulator@` is NOT here any more — R12 restored the role, and the seed
+#: creates that account again on purpose.
+#:
+#: `admin@jaldrishti.local` is not removed either: migration 0022 demotes any
+#: surplus admin to `analyst` rather than deleting the person, and deleting a
+#: seeded account that somebody may still be signed in as would be worse than
+#: leaving it.
+RETIRED_USER_EMAILS = ["viewer@jaldrishti.local"]
 
 # A hypothetical ISR field near Jaduguda — the East Singhbhum uranium belt is the
 # only place in Jharkhand where uranium ISR would plausibly be sited. This gives

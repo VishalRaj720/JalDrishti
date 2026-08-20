@@ -98,3 +98,11 @@ ml_pipeline/ml/artifact_bundles/
 
 # Dataset backups written by /datasets/*/restore and the sync path.
 Datasets/.backups/
+
+# ── Backups (R12). NEVER COMMIT THESE ────────────────────────────────
+# `scripts/backup.py` writes a full `pg_dump` here. It contains every argon2
+# password hash, the entire audit log, and every account — a database dump is
+# the single most sensitive artifact this project can produce, and the repo is
+# public. Also the tree that `--restore` moves aside before overwriting.
+backups/
+Datasets.before-restore-*/

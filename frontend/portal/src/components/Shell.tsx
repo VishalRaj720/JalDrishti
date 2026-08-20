@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Role, type SyncStatus } from "../api/client";
 import {
-  ROLE_COLOUR, ROLE_LABEL, canAdmin, canAudit, canReview, canRunSim,
+  ROLE_COLOUR, ROLE_LABEL, canAdmin, canAudit, canPublish, canReview, canRunSim,
   canSubmit, isStaff, useAuth,
 } from "../auth";
 
@@ -51,7 +51,7 @@ function sectionsFor(role: Role | undefined): NavGroup[] {
   add("Decisions", [
     // Analysts propose, admins decide — both need the queue. A field officer
     // does not run the model, so nothing here is theirs to propose or judge.
-    (canRunSim(role) || canReview(role)) && { to: "/publications", label: "Publications" },
+    (canRunSim(role) || canPublish(role)) && { to: "/publications", label: "Publications" },
     canAudit(role) && { to: "/audit", label: "Audit log" },
     canAdmin(role) && { to: "/admin", label: "Administration" },
   ]);

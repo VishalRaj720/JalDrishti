@@ -282,3 +282,135 @@ async def test_a_router_that_sets_its_own_cache_header_keeps_it(client):
     cc = r.headers.get("cache-control", "")
     assert "no-store" not in cc, (
         "the default overwrote a router's deliberate public cache policy")
+
+
+# ── orphaned simulation runs after a restart ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_a_restart_does_not_strand_a_run_for_ever(db_session):
+    """Simulations execute in-process, so a restart abandons whatever is running.
+
+    The audit found three real rows sitting at `queued` from the previous day —
+    a spinner nobody could clear, and no code path that would ever finish them.
+    """
+    import uuid as _uuid
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import text as _text
+
+    from app.models.isr_point import IsrPoint
+    from app.models.simulation_run import SimulationRun
+    from app.services.simulation_run import ORPHAN_AFTER_MINUTES, reap_orphaned_runs
+
+    await db_session.execute(_text("SELECT set_config('app.bypass_rls','on',true)"))
+    site = IsrPoint(name=f"Reap {_uuid.uuid4().hex[:6]}",
+                    location="SRID=4326;POINT(86.3564 22.6547)")
+    db_session.add(site)
+    await db_session.flush()
+
+    stale = SimulationRun(
+        isr_point_id=site.id, status="queued", engine="both",
+        species="uranium_ppb", request={},
+        created_at=datetime.now(timezone.utc)
+        - timedelta(minutes=ORPHAN_AFTER_MINUTES + 5))
+    fresh = SimulationRun(
+        isr_point_id=site.id, status="queued", engine="both",
+        species="uranium_ppb", request={},
+        created_at=datetime.now(timezone.utc))
+    db_session.add_all([stale, fresh])
+    await db_session.commit()
+    await db_session.execute(_text("SELECT set_config('app.bypass_rls','on',true)"))
+
+    out = await reap_orphaned_runs(db_session)
+    assert str(stale.id) in out["run_ids"], "the abandoned run was not reaped"
+
+    await db_session.execute(_text("SELECT set_config('app.bypass_rls','on',true)"))
+    rows = dict((await db_session.execute(_text(
+        "SELECT id::text, status FROM simulation_runs WHERE id = ANY(:ids)"),
+        {"ids": [str(stale.id), str(fresh.id)]})).all())
+
+    assert rows[str(stale.id)] == "failed"
+    # THE PART THAT MATTERS UNDER `--workers N`. Every worker runs the startup
+    # hook, so a blanket sweep would have worker 2 fail the run worker 1 is
+    # executing right now. A recent run must survive.
+    assert rows[str(fresh.id)] == "queued", (
+        "a run that started moments ago was reaped; under multiple workers this "
+        "would kill live simulations on every deploy")
+
+
+@pytest.mark.asyncio
+async def test_the_reaped_run_says_why(db_session):
+    """"failed" with no message reads as an engine problem. It was a restart."""
+    import uuid as _uuid
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import text as _text
+
+    from app.models.isr_point import IsrPoint
+    from app.models.simulation_run import SimulationRun
+    from app.services.simulation_run import reap_orphaned_runs
+
+    await db_session.execute(_text("SELECT set_config('app.bypass_rls','on',true)"))
+    site = IsrPoint(name=f"Reap2 {_uuid.uuid4().hex[:6]}",
+                    location="SRID=4326;POINT(86.3564 22.6547)")
+    db_session.add(site)
+    await db_session.flush()
+    run = SimulationRun(isr_point_id=site.id, status="running", engine="both",
+                        species="uranium_ppb", request={},
+                        created_at=datetime.now(timezone.utc) - timedelta(hours=3))
+    db_session.add(run)
+    await db_session.commit()
+    await db_session.execute(_text("SELECT set_config('app.bypass_rls','on',true)"))
+
+    await reap_orphaned_runs(db_session)
+    await db_session.refresh(run)
+    assert run.status == "failed"
+    assert "restart" in (run.error_message or "").lower()
+
+
+# ── rate limiting behind a reverse proxy ─────────────────────────────
+
+
+def test_the_rate_limiter_keys_on_the_user_not_the_proxy():
+    """Behind a gateway, `request.client.host` is the GATEWAY.
+
+    Keying on it gave every authenticated user one shared bucket, so the first
+    busy user rate-limited everybody. The limiter was measuring the wrong thing,
+    which no amount of raising the limit fixes.
+    """
+    import types
+
+    from app.main import _rate_limit_key
+    from app.models.user import UserRole
+    from app.services.auth import create_access_token
+
+    proxy = types.SimpleNamespace(host="10.0.0.5")
+
+    def req(headers):
+        return types.SimpleNamespace(headers=headers, client=proxy)
+
+    a = create_access_token("user-a", UserRole.analyst)
+    b = create_access_token("user-b", UserRole.analyst)
+
+    key_a = _rate_limit_key(req({"authorization": f"Bearer {a}"}))
+    key_b = _rate_limit_key(req({"authorization": f"Bearer {b}"}))
+    assert key_a != key_b, (
+        "two users behind one proxy shared a rate-limit bucket")
+    assert key_a.startswith("user:")
+
+    # Anonymous still keys on the address — which is why the deployment still
+    # needs `--proxy-headers`. Stated in DEPLOYMENT.md §6.
+    assert _rate_limit_key(req({})).startswith("ip:")
+
+
+def test_a_malformed_token_does_not_break_the_limiter():
+    """The key is a bucket, not an authorisation decision. A garbage token must
+    fall back to the address rather than raising inside middleware."""
+    import types
+
+    from app.main import _rate_limit_key
+
+    r = types.SimpleNamespace(headers={"authorization": "Bearer not.a.jwt"},
+                              client=types.SimpleNamespace(host="10.0.0.5"))
+    assert _rate_limit_key(r) == "ip:10.0.0.5"

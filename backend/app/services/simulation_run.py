@@ -14,6 +14,7 @@ from typing import Any, Optional
 
 from loguru import logger
 from sqlalchemy import select, text
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import ResourceNotFoundError
@@ -242,3 +243,53 @@ class SimulationRunService:
                     "extrapolation": run.extrapolation,
                     "error": run.error_message},
         )
+
+
+#: A run that has been `queued` or `running` for longer than this cannot still
+#: be executing. Generous on purpose: the longest real run is seconds, and the
+#: cost of being wrong in this direction is failing a live run, which is worse
+#: than leaving a corpse for another half hour.
+ORPHAN_AFTER_MINUTES = 30
+
+
+async def reap_orphaned_runs(db: AsyncSession, *,
+                             older_than_minutes: int = ORPHAN_AFTER_MINUTES
+                             ) -> dict[str, Any]:
+    """Fail runs left mid-flight by a restart.
+
+    DEPLOYMENT AUDIT. Simulations execute as in-process FastAPI background
+    tasks — there is no queue and no broker, which is the right size for this
+    product but means a restart silently abandons whatever was in flight. The
+    row stays `queued` for ever, the UI shows a spinner nobody can clear, and
+    the audit found three real ones sitting from the previous day.
+
+    WHY A TIME THRESHOLD RATHER THAN "everything at startup". Under
+    `--workers N` each worker runs the startup hook, so a blanket sweep would
+    have worker 2 failing the run worker 1 is executing right now. Thirty
+    minutes is far longer than any real run and far shorter than a shift.
+
+    Marking them `failed` rather than deleting them: somebody asked for that
+    run and is entitled to see what became of it. The message says restart
+    rather than leaving a bare "failed" to be read as an engine problem.
+    """
+    from datetime import timedelta
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
+    res = await db.execute(
+        sa_update(SimulationRun)
+        .where(SimulationRun.status.in_(("queued", "running")),
+               SimulationRun.created_at < cutoff)
+        .values(status="failed",
+                error_message=(
+                    "Abandoned when the server restarted. Simulations run "
+                    "in-process, so a restart ends anything in flight. Nothing "
+                    "was written from this run — start it again."),
+                completed_at=datetime.now(timezone.utc))
+        .returning(SimulationRun.id))
+    ids = [str(r[0]) for r in res.fetchall()]
+    await db.commit()
+    if ids:
+        logger.warning(f"reaped {len(ids)} orphaned simulation run(s) older "
+                       f"than {older_than_minutes}m: {ids[:5]}")
+    return {"reaped": len(ids), "run_ids": ids,
+            "older_than_minutes": older_than_minutes}

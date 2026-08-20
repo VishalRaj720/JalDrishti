@@ -33,7 +33,12 @@ import { ROLE_COLOUR, ROLE_LABEL, useAuth } from "../auth";
 const DEMO: Array<{ email: string; password: string; role: Role }> =
   import.meta.env.DEV
     ? [
-        { email: "admin@jaldrishti.local", password: "admin123", role: "admin" },
+        // No admin here, and not by omission. R12: a deployment has exactly one
+        // administrator, it is the owner's own account, and its password is
+        // never a value committed to this repository. Create it with
+        // `python -m scripts.bootstrap_admin`. These four cover every role a
+        // demo needs to walk, including the restored `regulator`.
+        { email: "regulator@jaldrishti.local", password: "regulator123", role: "regulator" },
         { email: "analyst@jaldrishti.local", password: "analyst123", role: "analyst" },
         { email: "field@jaldrishti.local", password: "field123", role: "field_officer" },
         { email: "citizen@jaldrishti.local", password: "citizen123", role: "citizen" },

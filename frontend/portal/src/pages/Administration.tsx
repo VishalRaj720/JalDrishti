@@ -13,12 +13,27 @@ import { ROLE_COLOUR, ROLE_LABEL } from "../auth";
 import { ErrorNote, Loading, Planned , TableScroll } from "../components/bits";
 
 interface U { id: string; username: string; email: string; role: Role }
-// `regulator` is NOT offered. R7 retired it — every power it had, admin already
-// had — and leaving it selectable let an operator assign a role the application
-// no longer recognises, whose label ("Administrator (former regulator)") was
-// itself an admission that it should not exist. The enum value survives in
-// Postgres only because a value cannot be dropped transactionally.
-const ROLES: Role[] = ["admin", "analyst", "field_officer", "citizen"];
+/**
+ * ASSIGNABLE roles. `admin` is deliberately absent.
+ *
+ * R12. There is exactly one administrator — the account that operates the
+ * dataset pipeline, the factory reset and the model. A second is not a
+ * convenience, it is a second person who can rewrite the evidence base. The
+ * backend refuses to create or promote one (`UserService._refuse_second_admin`)
+ * and a partial unique index in migration 0022 refuses it again below the
+ * application, so leaving it in this dropdown would only offer an operator a
+ * choice guaranteed to fail.
+ *
+ * `regulator` IS offered, and is the answer to "I need a second person who can
+ * approve submissions". There may be as many as needed.
+ *
+ * `viewer` is absent because migration 0008 replaced it with `citizen`.
+ */
+const ROLES: Role[] = ["regulator", "analyst", "field_officer", "citizen"];
+
+/** Counted on the summary tiles — includes `admin`, which exists and should be
+ *  visible, even though it cannot be assigned from here. */
+const COUNTED: Role[] = ["admin", "regulator", "analyst", "field_officer", "citizen"];
 
 
 /**
@@ -149,8 +164,8 @@ export default function Administration() {
         <p>Accounts and role assignment. Every action here is written to the audit trail.</p>
       </div>
 
-      <div className="grid-4" style={{ marginBottom: 16 }}>
-        {ROLES.slice(0, 4).map((r) => (
+      <div className="grid-5" style={{ marginBottom: 16 }}>
+        {COUNTED.map((r) => (
           <div className="tile" key={r}>
             <div className="tile-n" style={{ color: ROLE_COLOUR[r] }}>{byRole(r)}</div>
             <div className="tile-l">{ROLE_LABEL[r]}</div>

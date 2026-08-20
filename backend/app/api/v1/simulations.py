@@ -25,7 +25,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_analyst_or_admin, require_staff
+from app.dependencies import (require_admin, require_analyst_or_admin,
+                              require_staff)
 from app.engine_bounds import BOUNDS as B
 from app.exceptions import AppException
 from app.models.user import User
@@ -133,6 +134,22 @@ async def _run_in_background(run_id: uuid.UUID) -> None:
 class CompareRunsRequest(BaseModel):
     run_a: uuid.UUID
     run_b: uuid.UUID
+
+
+# Declared BEFORE `POST /{isr_id}` for the same reason as `/compare`.
+@router.post("/reap")
+async def reap_runs(
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """Fail simulations abandoned by a restart. Admin only.
+
+    Also runs automatically at startup. Exposed as well because a restart is not
+    the only way to strand one, and because a stuck spinner is the kind of thing
+    somebody wants to clear without waiting for a deploy.
+    """
+    from app.services.simulation_run import reap_orphaned_runs
+    return await reap_orphaned_runs(db)
 
 
 # Declared BEFORE `POST /{isr_id}`: FastAPI matches in declaration order,

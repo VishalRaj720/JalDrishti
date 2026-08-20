@@ -6,24 +6,25 @@ from pydantic import BaseModel, EmailStr, field_validator
 from app.models.user import UserRole
 
 
-def _reject_retired_role(v: Optional[UserRole]) -> Optional[UserRole]:
-    """`regulator` was retired in R7 and must not be assignable.
+def _reject_unassignable_role(v: Optional[UserRole]) -> Optional[UserRole]:
+    """`viewer` is a dead enum value and must not be assignable.
 
-    The enum value still exists because Postgres cannot drop one
-    transactionally, so it stayed *assignable* long after it stopped being
-    recognised — and an account really was created with it. Every
-    `require_admin` guard then rejected that user, so they could not publish,
-    reach the dataset manager, or read the audit log, with nothing on screen
-    explaining why. Their role pill read "Administrator (former regulator)",
-    which was the only clue.
+    R12. `regulator` used to be rejected here, because R7 had merged it into
+    `admin` and an account really was created on the dead role — every
+    `require_admin` guard then refused that user with nothing on screen saying
+    why. It is a REAL role again, with a narrower job than it had before
+    (reviewing field submissions, and nothing else), so the block is gone.
 
-    Rejected at the schema so the API, the seed and any script hit the same wall.
+    `viewer` stays blocked. Migration 0008 migrated those accounts to `citizen`
+    and nothing has recognised the value since; Postgres simply cannot drop an
+    enum label transactionally, which is the only reason it still exists.
+
+    Rejected at the schema so the API, the seed and any script hit one wall.
     """
-    if v is not None and v.value == "regulator":
+    if v is not None and v.value == "viewer":
         raise ValueError(
-            "The 'regulator' role was retired: admin holds every power it had. "
-            "Assign 'admin' instead. An account left on this role is refused by "
-            "every admin guard in the system.")
+            "The 'viewer' role was replaced by 'citizen' in migration 0008 and "
+            "is not assignable. Use 'citizen'.")
     return v
 
 
@@ -33,7 +34,7 @@ class UserBase(BaseModel):
     role: UserRole = UserRole.citizen
 
 
-    _no_retired_role = field_validator("role")(_reject_retired_role)
+    _no_dead_role = field_validator("role")(_reject_unassignable_role)
 
 
 class UserCreate(UserBase):
@@ -46,7 +47,7 @@ class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     password: Optional[str] = None
 
-    _no_retired_role = field_validator("role")(_reject_retired_role)
+    _no_dead_role = field_validator("role")(_reject_unassignable_role)
 
 
 class UserResponse(UserBase):

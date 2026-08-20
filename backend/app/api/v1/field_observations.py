@@ -24,7 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import (require_regulator_or_admin, require_staff,
+from app.dependencies import (require_field_reviewer, require_staff,
                               require_field_upload)
 from app.exceptions import AppException
 from app.models.field_observation import FieldObservation
@@ -281,7 +281,7 @@ async def approve_observation(
     decision: ReviewDecision,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_regulator_or_admin),
+    actor: User = Depends(require_field_reviewer),
 ):
     """Approve and apply. The submitter cannot reach this even as a reviewer:
     the service refuses, and `ck_field_obs_no_self_review` makes the row
@@ -300,7 +300,7 @@ async def reject_observation(
     decision: ReviewDecision,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_regulator_or_admin),
+    actor: User = Depends(require_field_reviewer),
 ):
     try:
         return await FieldObservationService(db).reject(

@@ -18,7 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_admin, require_staff
+from app.dependencies import require_admin, require_pipeline_staff
 from app.models.user import User
 from app.services import audit, datasets as ds
 
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
 
 @router.get("")
-async def list_datasets(_: User = Depends(require_staff)) -> dict[str, Any]:
+async def list_datasets(_: User = Depends(require_pipeline_staff)) -> dict[str, Any]:
     """Every writable dataset: row counts, original/added split, what it governs."""
     return {
         "source_column": ds.SOURCE_COL,
@@ -47,7 +47,7 @@ async def dataset_rows(
     q: Optional[str] = Query(None, description="free-text row filter"),
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    _: User = Depends(require_staff),
+    _: User = Depends(require_pipeline_staff),
 ) -> dict[str, Any]:
     """Paged rows. `added` rows sort first — they are what an admin came for."""
     return ds.rows(key, source=source, q=q, offset=offset, limit=limit)
