@@ -16,7 +16,7 @@ from fastapi import (APIRouter, BackgroundTasks, Depends, HTTPException, Query,
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_admin, require_pipeline_staff
+from app.dependencies import require_admin, require_staff
 from app.exceptions import AppException
 from app.models.user import User
 from app.services import audit, jobs, model_ops as mo
@@ -25,13 +25,13 @@ router = APIRouter(prefix="/model-ops", tags=["Model operations"])
 
 
 @router.get("/status")
-async def ops_status(_: User = Depends(require_pipeline_staff)) -> dict[str, Any]:
+async def ops_status(_: User = Depends(require_staff)) -> dict[str, Any]:
     """Is each derived artifact current with the datasets it is built from?"""
     return mo.status()
 
 
 @router.get("/jobs")
-async def list_jobs(_: User = Depends(require_pipeline_staff)) -> dict[str, Any]:
+async def list_jobs(_: User = Depends(require_staff)) -> dict[str, Any]:
     """Work started from this screen, running or recently finished.
 
     Several of these actions take real time — the flow-field rebuild reads a
@@ -143,7 +143,7 @@ async def factory_reset(
 
 
 @router.get("/model")
-async def model_state(_: User = Depends(require_pipeline_staff)) -> dict[str, Any]:
+async def model_state(_: User = Depends(require_staff)) -> dict[str, Any]:
     """What model is live, and whether anything exists to fall back to."""
     return mo.model_state()
 

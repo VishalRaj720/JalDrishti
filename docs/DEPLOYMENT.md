@@ -341,12 +341,24 @@ is not a seeded `@jaldrishti.local` demo account, else the oldest. Everyone else
 is demoted to `analyst` — nobody is deleted and no password changes.
 
 **`regulator` is a real role again**, with a narrower remit than it had before
-R7: review the submission queue, approve, reject. It cannot sync or seed
-`Datasets/`, factory reset, run model operations, read the audit log, publish an
-advisory, or create an admin. **There may be as many regulators as you need** —
-that is the role to give a second operator. Approving a submission records a
-decision and nothing else; writing it into `Datasets/` stays a separate,
-deliberate, admin-only act.
+R7: review the submission queue, approve, reject.
+
+**The rule is "only admin WRITES", not "only admin looks."** A regulator reads
+freely — the dataset listing and rows, the sync status, the model status, ISR
+points, stored runs — because a reviewer deciding whether a finding is plausible
+needs to see what the data currently holds. A role that can see nothing but a
+queue cannot judge what it is deciding about.
+
+What it cannot do is anything that CHANGES state outside its own decision: sync
+or seed `Datasets/`, factory reset, run model operations, start a simulation,
+read the audit log, publish an advisory, or create an admin. Every one of those
+is a `POST` behind `require_admin` (or, for starting a run, admin/analyst), and
+that boundary is verified over real HTTP in `tests/test_p6_roles.py` — twelve
+refusals and five permitted reads.
+
+**There may be as many regulators as you need** — that is the role to give a
+second operator. Approving a submission records a decision and nothing else;
+writing it into `Datasets/` stays a separate, deliberate, admin-only act.
 
 ---
 

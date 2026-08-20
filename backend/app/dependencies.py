@@ -181,19 +181,19 @@ require_simulation_roles = require_roles(UserRole.admin, UserRole.analyst)
 #: R12, which is what lets a regulator see the queue it decides on.
 require_staff = require_roles(*STAFF_ROLES)
 
-#: Staff who OPERATE the data pipeline — the pre-R12 staff set, deliberately
-#: preserved as its own name rather than left as a coincidence.
+#: KEPT, UNUSED. Left here as a record of a decision that was reversed.
 #:
-#: R12 added `regulator` to `STAFF_ROLES`, and that silently widened every
-#: `require_staff` route. Most of them are fine — reference geography, the
-#: submission queue — but the Dataset Manager listing, the sync status and the
-#: model-ops status are the read side of admin tooling, and a reviewer has no
-#: workflow that needs them.
+#: R12 first excluded `regulator` from the read side of the dataset tooling —
+#: the Dataset Manager listing, the sync status, the model-ops status — on the
+#: reasoning that a reviewer has no workflow needing them. The product owner
+#: overruled it, and was right: the rule that matters is **only admin WRITES**.
+#: Reading is how a reviewer understands what they are deciding about, and a
+#: role that can see nothing but a queue cannot judge whether a finding is
+#: plausible.
 #:
-#: Narrowing those routes to `require_admin` was the obvious move and the wrong
-#: one: it would have removed access from `analyst` and `field_officer`, whose
-#: behaviour R12 is explicitly not allowed to change. This keeps them exactly as
-#: they were and excludes only the new role.
+#: Every sync, seed, reset and model operation is a POST behind `require_admin`
+#: and always was. Blocking reads never protected the data; it only made the
+#: role harder to use.
 require_pipeline_staff = require_roles(UserRole.admin, UserRole.analyst,
                                        UserRole.field_officer)
 

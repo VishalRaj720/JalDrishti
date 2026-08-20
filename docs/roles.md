@@ -248,14 +248,14 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/dataset-sync/all` | ● | · | · | · | · |
 | `POST /api/v1/dataset-sync/groundwater-levels` | ● | · | · | · | · |
 | `POST /api/v1/dataset-sync/ore` | ● | · | · | · | · |
-| `GET /api/v1/dataset-sync/pending` | ● | · | ● | ● | · |
+| `GET /api/v1/dataset-sync/pending` | ● | ● | ● | ● | · |
 | `POST /api/v1/dataset-sync/reconcile` | ● | · | · | · | · |
-| `GET /api/v1/dataset-sync/status` | ● | · | ● | ● | · |
+| `GET /api/v1/dataset-sync/status` | ● | ● | ● | ● | · |
 | `POST /api/v1/dataset-sync/water-quality` | ● | · | · | · | · |
-| `GET /api/v1/datasets` | ● | · | ● | ● | · |
+| `GET /api/v1/datasets` | ● | ● | ● | ● | · |
 | `GET /api/v1/datasets/{key}/backups` | ● | · | · | · | · |
 | `POST /api/v1/datasets/{key}/restore` | ● | · | · | · | · |
-| `GET /api/v1/datasets/{key}/rows` | ● | · | ● | ● | · |
+| `GET /api/v1/datasets/{key}/rows` | ● | ● | ● | ● | · |
 | `DELETE /api/v1/datasets/{key}/rows/{row_id}` | ● | · | · | · | · |
 | `PATCH /api/v1/datasets/{key}/rows/{row_id}` | ● | · | · | · | · |
 | `GET /api/v1/districts` | ● | ● | ● | ● | · |
@@ -294,14 +294,14 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/ml/rivers` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/strike-field` | ● | ● | ● | ● | · |
 | `POST /api/v1/model-ops/factory-reset` | ● | · | · | · | · |
-| `GET /api/v1/model-ops/jobs` | ● | · | ● | ● | · |
-| `GET /api/v1/model-ops/model` | ● | · | ● | ● | · |
+| `GET /api/v1/model-ops/jobs` | ● | ● | ● | ● | · |
+| `GET /api/v1/model-ops/model` | ● | ● | ● | ● | · |
 | `POST /api/v1/model-ops/model-backups` | ● | · | · | · | · |
 | `POST /api/v1/model-ops/model-backups/{name}/restore` | ● | · | · | · | · |
 | `POST /api/v1/model-ops/rebuild-flow-field` | ● | · | · | · | · |
 | `POST /api/v1/model-ops/recompute-baselines` | ● | · | · | · | · |
 | `POST /api/v1/model-ops/seed-database` | ● | · | · | · | · |
-| `GET /api/v1/model-ops/status` | ● | · | ● | ● | · |
+| `GET /api/v1/model-ops/status` | ● | ● | ● | ● | · |
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | · | ● | · | · |
 | `GET /api/v1/public/risk/at` | ○ | ○ | ○ | ○ | ○ |
@@ -338,7 +338,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 105/117 · **regulator** 50/117 · **analyst** 70/117 · **field_officer** 57/117 · **citizen** 13/117
+Reachable endpoints per role — **admin** 105/117 · **regulator** 57/117 · **analyst** 70/117 · **field_officer** 57/117 · **citizen** 13/117
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

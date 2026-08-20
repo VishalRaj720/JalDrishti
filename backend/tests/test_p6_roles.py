@@ -365,7 +365,7 @@ async def test_citizen_copy_credits_the_authority_not_a_named_role(
     assert "authority" in _WHAT_THIS_IS.lower()
 
 
-# ── the pipeline read routes: narrowed for regulator, unchanged for others ──
+# ── reading is allowed; only ADMIN writes ────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -373,17 +373,24 @@ async def test_citizen_copy_credits_the_authority_not_a_named_role(
     "/api/v1/datasets",
     "/api/v1/dataset-sync/status",
     "/api/v1/model-ops/status",
+    "/api/v1/model-ops/model",
 ])
-async def test_pipeline_read_routes_exclude_the_regulator(
+async def test_a_regulator_may_READ_the_dataset_and_model_state(
         client, regulator_token, path):
-    """Adding `regulator` to STAFF_ROLES silently widened every `require_staff`
-    route, including the read side of the admin tooling — the Dataset Manager
-    listing, the sync status, the model-ops status. A reviewer has no workflow
-    that needs them, and this caught it live at HTTP 200."""
+    """The rule is "only admin WRITES", not "only admin looks".
+
+    R12 first blocked these for the regulator and that was wrong. A reviewer
+    deciding whether a finding is plausible needs to see what the model and the
+    datasets currently hold; a role that can see nothing but a queue cannot
+    judge what it is deciding about. Blocking reads never protected the data —
+    every sync, seed and reset is a POST behind `require_admin` — it only made
+    the role harder to use.
+    """
     r = await client.get(path, headers=_tok(regulator_token))
-    assert r.status_code == 403, (
-        f"{path} answered {r.status_code} for a regulator — pipeline tooling is "
-        f"not part of the review role")
+    assert r.status_code == 200, (
+        f"{path} answered {r.status_code} for a regulator; reading dataset and "
+        f"model state is allowed for every staff role — only writes are "
+        f"admin-only")
 
 
 @pytest.mark.asyncio
@@ -393,14 +400,8 @@ async def test_pipeline_read_routes_exclude_the_regulator(
     "/api/v1/model-ops/status",
 ])
 async def test_analyst_and_officer_keep_the_access_they_had(
-        client, db_session, analyst_token, officer_token, path):
-    """The constraint R12 must not break.
-
-    Narrowing these to `require_admin` would have been the obvious fix for the
-    line above and the wrong one: it removes access from `analyst` and
-    `field_officer`, whose behaviour this change is explicitly not allowed to
-    touch. `require_pipeline_staff` is exactly the pre-R12 staff set.
-    """
+        client, analyst_token, officer_token, path):
+    """Unchanged by R12, and asserted so it stays that way."""
     for tok, who in ((analyst_token, "analyst"), (officer_token, "field_officer")):
         r = await client.get(path, headers=_tok(tok))
         assert r.status_code == 200, (
