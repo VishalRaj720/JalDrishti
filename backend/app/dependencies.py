@@ -116,29 +116,44 @@ def require_roles(*roles: UserRole):
             )
         return current_user
 
+    # Expose what this guard admits. A dependency factory returns an opaque
+    # closure, so without this the only way to learn which roles an endpoint
+    # accepts is to call it and observe a 403 — which is how a role set drifts
+    # from the documentation describing it.
+    _check.allowed_roles = frozenset(roles)  # type: ignore[attr-defined]
     return _check
 
 
 # ── Role sets ────────────────────────────────────────────────────────
 # Named for what they protect, not for who happens to be in them today.
 
-STAFF_ROLES = (UserRole.admin, UserRole.regulator, UserRole.analyst,
-               UserRole.field_officer)
+#: R7 retired `regulator`: every power it had, `admin` already had, so it was a
+#: second label on one authority rather than a distinct role. Migration 0019
+#: merges those accounts into `admin`. The enum LABEL survives in Postgres
+#: (an enum value cannot be dropped transactionally) but is retired from the
+#: application vocabulary here — which is what makes it unmintable.
+STAFF_ROLES = (UserRole.admin, UserRole.analyst, UserRole.field_officer)
 PUBLIC_ROLES = (UserRole.citizen, UserRole.viewer)
 ALL_ROLES = STAFF_ROLES + PUBLIC_ROLES
 
 require_admin = require_roles(UserRole.admin)
-require_regulator_or_admin = require_roles(UserRole.admin, UserRole.regulator)
 require_analyst_or_admin = require_roles(UserRole.admin, UserRole.analyst)
 
-#: Who may run the contaminant model and place the sites it runs at.
-#: A regulator has to be able to test a scenario themselves rather than ask an
-#: analyst to produce the number they are meant to be scrutinising. Excludes
-#: `field_officer` (collects evidence, does not model) and `citizen`.
-require_simulation_roles = require_roles(
-    UserRole.admin, UserRole.regulator, UserRole.analyst)
+#: Reviewing field evidence and deciding on a public advisory.
+#: Kept as its own name even though it now resolves to admin alone: these are
+#: DOMAIN decisions, and naming them after what they protect rather than after
+#: who currently holds them is what let the regulator merge be a one-line change
+#: here instead of an edit at every call site.
+require_reviewer = require_roles(UserRole.admin)
 
-#: Any of the four working roles. Excludes `citizen`: use this wherever a
+#: Backwards-compatible alias. Retired name, same meaning.
+require_regulator_or_admin = require_reviewer
+
+#: Who may run the contaminant model and place the sites it runs at.
+#: Excludes `field_officer` (collects evidence, does not model) and `citizen`.
+require_simulation_roles = require_roles(UserRole.admin, UserRole.analyst)
+
+#: Any of the three working roles. Excludes `citizen`: use this wherever a
 #: response can expose a precise ISR site location (design section 2).
 require_staff = require_roles(*STAFF_ROLES)
 

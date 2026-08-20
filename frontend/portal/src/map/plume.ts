@@ -101,6 +101,15 @@ function casedRing(group: L.LayerGroup, latlngs: L.LatLngExpression[], o: {
 /** Create the two panes the plume needs. Reference geometry must never be
  *  buried under the concentration field it describes. */
 export function createPlumePanes(map: L.Map) {
+  // The outside-Jharkhand mask sits between the basemap labels (350) and the
+  // data overlays (400). Above the tiles so it dims them; below the overlays so
+  // districts, wells and the plume stay at full strength inside the state.
+  if (!map.getPane("paneMask")) {
+    map.createPane("paneMask");
+    const p = map.getPane("paneMask")!;
+    p.style.zIndex = "380";
+    p.style.pointerEvents = "none";
+  }
   if (!map.getPane("panePlume")) {
     map.createPane("panePlume");
     map.getPane("panePlume")!.style.zIndex = "420";
@@ -109,6 +118,58 @@ export function createPlumePanes(map: L.Map) {
     map.createPane("paneMarks");
     map.getPane("paneMarks")!.style.zIndex = "460";
   }
+}
+
+/**
+ * Reshape a STORED run into the same object `drawPlume` takes from a live one.
+ *
+ * P2 stores plume geometry on the run (migration 0016) so the auditable path
+ * can draw what the throwaway path always could. The stored record is flatter
+ * than the live response — it drops `hydro` and the metric blocks, which have
+ * their own columns — so this is the one place that knows both shapes.
+ *
+ * Deliberately one function and not a second renderer: a live plume and a
+ * stored plume that were drawn by different code would eventually disagree, and
+ * the disagreement would look like a physics difference rather than a bug.
+ *
+ * Returns null when the run has no geometry, which is a real state with two
+ * distinct causes the caller must tell apart — a run completed before P2, and a
+ * run where the engine correctly refused to produce an extent.
+ */
+export function storedRunToPlume(run: any): any | null {
+  const p = run?.plume;
+  if (!p) return null;
+  return {
+    species: p.species ?? run.species,
+    threshold: p.threshold,
+    plume: {
+      contours: p.contours ?? [],
+      compliance_ring: p.compliance_ring ?? null,
+      source_zone: p.source_zone ?? null,
+      peak_conc: p.peak_conc,
+      Xc_m: p.Xc_m,
+      aspect_ratio: p.aspect_ratio,
+      radial_dominated: p.radial_dominated,
+      off_scale: p.off_scale,
+    },
+    ml_envelope: p.ml_envelope ?? null,
+    ml_envelope_skipped: p.ml_envelope_skipped ?? {},
+    ml_status: p.ml_status ?? null,
+    extrapolation: run.extrapolation ?? [],
+    metrics: run.metrics ?? {},
+    isr_excursion: run.excursion ?? null,
+    notice: p.notice ?? null,
+    far_field_note: p.far_field_note ?? null,
+    ore_zone: p.ore_zone ?? null,
+    timeline: p.timeline ?? null,
+    restoration: p.restoration ?? null,
+    containment: p.containment ?? null,
+    azimuth_deg: p.azimuth_deg,
+    azimuth_source: p.azimuth_source,
+    // `drawPlume` reads the ring offset for its tooltip; the stored ring keeps
+    // its radius, and the offset is recoverable from the run's own request.
+    wellfield_geometry: { monitor_ring_m: p.compliance_ring?.offset_m },
+  };
 }
 
 /** Render one engine result into `group`, which is cleared first. */

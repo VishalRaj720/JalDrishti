@@ -19,7 +19,7 @@ from sqlalchemy import text
 @pytest_asyncio.fixture()
 async def site(db_session):
     rid = (await db_session.execute(text("""
-        INSERT INTO isr_points (id, name, location, injection_rate)
+        INSERT INTO isr_points (id, name, location, injection_rate_m3_day)
         VALUES (gen_random_uuid(), 'Location Test Site',
                 ST_SetSRID(ST_MakePoint(86.36, 22.65), 4326), 1000)
         RETURNING id
@@ -56,7 +56,13 @@ async def test_created_site_round_trips_its_location(client, admin_token):
     created = await client.post(
         "/api/v1/isr-points",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"name": f"RoundTrip {uuid.uuid4().hex[:6]}", "injection_rate": 500,
+        json={"name": f"RoundTrip {uuid.uuid4().hex[:6]}",
+              # P2: a site is a fully specified operation, so every operating
+              # parameter is required at registration.
+              "injection_rate_m3_day": 500, "bleed_percent": 2.0,
+              "operation_years": 8.0, "wellfield_width_m": 300.0,
+              "monitor_ring_m": 100.0, "ore_depth_m": 150.0,
+              "ore_thickness_m": 20.0,
               "location": {"type": "Point", "coordinates": [85.9, 23.4]}})
     assert created.status_code == 201
     body = created.json()
@@ -69,7 +75,7 @@ async def test_a_site_without_a_location_is_null_not_an_error(client, admin_toke
                                                               db_session):
     """The column is nullable; the serializer must cope rather than 500."""
     rid = (await db_session.execute(text("""
-        INSERT INTO isr_points (id, name, injection_rate)
+        INSERT INTO isr_points (id, name, injection_rate_m3_day)
         VALUES (gen_random_uuid(), 'No Location Site', 100) RETURNING id
     """))).scalar_one()
     await db_session.commit()

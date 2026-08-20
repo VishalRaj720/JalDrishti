@@ -244,7 +244,7 @@ rather than "row 3.4 uncertainty is propagated".
 returned the distance to the **upstream corner of the Domenico artifact box** —
 422.8 m at Jaduguda for a plume whose true down-gradient reach was 35.9 m,
 identical for every species because C0 cancels. It was baked into the ML labels,
-and [`docs/audits/QA_SWEEP_REPORT.md`](../docs/audits/QA_SWEEP_REPORT.md) had certified it as correct Tang physics (now retracted
+and `docs/local/audit-record/QA_SWEEP_REPORT.md` had certified it as correct Tang physics (now retracted
 there). Fixing it then exposed a second, pre-existing defect underneath: the
 solution grid is sized to the source disc, so travel was quantised to zero for
 short plumes — 29 of 60 sampled scenarios read exactly 0.0 m while not being

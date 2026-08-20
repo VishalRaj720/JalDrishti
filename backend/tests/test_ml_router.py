@@ -14,6 +14,9 @@ So: role-restricted engine endpoints must be `no-store`. The responsiveness is
 recovered client-side, where the portal holds these layers in memory for an hour
 and that memory dies with the session.
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import uuid
 
 import pytest
@@ -43,7 +46,7 @@ async def _user(db_session, role: UserRole) -> User:
 @pytest_asyncio.fixture()
 async def tokens(db_session):
     out = {}
-    for role in (UserRole.admin, UserRole.regulator, UserRole.analyst,
+    for role in (UserRole.admin, UserRole.admin, UserRole.analyst,
                  UserRole.field_officer, UserRole.citizen):
         u = await _user(db_session, role)
         out[role.value] = create_access_token(str(u.id), u.role)
@@ -64,7 +67,7 @@ async def test_reference_geography_is_staff_only(client, tokens, path):
     `/ml/ore` is the strongest case: it is the map of where a hypothetical
     uranium site could be sited at all.
     """
-    for role in ("admin", "regulator", "analyst", "field_officer"):
+    for role in ("admin", "admin", "analyst", "field_officer"):
         r = await client.get(path, headers=_h(tokens[role]))
         assert r.status_code != 403, f"{role} was refused {path}"
     assert (await client.get(path, headers=_h(tokens["citizen"]))).status_code == 403
@@ -76,7 +79,7 @@ async def test_running_the_model_is_restricted_to_the_modelling_roles(
         client, tokens, path):
     """A field officer collects evidence and a citizen reads measurements.
     Neither runs a contaminant simulation."""
-    for role in ("admin", "regulator", "analyst"):
+    for role in ("admin", "admin", "analyst"):
         assert (await client.get(path, headers=_h(tokens[role]))).status_code != 403
     for role in ("field_officer", "citizen"):
         assert (await client.get(path, headers=_h(tokens[role]))).status_code == 403

@@ -62,6 +62,12 @@ ALLOWED_FIELDS: dict[str, frozenset[str]] = {
     ObservationType.ore_presence.value: frozenset({
         "name", "longitude", "latitude", "ore_zone", "uranium_grade_pct",
         "depth_m", "observed_at", "notes",
+        # R11: the observed extent, in metres, stated by whoever saw it.
+        # The sync previously drew a fixed 400 m circle around every sighting —
+        # a number the system invented, applied identically to an outcrop and to
+        # a mapped lens. A submitter knows roughly how far the ore they saw
+        # extends; asking is better than assuming.
+        "radius_m",
     }),
 }
 
@@ -190,6 +196,14 @@ class OreObservation(Base):
     ore_zone: Mapped[str] = mapped_column(String(16), nullable=False)
     uranium_grade_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     depth_m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    #: Observed extent in metres, as REPORTED rather than assumed.
+    #:
+    #: The sync used to draw a fixed 400 m circle around every sighting — a
+    #: number this system invented and applied identically to a roadside outcrop
+    #: and a mapped lens, which then became the deposit polygon that decides
+    #: whether a uranium plume is possible at a pin. NULL keeps the 400 m
+    #: fallback, so rows that predate migration 0020 are unchanged.
+    radius_m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     observed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

@@ -9,11 +9,11 @@
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  api, type AuditEntry, type IsrPoint, type Observation,
+  api, type Advisory, type AuditEntry, type IsrPoint, type Observation,
   type PublicDistrictRisk, type Scenario, type SimRun, type SyncStatus,
 } from "../api/client";
 import { ROLE_PURPOSE, useAuth } from "../auth";
-import { Loading, Planned, Tile, bandOf } from "../components/bits";
+import { Loading, Planned, RiskBand, Tile } from "../components/bits";
 
 function Head() {
   const { me } = useAuth();
@@ -40,29 +40,114 @@ const useSites = () =>
 
 // ── ADMIN ────────────────────────────────────────────────────────────
 
+/**
+ * The admin landing screen.
+ *
+ * R7 folded the regulator's screen into this one. That was not a deletion: an
+ * admin now carries the DOMAIN decisions the regulator used to — approving
+ * field evidence and deciding what reaches residents — so the decision queue
+ * and the publication queue belong here, above platform housekeeping. What an
+ * admin needs first is "what is waiting on me", not "how many accounts exist".
+ */
 function AdminOverview() {
   const nav = useNavigate();
   const sync = useSync();
+  const pending = usePending();
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.get<any[]>("/users") });
   const audit = useQuery({ queryKey: ["audit", 8], queryFn: () => api.get<AuditEntry[]>("/audit?limit=8") });
   const health = useQuery({ queryKey: ["health"], queryFn: async () => (await fetch("/health")).json() });
+  const advisories = useQuery({
+    queryKey: ["advisories"], queryFn: () => api.get<Advisory[]>("/advisories?limit=200"),
+  });
+  const districts = useQuery({
+    queryKey: ["public-risk"],
+    queryFn: () => api.get<{ districts: PublicDistrictRisk[] }>("/public/risk/districts"),
+  });
+
+  const proposed = (advisories.data ?? []).filter((a) => a.status === "proposed");
+  const worst = [...(districts.data?.districts ?? [])]
+    .filter((d) => d.max_uranium_ppb !== null)
+    .sort((a, b) => (b.max_uranium_ppb ?? 0) - (a.max_uranium_ppb ?? 0))
+    .slice(0, 6);
 
   return (
     <div className="page">
       <Head />
       <div className="grid-4" style={{ marginBottom: 16 }}>
-        <Tile n={users.data?.length ?? "–"} label="User accounts" tone="blue"
-              sub="across five roles" onClick={() => nav("/admin")} />
-        <Tile n={sync.data?.pending_review ?? "–"} label="Awaiting review" tone="red"
-              sub="field observations" onClick={() => nav("/field")} />
+        <Tile n={proposed.length} label="Awaiting your decision" tone="red"
+              sub="screenings proposed for the public" onClick={() => nav("/publications")} />
+        <Tile n={sync.data?.pending_review ?? "–"} label="Field evidence to review" tone="amber"
+              sub="ore observations" onClick={() => nav("/field")} />
         <Tile n={sync.data?.approved_pending_sync ?? "–"} label="Approved, not in model" tone="amber"
               sub="needs a dataset sync" onClick={() => nav("/data")} />
-        <Tile n={health.data?.status === "ok" ? "OK" : "?"} label="API health" tone="green"
-              sub={health.data?.version ? `v${health.data.version}` : ""} />
+        <Tile n={users.data?.length ?? "–"} label="User accounts" tone="blue"
+              sub="across four roles" onClick={() => nav("/admin")} />
+      </div>
+
+      <div className="grid-2" style={{ marginBottom: 16 }}>
+        <div className="card">
+          <div className="card-title">
+            Decision queue
+            <span className="spacer grow" />
+            <button className="btn ghost" onClick={() => nav("/publications")}>Open →</button>
+          </div>
+          {advisories.isLoading && <Loading />}
+          {proposed.length === 0 && (
+            <div className="muted small">
+              Nothing is waiting on you. Screenings appear here when an analyst
+              proposes one from a completed run.
+            </div>
+          )}
+          {proposed.slice(0, 5).map((a) => (
+            <button key={a.id} className="list-item" onClick={() => nav("/publications")}>
+              <div>
+                <div className="nm">{a.headline}</div>
+                <div className="mt">
+                  proposed {new Date(a.proposed_at).toLocaleDateString()}
+                  {a.footprint_ha != null && ` · ${a.footprint_ha.toFixed(1)} ha`}
+                </div>
+              </div>
+              <span className="chip warn">decide</span>
+            </button>
+          ))}
+          {pending.data && pending.data.length > 0 && (
+            <div className="muted small" style={{ marginTop: 8 }}>
+              Also {pending.data.length} field observation(s) awaiting review.
+            </div>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="card-title">Districts by measured uranium</div>
+          <div className="muted small" style={{ marginBottom: 8 }}>
+            Real CGWB sampling — measurements, not model output.
+          </div>
+          {districts.isLoading && <Loading />}
+          {worst.map((d) => (
+            <div key={d.id} className="list-item">
+              <div>
+                <div className="nm">{d.name}</div>
+                <div className="mt">{d.wells} wells · max {d.max_uranium_ppb} ppb</div>
+              </div>
+              <RiskBand value={d.max_uranium_ppb} />
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid-2">
         <div>
+          <div className="card">
+            <div className="card-title">System</div>
+            <div className="row wrap" style={{ marginBottom: 8 }}>
+              <span className={`chip ${health.data?.status === "ok" ? "ok" : "warn"}`}>
+                API {health.data?.status === "ok" ? "healthy" : "unknown"}
+              </span>
+              {health.data?.version && (
+                <span className="muted small">v{health.data.version}</span>
+              )}
+            </div>
+          </div>
           <div className="card">
             <div className="card-title">Platform posture</div>
             <div className="banner ok" style={{ marginBottom: 9 }}>
@@ -99,90 +184,6 @@ function AdminOverview() {
   );
 }
 
-// ── REGULATOR ────────────────────────────────────────────────────────
-
-function RegulatorOverview() {
-  const nav = useNavigate();
-  const sync = useSync();
-  const pending = usePending();
-  const sites = useSites();
-  const runs = useRuns(sites.data?.[0]?.id);
-  const districts = useQuery({
-    queryKey: ["public-risk"],
-    queryFn: () => api.get<{ districts: PublicDistrictRisk[] }>("/public/risk/districts"),
-  });
-
-  const excursions = (runs.data ?? []).filter((r) => r.excursion?.excursion_declared);
-  const extrapolating = (runs.data ?? []).filter((r) => (r.extrapolation?.length ?? 0) > 0);
-  const worst = [...(districts.data?.districts ?? [])]
-    .filter((d) => d.max_uranium_ppb !== null)
-    .sort((a, b) => (b.max_uranium_ppb ?? 0) - (a.max_uranium_ppb ?? 0))
-    .slice(0, 6);
-
-  return (
-    <div className="page">
-      <Head />
-      <div className="grid-4" style={{ marginBottom: 16 }}>
-        <Tile n={pending.data?.length ?? "–"} label="Awaiting your decision" tone="red"
-              sub="field observations" onClick={() => nav("/field")} />
-        <Tile n={excursions.length} label="Runs declaring excursion" tone="amber"
-              sub="NUREG-1569 2-of-3" onClick={() => nav("/studio")} />
-        <Tile n={extrapolating.length} label="Runs outside trained support" tone="amber"
-              sub="ML band not guaranteed" onClick={() => nav("/studio")} />
-        <Tile n={sync.data?.approved_pending_sync ?? "–"} label="Approved, not in model" tone="amber"
-              sub="awaiting admin sync" onClick={() => nav("/data")} />
-      </div>
-
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-title">
-            Decision queue
-            <span className="spacer grow" />
-            <button className="btn ghost" onClick={() => nav("/field")}>Open →</button>
-          </div>
-          {pending.isLoading && <Loading />}
-          {pending.data?.length === 0 && (
-            <div className="muted small">Nothing is waiting on you.</div>
-          )}
-          {pending.data?.slice(0, 6).map((o) => (
-            <div key={o.id} className="list-item" onClick={() => nav("/field")}>
-              <div>
-                <div className="nm">{o.operation} · {o.observation_type}</div>
-                <div className="mt">submitted {new Date(o.submitted_at).toLocaleString()}</div>
-              </div>
-              <span className="chip danger">🔴 review</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="card">
-          <div className="card-title">Districts by measured uranium</div>
-          <div className="muted small" style={{ marginBottom: 8 }}>
-            Real CGWB sampling — measurements, not model output.
-          </div>
-          {districts.isLoading && <Loading />}
-          {worst.map((d) => {
-            const b = bandOf(d.max_uranium_ppb);
-            return (
-              <div key={d.id} className="list-item">
-                <div>
-                  <div className="nm">{d.name}</div>
-                  <div className="mt">{d.wells} wells · max {d.max_uranium_ppb} ppb</div>
-                </div>
-                <span className={`chip ${b.cls}`}>{b.label}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <Planned label="Publish / archive a site, and export a signed regulator report"
-               phase="P5 / P8"
-               why="The site status workflow and PDF export endpoints are not implemented." />
-    </div>
-  );
-}
-
 // ── ANALYST ──────────────────────────────────────────────────────────
 
 function AnalystOverview() {
@@ -196,11 +197,11 @@ function AnalystOverview() {
     <div className="page">
       <Head />
       <div className="grid-4" style={{ marginBottom: 16 }}>
-        <Tile n={sites.data?.length ?? "–"} label="Hypothetical sites" tone="blue" onClick={() => nav("/map")} />
-        <Tile n={scenarios.data?.length ?? "–"} label="Saved scenarios" tone="blue" onClick={() => nav("/studio")} />
-        <Tile n={runs.data?.length ?? "–"} label="Recent runs" tone="green" onClick={() => nav("/studio")} />
+        <Tile n={sites.data?.length ?? "–"} label="Hypothetical sites" tone="blue" onClick={() => nav("/console")} />
+        <Tile n={scenarios.data?.length ?? "–"} label="Saved scenarios" tone="blue" onClick={() => nav("/console")} />
+        <Tile n={runs.data?.length ?? "–"} label="Recent runs" tone="green" onClick={() => nav("/console")} />
         <Tile n={flagged.length} label="Outside trained support" tone="amber"
-              sub="conformal band void" onClick={() => nav("/studio")} />
+              sub="conformal band void" onClick={() => nav("/console")} />
       </div>
 
       <div className="grid-2">
@@ -208,7 +209,7 @@ function AnalystOverview() {
           <div className="card-title">
             Scenarios
             <span className="spacer grow" />
-            <button className="btn primary" onClick={() => nav("/studio")}>Open Studio →</button>
+            <button className="btn primary" onClick={() => nav("/console")}>Open Console →</button>
           </div>
           {scenarios.isLoading && <Loading />}
           {scenarios.data?.length === 0 && (
@@ -218,7 +219,7 @@ function AnalystOverview() {
             </div>
           )}
           {scenarios.data?.slice(0, 6).map((s) => (
-            <div key={s.id} className="list-item" onClick={() => nav("/studio")}>
+            <div key={s.id} className="list-item" onClick={() => nav("/console")}>
               <div>
                 <div className="nm">{s.name}</div>
                 <div className="mt">{s.description ?? "no description"}</div>
@@ -233,7 +234,7 @@ function AnalystOverview() {
           {runs.isLoading && <Loading />}
           {runs.data?.length === 0 && <div className="muted small">No runs yet.</div>}
           {runs.data?.slice(0, 6).map((r) => (
-            <div key={r.id} className="list-item" onClick={() => nav("/studio")}>
+            <div key={r.id} className="list-item" onClick={() => nav("/console")}>
               <div>
                 <div className="nm">{r.species}</div>
                 <div className="mt">
@@ -348,17 +349,40 @@ function CitizenOverview() {
         <div className="card-title">
           Groundwater near you
           <span className="spacer grow" />
-          <button className="btn primary" onClick={() => nav("/public")}>Find my area →</button>
+          <button className="btn primary" onClick={() => nav("/my-area")}>My area →</button>
         </div>
-        <div className="muted small" style={{ lineHeight: 1.6 }}>
+        <div className="prose muted">
           These are real measurements from government groundwater sampling — not
-          predictions. Choose your district to see the reading for each block, what it
-          means, and who to contact.
+          predictions. Follow your block to see what was tested there, what it means,
+          and who to contact.
         </div>
       </div>
 
-      <Planned label="Get an alert when water near me changes" phase="P7"
-               why="Alert subscriptions are designed but not built — there is no notification service yet." />
+      <div className="grid-2">
+        <div className="card">
+          <div className="card-title">
+            Alerts
+            <span className="spacer grow" />
+            <button className="btn ghost" onClick={() => nav("/alerts")}>Open →</button>
+          </div>
+          <div className="prose muted">
+            You are told when a well near you tests above the safe limit, and when an
+            assessment is published for your area. Alerts appear in this portal only —
+            no SMS, no email.
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-title">
+            Data &amp; methods
+            <span className="spacer grow" />
+            <button className="btn ghost" onClick={() => nav("/methods")}>Read →</button>
+          </div>
+          <div className="prose muted">
+            Where these numbers come from, what the safe limit is, and what this
+            platform does not know.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -367,7 +391,11 @@ export default function Overview() {
   const { me } = useAuth();
   switch (me?.role) {
     case "admin": return <AdminOverview />;
-    case "regulator": return <RegulatorOverview />;
+    // R7 retired `regulator`; migration 0019 merged those accounts into admin.
+    // Any token minted before that still decodes to the old role, so it maps to
+    // the admin screen rather than falling through to the citizen one — a stale
+    // token must not silently downgrade someone into the public surface.
+    case "regulator": return <AdminOverview />;
     case "analyst": return <AnalystOverview />;
     case "field_officer": return <FieldOverview />;
     default: return <CitizenOverview />;

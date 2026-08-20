@@ -26,7 +26,13 @@ DOC = Path(__file__).resolve().parents[2] / "docs" / "roles.md"
 BEGIN = "<!-- BEGIN GENERATED AUTHZ MATRIX -->"
 END = "<!-- END GENERATED AUTHZ MATRIX -->"
 
-ROLE_ORDER = [UserRole.admin, UserRole.regulator, UserRole.analyst,
+# R7 retired `regulator` (migration 0019). The enum LABEL survives in Postgres
+# because a value cannot be dropped transactionally, but no account holds it
+# (`test_no_regulator_accounts_remain`) and no guard admits it
+# (`test_regulator_is_not_a_staff_role`). Generating a column for it published a
+# reachability figure — "regulator 12/102" — for a role that cannot sign in,
+# which is the most persuasive possible argument for bringing it back.
+ROLE_ORDER = [UserRole.admin, UserRole.analyst,
               UserRole.field_officer, UserRole.citizen]
 
 # Not part of the product's role model.

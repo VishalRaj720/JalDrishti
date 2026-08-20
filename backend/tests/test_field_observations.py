@@ -4,6 +4,9 @@ Covers the nine acceptance checks for the workflow, plus the boundary that makes
 it meaningful: a pending proposal must be invisible to anything that reads the
 authoritative dataset.
 """
+
+# R7 retired the `regulator` role; migration 0019 merged those accounts
+# into `admin`, which now holds the reviewer powers this exercises.
 import uuid
 from datetime import datetime, timezone
 
@@ -39,9 +42,9 @@ async def officer2(db_session):
 
 
 @pytest_asyncio.fixture()
-async def regulator(db_session):
+async def reviewer(db_session):
     return await _mk_user(db_session, "reg1", "reg1@example.com",
-                          UserRole.regulator)
+                          UserRole.admin)
 
 
 @pytest_asyncio.fixture()
@@ -106,18 +109,18 @@ async def test_payload_allowlist_rejects_unknown_fields(client, officer):
     assert "synthetic" in r.text
 
 
-# ── 2. admin / regulator can approve and reject ──────────────────────
+# ── 2. admin / reviewer can approve and reject ──────────────────────
 
 @pytest.mark.asyncio
-async def test_regulator_can_approve(client, officer, regulator, db_session):
+async def test_regulator_can_approve(client, officer, reviewer, db_session):
     obs_id = (await client.post("/api/v1/field-observations",
                                 headers=_tok(officer), json=ORE)).json()["id"]
     r = await client.post(f"/api/v1/field-observations/{obs_id}/approve",
-                          headers=_tok(regulator), json={"review_note": "verified"})
+                          headers=_tok(reviewer), json={"review_note": "verified"})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["status"] == "approved"
-    assert body["reviewed_by"] == str(regulator.id)
+    assert body["reviewed_by"] == str(reviewer.id)
     assert body["applied_id"] is not None
 
     n = (await db_session.execute(
@@ -145,13 +148,13 @@ async def test_admin_can_reject_and_nothing_is_applied(
 
 @pytest.mark.asyncio
 async def test_a_decided_proposal_cannot_be_reviewed_again(
-        client, officer, regulator):
+        client, officer, reviewer):
     obs_id = (await client.post("/api/v1/field-observations",
                                 headers=_tok(officer), json=ORE)).json()["id"]
     await client.post(f"/api/v1/field-observations/{obs_id}/approve",
-                      headers=_tok(regulator), json={})
+                      headers=_tok(reviewer), json={})
     again = await client.post(f"/api/v1/field-observations/{obs_id}/approve",
-                              headers=_tok(regulator), json={})
+                              headers=_tok(reviewer), json={})
     assert again.status_code == 409, "double-approval must not re-apply"
 
 
@@ -195,12 +198,34 @@ async def test_submitter_cannot_approve_own_submission(client, admin_token):
 
 
 @pytest.mark.asyncio
-async def test_regulator_cannot_submit(client, regulator):
-    """Reviewers are not data collectors. Keeping submission off the reviewer
-    roles is what makes 'cannot approve your own' hard to reach by accident."""
-    r = await client.post("/api/v1/field-observations", headers=_tok(regulator),
-                          json=ORE)
-    assert r.status_code == 403
+async def test_a_reviewer_who_submits_still_cannot_approve_their_own(
+        client, reviewer):
+    """R7 CHANGED THIS PROPERTY, and the change is worth stating plainly.
+
+    This test used to assert that a reviewer could not submit at all -- keeping
+    submission off the reviewer roles was what made "cannot approve your own"
+    hard to reach by accident. Retiring `regulator` merged reviewers into
+    `admin`, and admin has always been able to submit, so that separation by
+    ROLE is gone.
+
+    What is NOT gone is the separation that actually matters, and it never
+    depended on the role split: `ck_field_obs_no_self_review` makes a row whose
+    reviewer equals its submitter unrepresentable in the database. A reviewer
+    can now file an observation, and still cannot be the one who accepts it.
+
+    That is the honest post-merge invariant, so it is what is asserted.
+    """
+    created = await client.post("/api/v1/field-observations",
+                                headers=_tok(reviewer), json=ORE)
+    assert created.status_code == 201, created.text
+
+    denied = await client.post(
+        f"/api/v1/field-observations/{created.json()['id']}/approve",
+        headers=_tok(reviewer), json={})
+    assert denied.status_code == 403, (
+        "a reviewer approved their own submission; the role merge must not have "
+        "collapsed the submitter and the approver into one person")
+    assert "own" in denied.text.lower()
 
 
 @pytest.mark.asyncio
@@ -224,7 +249,7 @@ async def test_self_review_is_impossible_at_the_database(db_session, officer):
 
 @pytest.mark.asyncio
 async def test_pending_water_sample_is_absent_then_present_after_approval(
-        client, officer, regulator, db_session, well):
+        client, officer, reviewer, db_session, well):
     async def count():
         return (await db_session.execute(
             text("SELECT count(*) FROM water_samples WHERE well_id = :w"),
@@ -251,7 +276,7 @@ async def test_pending_water_sample_is_absent_then_present_after_approval(
     assert leaked == 0, "pending field data reached the authoritative table"
 
     await client.post(f"/api/v1/field-observations/{obs_id}/approve",
-                      headers=_tok(regulator), json={})
+                      headers=_tok(reviewer), json={})
 
     # APPROVED: now it is authoritative.
     assert await count() == before + 1
@@ -263,7 +288,7 @@ async def test_pending_water_sample_is_absent_then_present_after_approval(
 
 @pytest.mark.asyncio
 async def test_update_records_old_and_new_and_applies_on_approval(
-        client, officer, regulator, db_session, well):
+        client, officer, reviewer, db_session, well):
     row_id = (await db_session.execute(text("""
         INSERT INTO water_samples (id, well_id, sampled_at, uranium_ppb,
                                    tds_derived, synthetic)
@@ -285,7 +310,7 @@ async def test_update_records_old_and_new_and_applies_on_approval(
     assert still == 10.0, "a pending update changed the authoritative row"
 
     await client.post(f"/api/v1/field-observations/{obs['id']}/approve",
-                      headers=_tok(regulator), json={})
+                      headers=_tok(reviewer), json={})
     now = (await db_session.execute(
         text("SELECT uranium_ppb FROM water_samples WHERE id = :i"),
         {"i": str(row_id)})).scalar_one()
@@ -294,7 +319,7 @@ async def test_update_records_old_and_new_and_applies_on_approval(
 
 @pytest.mark.asyncio
 async def test_stale_proposal_is_refused_rather_than_clobbering(
-        client, officer, regulator, db_session, well):
+        client, officer, reviewer, db_session, well):
     """If the target moved after submission, approving must not overwrite it."""
     row_id = (await db_session.execute(text("""
         INSERT INTO water_samples (id, well_id, sampled_at, uranium_ppb,
@@ -316,7 +341,7 @@ async def test_stale_proposal_is_refused_rather_than_clobbering(
     await db_session.commit()
 
     r = await client.post(f"/api/v1/field-observations/{obs_id}/approve",
-                          headers=_tok(regulator), json={})
+                          headers=_tok(reviewer), json={})
     assert r.status_code == 409
     kept = (await db_session.execute(
         text("SELECT uranium_ppb FROM water_samples WHERE id = :i"),
@@ -328,7 +353,7 @@ async def test_stale_proposal_is_refused_rather_than_clobbering(
 
 @pytest.mark.asyncio
 async def test_submit_and_approve_are_audited_with_old_and_new(
-        client, officer, regulator, db_session, well):
+        client, officer, reviewer, db_session, well):
     await db_session.execute(delete(AuditLog))
     await db_session.commit()
 
@@ -345,7 +370,7 @@ async def test_submit_and_approve_are_audited_with_old_and_new(
                                       "target_id": str(row_id),
                                       "payload": {"uranium_ppb": 55.0}})).json()["id"]
     await client.post(f"/api/v1/field-observations/{obs_id}/approve",
-                      headers=_tok(regulator), json={"review_note": "ok"})
+                      headers=_tok(reviewer), json={"review_note": "ok"})
 
     rows = list((await db_session.execute(
         select(AuditLog).where(AuditLog.entity_id == obs_id)
@@ -367,13 +392,13 @@ async def test_submit_and_approve_are_audited_with_old_and_new(
 
 @pytest.mark.asyncio
 async def test_rejection_is_audited_as_not_applied(
-        client, officer, regulator, db_session):
+        client, officer, reviewer, db_session):
     await db_session.execute(delete(AuditLog))
     await db_session.commit()
     obs_id = (await client.post("/api/v1/field-observations",
                                 headers=_tok(officer), json=ORE)).json()["id"]
     await client.post(f"/api/v1/field-observations/{obs_id}/reject",
-                      headers=_tok(regulator), json={"review_note": "no"})
+                      headers=_tok(reviewer), json={"review_note": "no"})
     row = (await db_session.execute(
         select(AuditLog).where(AuditLog.action == "field_observation.reject")
     )).scalars().first()
@@ -413,12 +438,12 @@ async def test_only_the_submitter_may_withdraw(client, officer, officer2):
 
 
 @pytest.mark.asyncio
-async def test_map_keeps_the_three_states_separate(client, officer, regulator):
+async def test_map_keeps_the_three_states_separate(client, officer, reviewer):
     """Three collections, not one list with a flag — a merged list invites a
     client to draw unreviewed or unsynced input as though it were in the model."""
     obs = await client.post("/api/v1/field-observations", headers=_tok(officer),
                             json=ORE)
-    r = await client.get("/api/v1/field-observations/map", headers=_tok(regulator))
+    r = await client.get("/api/v1/field-observations/map", headers=_tok(reviewer))
     assert r.status_code == 200
     body = r.json()
     assert set(body["counts"]) == {"pending_review", "approved_pending_sync",
@@ -430,12 +455,12 @@ async def test_map_keeps_the_three_states_separate(client, officer, regulator):
     assert body["counts"]["approved_in_model"] == 0
 
     await client.post(f"/api/v1/field-observations/{obs.json()['id']}/approve",
-                      headers=_tok(regulator), json={})
+                      headers=_tok(reviewer), json={})
 
     # amber: authoritative here, but Datasets/ has not been synced, so the
     # engine still does not see it
     body = (await client.get("/api/v1/field-observations/map",
-                             headers=_tok(regulator))).json()
+                             headers=_tok(reviewer))).json()
     assert body["counts"]["pending_review"] == 0
     assert body["counts"]["approved_pending_sync"] == 1
     assert body["counts"]["approved_in_model"] == 0

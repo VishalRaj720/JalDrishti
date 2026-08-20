@@ -12,6 +12,7 @@ What is being locked down here:
   * none of this touches the trained surrogate (requirement: no ML retrain).
 """
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -72,7 +73,15 @@ def test_negative_gradient_closes_the_pathway_and_never_inverts_it():
 
 def test_in_phase_end_member_reproduces_todays_behaviour_exactly():
     """The lower bound MUST equal the un-seasonal result, or the band is lying
-    about what 'no seasonal effect' means."""
+    about what 'no seasonal effect' means.
+
+    The un-seasonal result is now `seasonal.breakthrough_years_mean_gradient`.
+    It used to be the headline itself, and this assertion was written against
+    the headline — but the headline is duty-cycle averaged since LIMITATIONS.md
+    finding 1b, and equating the two would re-assert the bug. The invariant
+    being protected is unchanged: "no seasonal effect" must mean the gradient
+    nobody adjusted.
+    """
     r = _screen()
     base = r["seasonal"]["in_phase_deep_head"]
     for season in ("wet_season", "dry_season"):
@@ -82,7 +91,7 @@ def test_in_phase_end_member_reproduces_todays_behaviour_exactly():
             r["shallow_impact_probability"], abs=1e-9)
         assert d["risk_band"] == r["risk_band"]
         assert d["years_to_breakthrough"] == pytest.approx(
-            r["years_to_vertical_breakthrough"])
+            r["seasonal"]["breakthrough_years_mean_gradient"])
 
 
 def test_breakthrough_range_is_ordered_and_brackets_the_baseline():
@@ -162,3 +171,71 @@ def test_3_7_did_not_touch_the_trained_surrogate():
     assert list(feats) == list(MODEL_FEATURES)
     seasonal_leak = [f for f in feats if "water_table" in f or "seasonal_vert" in f]
     assert not seasonal_leak, f"3.7 leaked into the trained features: {seasonal_leak}"
+
+
+# ── LIMITATIONS.md 1b: the headline was the mean of a clamped quantity ──
+
+
+def test_the_headline_breakthrough_lies_inside_the_seasonal_band():
+    """The property the bug violated, stated directly.
+
+    Reported from the UI: headline 54.4 yr beside a dry season of 10.6 yr and a
+    wet season of "not expected". A single number that sits OUTSIDE the interval
+    printed next to it is not a summary of that interval — and a reader
+    reasonably takes the big number as the answer, which is the slow, reassuring
+    one. Whatever basis the headline uses, it must fall within the band.
+    """
+    r = _screen()
+    s = r["seasonal"]
+    lo, hi = s["breakthrough_years_range"]
+    head = r["years_to_vertical_breakthrough"]
+    assert head is not None
+    assert lo <= head <= hi, (
+        f"headline {head} yr is outside the reported band [{lo}, {hi}] — the "
+        f"exact shape of the finding this fix exists to close")
+
+
+def test_the_duty_cycle_headline_is_faster_than_the_mean_gradient_one():
+    """Clamping at zero can only make the pathway open LESS of the year than a
+    naive mean implies, so the corrected headline can never be slower."""
+    r = _screen()
+    s = r["seasonal"]
+    assert s["breakthrough_years_mean_gradient"] is not None
+    assert r["years_to_vertical_breakthrough"] <= s["breakthrough_years_mean_gradient"]
+    assert r["breakthrough_basis"] == "duty_cycle"
+    assert 0.0 <= s["duty_cycle"]["fraction_of_year_open"] <= 1.0
+
+
+def test_duty_cycle_reduces_to_the_mean_when_the_gradient_never_changes_sign():
+    """The correction must be inert where it does not apply.
+
+    A fix that moves numbers it has no business moving is worse than the bug:
+    every previously-correct site would shift with no physical reason, and the
+    project's own rule is that a parameter changes only against a cited reason.
+    """
+    from ml_pipeline.physics.transport import _duty_cycle_gradient as duty
+
+    assert duty(0.0037, 0.0) == pytest.approx(0.0037)     # no swing at all
+    assert duty(0.02, 0.0153) == pytest.approx(0.02)      # always open
+    assert duty(-0.02, 0.0153) == pytest.approx(0.0)      # never open
+    assert duty(-0.0037, 0.0) == pytest.approx(0.0)       # closed, no swing
+
+    # Centred on zero: the classic half-wave rectified mean, A/pi.
+    assert duty(0.0, 0.0153) == pytest.approx(0.0153 / math.pi)
+
+
+def test_duty_cycle_reproduces_the_reported_field_case():
+    """The arithmetic from the finding, pinned.
+
+    Separation 130 m, water table 3.22-7.20 m, baseline gradient 0.0037,
+    half-swing 0.0153 -> the pathway is open ~58 % of the year at an effective
+    gradient of 0.0069, which turns a 54.4 yr headline into ~29 yr. An
+    independent quarterly step model over the engine's own season map gave
+    30.5 yr, so this is not an artefact of assuming a sinusoid.
+    """
+    from ml_pipeline.physics.transport import _duty_cycle_gradient as duty
+
+    eff = duty(0.0037, 0.0153)
+    assert eff == pytest.approx(0.00686, abs=5e-5)
+    # Breakthrough time is inversely proportional to gradient.
+    assert 54.4 / (eff / 0.0037) == pytest.approx(29.3, abs=0.5)

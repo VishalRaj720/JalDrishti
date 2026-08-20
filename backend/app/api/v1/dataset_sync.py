@@ -84,3 +84,82 @@ async def sync_ore(
             ip=(request.client.host if request.client else None))
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+def _ip(request: Request):
+    return request.client.host if request.client else None
+
+
+@router.post("/water-quality")
+async def sync_water_quality(
+    request: Request,
+    dry_run: bool = Query(False, description="Report what would change, write nothing"),
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_admin),
+):
+    """Append approved chemistry to `waterQuality_jharkhand.csv`.
+
+    Returns `stale_marks: ["excursion_baselines"]` — the rows are in the file but
+    the baselines derived from them are not recomputed until
+    `POST /model-ops/recompute-baselines` runs. Reporting that is the difference
+    between a sync that took effect and one that only looks like it did.
+    """
+    try:
+        return await ds.sync_water_quality(
+            db, actor=actor, dry_run=dry_run, ip=_ip(request))
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/groundwater-levels")
+async def sync_groundwater_levels(
+    request: Request,
+    dry_run: bool = Query(False, description="Report what would change, write nothing"),
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_admin),
+):
+    """Append approved level readings to `cgwb_waterlevel_jharkhand.csv`.
+
+    Returns `stale_marks: ["flow_field"]`. The flow field is baked from these
+    readings plus the GLO-30 DEM, so a rebuild is required before any pin sees a
+    different gradient or azimuth.
+    """
+    try:
+        return await ds.sync_groundwater_levels(
+            db, actor=actor, dry_run=dry_run, ip=_ip(request))
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/all")
+async def sync_all(
+    request: Request,
+    dry_run: bool = Query(False, description="Report what would change, write nothing"),
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_admin),
+):
+    """Run every syncable type in one action, and report the union of stale marks."""
+    try:
+        return await ds.sync_all(db, actor=actor, dry_run=dry_run, ip=_ip(request))
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/reconcile")
+async def reconcile(
+    request: Request,
+    dry_run: bool = Query(True, description="Defaults to TRUE. Pass false to apply."),
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(require_admin),
+):
+    """Clear approved observations that can never sync.
+
+    Their applied row was deleted, so the sync joins to nothing and reports
+    "Nothing to sync" while the status counts them as pending — permanently.
+    A queue that cannot be emptied trains people to ignore the number.
+    """
+    try:
+        return await ds.reconcile_orphans(
+            db, actor=actor, dry_run=dry_run, ip=_ip(request))
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)

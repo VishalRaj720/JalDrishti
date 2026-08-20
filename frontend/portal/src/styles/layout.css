@@ -1,4 +1,21 @@
-/* Shell, navigation, map and page layout. */
+/* Shell, navigation, map and page layout.
+ *
+ * RESPONSIVE CONTRACT (P1). One codebase serves a staff console on a desktop
+ * and a citizen surface on a phone, so the breakpoints are behavioural, not
+ * cosmetic — panels change KIND, not just width:
+ *
+ *   ≥1280px  three columns: rail · map · drawer, all in flow
+ *   ≥1024px  drawer narrows; rail keeps its column
+ *   ≥768px   drawer OVERLAYS the map (absolute, right) so the map keeps width
+ *   <768px   rail becomes an off-canvas sheet over a scrim; the drawer becomes
+ *            a BOTTOM SHEET; the map goes full-bleed; header nav collapses to
+ *            a menu button
+ *   <640px   every grid collapses to one column
+ *
+ * The reason the drawer becomes a bottom sheet rather than a narrower column:
+ * at 375px a 380px right-hand column IS the screen, so the map — the thing the
+ * drawer is describing — would be entirely hidden while reading it.
+ */
 
 .shell { display: flex; flex-direction: column; height: 100%; }
 
@@ -7,103 +24,212 @@
 .hdr {
   height: var(--header-h); flex: 0 0 var(--header-h);
   background: var(--panel); border-bottom: 1px solid var(--line);
-  display: flex; align-items: center; gap: 14px; padding: 0 14px;
+  display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-3);
+  position: relative; z-index: 900;
 }
-.hdr-brand { display: flex; align-items: center; gap: 9px; min-width: 210px; }
+.hdr-brand { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+/* R10: the mark and the wordmark were a blue→green gradient apiece. Two
+   gradients in a 56px header is decoration doing the work identity should do,
+   and gradient-clipped text is the first thing to break in a print or a
+   screenshot. One flat accent block, one plain wordmark. */
 .hdr-mark {
-  width: 30px; height: 30px; border-radius: 8px;
-  background: linear-gradient(135deg, #3fb6ff, #37d39b);
-  display: grid; place-items: center; font-size: 15px;
+  width: 28px; height: 28px; border-radius: var(--r-md); flex: 0 0 28px;
+  background: var(--accent); color: var(--on-accent);
+  display: grid; place-items: center; font-size: var(--fs-base);
 }
 .hdr-name {
-  font-size: 16px; font-weight: 700; line-height: 1.05;
-  background: linear-gradient(90deg, #3fb6ff, #37d39b);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: var(--fs-lg); font-weight: 650; line-height: 1.05;
+  color: var(--text); letter-spacing: -.01em;
 }
 .hdr-sub { font-size: 9.5px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
 
-.hdr-nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+/* NO `overflow-x: auto` here.
+ *
+ * It was a scroll container to cope with eleven flat links, and it silently
+ * broke the grouped nav that replaced them: an overflow container CLIPS its
+ * absolutely-positioned descendants, and CSS forces `overflow-y` to `auto` as
+ * soon as `overflow-x` is set — so every dropdown was cut off below a 44px-tall
+ * strip and could not be clicked at all. The button toggled correctly and the
+ * menu was simply invisible, which is why a `getBoundingClientRect()` check
+ * passed: a clipped element still reports its full box.
+ *
+ * Five groups do not need to scroll, so the container goes. `min-width: 0` lets
+ * the nav shrink rather than push the account controls off the edge. */
+.hdr-nav { display: flex; gap: 2px; flex: 1; min-width: 0; flex-wrap: nowrap; }
 .hdr-nav a {
-  padding: 7px 12px; border-radius: var(--r-sm); color: var(--muted);
-  text-decoration: none; font-size: 12.5px; font-weight: 500; white-space: nowrap;
+  padding: 7px var(--s-3); border-radius: var(--r-sm); color: var(--muted);
+  text-decoration: none; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
 }
 .hdr-nav a:hover { background: var(--card2); color: var(--text); }
-.hdr-nav a.active { background: rgba(63,182,255,.14); color: var(--accent); font-weight: 700; }
+.hdr-nav a.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
 
-.hdr-right { display: flex; align-items: center; gap: 10px; }
+.hdr-right { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
+
+/* Menu button — only rendered below the nav breakpoint. */
+.nav-btn {
+  display: none; width: 34px; height: 34px; border-radius: var(--r-sm);
+  background: var(--card); border: 1px solid var(--line); color: var(--text);
+  cursor: pointer; place-items: center; font-size: var(--fs-lg); line-height: 1;
+}
+.nav-sheet {
+  position: absolute; top: var(--header-h); left: 0; right: 0; z-index: 1200;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: var(--s-2); display: grid; gap: 2px;
+  box-shadow: 0 16px 34px rgba(0,0,0,.5); animation: sheetUp .16s ease-out;
+}
+.nav-sheet a {
+  padding: var(--s-3); border-radius: var(--r-sm); color: var(--text);
+  text-decoration: none; font-size: var(--fs-md); font-weight: 500;
+}
+.nav-sheet a.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
 
 /* The portal-vs-model lag, carried on every screen (PRODUCT_DESIGN §4.4b). */
 .sync-pill {
-  display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); font-weight: 600;
   padding: 5px 10px; border-radius: var(--r-pill); cursor: pointer;
-  border: 1px solid; background: transparent; font-family: inherit;
+  border: 1px solid; background: transparent; font-family: inherit; white-space: nowrap;
 }
-.sync-pill.amber { color: var(--warn);  border-color: rgba(255,184,77,.45); background: rgba(255,184,77,.10); }
-.sync-pill.clean { color: var(--ok);    border-color: rgba(55,211,155,.35); background: rgba(55,211,155,.08); }
+.sync-pill.amber { color: var(--warn);  border-color: rgba(245,165,36,.45); background: rgba(245,165,36,.10); }
+.sync-pill.clean { color: var(--ok);    border-color: rgba(62,207,142,.35); background: rgba(62,207,142,.08); }
+
+/* Alert bell — the citizen's whole notification channel is in-portal, so this
+   is the only place an alert can surface. It must be visible on every screen
+   and at every width. */
+.bell {
+  position: relative; width: 34px; height: 34px; border-radius: var(--r-sm);
+  background: transparent; border: 1px solid var(--line); color: var(--muted);
+  cursor: pointer; display: grid; place-items: center; font-size: var(--fs-md);
+}
+.bell:hover { color: var(--text); border-color: var(--accent); }
+.bell .count {
+  position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px;
+  padding: 0 4px; border-radius: var(--r-pill); background: var(--danger);
+  color: #fff; font-size: 9.5px; font-weight: 800; display: grid; place-items: center;
+  font-variant-numeric: tabular-nums; border: 2px solid var(--panel);
+}
 
 .role-pill {
-  font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
-  padding: 4px 9px; border-radius: var(--r-pill);
-  border: 1px solid currentColor;
+  font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  padding: 4px var(--s-2); border-radius: var(--r-pill);
+  border: 1px solid currentColor; white-space: nowrap;
 }
 .avatar {
   width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
-  font-weight: 700; font-size: 12px; color: #04121e; cursor: pointer; border: none;
+  font-weight: 700; font-size: var(--fs-sm); color: var(--on-accent); cursor: pointer; border: none;
+  flex: 0 0 30px;
 }
 .acct-menu {
-  position: absolute; right: 14px; top: calc(var(--header-h) - 4px); z-index: 1200;
+  position: absolute; right: var(--s-3); top: calc(var(--header-h) - 4px); z-index: 1200;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
   min-width: 230px; padding: 6px; box-shadow: 0 12px 34px rgba(0,0,0,.5);
 }
-.acct-menu .who { padding: 9px 10px; border-bottom: 1px solid var(--line); margin-bottom: 5px; }
+.acct-menu .who { padding: var(--s-2) 10px; border-bottom: 1px solid var(--line); margin-bottom: 5px; }
 .acct-menu button {
   width: 100%; text-align: left; background: none; border: none; color: var(--text);
-  padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; font-size: 12.5px;
+  padding: var(--s-2) 10px; border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-sm);
   font-family: inherit;
 }
 .acct-menu button:hover { background: var(--card2); color: var(--danger); }
 
 .body { flex: 1; display: flex; min-height: 0; }
 
+/* Scrim behind any off-canvas panel. Rendered only at small widths. */
+.scrim {
+  position: fixed; inset: var(--header-h) 0 0 0; z-index: 690;
+  background: var(--scrim); border: none; padding: 0;
+  animation: fadeIn .14s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } }
+
 /* ── pages ─────────────────────────────────────────────────────────── */
 
-.page { flex: 1; overflow-y: auto; padding: 20px 22px; min-width: 0; }
-.page-head { margin-bottom: 18px; }
-.page-head h1 { font-size: 21px; margin: 0 0 4px; font-weight: 700; }
-.page-head p { margin: 0; color: var(--muted); font-size: 12.5px; max-width: 78ch; line-height: 1.55; }
+.page { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); min-width: 0; }
+.page-head { margin-bottom: var(--s-5); }
+.page-head h1 { font-size: var(--fs-xl); margin: 0 0 var(--s-1); font-weight: 700; line-height: var(--lh-tight); }
+.page-head p { margin: 0; color: var(--muted); font-size: var(--fs-sm); max-width: 78ch; line-height: var(--lh-base); }
 
-.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
-@media (max-width: 1100px) { .grid-3, .grid-4 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+/* Citizen prose runs longer and is read by non-specialists. */
+.page.citizen { max-width: 860px; margin: 0 auto; }
+.page.citizen .page-head p { font-size: var(--fs-md); line-height: var(--lh-loose); }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--s-3); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--s-3); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: var(--s-3); }
 
 /* Attention tiles on the role landing pages. */
 .tile {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
-  padding: 14px; display: flex; flex-direction: column; gap: 3px;
-  text-decoration: none; color: inherit;
+  padding: var(--s-4); display: flex; flex-direction: column; gap: 3px;
+  text-decoration: none; color: inherit; text-align: left; font-family: inherit;
 }
 .tile.clickable { cursor: pointer; }
 .tile.clickable:hover { border-color: var(--accent); }
 .tile-n { font-size: 27px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.tile-l { font-size: 11.5px; color: var(--muted); }
-.tile-s { font-size: 10.5px; color: var(--muted); opacity: .8; }
+.tile-l { font-size: var(--fs-xs); color: var(--muted); }
+.tile-s { font-size: var(--fs-2xs); color: var(--muted); opacity: .8; }
 .tile.red    .tile-n { color: var(--danger); }
 .tile.amber  .tile-n { color: var(--warn); }
 .tile.green  .tile-n { color: var(--ok); }
-.tile.blue   .tile-n { color: var(--accent); }
+.tile.blue   .tile-n { color: var(--accent-text); }
 
 /* ── rail + map ────────────────────────────────────────────────────── */
 
 .rail {
   width: var(--rail-w); flex: 0 0 var(--rail-w); background: var(--panel);
-  border-right: 1px solid var(--line); overflow-y: auto; padding: 12px;
+  border-right: 1px solid var(--line); overflow-y: auto; padding: var(--s-3);
+  animation: railIn .18s ease-out;
 }
-.rail-head { font-size: 11px; font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--muted); margin: 14px 0 7px; }
+@keyframes railIn { from { opacity: 0; transform: translateX(-8px); } }
+
+/* NOTE — the rail is COLLAPSED BY UNMOUNTING IT, not by a `.collapsed` class.
+   A width-and-visibility class was tried first and could not be made to work:
+   the rail is a flex item, and a flex item's default `min-width: auto` resolves
+   to its CONTENT's minimum size. With a district list inside, it refused to go
+   below ~340px against `width: 0`, `flex-basis: 0`, an explicit `min-width: 0`,
+   and even an inline `width: 0px` — the class applied, `visibility` took
+   effect, and the element still occupied its full width. Not rendering it
+   removes the flex item entirely, which is both simpler and unambiguous.
+   `useRail` calls Leaflet's `invalidateSize()` afterwards so the map actually
+   claims the freed space. */
+
+.rail-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-2); margin-bottom: 10px;
+}
+.rail-top .t {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* The collapse control, and the strip that brings the rail back.
+   A dedicated target on purpose: the rail body is toggles, sliders and a
+   district list, so a tap-anywhere affordance would fire every time someone
+   reached for a control. */
+.rail-btn {
+  display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: var(--r-sm); border: 1px solid var(--line);
+  background: var(--card); color: var(--muted); cursor: pointer;
+  font-size: var(--fs-base); line-height: 1; transition: color .12s, border-color .12s;
+}
+.rail-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.rail-peek {
+  position: absolute; z-index: 620; left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 74px; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--line); border-left: none;
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  box-shadow: 2px 0 10px rgba(0,0,0,.35);
+  transition: color .12s, background .12s;
+}
+.rail-peek:hover { color: var(--text); background: var(--card2); }
+.rail-head { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin: var(--s-4) 0 7px; }
 .rail-head:first-child { margin-top: 0; }
 
-.layer-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-size: 12.5px; }
+.layer-row { display: flex; align-items: center; gap: var(--s-2); padding: 6px 0; font-size: var(--fs-sm); }
 .toggle {
   width: 32px; height: 18px; border-radius: var(--r-pill); background: var(--line);
   position: relative; cursor: pointer; border: none; flex: 0 0 32px; transition: background .15s;
@@ -123,14 +249,15 @@
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
 
 .list-item {
-  display: flex; align-items: center; justify-content: space-between; gap: 9px;
-  padding: 9px 10px; border-radius: var(--r-sm); cursor: pointer;
-  border: 1px solid transparent;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  padding: var(--s-2) 10px; border-radius: var(--r-sm); cursor: pointer;
+  border: 1px solid transparent; width: 100%; text-align: left;
+  background: none; color: inherit; font-family: inherit;
 }
 .list-item:hover { background: var(--card2); }
-.list-item.sel { background: rgba(63,182,255,.12); border-color: rgba(63,182,255,.35); }
-.list-item .nm { font-size: 12.5px; font-weight: 500; }
-.list-item .mt { font-size: 10.5px; color: var(--muted); }
+.list-item.sel { background: var(--accent-soft); border-color: var(--accent-line); }
+.list-item .nm { font-size: var(--fs-sm); font-weight: 500; }
+.list-item .mt { font-size: var(--fs-2xs); color: var(--muted); }
 
 .map-wrap { flex: 1; position: relative; min-width: 0; background: var(--bg); }
 .map { position: absolute; inset: 0; }
@@ -143,52 +270,62 @@
    drawer — and the map between them collapses to zero width. */
 .map-shell {
   display: flex; flex: 1; width: 100%;
-  height: 100%; min-height: 0; min-width: 0; overflow: hidden;
+  height: 100%; min-height: 0; min-width: 0; overflow: hidden; position: relative;
 }
 .map-area { flex: 1; position: relative; min-width: 0; background: var(--bg); }
 .map-canvas { position: absolute; inset: 0; }
 .page-map { display: flex; flex: 1; width: 100%; flex-direction: column; height: 100%; min-height: 0; }
 .page-head.compact {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  padding: 12px 18px; margin: 0; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); margin: 0; border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
 }
-.page-head.compact h1 { margin: 0; font-size: 17px; }
+.page-head.compact h1 { margin: 0; font-size: var(--fs-lg); }
 .page-head.compact p { margin: 2px 0 0; }
 .leaflet-container { background: var(--bg); font-family: inherit; }
 .leaflet-control-zoom a { background: var(--card) !important; color: var(--text) !important; border-color: var(--line) !important; }
 .leaflet-tooltip {
   background: var(--card); color: var(--text); border: 1px solid var(--line);
-  box-shadow: none; font-size: 11.5px;
+  box-shadow: none; font-size: var(--fs-xs);
 }
 .leaflet-tooltip::before { border-top-color: var(--line); }
 
 .map-ov {
-  position: absolute; z-index: 600; background: rgba(14,17,22,.92);
+  position: absolute; z-index: 600; background: rgba(15,16,19,.92);
   border: 1px solid var(--line); border-radius: var(--r-md);
-  padding: 10px 12px; font-size: 11.5px; backdrop-filter: blur(5px);
+  padding: 10px var(--s-3); font-size: var(--fs-xs); backdrop-filter: blur(5px);
 }
-.map-ov.legend { left: 12px; bottom: 12px; min-width: 200px; max-width: 260px; }
-.map-ov.status { right: 12px; bottom: 12px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
-.map-ov.hint { top: 12px; left: 50%; transform: translateX(-50%); max-width: 420px; text-align: center; }
-.ov-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+.map-ov.legend { left: var(--s-3); bottom: var(--s-3); min-width: 200px; max-width: 260px; max-height: 46%; overflow-y: auto; }
+.map-ov.status { right: var(--s-3); bottom: var(--s-3); font-family: var(--mono); font-size: var(--fs-2xs); color: var(--muted); }
+.map-ov.hint { top: var(--s-3); left: 50%; transform: translateX(-50%); max-width: 420px; text-align: center; }
+.ov-title { font-size: var(--fs-2xs); letter-spacing: .08em; text-transform: uppercase;
   color: var(--muted); font-weight: 700; margin-bottom: 6px; }
-.legend h5 { margin: 0 0 7px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.legend-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.legend h5 { margin: 0 0 7px; font-size: var(--fs-2xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.legend-row { display: flex; align-items: center; gap: var(--s-2); padding: 2px 0; }
 .legend-hr { height: 1px; background: var(--line); margin: 7px 0; }
 
+/* A collapsible legend, so it can be folded away on a small screen where it
+   would otherwise cover a quarter of the map. */
+.legend-toggle {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-family: inherit; font-size: var(--fs-2xs); letter-spacing: .08em;
+  text-transform: uppercase; font-weight: 700; padding: 0; display: flex;
+  align-items: center; gap: 6px; width: 100%;
+}
+
 .ribbon {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 600;
-  background: rgba(255,184,77,.16); color: var(--warn);
-  border: 1px solid rgba(255,184,77,.45);
-  font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
-  padding: 5px 14px; border-radius: var(--r-pill);
+  position: absolute; top: var(--s-3); left: 50%; transform: translateX(-50%); z-index: 600;
+  background: rgba(245,165,36,.16); color: var(--warn);
+  border: 1px solid rgba(245,165,36,.45);
+  font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  padding: 5px var(--s-4); border-radius: var(--r-pill);
 }
 
 .isr-pin-wrap { background: none; border: none; }
 .isr-pin {
   width: 12px; height: 12px; background: var(--warn);
-  border: 2px solid #04121e; transform: rotate(45deg);
-  box-shadow: 0 0 0 1px rgba(255,184,77,.6);
+  border: 2px solid var(--on-accent); transform: rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(245,165,36,.6);
 }
 
 /* The dropped pin. A ring rather than a teardrop: it marks a coordinate the
@@ -197,73 +334,467 @@
 .pin-wrap { background: none; border: none; }
 .map-pin {
   width: 14px; height: 14px; border-radius: 50%;
-  background: rgba(63,182,255,.35); border: 2.5px solid var(--accent);
-  box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 12px rgba(63,182,255,.7);
+  background: rgba(61,126,255,.35); border: 2.5px solid var(--accent);
+  box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 12px rgba(61,126,255,.7);
   animation: pinPulse 1.8s ease-out infinite;
 }
 @keyframes pinPulse {
-  0%   { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(63,182,255,.55); }
-  70%  { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 12px rgba(63,182,255,0); }
-  100% { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(63,182,255,0); }
+  0%   { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(61,126,255,.55); }
+  70%  { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 12px rgba(61,126,255,0); }
+  100% { box-shadow: 0 0 0 2px rgba(4,18,30,.8), 0 0 0 0 rgba(61,126,255,0); }
 }
 
 /* Leaflet tooltips for the engine layers. Wider than the default so an aquifer
    line does not wrap after three words. */
-.plume-tip, .aq-tip { max-width: 300px; white-space: normal; line-height: 1.5; }
+.plume-tip, .aq-tip { max-width: 300px; white-space: normal; line-height: var(--lh-base); }
 
 /* ── drawer ────────────────────────────────────────────────────────── */
 
 .drawer {
   width: var(--drawer-w); flex: 0 0 var(--drawer-w); background: var(--panel);
   border-left: 1px solid var(--line); display: flex; flex-direction: column;
-  min-height: 0; overflow-y: auto; padding-bottom: 16px;
+  min-height: 0; overflow-y: auto; padding-bottom: var(--s-4);
   animation: slideIn .16s ease-out;
 }
 /* The engine drawer carries sliders, three metric cards and a register form.
    At the standard width those wrap into an unreadable column. */
 .drawer.wide { width: 380px; flex: 0 0 380px; }
-.drawer > *:not(.drawer-head) { padding-left: 14px; padding-right: 14px; }
+.drawer > *:not(.drawer-head) { padding-left: var(--s-4); padding-right: var(--s-4); }
 .drawer-head {
-  padding: 13px 14px; border-bottom: 1px solid var(--line);
+  padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--line);
   display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
   position: sticky; top: 0; background: var(--panel); z-index: 2;
 }
-.drawer-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
-.dh-title { font-size: 15px; font-weight: 700; }
-.dh-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.drawer-body { padding: 13px 14px; overflow-y: auto; }
+.drawer-head h2 { margin: 0; font-size: var(--fs-lg); font-weight: 700; }
+.dh-title { font-size: var(--fs-lg); font-weight: 700; }
+.dh-sub { font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; }
+.drawer-body { padding: var(--s-3) var(--s-4); overflow-y: auto; }
+
+/* The grab handle only appears when the drawer is a bottom sheet. */
+.sheet-grip { display: none; }
 
 .sec {
-  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--muted); font-weight: 700; margin: 16px 0 8px;
+  font-size: var(--fs-2xs); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; margin: var(--s-4) 0 var(--s-2);
 }
-.metric-row { display: grid; gap: 8px; }
+.metric-row { display: grid; gap: var(--s-2); }
 .btn.block { width: 100%; justify-content: center; margin-top: 10px; }
-.seg.seg-sm button { padding: 5px 9px; font-size: 11.5px; }
+.seg.seg-sm button { padding: 5px 9px; font-size: var(--fs-xs); }
 .spinner.sm { width: 12px; height: 12px; border-width: 2px; margin-left: 7px; vertical-align: -1px; }
 
-.kv { display: grid; grid-template-columns: 44% 1fr; gap: 7px 10px; font-size: 12.5px; }
+.kv { display: grid; grid-template-columns: 44% 1fr; gap: 7px 10px; font-size: var(--fs-sm); }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
 
 /* ── login ─────────────────────────────────────────────────────────── */
 
 .login {
-  height: 100%; display: grid; place-items: center;
-  background: radial-gradient(1100px 560px at 50% -12%, #14202c 0%, var(--bg) 62%);
+  height: 100%; display: grid; place-items: center; overflow-y: auto;
+  padding: var(--s-5) var(--s-4);
+  background: radial-gradient(900px 460px at 50% -14%, #171b22 0%, var(--bg) 60%);
 }
 .login-card {
-  width: 400px; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 14px; padding: 26px; box-shadow: 0 26px 60px rgba(0,0,0,.55);
+  width: 400px; max-width: 100%; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; padding: var(--s-6); box-shadow: 0 26px 60px rgba(0,0,0,.55);
 }
-.login-card h1 { margin: 0 0 3px; font-size: 20px; }
-.field { margin-bottom: 13px; }
-.field label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
-.demo-users { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 13px; }
+.login-card h1 { margin: 0 0 3px; font-size: var(--fs-xl); }
+.field { margin-bottom: var(--s-3); }
+.field label { display: block; font-size: var(--fs-xs); color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+.field .hint { font-size: var(--fs-2xs); color: var(--muted); margin-top: 4px; line-height: var(--lh-snug); }
+.field .err { font-size: var(--fs-2xs); color: var(--danger); margin-top: 4px; }
+.demo-users { margin-top: var(--s-5); border-top: 1px solid var(--line); padding-top: var(--s-3); }
 .demo-user {
-  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  display: flex; align-items: center; gap: var(--s-2); width: 100%; text-align: left;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm);
   padding: 7px 9px; margin-bottom: 5px; cursor: pointer; color: var(--text);
-  font-family: inherit; font-size: 12px;
+  font-family: inherit; font-size: var(--fs-sm); flex-wrap: wrap;
 }
 .demo-user:hover { border-color: var(--accent); }
+.link-btn {
+  background: none; border: none; color: var(--accent-text); cursor: pointer;
+  font-family: inherit; font-size: var(--fs-sm); padding: 0; text-decoration: underline;
+}
+
+/* ── scale ─────────────────────────────────────────────────────────── */
+
+/* The representative fraction, sitting under Leaflet's distance bar. The two
+   answer different questions — "how far is that" and "what scale is this" —
+   so both are shown rather than one replacing the other. */
+.scale-ratio {
+  display: flex; align-items: baseline; gap: 6px;
+  background: rgba(15,16,19,.86); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 2px 7px;
+  font-family: var(--mono); font-size: var(--fs-2xs); color: var(--text);
+  backdrop-filter: blur(4px);
+}
+.scale-ratio .sr-n { font-variant-numeric: tabular-nums; }
+.scale-ratio .sr-t {
+  font-family: inherit; font-size: 9px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted); cursor: help;
+}
+.leaflet-control-scale-line {
+  background: rgba(15,16,19,.86) !important; color: var(--text) !important;
+  border-color: var(--line) !important; font-size: var(--fs-2xs);
+}
+
+/* ══ RESPONSIVE ══════════════════════════════════════════════════════ */
+
+/* ≥768px and <1024px — the drawer stops taking a column and overlays the map
+   from the right, so the map keeps its width while a result is being read. */
+@media (max-width: 1023px) {
+  .map-shell .drawer,
+  .map-shell .drawer.wide {
+    position: absolute; inset: 0 0 0 auto; z-index: 700;
+    width: min(380px, 82vw); flex: none;
+    box-shadow: -14px 0 40px rgba(0,0,0,.45);
+  }
+  :root { --rail-w: 300px; }
+  .grid-4 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* <900px — the header nav does not fit beside the brand and the account
+   controls, so it moves into a menu. */
+@media (max-width: 899px) {
+  .hdr-nav { display: none; }
+  .nav-btn { display: grid; }
+  .hdr-brand .hdr-sub { display: none; }
+  .grid-3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* <768px — panels change kind. */
+@media (max-width: 767px) {
+  .page { padding: var(--s-4) var(--s-3); }
+  .page-head { margin-bottom: var(--s-4); }
+  .page-head h1 { font-size: var(--fs-lg); }
+
+  /* Rail → off-canvas sheet over a scrim, on map screens AND on the
+     page-with-rail screens (Console side panel). */
+  .map-shell .rail,
+  .body > .rail {
+    position: fixed; inset: var(--header-h) auto 0 0; z-index: 700;
+    width: min(88vw, var(--rail-w)); flex: none;
+    box-shadow: 14px 0 40px rgba(0,0,0,.5);
+  }
+
+  /* Drawer → bottom sheet. A right-hand column at 375px hides the map it is
+     describing; a bottom sheet leaves the top half of the map visible. */
+  .map-shell .drawer,
+  .map-shell .drawer.wide {
+    inset: auto 0 0 0; width: 100%; max-height: 76vh;
+    border-left: none; border-top: 1px solid var(--line);
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    box-shadow: 0 -14px 40px rgba(0,0,0,.5);
+    animation: sheetUp .18s ease-out;
+  }
+  .map-shell .drawer .sheet-grip {
+    display: block; width: 38px; height: 4px; border-radius: 99px;
+    background: var(--line); margin: var(--s-2) auto 0; flex: none;
+  }
+  .drawer-head { padding: var(--s-2) var(--s-3) var(--s-3); }
+
+  .map-ov.legend { max-width: 190px; font-size: var(--fs-2xs); max-height: 38%; }
+  .map-ov.hint { max-width: calc(100vw - 24px); font-size: var(--fs-2xs); }
+  .map-ov.status { display: none; }
+
+  .kv { grid-template-columns: 1fr; gap: 2px var(--s-2); }
+  .kv dt { margin-top: 6px; font-size: var(--fs-xs); }
+  .kv dd { font-size: var(--fs-base); }
+
+  .page-head.compact { padding: var(--s-2) var(--s-3); }
+  .login-card { padding: var(--s-4); }
+}
+
+/* <640px — one column everywhere. */
+@media (max-width: 639px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  .hdr { gap: var(--s-2); padding: 0 var(--s-2); }
+  .hdr-name { font-size: var(--fs-md); }
+  .role-pill { display: none; }   /* the account menu still shows the role */
+  .sync-pill span:last-child { display: none; }  /* dot only */
+  .sync-pill { padding: 5px 7px; }
+}
+
+/* ── resizable panels + floating overlays (R10) ────────────────────── */
+
+/* The drag edge. `.rail` and `.drawer` are `position: static` in flow, so the
+   handle is positioned against `.map-shell`-relative stacking by making the
+   panel itself the containing block. */
+.rail, .drawer { position: relative; }
+
+.resize-handle {
+  position: absolute; top: 0; bottom: 0; width: 9px; z-index: 5;
+  cursor: col-resize; touch-action: none;
+  background: transparent; transition: background .12s;
+}
+.resize-handle.right { right: -4px; }
+.resize-handle.left  { left: -4px; }
+.resize-handle::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 1px; margin-left: -.5px; background: transparent; transition: background .12s;
+}
+.resize-handle:hover::after, .resize-handle.on::after { background: var(--accent); }
+.resize-handle.on { background: rgba(61,126,255,.08); }
+
+/* While dragging, no text anywhere should select. */
+body:has(.resize-handle.on) { user-select: none; }
+
+/* The tab that brings a hidden drawer back, mirroring `.rail-peek`. */
+.drawer-peek {
+  position: absolute; z-index: 620; right: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 74px; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--line); border-right: none;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  box-shadow: -2px 0 10px rgba(0,0,0,.35);
+  transition: color .12s, background .12s;
+}
+.drawer-peek:hover { color: var(--text); background: var(--card2); }
+
+/* Floating, draggable overlay (the legend). */
+.map-ov.floater { padding: 0; min-width: 210px; max-width: 280px; }
+.map-ov.floater.bottom-left  { left: var(--s-3); bottom: var(--s-3); }
+.map-ov.floater.bottom-right { right: var(--s-3); bottom: var(--s-3); }
+.map-ov.floater.top-left     { left: var(--s-3); top: 58px; }
+.map-ov.floater.dragging { box-shadow: 0 18px 40px rgba(0,0,0,.55); }
+
+.floater-bar {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 7px 8px 7px 6px; cursor: grab; touch-action: none;
+  border-bottom: 1px solid var(--line);
+}
+.floater.dragging .floater-bar { cursor: grabbing; }
+.floater-grip {
+  width: 9px; height: 14px; flex: 0 0 9px; opacity: .55;
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 4px 4px; color: var(--muted);
+}
+.floater-bar .ov-title { flex: 1; }
+.floater-btn {
+  width: 20px; height: 20px; flex: 0 0 20px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--card); color: var(--muted);
+  cursor: pointer; display: grid; place-items: center; font-size: var(--fs-base);
+  line-height: 1; font-family: inherit; padding: 0;
+}
+.floater-btn:hover { color: var(--text); border-color: var(--accent); }
+.floater-body {
+  padding: var(--s-2) var(--s-3) 10px;
+  max-height: 42vh; overflow-y: auto;
+}
+
+/* The map-mode switch — which of the two things a map click means. */
+.map-ov.modesw {
+  top: var(--s-3); left: var(--s-3); padding: 5px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.map-ov.modesw .seg { gap: 3px; }
+.map-ov.modesw .seg button { padding: 5px 10px; }
+.modesw-note { font-size: var(--fs-2xs); color: var(--muted); max-width: 210px;
+  padding: 0 3px 2px; line-height: var(--lh-snug); }
+
+@media (max-width: 767px) {
+  /* Resize edges are a pointer affordance; at sheet widths the panels are
+     full-bleed and there is no column to resize. */
+  .resize-handle { display: none; }
+  .map-ov.floater { max-width: 62vw; }
+  .floater-body { max-height: 34vh; }
+  .map-ov.modesw { left: var(--s-2); top: var(--s-2); }
+  .modesw-note { display: none; }
+}
+
+/* ── the ISR report as a document (R10) ────────────────────────────── */
+
+/* The report is prose and figures, not a console. It gets a measure, a title
+   block and a colophon, and it is the one screen in the product that is meant
+   to be read straight through rather than operated. */
+.report-page { max-width: 1080px; margin: 0 auto; }
+.report-doc { display: block; }
+
+.doc-head { margin-bottom: var(--s-5); }
+.doc-eyebrow {
+  font-size: var(--fs-2xs); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700;
+}
+.doc-head h1 {
+  font-size: 28px; line-height: var(--lh-tight); margin: var(--s-2) 0 var(--s-1);
+  font-weight: 700; letter-spacing: -.01em;
+}
+.doc-sub { color: var(--muted); font-size: var(--fs-md); max-width: 70ch; }
+
+/* The identity strip. A screening document that does not say which site, which
+   horizon and when it was generated is not re-checkable. */
+.doc-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s-3); margin: var(--s-4) 0 0; padding: var(--s-3) 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.doc-meta dt {
+  font-size: var(--fs-2xs); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; margin-bottom: 3px;
+}
+.doc-meta dd { margin: 0; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
+
+.doc-foot {
+  margin-top: var(--s-5); padding-top: var(--s-3); border-top: 1px solid var(--line);
+  font-size: var(--fs-xs); color: var(--muted); line-height: var(--lh-base);
+}
+
+/* A figure and its numbers, side by side. The depth schematic is the case this
+   exists for: at full width the section became a tall diagram with the numbers
+   that interpret it pushed a screen below. */
+.split-figure {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--s-4); align-items: start;
+}
+.split-figure-fig { min-width: 0; }
+.split-figure-num { min-width: 0; }
+
+.report-map {
+  height: 380px; width: 100%; border-radius: var(--r-md);
+  border: 1px solid var(--line); overflow: hidden;
+}
+
+@media (max-width: 899px) {
+  .split-figure { grid-template-columns: minmax(0, 1fr); }
+  .report-map { height: 300px; }
+  .doc-head h1 { font-size: 22px; }
+}
+
+/* ── PDF capture palette ───────────────────────────────────────────────
+   The console theme is dark; an A4 page is not. During capture the report
+   container redefines the token layer to a light document palette, so every
+   child — cards, chips, SVG charts, band glyphs — follows without knowing it is
+   being printed. Only the tokens change; no call site does.                */
+.report-doc.printing {
+  --bg:     #ffffff;
+  --panel:  #ffffff;
+  --card:   #ffffff;
+  --card2:  #f4f6f9;
+  --line:   #d3dae3;
+  --text:   #14181f;
+  --muted:  #5a6675;
+  --accent: #1d4ed8;
+  --danger: #b42318;
+  --warn:   #a15c07;
+  --ok:     #067647;
+  --scrim:  rgba(0,0,0,.4);
+  background: #ffffff;
+  color: var(--text);
+  padding: 0 4px;
+}
+.report-doc.printing .card {
+  background: #ffffff; border: 1px solid var(--line);
+  box-shadow: none; break-inside: avoid;
+}
+.report-doc.printing .banner { background: #f6f8fb; }
+.report-doc.printing .banner.warn   { background: #fdf6e8; }
+.report-doc.printing .banner.danger { background: #fdf0ee; }
+.report-doc.printing .banner.ok     { background: #eef8f2; }
+.report-doc.printing .metric { background: #fbfcfe; }
+.report-doc.printing .readonly-val { background: #f7f9fc; }
+/* Controls do not belong in a printed record; the values they chose are
+   already stated in the title block. */
+.report-doc.printing .no-print-controls { display: none; }
+.avoid-break { break-inside: avoid; }
+
+/* ── floating panel resize grip ──────────────────────────────────────
+   The panel is draggable by its title bar and resizable from its bottom-right
+   corner. The grip is a real element rather than `resize: both`, because the
+   native affordance cannot be pointer-captured — a fast drag outside the corner
+   drops the gesture — and does not fire on touch at all. */
+.floater { display: flex; flex-direction: column; }
+.floater .floater-body { overflow: auto; flex: 1 1 auto; min-height: 0; }
+.floater.resizing { user-select: none; }
+.floater-resize {
+  position: absolute; right: 0; bottom: 0;
+  width: 16px; height: 16px;
+  cursor: nwse-resize; touch-action: none;
+  /* Two hairlines reading as a corner, in the panel's own border colour so the
+     restyle carries it without a second token. */
+  background:
+    linear-gradient(135deg, transparent 0 45%, var(--line) 45% 55%, transparent 55% 100%),
+    linear-gradient(135deg, transparent 0 70%, var(--line) 70% 80%, transparent 80% 100%);
+  opacity: .75;
+}
+.floater-resize:hover { opacity: 1; }
+
+/* ── suggested well sites ────────────────────────────────────────────
+   Hollow and numbered, so a candidate reads as a proposal rather than as a
+   well that already exists. The numbers tie each marker to its table row. */
+.suggest-pin-wrap { background: none; border: none; }
+.suggest-pin {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px dashed var(--accent, #3D7EFF);
+  background: color-mix(in srgb, var(--accent, #3D7EFF) 18%, transparent);
+  color: var(--accent-text, #3D7EFF);
+  font-size: 12px; font-weight: 700; line-height: 18px; text-align: center;
+}
+
+/* ── grouped header nav ──────────────────────────────────────────────
+   Eleven flat links overflowed the header and collided with the sync pill and
+   account controls. Five groups keep the header a fixed width no matter how
+   many sections exist.
+
+   The tokens here are the REAL ones. The first version reached for
+   `--surface` / `--surface-2` / `--text-dim`, none of which exist in
+   theme.css — so every one fell back to its second argument and the menu
+   rendered white-on-white in a dark UI. Styling matches `.acct-menu`, which is
+   the other dropdown in this same header, so the two cannot drift apart. */
+.nav-group { position: relative; display: inline-flex; }
+.nav-group-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px var(--s-3); border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted);
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 500;
+  white-space: nowrap; cursor: pointer;
+}
+.nav-group-btn:hover { background: var(--card2); color: var(--text); }
+.nav-group-btn.active {
+  background: var(--accent-soft); color: var(--accent-text); font-weight: 700;
+}
+.nav-group-btn .caret { font-size: 9px; opacity: .6; }
+
+.nav-drop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 1200;
+  min-width: 212px; padding: 6px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-md); box-shadow: 0 12px 34px rgba(0, 0, 0, .5);
+  display: flex; flex-direction: column; gap: 2px;
+}
+/* `color` is set explicitly rather than inherited: the header sets a muted
+   colour for its links, and inheriting it into a panel with its own background
+   is how the first version ended up unreadable. */
+.nav-drop a {
+  padding: var(--s-2) 10px; border-radius: var(--r-sm);
+  color: var(--text); text-decoration: none;
+  font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
+}
+.nav-drop a:hover { background: var(--card2); color: var(--text); }
+.nav-drop a.active {
+  background: var(--accent-soft); color: var(--accent-text); font-weight: 700;
+}
+
+/* Mobile sheet keeps the grouping as headings — a flat list of eleven is the
+   thing being fixed, and it is no better in a drawer. */
+.nav-sheet-head {
+  padding: 10px 12px 4px; font-size: var(--fs-xs, 11px); font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+
+/* ── citizen block summary ───────────────────────────────────────────
+   Six counts, and the two "unknown" ones carry the same visual weight as the
+   rest. Greying them out would repeat the mistake the copy exists to prevent. */
+.blk-summary { padding: 0 var(--s-3) var(--s-2); }
+.blk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.blk-cell {
+  background: var(--card2); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 7px 9px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.blk-cell b { font-size: var(--fs-lg); line-height: 1.1; color: var(--text); }
+.blk-cell span { font-size: 11px; color: var(--muted); line-height: 1.25; }
+.blk-cell.danger b { color: #f2555a; }
+.blk-cell.warn   b { color: #f5a524; }
+.blk-cell.ok     b { color: #3ecf8e; }
+.blk-cell.grey   b { color: #8b919c; }

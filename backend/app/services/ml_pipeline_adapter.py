@@ -59,7 +59,30 @@ ALLOWED_PAYLOAD_KEYS = frozenset({
 })
 
 #: Sliders a caller may set. `lon`/`lat` come from the ISR point, not the body.
+#:
+#: Still the full set, because the INTERACTIVE map path (`POST /ml/predict`) has
+#: no registered site behind it: an unpersisted pin run has to supply its own
+#: operating parameters or it has none. That path is explicitly exploratory and
+#: stores nothing.
 CLIENT_TUNABLE = ALLOWED_PAYLOAD_KEYS - {"lon", "lat"}
+
+#: What a run against a REGISTERED SITE may vary — and it is only these three.
+#:
+#: P2. A site is the operation (migration 0015), so "run this site" must mean
+#: the same thing to everyone who does it. `RunRequest` was cut to these three
+#: fields for that reason, but the schema alone was not enough: a **scenario**
+#: stores an arbitrary parameter dict, validates it against `CLIENT_TUNABLE`,
+#: and `POST /scenarios/{id}/run` feeds it straight in as run overrides —
+#: bypassing `RunRequest` entirely. `operation_years` could therefore still
+#: override the site through the scenario door after the front door was shut.
+#:
+#: So the rule lives here, next to the allowlist it narrows, and both the
+#: scenario validator and the run service enforce it. One definition, two
+#: enforcement points, no third door.
+#:
+#: `species` is included because it selects which contaminant to solve for, not
+#: how the operation is configured.
+RUN_VARIABLE = frozenset({"species", "time_years", "restoration_years"})
 
 #: Engine inputs a portal user may NOT override, even though the pipeline's own
 #: local dashboard exposes them as "expert" fields. These are exactly the
@@ -74,6 +97,53 @@ EXPERT_OVERRIDES_WITHHELD = frozenset({
 
 class MLPipelineError(RuntimeError):
     pass
+
+
+#: Site column -> engine field. Identical for most, but the mapping is written
+#: out so a rename on either side is a compile-time-ish failure here rather than
+#: a parameter that silently stops crossing.
+SITE_TO_ENGINE = {
+    "injection_rate_m3_day": "injection_rate_m3_day",
+    "bleed_percent": "bleed_percent",
+    "operation_years": "operation_years",
+    "restoration_years": "restoration_years",
+    "wellfield_width_m": "wellfield_width_m",
+    "monitor_ring_m": "monitor_ring_m",
+    "ore_depth_m": "ore_depth_m",
+    "ore_thickness_m": "ore_thickness_m",
+    "regime_override": "regime",
+    "gradient_i": "gradient_i",
+    "azimuth_deg": "azimuth_deg",
+}
+
+
+def payload_from_site(site: Any, *, overrides: Optional[dict[str, Any]] = None
+                      ) -> dict[str, Any]:
+    """Build the engine payload from a registered ISR point.
+
+    NOT a violation of this module's rule. The rule keeps *measured* values —
+    chemistry, hydrogeology, baselines, anything a field observation could
+    touch — from crossing into a model whose conformal coverage was calibrated
+    without them. These are the operator's chosen SCENARIO INPUTS: how much
+    lixiviant, over how many years, across what footprint. They are the same
+    numbers a Studio slider used to supply, now stored on the site so a run is
+    reproducible and two people mean the same thing by one name.
+
+    `overrides` is what the Studio may still vary — evaluation year and
+    restoration years — and is filtered by the same allowlist as everything
+    else.
+    """
+    from geoalchemy2.shape import to_shape
+    point = to_shape(site.location)
+    params: dict[str, Any] = {}
+    for column, field in SITE_TO_ENGINE.items():
+        value = getattr(site, column, None)
+        if value is not None:
+            params[field] = value
+    if getattr(site, "injection_start_date", None):
+        params["start_date"] = site.injection_start_date.date().isoformat()
+    params.update(overrides or {})
+    return build_payload(lon=point.x, lat=point.y, params=params)
 
 
 def build_payload(*, lon: float, lat: float,
@@ -175,9 +245,31 @@ async def predict(payload: dict[str, Any]) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         raise MLPipelineError(f"ml_pipeline call failed: {exc}") from exc
     if resp.status_code != 200:
-        raise MLPipelineError(
-            f"ml_pipeline returned {resp.status_code}: {resp.text[:300]}")
+        raise _engine_http_error(resp)
     return resp.json()
+
+
+def _engine_http_error(resp) -> "MLPipelineError":
+    """Turn an engine HTTP failure into something a person can act on.
+
+    A 429 used to reach the screen verbatim as
+    `MLPipelineError: ml_pipeline returned 429: {"code":"RATE_LIMITED",...}` —
+    raw JSON, an internal env-var name, and no indication of what the reader
+    should do. The reader is an analyst looking at a report, not the person who
+    configured the limiter.
+
+    Rate limiting is the one engine failure a user routinely causes and can
+    routinely clear by waiting, so it gets its own sentence. Everything else
+    keeps the status and body, which is what a developer needs.
+    """
+    if resp.status_code == 429:
+        return MLPipelineError(
+            "The engine is rate limiting this client: too many solves in the "
+            "last minute. Nothing is wrong with the model or the site — wait a "
+            "few seconds and try again. If this keeps happening on ordinary "
+            "use, it means something is calling the engine in a loop.")
+    return MLPipelineError(
+        f"ml_pipeline returned {resp.status_code}: {resp.text[:300]}")
 
 
 async def get_json(path: str, params: Optional[dict[str, Any]] = None,
@@ -201,9 +293,7 @@ async def get_json(path: str, params: Optional[dict[str, Any]] = None,
     except Exception as exc:  # noqa: BLE001
         raise MLPipelineError(f"ml_pipeline call failed: {exc}") from exc
     if resp.status_code != 200:
-        raise MLPipelineError(
-            f"ml_pipeline returned {resp.status_code}: {resp.text[:300]}",
-            )
+        raise _engine_http_error(resp)
     return resp.json()
 
 

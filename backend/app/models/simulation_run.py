@@ -44,6 +44,12 @@ class SimulationRun(Base):
     extrapolation: Mapped[Optional[list[str]]] = mapped_column(
         ARRAY(Text), nullable=True)
     hydro: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+
+    #: Plume geometry for redraw (migration 0016). NULL on runs completed before
+    #: P2 — a real state the API reports rather than papering over, because the
+    #: alternative is a client drawing an empty map and calling it a result.
+    plume: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     runtime_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 

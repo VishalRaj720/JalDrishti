@@ -1,174 +1,336 @@
 /* JalDrishti portal — design tokens.
  *
- * Taken from the `ml_pipeline` dashboard (frontend/ml_pipeline/styles.css), the
- * working scientific instrument this portal has to contain. Reusing its palette
- * means the Simulation Studio sits inside the portal instead of looking bolted
- * on, and a dark console is the right register for an operations screen read
- * for long stretches beside a dark map.
+ * R10 RESTYLE. The palette was inherited wholesale from the `ml_pipeline`
+ * dashboard: a blue-tinted dark console with a cyan accent. It read as an
+ * instrument panel, which was right when the engine was the whole product and
+ * wrong now that the same codebase serves a resident reading prose about their
+ * drinking water.
+ *
+ * The register is now MINIMAL AND CLASSIC, in the spirit of the Cursor editor:
+ *
+ *   · SURFACES ARE NEUTRAL, not blue. The old greys carried a blue cast that
+ *     fought every blue thing placed on them — the accent, the porous-regime
+ *     fill, the ML envelope. Near-neutral ink lets one blue mean one thing.
+ *   · ONE ACCENT, USED SPARINGLY. Steel blue #3D7EFF. Colour now marks the
+ *     interactive and the important; everything else is greyscale.
+ *   · FEWER, QUIETER BORDERS. `--line` is a separator, not an outline. Density
+ *     comes from spacing and type, which is why the scales below matter more
+ *     than the hues.
+ *
+ * WHAT DID NOT CHANGE, and must not:
+ *
+ *   · a TYPE SCALE and a SPACING SCALE, so cards align vertically across the
+ *     product rather than each rule inventing its own 11px
+ *   · RISK ENCODING THAT IS NOT ONLY COLOUR — a green/amber/red ramp is the
+ *     entire risk vocabulary of this product and ~1 in 12 men cannot separate
+ *     the amber from the red. Every band carries a GLYPH and a BORDER
+ *     TREATMENT alongside its hue (see `--band-*` below and `.band` in
+ *     layout.css). Leaflet gets the same treatment via `dashArray`/`weight`.
+ *   · BREAKPOINTS as named tokens, because the citizen surface is read on a
+ *     phone and the staff console on a desktop, from one codebase.
+ *
+ * ACCENT CONTRAST, stated because it is easy to undo by accident. #3D7EFF is a
+ * mid blue: excellent as a FILL with near-black text on it (~4.9:1), and
+ * marginal as small TEXT on a dark surface (~4.4:1). So there are two tokens.
+ * `--accent` fills, strokes and marks state; `--accent-text` is the lighter
+ * tint used wherever the blue is a glyph or a word (~7:1). Reaching for
+ * `--accent` on text is the mistake this pair exists to prevent.
  */
 :root {
-  --bg:      #0e1116;
-  --panel:   #161b22;
-  --card:    #1b222c;
-  --card2:   #212a36;
-  --line:    #2b3441;
-  --text:    #e6edf3;
-  --muted:   #8b97a7;
-  --accent:  #3fb6ff;
-  --danger:  #ff5a5a;
-  --warn:    #ffb84d;
-  --ok:      #37d39b;
+  /* ── colour ─────────────────────────────────────────────────────── */
+  --bg:      #0f1013;
+  --panel:   #16181c;
+  --card:    #191c21;
+  --card2:   #202429;
+  --line:    #282c33;
+  --text:    #e7e9ee;
+  --muted:   #8b919c;
+
+  --accent:      #3d7eff;   /* fills, strokes, active state */
+  --accent-text: #7ea6ff;   /* the same blue as a word or a glyph */
+  --accent-soft: rgba(61,126,255,.13);
+  --accent-line: rgba(61,126,255,.38);
+  --on-accent:   #05101f;   /* text ON an accent fill */
+
+  --danger:  #f2555a;
+  --warn:    #f5a524;
+  --ok:      #3ecf8e;
   --frac:    #e8833a;   /* fractured regime */
-  --porous:  #3f8cff;   /* porous regime   */
+  --porous:  #4a86e8;   /* porous regime   */
+
+  /* Backdrop behind off-canvas panels on small screens. */
+  --scrim: rgba(6, 7, 10, .66);
 
   /* Role identity. Distinct hues so a screenshot is unambiguous about who is
-     looking, which matters when five roles see five different portals. */
-  --role-admin:     #ff5a5a;
-  --role-regulator: #a78bfa;
-  --role-analyst:   #3fb6ff;
-  --role-field:     #37d39b;
-  --role-citizen:   #ffb84d;
+     looking. `regulator` was RETIRED from the application vocabulary in R7
+     (migration 0019) and has no token here — a colour for a role that cannot
+     sign in is an invitation to reintroduce it. */
+  --role-admin:   #f2555a;
+  --role-analyst: #3d7eff;
+  --role-field:   #3ecf8e;
+  --role-citizen: #f5a524;
 
+  /* ── risk bands ─────────────────────────────────────────────────────
+     One vocabulary, used by chips, lists, legends and map geometry alike.
+     `--band-*-glyph` is the non-colour carrier; `--band-*-dash` is what
+     Leaflet strokes with so a polygon is separable in greyscale too. */
+  --band-high:  var(--danger);
+  --band-mod:   var(--warn);
+  --band-low:   var(--ok);
+  --band-none:  var(--muted);
+
+  /* ── spacing ────────────────────────────────────────────────────── */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+
+  /* ── type scale ─────────────────────────────────────────────────── */
+  --fs-2xs: 10px;   /* uppercase eyebrow labels only */
+  --fs-xs:  11px;   /* captions, legend rows, table headers */
+  --fs-sm:  12px;   /* secondary body, chips, muted notes */
+  --fs-base:13px;   /* body default */
+  --fs-md:  14px;   /* emphasised body, inputs */
+  --fs-lg:  16px;   /* card/drawer headings */
+  --fs-xl:  20px;   /* page titles */
+  --fs-2xl: 26px;   /* metric values, tile numbers */
+  --fs-3xl: 32px;   /* citizen hero numbers */
+
+  --lh-tight: 1.2;
+  --lh-snug:  1.4;
+  --lh-base:  1.55;
+  --lh-loose: 1.7;   /* citizen prose — read by non-specialists */
+
+  /* ── layout ─────────────────────────────────────────────────────── */
   --header-h: 56px;
   --rail-w:   340px;
   --drawer-w: 460px;
   --r-sm: 6px; --r-md: 8px; --r-lg: 11px; --r-pill: 999px;
   --mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Minimum comfortable touch target. Applied to controls on coarse pointers
+     rather than everywhere, so the desktop console stays dense. */
+  --touch: 44px;
+
+  /* Breakpoints, documented here and hand-inlined in @media (CSS variables are
+     not valid in media queries):
+       --bp-sm  640px   single column, citizen phone layout
+       --bp-md  768px   rail becomes off-canvas, drawer becomes a bottom sheet
+       --bp-lg  1024px  drawer overlays the map instead of taking a column
+       --bp-xl  1280px  full three-column console                             */
 }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body {
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 14px;
+  font-size: var(--fs-md);
+  line-height: var(--lh-base);
   background: var(--bg);
   color: var(--text);
+  -webkit-text-size-adjust: 100%;
 }
-a { color: var(--accent); }
+a { color: var(--accent-text); }
+
+/* Keyboard focus must be visible everywhere. The console is dense and several
+   controls are icon-only, so relying on the UA default (which some resets kill)
+   is not safe. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
 
 /* ── primitives ────────────────────────────────────────────────────── */
 
+/* R10: a card is a SURFACE, not a box. The old rule drew a full 1px outline on
+   every card, and a page of eight cards was eight rectangles competing with the
+   content inside them. Restraint here is what buys the density the console
+   needs elsewhere: separation now comes from the surface step and the spacing,
+   and the border is quiet enough to be a hairline rather than a frame. */
 .card {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  padding: 12px 13px;
-  margin-bottom: 11px;
+  padding: var(--s-4);
+  margin-bottom: var(--s-4);
 }
 .card-title {
-  font-size: 12px; font-weight: 700; color: var(--accent);
-  margin-bottom: 9px; text-transform: uppercase; letter-spacing: .4px;
-  display: flex; align-items: center; gap: 8px;
+  font-size: var(--fs-2xs); font-weight: 700; color: var(--muted);
+  margin-bottom: var(--s-3); text-transform: uppercase; letter-spacing: .1em;
+  display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
 }
 .card-title .spacer { margin-left: auto; }
 .muted { color: var(--muted); }
-.small { font-size: 11.5px; }
-.mono  { font-family: var(--mono); font-size: 11.5px; }
-.row   { display: flex; align-items: center; gap: 8px; }
+.small { font-size: var(--fs-xs); }
+.mono  { font-family: var(--mono); font-size: var(--fs-xs); }
+.row   { display: flex; align-items: center; gap: var(--s-2); }
 .wrap  { flex-wrap: wrap; }
 .grow  { flex: 1; }
+.prose { line-height: var(--lh-loose); max-width: 68ch; }
 
 .chip {
-  display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
-  font-size: 10.5px; font-weight: 700; letter-spacing: .03em;
-  border: 1px solid currentColor;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px var(--s-2); border-radius: var(--r-pill);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .03em;
+  border: 1px solid currentColor; white-space: nowrap;
 }
 .chip.ok      { color: var(--ok); }
 .chip.warn    { color: var(--warn); }
 .chip.danger  { color: var(--danger); }
-.chip.info    { color: var(--accent); }
+.chip.info    { color: var(--accent-text); }
 .chip.neutral { color: var(--muted); }
 .chip.planned { color: var(--muted); border-style: dashed; }
 
-.banner {
-  border-radius: var(--r-md); padding: 9px 11px; font-size: 12px;
-  line-height: 1.5; border-left: 3px solid var(--accent);
-  background: rgba(63,182,255,.08);
+/* Risk band — colour PLUS glyph PLUS border treatment.
+   The glyph is generated so no call site can forget it, and the border style
+   differs per band so the four are separable with no colour at all. */
+.band {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px var(--s-2); border-radius: var(--r-pill);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .03em;
+  border: 1px solid currentColor; white-space: nowrap;
 }
-.banner.warn   { border-left-color: var(--warn);   background: rgba(255,184,77,.09); }
-.banner.danger { border-left-color: var(--danger); background: rgba(255,90,90,.09); }
-.banner.ok     { border-left-color: var(--ok);     background: rgba(55,211,155,.08); }
+.band::before { font-size: var(--fs-xs); line-height: 1; }
+.band.high    { color: var(--band-high); border-width: 2px; }
+.band.high::before    { content: "▲"; }
+.band.moderate{ color: var(--band-mod); }
+.band.moderate::before{ content: "◆"; }
+.band.low     { color: var(--band-low); }
+.band.low::before     { content: "●"; }
+.band.none    { color: var(--band-none); border-style: dashed; }
+.band.none::before    { content: "○"; }
+
+.banner {
+  border-radius: var(--r-md); padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-sm); line-height: var(--lh-base);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+}
+.banner.warn   { border-left-color: var(--warn);   background: rgba(245,165,36,.09); }
+.banner.danger { border-left-color: var(--danger); background: rgba(242,85,90,.09); }
+.banner.ok     { border-left-color: var(--ok);     background: rgba(62,207,142,.08); }
 
 button.btn {
   background: var(--card2); color: var(--text);
   border: 1px solid var(--line); border-radius: var(--r-sm);
-  padding: 7px 13px; font-size: 12.5px; cursor: pointer;
+  padding: 7px var(--s-3); font-size: var(--fs-sm); cursor: pointer;
   font-family: inherit; transition: .15s;
+  display: inline-flex; align-items: center; gap: 6px; justify-content: center;
 }
-button.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+button.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); }
 button.btn.primary {
-  background: var(--accent); color: #04121e; border-color: var(--accent); font-weight: 700;
+  background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700;
 }
-button.btn.primary:hover:not(:disabled) { background: #66c6ff; color: #04121e; }
+button.btn.primary:hover:not(:disabled) { background: #5b93ff; color: var(--on-accent); }
 button.btn.ghost { background: transparent; }
-button.btn.danger { color: var(--danger); border-color: rgba(255,90,90,.4); }
+button.btn.danger { color: var(--danger); border-color: rgba(242,85,90,.4); }
+button.btn.danger:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
 button.btn:disabled { opacity: .45; cursor: not-allowed; }
+button.btn.lg { padding: 10px var(--s-4); font-size: var(--fs-base); }
 
-.seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.seg { display: flex; gap: var(--s-1); flex-wrap: wrap; }
 .seg button {
   flex: 1; min-width: 0; background: var(--card2); color: var(--muted);
   border: 1px solid var(--line); border-radius: 7px; padding: 7px 6px;
-  font-size: 11.5px; cursor: pointer; transition: .15s; white-space: nowrap;
+  font-size: var(--fs-xs); cursor: pointer; transition: .15s; white-space: nowrap;
   font-family: inherit;
 }
 .seg button:hover { color: var(--text); }
 .seg button.active {
-  background: var(--accent); color: #04121e; border-color: var(--accent); font-weight: 700;
+  background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700;
 }
 
-.slider { margin: 11px 0; }
+.slider { margin: var(--s-3) 0; }
 .slider label {
-  display: flex; align-items: baseline; gap: 6px; font-size: 12px;
+  display: flex; align-items: baseline; gap: 6px; font-size: var(--fs-sm);
   color: var(--muted); margin-bottom: 5px;
 }
-.slider label .u { font-size: 10px; opacity: .7; }
+.slider label .u { font-size: var(--fs-2xs); opacity: .7; }
 .slider label b {
   margin-left: auto; color: var(--text);
-  font-variant-numeric: tabular-nums; font-size: 13px;
+  font-variant-numeric: tabular-nums; font-size: var(--fs-base);
 }
 input[type=range] {
-  width: 100%; -webkit-appearance: none; height: 5px; border-radius: 5px;
-  background: var(--line); outline: none;
+  width: 100%; -webkit-appearance: none; appearance: none;
+  height: 5px; border-radius: 5px; background: var(--line); outline: none;
 }
 input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
-  background: var(--accent); cursor: pointer; border: 2px solid #04121e;
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 2px solid var(--on-accent);
+}
+input[type=range]::-moz-range-thumb {
+  width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--on-accent);
+  background: var(--accent); cursor: pointer;
 }
 input[type=text], input[type=email], input[type=password], input[type=number],
-select, textarea {
+input[type=date], select, textarea {
   width: 100%; background: var(--bg); color: var(--text);
   border: 1px solid var(--line); border-radius: var(--r-sm);
-  padding: 8px 10px; font-family: inherit; font-size: 13px;
+  padding: var(--s-2) 10px; font-family: inherit; font-size: var(--fs-base);
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--danger); }
+input:disabled, select:disabled, textarea:disabled {
+  opacity: .6; cursor: not-allowed; background: var(--card);
+}
+
+/* A value the user may read but not change — the locked site parameters in the
+   Console. Deliberately NOT a disabled input: a disabled control says "you
+   could set this but not now", and these are properties of a registered site. */
+.readonly-val {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3);
+  padding: 7px 10px; background: var(--card2); border: 1px solid var(--line);
+  border-radius: var(--r-sm); font-size: var(--fs-base);
+}
+.readonly-val .rv-v { font-variant-numeric: tabular-nums; font-weight: 600; }
+.readonly-val .rv-u { color: var(--muted); font-size: var(--fs-xs); }
 
 /* ── metric cards (from the ml_pipeline panel) ─────────────────────── */
 
 .metric {
   background: var(--card); border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
-  border-radius: var(--r-md); padding: 10px 12px;
+  border-radius: var(--r-md); padding: 10px var(--s-3);
 }
 .metric.danger { border-left-color: var(--danger); }
 .metric.warn   { border-left-color: var(--warn); }
 .metric.ok     { border-left-color: var(--ok); }
-.m-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
-.m-value { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
-.m-value.sm { font-size: 15px; }
-.m-unit { font-size: 12px; color: var(--muted); font-weight: 400; }
-.m-band { font-size: 11px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }
+.m-label { font-size: var(--fs-xs); color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.m-value { font-size: var(--fs-2xl); font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; line-height: var(--lh-tight); }
+.m-value.sm { font-size: var(--fs-lg); }
+.m-unit { font-size: var(--fs-sm); color: var(--muted); font-weight: 400; }
+.m-band { font-size: var(--fs-xs); color: var(--muted); margin-top: 3px; font-family: var(--mono); }
 
 /* ── tables ────────────────────────────────────────────────────────── */
 
-table.grid { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.grid { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 table.grid th {
-  text-align: left; font-size: 10.5px; letter-spacing: .06em;
+  text-align: left; font-size: var(--fs-2xs); letter-spacing: .06em;
   text-transform: uppercase; color: var(--muted);
-  padding: 9px 11px; border-bottom: 1px solid var(--line); font-weight: 700;
+  padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--line); font-weight: 700;
 }
-table.grid td { padding: 9px 11px; border-bottom: 1px solid var(--line); }
+table.grid td { padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--line); }
 table.grid tr:hover td { background: var(--card2); }
 table.grid tr:last-child td { border-bottom: none; }
+
+/* Wide tables must scroll inside their own box rather than pushing the page
+   sideways — the failure mode on a phone. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll > table.grid { min-width: 460px; }
 
 .spinner {
   width: 15px; height: 15px; border-radius: 50%;
@@ -177,8 +339,28 @@ table.grid tr:last-child td { border-bottom: none; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slideIn { from { transform: translateX(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sheetUp { from { transform: translateY(18px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #3a465a; }
+::-webkit-scrollbar-thumb:hover { background: #3a3f48; }
+
+/* Screen-reader-only text, for the icon-only controls the console relies on. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* On a coarse pointer every interactive control gets a real touch target.
+   Scoped to the pointer type so the desktop console keeps its density. */
+@media (pointer: coarse) {
+  button.btn, .seg button, .demo-user, .rail-btn {
+    min-height: var(--touch);
+  }
+  input[type=text], input[type=email], input[type=password], input[type=number],
+  input[type=date], select {
+    min-height: var(--touch);
+  }
+  input[type=range] { height: 22px; background-clip: content-box; padding: 8px 0; }
+}

@@ -13,12 +13,19 @@ import type { Role } from "./api/client";
 import Shell from "./components/Shell";
 import Login from "./pages/Login";
 import Overview from "./pages/Overview";
-import MapConsole from "./pages/MapConsole";
-import Studio from "./pages/Studio";
+import Console from "./pages/Console";
+import Publications from "./pages/Publications";
+import IsrReport from "./pages/IsrReport";
+import MyArea from "./pages/MyArea";
+import Alerts from "./pages/Alerts";
+import Methods from "./pages/Methods";
 import FieldData from "./pages/FieldData";
 import DataGaps from "./pages/DataGaps";
 import Audit from "./pages/Audit";
 import Administration from "./pages/Administration";
+import Datasets from "./pages/Datasets";
+import Compare from "./pages/Compare";
+import NetworkPlanPage from "./pages/NetworkPlan";
 import PublicView from "./pages/PublicView";
 
 const qc = new QueryClient({
@@ -59,18 +66,38 @@ function Gate() {
     <Routes>
       <Route element={<Shell />}>
         <Route path="/overview" element={<Overview />} />
-        <Route path="/map" element={<Guard allow={isStaff}><MapConsole /></Guard>} />
+        {/* P2 merged /map and /studio into one Console. The old paths redirect
+            rather than 404: they were linked from the role overviews and are
+            almost certainly bookmarked. */}
+        <Route path="/console" element={<Guard allow={isStaff}><Console /></Guard>} />
+        <Route path="/compare" element={<Guard allow={canRunSim}><Compare /></Guard>} />
         <Route
-          path="/studio"
-          element={<Guard allow={(r) => canRunSim(r) || canReview(r)}><Studio /></Guard>}
+          path="/publications"
+          element={<Guard allow={(r) => canRunSim(r) || canReview(r)}><Publications /></Guard>}
         />
+        {/* The full assessment record for one site. Staff-readable: it carries
+            the site's coordinates and operating parameters, which design §2
+            keeps away from the public surface. */}
+        <Route path="/report/:siteId"
+               element={<Guard allow={isStaff}><IsrReport /></Guard>} />
+        <Route path="/map" element={<Navigate to="/console" replace />} />
+        <Route path="/studio" element={<Navigate to="/console" replace />} />
         <Route
           path="/field"
           element={<Guard allow={(r) => canSubmit(r) || canReview(r)}><FieldData /></Guard>}
         />
         <Route path="/data" element={<Guard allow={isStaff}><DataGaps /></Guard>} />
+        <Route path="/network-plan" element={<Guard allow={isStaff}><NetworkPlanPage /></Guard>} />
         <Route path="/audit" element={<Guard allow={canAudit}><Audit /></Guard>} />
         <Route path="/admin" element={<Guard allow={canAdmin}><Administration /></Guard>} />
+        <Route path="/datasets" element={<Guard allow={canAdmin}><Datasets /></Guard>} />
+        {/* The citizen surface. Every signed-in role may read these: an
+            official seeing exactly what a resident sees is a feature, and
+            nothing here is restricted. */}
+        <Route path="/my-area" element={<MyArea />} />
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/methods" element={<Methods />} />
+        {/* The old map-and-table public view, kept for staff review. */}
         <Route path="/public" element={<PublicView />} />
         <Route path="*" element={<Navigate to="/overview" replace />} />
       </Route>

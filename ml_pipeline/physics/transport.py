@@ -635,6 +635,44 @@ def _advective_leakage(i_up: float, *, Kv: float, phi_confining: float,
             "years_to_breakthrough": (None if not np.isfinite(yrs) else round(yrs, 1))}
 
 
+def _duty_cycle_gradient(i0: float, amp: float) -> float:
+    """Annual mean of max(i(t), 0) for i(t) = i0 + amp*sin(t), in closed form.
+
+    THE BUG THIS FIXES (LIMITATIONS.md 1b, reported from the UI). The headline
+    breakthrough time was evaluated at max(MEAN gradient, 0). Upward velocity is
+    linear in gradient, so for a gradient that never changes sign that is exactly
+    right and this function returns the same number. It is wrong the moment the
+    seasonal swing crosses zero -- because the pathway is CLOSED, not reversed,
+    for part of the year, and `max()` is not linear across that clamp:
+
+        mean(max(i, 0))  !=  max(mean(i), 0)
+
+    The clamp is correct physics -- a reversed gradient stops upward transport
+    rather than dragging the front back down -- but summarising a clamped,
+    swinging quantity by its mean understates how much of the year the pathway
+    is open. On the run that exposed this: mean gradient 0.0037 gave 54.4 yr,
+    while the pathway is actually open ~58 % of the year at a duty-cycle mean of
+    0.0069, giving ~29 yr. The headline OVERSTATED time-to-breakthrough by 1.9x,
+    which is to say it understated the hazard.
+
+        mean = (i0/pi)(pi/2 + asin(i0/A)) + (A/pi) sqrt(1 - (i0/A)^2)
+
+    Degenerate cases are the reassuring ones: A <= 0 (no swing) returns
+    max(i0, 0); i0 >= A (always open) returns i0; i0 <= -A (never open) returns
+    0. So this only moves a number where the sign change is real.
+    """
+    a = abs(float(amp))
+    if a <= 1e-12:
+        return max(float(i0), 0.0)
+    r = float(i0) / a
+    if r >= 1.0:
+        return float(i0)
+    if r <= -1.0:
+        return 0.0
+    return float(i0 / math.pi * (math.pi / 2.0 + math.asin(r))
+                 + a / math.pi * math.sqrt(max(1.0 - r * r, 0.0)))
+
+
 def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                              Xc_m: float, source_width_m: float, alpha_L: float,
                              alpha_V: float, ore_depth_m: float,
@@ -769,6 +807,35 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
             "deep_head_caveat": _SEA["deep_head_caveat"],
             "source_citation": _SEA["source_citation"],
         }
+
+        # ---- the headline, corrected (LIMITATIONS.md 1b) -------------------- #
+        # The upper-bound member is the one whose gradient actually swings, so
+        # the duty cycle is computed on it: half-swing in HEAD over the
+        # separation is the gradient amplitude.
+        amp = (dry - wt_mean) / dz_adv
+        i_duty = _duty_cycle_gradient(float(upward_gradient), amp)
+        duty = _leak(i_duty)
+        seasonal["duty_cycle"] = {
+            **duty,
+            "gradient_amplitude": round(float(amp), 5),
+            "fraction_of_year_open": round(
+                float(np.clip(
+                    0.5 + math.asin(float(np.clip(
+                        float(upward_gradient) / amp, -1.0, 1.0)))
+                    / math.pi, 0.0, 1.0)) if abs(amp) > 1e-12
+                else (1.0 if upward_gradient > 0 else 0.0), 3),
+            "note": ("Time-averaged over the year with the pathway CLOSED, not "
+                     "reversed, while the gradient is negative. This is the "
+                     "headline; the mean-gradient figure is kept beside it "
+                     "because it is what earlier runs reported."),
+        }
+        # Deliberately NOT dropped: stored runs and the model card carry the
+        # mean-gradient number, and silently replacing it would make old and new
+        # runs incomparable with nothing on screen to say why.
+        seasonal["breakthrough_years_mean_gradient"] = (
+            None if not np.isfinite(yrs_break) else round(yrs_break, 1))
+        if duty["years_to_breakthrough"] is not None:
+            yrs_break = duty["years_to_breakthrough"]
         # TIMELINE: the state at the animation's CURRENT calendar month. Same
         # two end members, evaluated at this month's interpolated water table
         # instead of the seasonal extremes -- so the timeline reads out a point
@@ -801,8 +868,14 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
         "conc_reaching_shallow": round(conc_shallow, 3),
         "a_vert_max": round(float(np.max(a_vert)), 6),
         "advective_breakthrough_fraction": round(barrier_crossed, 3),
+        # Duty-cycle averaged where a seasonal band exists and the gradient
+        # changes sign within it; identical to the mean-gradient result
+        # otherwise. `seasonal.breakthrough_years_mean_gradient` carries what
+        # this used to report. See `_duty_cycle_gradient`.
         "years_to_vertical_breakthrough": (None if not np.isfinite(yrs_break)
                                            else round(yrs_break, 1)),
+        "breakthrough_basis": ("duty_cycle" if (seasonal or {}).get("duty_cycle")
+                               else "mean_gradient"),
         "shallow_impact_probability": round(p_shallow, 3),
         "risk_band": _vertical_risk_band(p_shallow),
         "pathways": {k: round(v, 3) for k, v in pathways.items()},

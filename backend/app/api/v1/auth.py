@@ -71,6 +71,27 @@ async def logout():
     return MessageResponse(message="Logged out successfully. Please discard your tokens.")
 
 
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh(current_user: User = Depends(get_current_user)):
+    """Exchange a still-valid token for a fresh one.
+
+    R11 finding O-9: `.env` sets ACCESS_TOKEN_EXPIRE_MINUTES=15 while the code
+    default is 480, and there was no way to extend a session. A 401 clears the
+    token, so anyone reading a long report — or filling in a submission form —
+    was silently signed out mid-task and lost what they were typing.
+
+    This is a **sliding session**, not a refresh-token scheme. It requires a
+    token that is still valid, so it extends an active session and cannot
+    resurrect an expired one; an attacker holding a stolen token gains nothing
+    they did not already have for its remaining lifetime. A real refresh-token
+    flow (separate long-lived credential, rotation, server-side revocation) is
+    the right end state and needs a token store this prototype does not have —
+    recorded in LIMITATIONS.md rather than half-built here.
+    """
+    return TokenResponse(
+        access_token=create_access_token(str(current_user.id), current_user.role))
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Return the profile of the currently authenticated user."""
