@@ -31,6 +31,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   api, type Advisory, type IsrPoint, type Lifecycle, type PreviewRun, type SimRun,
+  type VerticalScreening,
 } from "../api/client";
 import { canRunSim, useAuth } from "../auth";
 import { ErrorNote, Loading, TableScroll } from "../components/bits";
@@ -99,13 +100,34 @@ export default function IsrReport() {
     }),
   });
 
-  // Build the report on open, and again whenever the two live inputs change —
-  // the reader should not have to press a button to see the defaults.
+  /**
+   * Build the report on open, and again when the inputs settle.
+   *
+   * DEBOUNCED, and that is a bug fix rather than a nicety. `horizon` and
+   * `restoration` are range sliders, so this effect used to fire on every
+   * single step of a drag — and each firing is three engine calls totalling
+   * about NINETEEN evaluations (lifecycle 12 points + detail + sweep 6 points).
+   * Dragging horizon from 1 to 50 issued on the order of 950 requests in about
+   * two seconds, which walks straight through the pipeline's 240/min limiter.
+   *
+   * The user-visible symptom was not "slow": it was the report losing whole
+   * sections. `detail` came back 429, so `vertical` was undefined, and the
+   * shallow-aquifer stratification simply disappeared from the document with an
+   * engine error in its place. A rate limit should never be able to delete a
+   * section of a report.
+   *
+   * 450 ms is longer than the gap between slider steps and shorter than the
+   * pause before someone reads the result, so a drag now costs one rebuild
+   * instead of fifty.
+   */
   useEffect(() => {
     if (!siteId || !mayRun) return;
-    lifecycle.mutate();
-    detail.mutate();
-    sweep.mutate();
+    const t = setTimeout(() => {
+      lifecycle.mutate();
+      detail.mutate();
+      sweep.mutate();
+    }, 450);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId, horizon, restoration, mayRun]);
 
@@ -165,7 +187,25 @@ export default function IsrReport() {
   if (!s) return null;
 
   const coords = s.location?.coordinates;
-  const v = detail.data?.vertical;
+  /**
+   * The vertical screening, with a stored run as the fallback.
+   *
+   * `detail` is a LIVE engine call, and a live call can fail — rate limited,
+   * engine restarting, network. When it did, this was `undefined` and the whole
+   * shallow-aquifer section, stratigraphic column included, vanished from the
+   * report. A document that silently drops the depth structure of the ore is
+   * worse than one that shows a slightly older version of it.
+   *
+   * Stored runs have carried `hydro.vertical` since R11, so the most recent
+   * completed run can stand in. Runs saved before that have no `vertical` key
+   * and correctly yield nothing — absence there means "not recorded", never
+   * "no pathway", and the section says which source it is showing.
+   */
+  const storedVertical = (runs.data ?? [])
+    .find((r) => r.status === "completed" && (r.hydro as any)?.vertical)
+    ?.hydro?.vertical as VerticalScreening | undefined;
+  const v = detail.data?.vertical ?? storedVertical ?? null;
+  const verticalIsStored = !detail.data?.vertical && !!storedVertical;
   const an = detail.data?.metrics?.analytical;
   const generated = new Date();
 
@@ -381,11 +421,42 @@ export default function IsrReport() {
         )}
 
         {/* ── the shallow aquifer: schematic beside its numbers ── */}
+        {mayRun && !v && (
+          <section className="card">
+            <div className="card-title">
+              The shallow aquifer — the water people pump
+            </div>
+            {/* The reported defect: this section used to render nothing at all
+                when the live call failed, so the ore's depth structure just was
+                not in the document and no wording said why. An absent section
+                reads as "there is nothing to say here", which is the opposite
+                of the truth. */}
+            <div className="banner warn">
+              <strong>Not available for this report.</strong>{" "}
+              {detail.error
+                ? <>The engine did not answer for these settings, and no saved
+                    run for this site carries a vertical screening.</>
+                : <>No vertical screening has been recorded for this site yet.</>}
+              {" "}This is a gap in what has been computed — <b>not</b> a finding
+              that the ore is isolated from the shallow aquifer.
+            </div>
+            <ErrorNote error={detail.error} />
+          </section>
+        )}
+
         {mayRun && v && (
           <section className="card">
             <div className="card-title">
               The shallow aquifer — the water people pump
             </div>
+            {verticalIsStored && (
+              <div className="banner" style={{ marginBottom: 10 }}>
+                <strong>From the last saved run,</strong> not a live solve — the
+                engine did not answer for the current settings. The depth
+                structure below is what that stored run recorded. Move a slider
+                to try again.
+              </div>
+            )}
             <div className="split-figure">
               <div className="split-figure-fig">
                 <VerticalSchematic v={v} heading={false} />

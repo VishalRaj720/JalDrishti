@@ -245,9 +245,31 @@ async def predict(payload: dict[str, Any]) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         raise MLPipelineError(f"ml_pipeline call failed: {exc}") from exc
     if resp.status_code != 200:
-        raise MLPipelineError(
-            f"ml_pipeline returned {resp.status_code}: {resp.text[:300]}")
+        raise _engine_http_error(resp)
     return resp.json()
+
+
+def _engine_http_error(resp) -> "MLPipelineError":
+    """Turn an engine HTTP failure into something a person can act on.
+
+    A 429 used to reach the screen verbatim as
+    `MLPipelineError: ml_pipeline returned 429: {"code":"RATE_LIMITED",...}` —
+    raw JSON, an internal env-var name, and no indication of what the reader
+    should do. The reader is an analyst looking at a report, not the person who
+    configured the limiter.
+
+    Rate limiting is the one engine failure a user routinely causes and can
+    routinely clear by waiting, so it gets its own sentence. Everything else
+    keeps the status and body, which is what a developer needs.
+    """
+    if resp.status_code == 429:
+        return MLPipelineError(
+            "The engine is rate limiting this client: too many solves in the "
+            "last minute. Nothing is wrong with the model or the site — wait a "
+            "few seconds and try again. If this keeps happening on ordinary "
+            "use, it means something is calling the engine in a loop.")
+    return MLPipelineError(
+        f"ml_pipeline returned {resp.status_code}: {resp.text[:300]}")
 
 
 async def get_json(path: str, params: Optional[dict[str, Any]] = None,
@@ -271,9 +293,7 @@ async def get_json(path: str, params: Optional[dict[str, Any]] = None,
     except Exception as exc:  # noqa: BLE001
         raise MLPipelineError(f"ml_pipeline call failed: {exc}") from exc
     if resp.status_code != 200:
-        raise MLPipelineError(
-            f"ml_pipeline returned {resp.status_code}: {resp.text[:300]}",
-            )
+        raise _engine_http_error(resp)
     return resp.json()
 
 

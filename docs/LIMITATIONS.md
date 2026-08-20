@@ -8,7 +8,7 @@ The rule this file exists to enforce: *if a model misses a threshold, report it 
 than moving the threshold.* Nothing below has been softened to make the project look
 finished.
 
-**Last consolidated:** 2026-08-19. Sources: the ML pipeline readiness review (2026-08-12)
+**Last consolidated:** 2026-08-20. Sources: the ML pipeline readiness review (2026-08-12)
 and the R10 audit (2026-08-19). The full chronological review record — including findings
 that were later **retracted**, which is why it is kept rather than summarised — lives in
 `docs/local/audit-record/` and is not tracked in git.
@@ -42,44 +42,90 @@ pipeline is not ready** until the two-stage head is built.
 
 ---
 
-## 1b. Open — the vertical breakthrough headline is too slow
+## 1b. Closed (2026-08-20) — the vertical breakthrough headline was too slow
 
-**Reported by the project owner from the UI, then reproduced arithmetically.**
+**Reported by the project owner from the UI, then reproduced arithmetically, then
+fixed.**
 
-The shallow-aquifer panel shows a single headline breakthrough time computed at
-the **annual-mean** water table, beside a seasonal band that can disagree with it
-by 5×. On one real run: headline **54.4 yr**, dry season **10.6 yr**, wet season
-*"not expected"*. That combination is not self-consistent.
+The shallow-aquifer panel showed a single headline breakthrough time computed at
+the **annual-mean** water table, beside a seasonal band that disagreed with it by
+5×. On the run that exposed it: headline **54.4 yr**, dry season **10.6 yr**, wet
+season *"not expected"*. A headline outside the interval printed next to it is
+not a summary of that interval.
 
 The upward velocity is linear in gradient, `v = Kv·max(i,0)/φ`, and the code
 **floors the gradient at zero** — correctly, because a reversed gradient stops
-upward transport rather than reversing the front. But the headline then evaluates
+upward transport rather than reversing the front. But the headline evaluated
 travel time at `max(mean i, 0)` instead of averaging `max(i(t), 0)` over the
-year. Where the seasonal swing crosses zero — as it does here — those are
-different numbers, and the clamp is exactly what makes them differ.
-
-Reproduced with the engine's own constants (separation 130 m, water table
-3.22–7.20 m, baseline gradient 0.0037, half-swing 0.0153):
+year. Where the seasonal swing crosses zero, `max()` is not linear across the
+clamp and those are different numbers:
 
 | Basis | Gradient used | Breakthrough |
 |---|---|---|
-| Headline, mean gradient | 0.00370 | **54.4 yr** |
+| Old headline, mean gradient | 0.00370 | 54.4 yr |
 | Dry season | 0.01901 | 10.6 yr |
 | Wet season | −0.01160 → clamped to 0 | never |
 | **Duty-cycle, mean of max(i,0)** | **0.00687** | **≈29 yr** |
 
-The pathway is open ~58 % of the year. A quarterly step model matching the
-engine's own season map gives 30.5 yr, so the result is not an artefact of
-assuming a sinusoid.
+The pathway is open ~58 % of the year. **The old headline overstated time to
+breakthrough by about 1.9× — it understated the hazard.**
 
-**The headline therefore overstates the time to breakthrough by about 1.9× —
-it understates the hazard.** It is not wrong about the physics of any single
-season; it is wrong to summarise a clamped, swinging quantity by its mean.
+**What was changed.** `_duty_cycle_gradient` in `ml_pipeline/physics/transport.py`
+computes the annual mean of `max(i(t), 0)` in closed form and the headline is
+evaluated there. Verified on the live UI: the same site now reads **18.7 yr**
+against a dry season of 6.8 yr — inside its own band, where it belongs.
 
-**Not fixed here.** Changing a headline number changes every stored run's
-meaning and the model card behind it, and `ml_pipeline/` is frozen. Recorded as
-an open finding for an explicit decision rather than patched quietly. The
-seasonal band shown beside it is correct and already brackets the true value.
+- **No retrain was required.** `shallow_impact_screening` is called only by
+  `dashboard/server.py` and the tests; it produces no ML training label, so the
+  surrogate is untouched. This was checked, not assumed.
+- **Nothing was silently overwritten.** The old value is kept as
+  `seasonal.breakthrough_years_mean_gradient`, and `breakthrough_basis` says
+  which basis produced the headline, so old and new runs stay comparable.
+- **The correction is inert where it does not apply.** With no seasonal swing,
+  an always-open gradient, or an always-closed one, it returns exactly the old
+  number. Pinned by test.
+- **Runs stored before 2026-08-20 carry the old headline** and no `vertical`
+  block at all (see §4a). They are not retro-corrected.
+
+This is the third sanctioned change inside the otherwise-frozen `ml_pipeline/`.
+
+---
+
+## 1c. Closed (2026-08-20) — the alert system had never delivered an alert
+
+**Found while building the aquifer-reach extension.** Eight advisories had been
+published and the `alerts` table was **empty**. Not sparse — empty. The citizen
+notification path, which is the product's only channel to a resident, had never
+written a row.
+
+`set_rls_context` uses `SET LOCAL`, which Postgres discards at COMMIT —
+deliberately, so a pooled connection cannot leak one request's identity into the
+next. `AdvisoryService.decide` commits the decision and *then* raises alerts, so
+by that point the session had no context at all, `app.bypass_rls` read as `off`,
+and the `alerts_write` policy refused every insert. The call was wrapped in
+`except Exception`, which logged the refusal and let the publication stand. The
+product reported success, showed the advisory to citizens, and notified nobody —
+once per publication, for the life of the feature.
+
+`POST /citizen/alerts/scan` had the same defect for the same reason.
+
+**Fixed** by `alerts.raise_for_advisory`, which raises alerts in its own session
+under the system context — the pattern `audit.record` has always used. Verified
+end to end: publish → 7 alerts written → a citizen subscribed to the affected
+block receives them with the hypothetical premise intact.
+
+**The general hazard, written down because it will recur:** *after any commit,
+the RLS context is gone until it is set again.* No other route noticed because
+they all commit as their last act. Any route that commits and keeps querying is
+anonymous from that point on, and RLS-protected tables return nothing rather
+than erroring — a silent empty result, not a failure. The same bug bit twice
+more the same day inside the fix itself.
+
+**Why no test caught it, and still cannot:** the test database is built from ORM
+metadata via `create_all`, so **the RLS policies do not exist in it**. An insert
+that production refuses succeeds in the suite. This class of bug is not
+runtime-testable in the current harness; `test_r11_publish_and_alerts.py` guards
+it at the source level instead, and says so.
 
 ---
 
@@ -124,6 +170,53 @@ seasonal band shown beside it is correct and already brackets the true value.
 | O-5 | `/metrics` is unauthenticated | Open — restrict at the gateway |
 | O-8 | PDF export is wired but **pagination has never been visually confirmed** — the test harness cannot open a generated PDF | Open, verify by hand |
 | O-9 | **Sessions expire in 15 minutes with no refresh path.** `.env` sets `ACCESS_TOKEN_EXPIRE_MINUTES=15`, code defaults to 480, and no `/auth/refresh` exists — a 401 clears the token | Open, deployment decision |
+
+---
+
+## 4a. The aquifer-reach alert, and what bounds it
+
+Publishing now raises a second kind of alert — `aquifer_pathway` — for blocks
+that share the shallow aquifer a modelled vertical pathway would enter but that
+the horizontal footprint never touches. It is a different claim from the
+footprint alert and is worded as one: *you share this water body*, never *your
+water is affected*.
+
+**Three gates, because any one alone over-claims:** breakthrough must be credible
+within the run's own horizon; the aquifer is resolved by point-in-polygon under
+the site; and the reach is bounded by advective travel, `v = K·i/φ` over that
+horizon, capped at 25 km.
+
+**Alerting the whole formation was rejected.** The Basement Gneissic Complex
+alone covers 48,047 km² — over half of Jharkhand — so "every block touching the
+aquifer" would turn one hypothetical 13-hectare plume into a statewide warning.
+
+**Be honest about how often this fires: almost never, and that is the finding.**
+Shallow groundwater in Jharkhand's hard rock moves ~1.5 m/yr (Phyllite: K 0.08
+m/day, φ 0.04, i 0.0021 → 27 m in 20 years). Even the state's fastest unit, Older
+Alluvium (K 5.0, φ 0.3), reaches only ~255 m in 20 years. At every currently
+registered site the reach is tens of metres, so the blocks within it were already
+alerted by the footprint and this adds nobody. Lateral shallow transport does not
+carry a plume to the next block within any period these runs model. The count of
+blocks sharing the *formation* is recorded in the audit entry as context and is
+explicitly **not** a basis for alerting.
+
+**Not modelled:** movement inside the shallow aquifer after breakthrough. There
+is no shallow plume solution in this product. The radius decides *who is told*;
+it is not a predicted extent, and the alert body says so.
+
+---
+
+## 4b. Runs stored before 2026-08-20 have no shallow-aquifer record
+
+`shallow_impact_screening` ran on every simulation and its result was thrown
+away: the engine returns it at the top level of the payload, not inside `hydro`,
+and the persistence step assigned `hydro` alone. So the breakthrough time a user
+read on screen came from the live preview and existed nowhere afterwards.
+
+Now stored at `hydro.vertical`. Older runs carry no `vertical` key, and readers
+must treat its absence as **"not recorded"**, never as "no pathway" —
+`announce_aquifer_reach` returns `reason: no_vertical_screening` and says so
+rather than reporting a clean result.
 
 ---
 
