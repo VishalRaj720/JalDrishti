@@ -1,4 +1,5 @@
 /** Small shared pieces used across screens. */
+import { useEffect, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 export function Loading({ label = "Loading…" }: { label?: string }) {
@@ -231,4 +232,82 @@ export function HypotheticalNote({ compact = false }: { compact?: boolean }) {
       reports an operation that has taken place.
     </div>
   );
+}
+
+/**
+ * Scroll a just-opened detail panel into view.
+ *
+ * WHY. Several screens answer a row-level question ("Where exactly?", "Wells",
+ * "Series", "All parameters") by rendering a panel AFTER the table that
+ * triggered it. On a 24-row district table that is a small nudge; on a 397-row
+ * well table the answer lands hundreds of pixels below the fold and the button
+ * looks broken — you press it and nothing appears to happen.
+ *
+ * Scrolling is the fix rather than repositioning the panel, because the panel
+ * genuinely belongs below the table it describes: moving it above would push
+ * the table itself off-screen every time it opened, trading one scroll for
+ * another.
+ *
+ * `block: "start"` rather than "center": these panels are tall (a map, a chart,
+ * an 18-row parameter table), and centring a tall element puts its heading
+ * above the viewport.
+ *
+ * Pass the identity of what is open — an id, or null when nothing is. The
+ * effect runs on change, so re-opening a DIFFERENT row scrolls again while a
+ * re-render for any other reason does not.
+ */
+export function useRevealOnOpen<T>(openKey: T) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (openKey === null || openKey === undefined) return;
+    const el = ref.current;
+    if (!el) return;
+    // Two frames: one for React to commit the panel, one for layout to settle
+    // before we measure. A single frame lands short when the panel contains a
+    // map or a chart that sizes itself on mount.
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // A TIMER, NOT requestAnimationFrame.
+    //
+    // The obvious implementation is a double rAF — one frame for React to
+    // commit, one for layout to settle. It is also wrong here: browsers pause
+    // rAF entirely while a tab is not compositing (backgrounded, or in a hidden
+    // preview pane), so the callback simply never runs and the panel opens off
+    // screen with no error anywhere. Caught by measuring `scrollTop` after a
+    // click and finding it still 0 while a manual `scrollIntoView` moved it
+    // 2,143 px.
+    //
+    // A short timeout fires regardless of compositing state, and 60 ms is long
+    // enough for a panel containing a Leaflet map or an SVG chart to have taken
+    // its height.
+    let verify = 0;
+    const id = window.setTimeout(() => {
+      el.scrollIntoView({
+        behavior: reduced ? "auto" : "smooth",
+        block: "start",
+      });
+
+      // THEN CHECK THAT IT ACTUALLY MOVED, and jump if it did not.
+      //
+      // A smooth scroll is an animation, and a browser runs no animations while
+      // the tab is not compositing — backgrounded, or in a hidden preview pane.
+      // `scrollIntoView({behavior:"smooth"})` in that state returns without
+      // error and without scrolling, so the panel opens off screen and nothing
+      // anywhere reports a problem. Measured: smooth left `scrollTop` at 0
+      // where `auto` moved it 2,143 px.
+      //
+      // The fallback is deliberately a *verification* rather than always using
+      // `auto`: the animation is worth having when the tab can run it, and this
+      // costs one comparison when it cannot.
+      verify = window.setTimeout(() => {
+        const top = el.getBoundingClientRect().top;
+        const host = el.closest<HTMLElement>("[data-scroll], .page") ?? undefined;
+        const hostTop = host ? host.getBoundingClientRect().top : 0;
+        if (top - hostTop > 4) {
+          el.scrollIntoView({ behavior: "auto", block: "start" });
+        }
+      }, 400);
+    }, 60);
+    return () => { window.clearTimeout(id); window.clearTimeout(verify); };
+  }, [openKey]);
+  return ref;
 }

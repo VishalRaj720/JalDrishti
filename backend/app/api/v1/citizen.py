@@ -33,7 +33,7 @@ security (migration 0018) confines it to its own user rather than to a role.
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Mapping, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
@@ -257,6 +257,28 @@ async def scan_measured(
         return await AlertService(adb).scan_measured_exceedances()
 
 
+@router.post("/alerts/scan-breach-due")
+async def scan_breach_due(
+    dry_run: bool = Query(True, description="report only; raise nothing"),
+    _: User = Depends(require_admin),
+):
+    """Alert where a published screening's modelled breakthrough date has passed.
+
+    Admin only, and **`dry_run` defaults to TRUE** — the opposite of the other
+    scans. This is the only alert in the system that fires on elapsed time
+    rather than on an event somebody just caused, so the operator should be able
+    to see exactly who would be told, and on what basis, before anyone is. The
+    dry run returns the full per-screening reasoning including every skip.
+
+    See `AlertService.scan_breach_due` for the five gates and for why the copy
+    is written the way it is.
+    """
+    from app.database import AsyncSessionLocal, set_rls_context
+    async with AsyncSessionLocal() as adb:
+        await set_rls_context(adb, bypass=True)
+        return await AlertService(adb).scan_breach_due(dry_run=dry_run)
+
+
 # ── published screenings, as a citizen sees them ─────────────────────
 
 class PublicAdvisory(BaseModel):
@@ -320,6 +342,122 @@ async def published_advisories(
     ]
 
 
+async def _published_run_detail(advisory_ids: list[str]) -> dict[str, dict]:
+    """Operating parameters and run output for advisories ALREADY published.
+
+    WHY THIS NEEDS ITS OWN SESSION AND A BYPASS, spelled out because adding a
+    bypass to a read path deserves justifying rather than assuming.
+
+    `isr_points` and `simulation_runs` are RLS-protected and a citizen reads
+    nothing from either. Joining them in the request's own session does not
+    error — it returns NULL for every column, so the response looks complete and
+    every operating parameter silently reads as "unknown". That is the same
+    class of silent-empty failure LIMITATIONS.md section 1c records twice.
+
+    What this widens is bounded on purpose:
+      * only advisories whose `status` is already `published` — the deliberate
+        administrative act of telling residents about this screening;
+      * only the operating parameters and run OUTPUT, never `location`. The ISR
+        coordinate is what design section 2 withholds, and it is not selected
+        here at all;
+      * read-only, and the ids come from a query the caller was already
+        entitled to run.
+
+    THE BETTER LONG-TERM FIX is to copy these figures onto the advisory row at
+    publication time, so a published finding is self-contained and cannot drift
+    when somebody later edits the site — which the R13 site editor now allows.
+    That needs a migration and would not backfill the advisories already
+    published, so it is recorded in LIMITATIONS.md rather than half-done here.
+    """
+    if not advisory_ids:
+        return {}
+    from app.database import AsyncSessionLocal, set_rls_context
+    out: dict[str, dict] = {}
+    async with AsyncSessionLocal() as db:
+        await set_rls_context(db, bypass=True)
+        rows = (await db.execute(text("""
+            SELECT a.id::text AS id,
+                   ip.operation_years, ip.injection_rate_m3_day, ip.ore_depth_m,
+                   ip.injection_start_date,
+                   sr.metrics, sr.hydro, sr.plume, a.species
+            FROM advisories a
+            LEFT JOIN isr_points ip      ON ip.id = a.isr_point_id
+            LEFT JOIN simulation_runs sr ON sr.id = a.run_id
+            WHERE a.status = 'published'
+              AND a.id::text = ANY(:ids)
+        """), {"ids": advisory_ids})).mappings().all()
+        for r in rows:
+            d = dict(r)
+            d["injection_start_date"] = (
+                d["injection_start_date"].isoformat()
+                if d["injection_start_date"] else None)
+            out[r["id"]] = d
+    return out
+
+
+def _spread_summary(r: Mapping[str, Any]) -> dict[str, Any]:
+    """How far and how strong, in the plainest terms the stored run supports.
+
+    Returns `recorded: False` rather than zeros when the run predates geometry
+    capture. A missing measurement and a measurement of nothing are different
+    claims, and on this surface the difference is the whole point.
+    """
+    plume = r.get("plume") or {}
+    metrics = r.get("metrics") or {}
+    if isinstance(plume, str):
+        plume = json.loads(plume)
+    if isinstance(metrics, str):
+        metrics = json.loads(metrics)
+    if not plume:
+        return {"recorded": False,
+                "note": ("This screening was run before the platform stored "
+                         "plume geometry. Its extent is not recorded.")}
+
+    analytical = metrics.get("analytical") or {}
+    return {
+        "recorded": True,
+        "furthest_travel_m": plume.get("Xc_m"),
+        "peak_concentration": plume.get("peak_conc"),
+        "threshold": plume.get("threshold"),
+        "unit": r.get("species"),
+        "note": ("Modelled distance from the injection area at the evaluation "
+                 "time, for a mine that does not exist."),
+        "migration_m": analytical.get("migration_m"),
+        "area_ha": analytical.get("area_ha"),
+    }
+
+
+def _shallow_summary(r: Mapping[str, Any]) -> dict[str, Any]:
+    """Whether the model expects the plume to reach shallow drinking water.
+
+    LIMITATIONS section 4b: runs stored before 2026-08-20 carry no `vertical`
+    block at all, and its absence must read as **"not recorded"**, never as "no
+    pathway". Both currently published advisories are such runs, so this returns
+    `recorded: False` for them — which is the honest answer, not a clean one.
+    """
+    hydro = r.get("hydro") or {}
+    if isinstance(hydro, str):
+        hydro = json.loads(hydro)
+    v = (hydro or {}).get("vertical")
+    if not v:
+        return {"recorded": False,
+                "note": ("Whether this reaches shallow drinking water was not "
+                         "recorded for this screening. That is a gap in the "
+                         "record, not a finding that it does not.")}
+
+    seasonal = v.get("seasonal") or {}
+    return {
+        "recorded": True,
+        "probability": v.get("shallow_impact_probability"),
+        "risk_band": v.get("risk_band"),
+        "years_to_breakthrough": v.get("years_to_vertical_breakthrough"),
+        "dominant_pathway": v.get("dominant_pathway"),
+        "dry_season_years": seasonal.get("breakthrough_years_dry"),
+        "note": ("Modelled time for contamination to rise from the ore zone to "
+                 "the shallow aquifer, if such a mine operated."),
+    }
+
+
 @router.get("/advisories/geojson")
 async def published_advisory_geojson(
     response: Response,
@@ -344,8 +482,20 @@ async def published_advisory_geojson(
     so a forgotten filter cannot leak one.
     """
     response.headers["Cache-Control"] = "no-store"
+    # R14 (2026-08-25): the footprint alone answered "does this reach me?" and
+    # nothing else. A resident who has been told a screening covers their block
+    # then asks the obvious follow-ups — how big was the modelled operation, how
+    # long would it run, how far did the contamination travel, and does it reach
+    # the shallow water we actually drink. All of that is already stored on the
+    # run the advisory was published from; it was simply never joined.
+    #
+    # STILL WITHHELD, and the reason is unchanged: the ISR point's coordinate.
+    # Design section 2 keeps a precise pin for a hypothetical mine off the public
+    # surface, because a point next to a named village reads as a plan. The
+    # footprint is the published finding and is shown; the pin is not.
     rows = (await db.execute(text("""
-        SELECT a.id::text AS id, a.headline, a.species, a.footprint_ha,
+        SELECT a.id::text AS id, a.headline, a.what_it_means, a.what_to_do,
+               a.species, a.footprint_ha,
                a.time_years, a.restoration_years, a.published_at,
                ST_AsGeoJSON(a.footprint) AS geom
         FROM advisories a
@@ -353,6 +503,8 @@ async def published_advisory_geojson(
         ORDER BY a.published_at DESC
         LIMIT 200
     """))).mappings().all()
+
+    detail = await _published_run_detail([r["id"] for r in rows])
 
     return {
         "type": "FeatureCollection",
@@ -363,12 +515,28 @@ async def published_advisory_geojson(
                 "properties": {
                     "id": r["id"],
                     "headline": r["headline"],
+                    "what_it_means": r["what_it_means"],
+                    "what_to_do": r["what_to_do"],
                     "species": r["species"],
                     "footprint_ha": r["footprint_ha"],
-                    "time_years": r["time_years"],
-                    "restoration_years": r["restoration_years"],
                     "published_at": (r["published_at"].isoformat()
                                      if r["published_at"] else None),
+                    # THE THREE TIMES A RESIDENT ASKS ABOUT, kept distinct
+                    # because they are three different things and the words for
+                    # them are easily muddled:
+                    #   operation   how long the hypothetical mine injects
+                    #   evaluated_at  how far out the model was asked to look
+                    #   restoration how long clean-up pumping runs afterwards
+                    "operation_years": detail.get(r["id"], {}).get("operation_years"),
+                    "evaluated_at_years": r["time_years"],
+                    "restoration_years": r["restoration_years"],
+                    "injection_rate_m3_day":
+                        detail.get(r["id"], {}).get("injection_rate_m3_day"),
+                    "ore_depth_m": detail.get(r["id"], {}).get("ore_depth_m"),
+                    "injection_start_date":
+                        detail.get(r["id"], {}).get("injection_start_date"),
+                    "spread": _spread_summary(detail.get(r["id"], {})),
+                    "shallow_water": _shallow_summary(detail.get(r["id"], {})),
                     "what_this_is": _WHAT_THIS_IS,
                 },
             }
@@ -376,6 +544,32 @@ async def published_advisory_geojson(
         ],
         "what_this_is": _WHAT_THIS_IS,
     }
+
+
+@router.get("/ore")
+async def citizen_ore(response: Response,
+                      _: User = Depends(get_current_user)):
+    """Known uranium deposits, for the citizen map.
+
+    WHY THIS IS ALLOWED WHERE AN ISR PIN IS NOT, which is the question this
+    endpoint has to answer to exist at all.
+
+    Design section 2 withholds the coordinate of a *hypothetical ISR site*
+    because that site is this project's invention, and a pin next to a named
+    village reads as a plan somebody has made. A uranium DEPOSIT is the
+    opposite: it is published Geological Survey of India / UDEPO reference data
+    about rock that has been there for a billion years. Withholding it would not
+    protect anybody — it is already public — and showing it answers a question
+    residents of the Singhbhum belt genuinely ask, which is why the assessed
+    areas are where they are.
+
+    Same payload the staff surface reads, so there is one source of truth for
+    where the ore is.
+    """
+    # Reuses the ML router's forwarder rather than a second copy: the engine
+    # being down should look the same (503) on both surfaces.
+    from app.api.v1.ml import _forward
+    return await _forward("/api/ore", response)
 
 
 # ── "my area" ────────────────────────────────────────────────────────

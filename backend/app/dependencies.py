@@ -174,7 +174,17 @@ require_regulator_or_admin = require_audit_reader
 
 #: Who may run the contaminant model and place the sites it runs at.
 #: Excludes `field_officer` (collects evidence, does not model) and `citizen`.
-require_simulation_roles = require_roles(UserRole.admin, UserRole.analyst)
+#:
+#: `regulator` was added 2026-08-25 at the product owner's request. R12 had
+#: excluded it on the reasoning that a reviewer of field evidence should not
+#: also operate the pipeline that consumes it — but running a screening is not
+#: operating the pipeline. A CGWB or SPCB officer asking "what would happen if"
+#: is the primary real-world user of a screening tool, and refusing them the
+#: model while showing them everything it produced was the wrong side of that
+#: line. What stays admin-only is unchanged and is the part that matters:
+#: publishing to citizens, dataset writes, model operations and accounts.
+require_simulation_roles = require_roles(UserRole.admin, UserRole.regulator,
+                                         UserRole.analyst)
 
 #: Any staff role. Excludes `citizen`: use this wherever a response can expose
 #: a precise ISR site location (design section 2). Includes `regulator` since

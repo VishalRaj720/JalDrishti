@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_analyst_or_admin, require_staff
+from app.dependencies import require_simulation_roles, require_staff
 from app.exceptions import AppException, ResourceNotFoundError
 from app.models.scenario import Scenario
 from app.models.simulation_run import SimulationRun
@@ -67,7 +67,7 @@ async def create_scenario(
     payload: ScenarioCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_analyst_or_admin),
+    actor: User = Depends(require_simulation_roles),
 ):
     # P2: narrowed from CLIENT_TUNABLE to RUN_VARIABLE. A scenario is a named
     # set of RUN inputs against a fixed site, and a run may vary exactly three
@@ -151,7 +151,7 @@ async def run_scenario(
     background_tasks: BackgroundTasks,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_analyst_or_admin),
+    actor: User = Depends(require_simulation_roles),
 ):
     """Queue a run of this scenario's saved inputs."""
     from app.api.v1.simulations import _run_in_background
@@ -208,7 +208,7 @@ async def archive_scenario(
     scenario_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_analyst_or_admin),
+    actor: User = Depends(require_simulation_roles),
 ):
     """Archive, never delete: runs reference the scenario that produced them."""
     try:

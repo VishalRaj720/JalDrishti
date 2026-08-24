@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import (require_admin, require_analyst_or_admin,
+from app.dependencies import (require_admin, require_simulation_roles,
                               require_staff)
 from app.engine_bounds import BOUNDS as B
 from app.exceptions import AppException
@@ -197,7 +197,7 @@ async def trigger_simulation(
     background_tasks: BackgroundTasks,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_analyst_or_admin),
+    actor: User = Depends(require_simulation_roles),
 ):
     """Queue a run against a registered ISR point. Poll `GET /simulations/runs/{id}`."""
     try:
@@ -283,7 +283,7 @@ async def sweep_simulation(
     isr_id: uuid.UUID,
     payload: SweepRequest,
     db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_analyst_or_admin),
+    actor: User = Depends(require_simulation_roles),
 ):
     """Run the engine across one axis against a registered site."""
     from app.services import ml_pipeline_adapter as mlp

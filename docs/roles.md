@@ -232,11 +232,13 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/citizen/advisories/geojson` | ● | ● | ● | ● | ● |
 | `GET /api/v1/citizen/alerts` | ● | ● | ● | ● | ● |
 | `POST /api/v1/citizen/alerts/read-all` | ● | ● | ● | ● | ● |
+| `POST /api/v1/citizen/alerts/scan-breach-due` | ● | · | · | · | · |
 | `POST /api/v1/citizen/alerts/scan-measured` | ● | · | · | · | · |
 | `GET /api/v1/citizen/alerts/unread-count` | ● | ● | ● | ● | ● |
 | `POST /api/v1/citizen/alerts/{alert_id}/read` | ● | ● | ● | ● | ● |
 | `GET /api/v1/citizen/blocks` | ● | ● | ● | ● | ● |
 | `GET /api/v1/citizen/my-area` | ● | ● | ● | ● | ● |
+| `GET /api/v1/citizen/ore` | ● | ● | ● | ● | ● |
 | `POST /api/v1/citizen/register` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/citizen/subscriptions` | ● | ● | ● | ● | ● |
 | `POST /api/v1/citizen/subscriptions` | ● | ● | ● | ● | ● |
@@ -279,10 +281,10 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/ingest/subdistricts/geojson` | ● | · | · | · | · |
 | `POST /api/v1/ingest/water-quality/csv` | ● | · | · | · | · |
 | `GET /api/v1/isr-points` | ● | ● | ● | ● | · |
-| `POST /api/v1/isr-points` | ● | · | ● | · | · |
+| `POST /api/v1/isr-points` | ● | ● | ● | · | · |
 | `DELETE /api/v1/isr-points/{isr_id}` | ● | · | · | · | · |
 | `GET /api/v1/isr-points/{isr_id}` | ● | ● | ● | ● | · |
-| `PUT /api/v1/isr-points/{isr_id}` | ● | · | ● | · | · |
+| `PUT /api/v1/isr-points/{isr_id}` | ● | ● | ● | · | · |
 | `GET /api/v1/isr-points/{isr_id}/deletion-impact` | ● | · | · | · | · |
 | `GET /api/v1/isr-points/{isr_id}/simulations` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/aquifers` | ● | ● | ● | ● | · |
@@ -293,8 +295,8 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/ml/flow-field` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/health` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/ore` | ● | ● | ● | ● | · |
-| `GET /api/v1/ml/pin` | ● | · | ● | · | · |
-| `POST /api/v1/ml/predict` | ● | · | ● | · | · |
+| `GET /api/v1/ml/pin` | ● | ● | ● | · | · |
+| `POST /api/v1/ml/predict` | ● | ● | ● | · | · |
 | `GET /api/v1/ml/rivers` | ● | ● | ● | ● | · |
 | `GET /api/v1/ml/strike-field` | ● | ● | ● | ● | · |
 | `POST /api/v1/model-ops/factory-reset` | ● | · | · | · | · |
@@ -316,19 +318,19 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/public/risk/geojson/wells` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/{district_id}` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/scenarios` | ● | ● | ● | ● | · |
-| `POST /api/v1/scenarios` | ● | · | ● | · | · |
-| `DELETE /api/v1/scenarios/{scenario_id}` | ● | · | ● | · | · |
+| `POST /api/v1/scenarios` | ● | ● | ● | · | · |
+| `DELETE /api/v1/scenarios/{scenario_id}` | ● | ● | ● | · | · |
 | `GET /api/v1/scenarios/{scenario_id}` | ● | ● | ● | ● | · |
 | `POST /api/v1/scenarios/{scenario_id}/compare` | ● | ● | ● | ● | · |
-| `POST /api/v1/scenarios/{scenario_id}/run` | ● | · | ● | · | · |
+| `POST /api/v1/scenarios/{scenario_id}/run` | ● | ● | ● | · | · |
 | `POST /api/v1/simulations/compare` | ● | ● | ● | ● | · |
 | `POST /api/v1/simulations/reap` | ● | · | · | · | · |
 | `GET /api/v1/simulations/runs` | ● | ● | ● | ● | · |
 | `GET /api/v1/simulations/runs/{run_id}` | ● | ● | ● | ● | · |
-| `POST /api/v1/simulations/{isr_id}` | ● | · | ● | · | · |
-| `POST /api/v1/simulations/{isr_id}/lifecycle` | ● | · | ● | · | · |
-| `POST /api/v1/simulations/{isr_id}/preview` | ● | · | ● | · | · |
-| `POST /api/v1/simulations/{isr_id}/sweep` | ● | · | ● | · | · |
+| `POST /api/v1/simulations/{isr_id}` | ● | ● | ● | · | · |
+| `POST /api/v1/simulations/{isr_id}/lifecycle` | ● | ● | ● | · | · |
+| `POST /api/v1/simulations/{isr_id}/preview` | ● | ● | ● | · | · |
+| `POST /api/v1/simulations/{isr_id}/sweep` | ● | ● | ● | · | · |
 | `GET /api/v1/simulations/{sim_id}` | ● | ● | ● | ● | · |
 | `GET /api/v1/users` | ● | · | · | · | · |
 | `POST /api/v1/users` | ● | · | · | · | · |
@@ -347,7 +349,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 114/126 · **regulator** 66/126 · **analyst** 79/126 · **field_officer** 66/126 · **citizen** 14/126
+Reachable endpoints per role — **admin** 116/128 · **regulator** 78/128 · **analyst** 80/128 · **field_officer** 67/128 · **citizen** 15/128
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

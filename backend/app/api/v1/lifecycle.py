@@ -34,7 +34,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_analyst_or_admin
+from app.dependencies import require_simulation_roles
 from app.engine_bounds import BOUNDS as B
 from app.exceptions import AppException
 from app.models.user import User
@@ -110,7 +110,7 @@ async def lifecycle(
     isr_id: uuid.UUID,
     payload: LifecycleRequest,
     db: AsyncSession = Depends(get_db),
-    actor: User = Depends(require_analyst_or_admin),
+    actor: User = Depends(require_simulation_roles),
 ):
     """Trace every contaminant across operation → restoration → post-closure."""
     from app.services import ml_pipeline_adapter as mlp

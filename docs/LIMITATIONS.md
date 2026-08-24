@@ -8,9 +8,9 @@ The rule this file exists to enforce: *if a model misses a threshold, report it 
 than moving the threshold.* Nothing below has been softened to make the project look
 finished.
 
-**Last consolidated:** 2026-08-24. Sources: the ML pipeline readiness review
-(2026-08-12), the R10 audit (2026-08-19) and the **R13 deployment-readiness audit
-(2026-08-24)**, which reviewed the whole repository against the proposal, swept
+**Last consolidated:** 2026-08-25. Sources: the ML pipeline readiness review
+(2026-08-12), the R10 audit (2026-08-19), the **R13 deployment-readiness audit
+(2026-08-24)** and the **R14 pre-deployment changes (2026-08-25)**, which reviewed the whole repository against the proposal, swept
 every endpoint against every role, and drove the portal end to end. The full chronological review record — including findings
 that were later **retracted**, which is why it is kept rather than summarised — lives in
 `docs/local/audit-record/` and is not tracked in git.
@@ -287,6 +287,173 @@ legacy `simulations` table, 0 rows); and `GET /ml/health` plus
 
 ---
 
+## 4e. R14 (2026-08-25) — the citizen surface stops banding on uranium alone
+
+Five pre-deployment changes requested by the product owner. Two of them change
+what a resident is told about their own water, so they are recorded here rather
+than in a changelog.
+
+### The public map could not show a high-concern district. At all.
+
+The citizen band was computed from `max(uranium_ppb)` and nothing else.
+Statewide maximum uranium is **28.5 ppb against a 30 ppb limit**, so no
+district, block or point could ever reach "High concern" no matter what was in
+the water — while 22 wells exceeded the nitrate limit (peak 121 mg/L, 2.7x) and
+32 exceeded fluoride.
+
+Banding now reads every measured **health-significant** determinand — uranium,
+nitrate and fluoride. The result is not marginal: **14 of 24 districts move to
+"High concern"**, several of them from readings where uranium is essentially
+absent. Lohardaga sat at 0.5 ppb uranium and 48 mg/L nitrate; Gumla at 2.1 and
+53.
+
+Four things bound this so it stays honest:
+
+* **Only health determinands band.** Hardness, alkalinity and TDS exceed at
+  roughly two-thirds of Jharkhand's wells and are hard-rock aquifer chemistry,
+  not contamination. Banding a village red for hard water would bury the wells
+  carrying a real nitrate load. They remain on the water-quality surface.
+* **`Not tested` is its own band**, grey and never green, distinct from both
+  `No data` and `Low concern`.
+* **`untested_health` ships with every row.** Arsenic and iron are 0 %
+  populated statewide, so they are listed unconditionally — no block in
+  Jharkhand has been cleared for them, and a "Low concern" that quietly means
+  "clean for the three we happened to measure" is exactly the failure section 3
+  exists to prevent. The three districts with wells but no uranium result
+  (East Singhbum, Saraikela Kharsawan, West Singhbhum) still say so.
+* **`band_driver` names the substance**, because "High concern" without saying
+  *what* is high is not actionable: a resident can boil water for bacteria and
+  cannot boil out fluoride, and the copy now says which.
+
+### The alert channel that mattered most had never sent an alert
+
+Found while reviewing the alert system, and it is the same defect as the band
+above in the one place where it counts.
+
+`scan_measured_exceedances` — the scan the code itself calls **"THE REAL
+CHANNEL... for most citizens the only thing on this platform about water they
+actually drink today"** — queried `WHERE uranium_ppb > 30`. Statewide maximum
+uranium is 28.5 ppb, so it **matched zero rows every time it ran**.
+
+The `alerts` table held eight rows, all `published_screening`. This platform had
+warned people eight times about a mine that does not exist and **not once** about
+the contamination measured in their own wells.
+
+It scans every health determinand now. On the existing data that is **32 real
+alerts** where there were none, including a well at 121 mg/L nitrate — 2.7x the
+limit, in a district the old surface banded "Low concern".
+
+Two details that matter more than the count:
+
+* **One alert per well, not per determinand.** A well over both nitrate and
+  fluoride is one problem with that well; two notifications would read as two.
+  It also keeps the `(block_id, well_name, sampled_at)` unique index correct —
+  per-determinand alerts would have collided on it and the second would have
+  vanished into `ON CONFLICT DO NOTHING`.
+* **The advice is determinand-specific**, because the generic version is
+  actively harmful here: boiling *concentrates* nitrate rather than removing it,
+  and the nitrate alert says so.
+
+Arsenic and iron are in the scan although nothing measures them today, so the
+first lab result that arrives raises an alert without anybody remembering to
+come back and add it.
+
+**A scan that finds nothing looks exactly like a scan that found nothing wrong.**
+That is why this survived, and it is the third instance in this codebase of a
+control that was present, configured, and inert — after the rate limiter and
+`POST /scenarios/{id}/run`.
+
+### A published screening now shows what it was, not just where it was
+
+The citizen map drew the footprint polygon and nothing else. It now carries the
+operating parameters (how long the hypothetical mine runs, what horizon it was
+assessed over, how long clean-up runs, injection rate), the modelled spread, and
+whether the run expected the plume to reach shallow drinking water — all of it
+already stored on the run, none of it previously joined.
+
+**The ISR coordinate is still withheld.** That is what design section 2 protects
+and the reason is unchanged. Known uranium **deposits** are now shown as an
+opt-in layer, which is a different thing entirely: published GSI/UDEPO reference
+data about rock, not the location of a mine somebody imagined.
+
+**One consequence worth knowing about.** Reading those parameters needs a
+scoped system-context query, because `isr_points` and `simulation_runs` are
+RLS-protected and a citizen reads nothing from either — a plain join returns
+NULL for every column and the response looks complete while every figure reads
+"unknown". The better long-term fix is to copy the figures onto the advisory row
+at publication time, so a published finding is self-contained and cannot drift
+when somebody later edits the site (which the R13 site editor now allows). That
+needs a migration and would not backfill the two advisories already published,
+so it is written down here rather than half-done.
+
+### A fourth alert kind, and the first that fires on elapsed time
+
+`aquifer_breach_due`. A published screening modelled that contamination would
+reach the shallow aquifer after N years; the hypothetical operation's injection
+start date is now more than N years ago; so on the model's own terms that
+milestone has passed and the people over that aquifer have heard nothing since
+the day it was published.
+
+**This is the most easily misread alert in the system**, and the copy is written
+accordingly: it opens by stating that no such mine exists, it names the
+hypothetical start date it counted from, and it ends by saying that real testing
+is the only thing that can answer the question the model raises. It is
+`warning`, never `high`.
+
+Five gates, each of which alone would over-claim:
+
+1. The advisory is **published**.
+2. The run **actually carries a vertical screening**. Runs stored before
+   2026-08-20 have no `vertical` block, and its absence means *not assessed*,
+   never *no pathway* (section 4b). Those are skipped and counted.
+3. The site has a **real injection start date**. Publication date is not a
+   substitute — it is when people were told, not when injection would have
+   begun.
+4. Elapsed time has passed the modelled breakthrough.
+5. Probability at or above **0.5**.
+
+Reach is bounded exactly as section 4a bounds it, and for the same reason:
+alerting everyone on the formation would turn one hypothetical 13-hectare plume
+into a statewide warning.
+
+**`POST /citizen/alerts/scan-breach-due` defaults to `dry_run=true`** — the
+opposite of the other scans. It is the only alert that fires without anybody
+having acted, so the operator sees exactly who would be told, and on what basis,
+before anyone is.
+
+**On the current data it correctly fires on nobody**, and the reasons are the
+result: both originally published advisories predate vertical-screening
+persistence, and a freshly published Potka run is at 22 elapsed years against a
+29.4-year modelled breakthrough — *due in 7.4 years*, reported rather than
+raised.
+
+### `regulator` may now run the model
+
+R12 excluded it, reasoning that whoever reviews field evidence should not also
+operate the pipeline that consumes it. Running a screening is not operating the
+pipeline, and a CGWB or SPCB officer asking "what would happen if" is the
+primary real-world user of a screening tool. Widened to cover pin, predict,
+preview, lifecycle, sweep, stored runs, scenarios and site registration.
+
+**What did not move is the part that matters:** publishing to citizens, dataset
+writes, model operations and accounts all remain admin-only, and a regulator
+hits the same 403 a citizen would.
+
+### A UI failure mode worth recording, because it will recur
+
+Four screens answer a row-level question by rendering a panel *after* the table
+that triggered it. On a 415-row station table that panel opens 20,577 px below
+the fold, and the button reads as broken.
+
+The fix scrolls the panel into view — and the first two implementations of it
+silently did nothing. `requestAnimationFrame` never runs while a tab is not
+compositing, and `scrollIntoView({behavior:"smooth"})` is an animation, so it
+also returns without error and without scrolling in that state. Measured: smooth
+left `scrollTop` at 0 where `auto` moved it 2,143 px. The hook now scrolls,
+then **verifies it moved** and jumps if it did not.
+
+---
+
 ## 4a. The aquifer-reach alert, and what bounds it
 
 Publishing now raises a second kind of alert — `aquifer_pathway` — for blocks
@@ -385,6 +552,12 @@ presentation:
 - **The IS 10500 assessment is not a health determination.** It compares a
   laboratory value with a published limit. It says nothing about exposure,
   duration, treatment at the point of use, or what anybody actually drinks.
+- **A "Low concern" band is not a clean bill of health.** It means the
+  determinands that were *analysed* came back within limits. Arsenic and iron
+  were analysed nowhere in Jharkhand, so no block has been fully cleared, and
+  `untested_health` says which substances were never looked for.
+- **`aquifer_breach_due` is not a detection.** Nothing has been measured and no
+  mine exists. It reports that a published model's own timetable has run out.
 - **Not "validated".** Benchmarked against exact analytical solutions, yes. Validated
   against a real plume, never — see §0.
 - **Not "scalable to other mining contexts", yet.** The architecture is built for it (the

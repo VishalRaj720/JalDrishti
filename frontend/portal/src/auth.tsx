@@ -40,7 +40,12 @@ export const canReview  = (r?: Role) => r === "admin" || r === "regulator";
  *  accepting evidence and announcing a modelled result to a village are
  *  different decisions, and R12 restored only the first to the regulator. */
 export const canPublish = (r?: Role) => r === "admin";
-export const canRunSim  = (r?: Role) => r === "admin" || r === "analyst";
+//: Regulator added 2026-08-25: a CGWB/SPCB officer asking "what would happen
+//: if" is the primary real-world user of a screening tool. Publication stays
+//: `canPublish` (admin only) — running a model and announcing its result to
+//: a village are different authorities.
+export const canRunSim  = (r?: Role) =>
+  r === "admin" || r === "regulator" || r === "analyst";
 export const canSubmit  = (r?: Role) => r === "admin" || r === "field_officer";
 export const canSync    = (r?: Role) => r === "admin";
 export const canIngest  = (r?: Role) => r === "admin";

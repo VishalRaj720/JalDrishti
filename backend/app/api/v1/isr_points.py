@@ -60,7 +60,7 @@ async def update_isr_point(
     isr_id: uuid.UUID,
     payload: IsrPointUpdate,
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_analyst_or_admin),
+    _=Depends(require_simulation_roles),
 ):
     try:
         return await IsrPointService(db).update(isr_id, payload)

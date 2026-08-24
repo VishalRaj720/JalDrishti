@@ -47,6 +47,15 @@ const KIND = {
     chip: "warn",
     lead: "A modelled pathway into water this area shares",
   },
+  // R14. The only alert that fires because time passed rather than because
+  // somebody acted. Labelled "Timetable passed" rather than anything resembling
+  // "breach" or "detected": no mine exists, nothing has been measured, and the
+  // finding is that a published assessment's own schedule has run out.
+  aquifer_breach_due: {
+    label: "Timetable passed",
+    chip: "warn",
+    lead: "A published screening's modelled schedule has been reached",
+  },
 } as const;
 
 /** Never index `KIND` blind: an unknown kind from a newer backend must not
