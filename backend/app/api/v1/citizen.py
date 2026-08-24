@@ -45,6 +45,7 @@ from app.dependencies import get_current_user, require_admin
 from app.models.advisory import Advisory
 from app.models.user import User, UserRole
 from app.services import audit
+from app.ratelimit import AUTH_RATE_LIMIT, limiter
 from app.services.alerts import URANIUM_LIMIT_PPB, AlertService
 from app.services.auth import create_access_token, hash_password
 
@@ -71,6 +72,7 @@ class TokenAndUser(BaseModel):
 
 @router.post("/register", response_model=TokenAndUser,
              status_code=status.HTTP_201_CREATED)
+@limiter.limit(AUTH_RATE_LIMIT)
 async def register_citizen(
     payload: CitizenRegister,
     request: Request,

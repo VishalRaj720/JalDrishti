@@ -159,12 +159,14 @@ async def run_scenario(
         sc = await _get(db, scenario_id)
         run = await SimulationRunService(db).create(
             actor=actor, isr_id=sc.isr_point_id, params=dict(sc.params),
-            ip=_ip(request))
+            ip=_ip(request), scenario_id=sc.id)
     except AppException as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
-    run.scenario_id = sc.id
-    await db.commit()
+    # No second write here. Assigning `run.scenario_id` after `create()` and
+    # committing again raised StaleDataError every time -- the RLS context is
+    # discarded at COMMIT, so the follow-up UPDATE matched no rows. The link is
+    # now written by the INSERT itself; see SimulationRunService.create.
     background_tasks.add_task(_run_in_background, run.id)
     return {"run_id": str(run.id), "scenario_id": str(sc.id), "status": run.status}
 

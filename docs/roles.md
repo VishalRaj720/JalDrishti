@@ -268,6 +268,10 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/field-observations/{obs_id}/approve` | ● | ● | · | · | · |
 | `POST /api/v1/field-observations/{obs_id}/reject` | ● | ● | · | · | · |
 | `POST /api/v1/field-observations/{obs_id}/withdraw` | ● | · | · | ● | · |
+| `GET /api/v1/groundwater/districts` | ● | ● | ● | ● | · |
+| `GET /api/v1/groundwater/method` | ● | ● | ● | ● | · |
+| `GET /api/v1/groundwater/stations/{station_id}` | ● | ● | ● | ● | · |
+| `GET /api/v1/groundwater/trends` | ● | ● | ● | ● | · |
 | `POST /api/v1/ingest/aquifers/geojson` | ● | · | · | · | · |
 | `GET /api/v1/ingest/data-quality-report` | ● | ● | ● | ● | · |
 | `POST /api/v1/ingest/districts/geojson` | ● | · | · | · | · |
@@ -331,6 +335,11 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `DELETE /api/v1/users/{user_id}` | ● | · | · | · | · |
 | `GET /api/v1/users/{user_id}` | ● | · | · | · | · |
 | `PUT /api/v1/users/{user_id}` | ● | · | · | · | · |
+| `GET /api/v1/water-quality/blocks` | ● | ● | ● | ● | · |
+| `GET /api/v1/water-quality/districts` | ● | ● | ● | ● | · |
+| `GET /api/v1/water-quality/standard` | ● | ● | ● | ● | ● |
+| `GET /api/v1/water-quality/well/{well_id}` | ● | ● | ● | ● | · |
+| `GET /api/v1/water-quality/wells` | ● | ● | ● | ● | · |
 | `GET /api/v1/water-samples` | ● | ● | ● | ● | · |
 | `POST /api/v1/water-samples/bulk` | ● | · | ● | · | · |
 | `GET /health` | ○ | ○ | ○ | ○ | ○ |
@@ -338,7 +347,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 105/117 · **regulator** 57/117 · **analyst** 70/117 · **field_officer** 57/117 · **citizen** 13/117
+Reachable endpoints per role — **admin** 114/126 · **regulator** 66/126 · **analyst** 79/126 · **field_officer** 66/126 · **citizen** 14/126
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

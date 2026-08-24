@@ -28,6 +28,10 @@ import Datasets from "./pages/Datasets";
 import Compare from "./pages/Compare";
 import NetworkPlanPage from "./pages/NetworkPlan";
 import PublicView from "./pages/PublicView";
+import WaterQuality from "./pages/WaterQuality";
+import GroundwaterTrends from "./pages/GroundwaterTrends";
+import Scenarios from "./pages/Scenarios";
+import Ingest from "./pages/Ingest";
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
@@ -72,6 +76,10 @@ function Gate() {
             almost certainly bookmarked. */}
         <Route path="/console" element={<Guard allow={isStaff}><Console /></Guard>} />
         <Route path="/compare" element={<Guard allow={canRunSim}><Compare /></Guard>} />
+        {/* The scenario feature has existed in the backend since migration 0014
+            and had no UI at all, so the table held zero rows. Analysts and
+            admins run the model, so they own scenarios. */}
+        <Route path="/scenarios" element={<Guard allow={canRunSim}><Scenarios /></Guard>} />
         <Route
           path="/publications"
           element={<Guard allow={(r) => canRunSim(r) || canPublish(r)}><Publications /></Guard>}
@@ -88,10 +96,19 @@ function Gate() {
           element={<Guard allow={(r) => canSubmit(r) || canReview(r)}><FieldData /></Guard>}
         />
         <Route path="/data" element={<Guard allow={isStaff}><DataGaps /></Guard>} />
+        {/* Added 2026-08-24. Both read data the platform already collected and
+            had never assessed: nineteen unread determinands, and nine years of
+            level readings that only ever fed the static flow field. Staff-only
+            because both carry well and station coordinates. */}
+        <Route path="/water-quality"
+               element={<Guard allow={isStaff}><WaterQuality /></Guard>} />
+        <Route path="/groundwater"
+               element={<Guard allow={isStaff}><GroundwaterTrends /></Guard>} />
         <Route path="/network-plan" element={<Guard allow={isStaff}><NetworkPlanPage /></Guard>} />
         <Route path="/audit" element={<Guard allow={canAudit}><Audit /></Guard>} />
         <Route path="/admin" element={<Guard allow={canAdmin}><Administration /></Guard>} />
         <Route path="/datasets" element={<Guard allow={canAdmin}><Datasets /></Guard>} />
+        <Route path="/ingest" element={<Guard allow={canAdmin}><Ingest /></Guard>} />
         {/* The citizen surface. Every signed-in role may read these: an
             official seeing exactly what a resident sees is a feature, and
             nothing here is restricted. */}

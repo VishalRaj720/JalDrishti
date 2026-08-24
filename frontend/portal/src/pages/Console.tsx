@@ -46,6 +46,7 @@ import {
   drawArrow, drawTick, fmt, ringsOf,
 } from "../console/mapLayers";
 import RegisterForm from "../console/RegisterForm";
+import SiteEditForm from "../console/SiteEditForm";
 import RunResult from "../console/RunResult";
 import SweepChart, { type Sweep } from "../console/SweepChart";
 import ProposeAdvisory from "../console/ProposeAdvisory";
@@ -77,6 +78,10 @@ export default function Console() {
   const [mode, setMode] = useState<"none" | "pin" | "site">("none");
   const [pin, setPin] = useState<{ lon: number; lat: number } | null>(null);
   const [siteId, setSiteId] = useState<string>("");
+  /** PUT /isr-points/{id} existed with no caller: a site could be created
+   *  and deleted but never corrected, so fixing a typo meant a cascading
+   *  delete of every run filed against it. */
+  const [editingSite, setEditingSite] = useState(false);
 
   /**
    * WHAT A MAP CLICK MEANS — R10.
@@ -1009,6 +1014,16 @@ This also destroys ${n} stored run(s) `
               </button>
             </div>
           )}
+
+          {mayRun && (editingSite ? (
+            <SiteEditForm site={site} bounds={bounds.data}
+                          onDone={() => setEditingSite(false)} />
+          ) : (
+            <button className="btn ghost small" style={{ margin: "6px 0" }}
+                    onClick={() => setEditingSite(true)}>
+              Edit the operation
+            </button>
+          ))}
 
           <div className="sec">The operation — fixed for this site</div>
           <dl className="kv">

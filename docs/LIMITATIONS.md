@@ -8,8 +8,10 @@ The rule this file exists to enforce: *if a model misses a threshold, report it 
 than moving the threshold.* Nothing below has been softened to make the project look
 finished.
 
-**Last consolidated:** 2026-08-20. Sources: the ML pipeline readiness review (2026-08-12)
-and the R10 audit (2026-08-19). The full chronological review record — including findings
+**Last consolidated:** 2026-08-24. Sources: the ML pipeline readiness review
+(2026-08-12), the R10 audit (2026-08-19) and the **R13 deployment-readiness audit
+(2026-08-24)**, which reviewed the whole repository against the proposal, swept
+every endpoint against every role, and drove the portal end to end. The full chronological review record — including findings
 that were later **retracted**, which is why it is kept rather than summarised — lives in
 `docs/local/audit-record/` and is not tracked in git.
 
@@ -168,8 +170,120 @@ it at the source level instead, and says so.
 | ~~O-3~~ | ~~`react-router-dom` 6.28 advisories~~ | **Downgraded (2026-08-20).** Neither is reachable: the SSR one needs SSR (this is an SPA), and the open redirect needs a user-controlled navigation target — every `navigate()` call takes a string literal or an internal UUID. Routine upgrade, not a blocker |
 | ~~O-4~~ | ~~Demo accounts with weak public passwords on the login screen~~ | **Resolved in code (2026-08-20), one action outstanding.** They were worse than listed: Vite compiled them into the production bundle, so a working *admin* password was readable by anyone who viewed source. Now behind `import.meta.env.DEV`, and `npm run build` fails if a credential reaches `dist/`. **The four accounts must still be deleted or rotated in any deployed database** |
 | ~~O-5~~ | ~~`/metrics` is unauthenticated~~ | **Resolved (2026-08-20).** `METRICS_TOKEN` gates it with a bearer token; with `APP_ENV=production` and no token it is not mounted at all |
-| O-8 | PDF export is wired but **pagination has never been visually confirmed** — the test harness cannot open a generated PDF | Open, verify by hand |
-| O-9 | **Sessions expire in 15 minutes with no refresh path.** `.env` sets `ACCESS_TOKEN_EXPIRE_MINUTES=15`, code defaults to 480, and no `/auth/refresh` exists — a 401 clears the token | Open, deployment decision |
+| O-8 | PDF export is wired but **pagination has never been visually confirmed** — the test harness cannot open a generated PDF | **Still open**, verify by hand |
+| ~~O-9~~ | ~~Sessions expire in 15 minutes with no refresh path~~ | **Resolved.** `POST /auth/refresh` exists and is a *sliding session*: it requires a still-valid token, so it extends an active session and cannot resurrect an expired one. A real refresh-token scheme (separate long-lived credential, rotation, server-side revocation) needs a token store this prototype does not have, and is not built |
+
+---
+
+## 4d. R13 (2026-08-24) — what a full-repo audit found
+
+Three classes of finding. The first two were **invisible to review**: the code
+looked right, the settings were present and read, and every request succeeded.
+
+### The security controls that enforced nothing
+
+| # | Finding | Fix |
+|---|---|---|
+| S-1 | **Rate limiting was entirely inert.** `main.py` built a slowapi `Limiter` with `default_limits` and never installed `SlowAPIMiddleware`, which is the only thing that consults them. `RATE_LIMIT_PER_MINUTE=60` sat in `.env`, appeared in the deployment checklist, and applied to nothing. Measured: **120 `POST /auth/login` in 5.7 s, 120 × 401, zero 429s** — about 21 password guesses per second with no lockout | Middleware installed; `app/ratelimit.py` owns the limiter; login and citizen registration carry a separate `AUTH_RATE_LIMIT_PER_MINUTE=10`; `/health` exempt. Re-measured: 10 × 401 then 110 × 429 |
+| S-2 | **`docker-compose.yml` pointed the running API at the `postgres` superuser**, so all 21 RLS policies were silently inert. Anyone who ran `docker-compose up` got a system that believed it had row-level security and did not — the exact failure the two-role design exists to prevent, shipped as the default way to run the project | Rewritten: a `migrate` service uses the owner, `backend` uses `jaldrishti_app`, and passwords come from the environment with **no defaults**, so an unset value fails loudly at `up` |
+| S-3 | **No production guard on `JWT_SECRET`.** There was one for inert RLS but none for the signing key, which is the more direct failure: a token forged with the published default arrives as a valid administrator, and RLS serves it faithfully — the database cannot tell a real admin from a minted one | `_require_production_secrets` refuses to start with `APP_ENV=production` on a placeholder or under-32-character secret, an empty `DATABASE_URL`, or `CORS_ORIGINS=*` |
+| S-4 | The real local Postgres password was **committed in `app/config.py`** (twice) and in `docker-compose.yml`. A default must never be a secret: it is readable by anyone with the source, and it silently *works* on the author's machine, so nothing ever forces it to be replaced | Defaults emptied; startup refuses production without real values |
+| S-5 | **No security headers at all** — verified against a live response, not assumed | `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, and a restrictive CSP. HSTS is opt-in via `HSTS_ENABLED`, because sent over plain HTTP it pins a browser to a scheme the host cannot answer |
+| S-6 | `/docs`, `/redoc` and `/openapi.json` were served **unconditionally**, publishing the full route inventory, every schema and every role guard | Off in production unless `DOCS_ENABLED=true` |
+| S-7 | `APP_ENV` was compared inconsistently: CORS tested `== "production"` while metrics tested `.lower() in ("production","prod")`, so `APP_ENV=prod` gated metrics and still opened CORS to **every origin** | One definition, `Settings.is_production` |
+
+Checked and found **clean**: no SQL injection (raw `text()` interpolates only
+module constants and allowlisted table and column names; parameters are always
+bound), no path traversal (a dataset `key` resolves through a fixed registry),
+citizen registration hard-pins the role and gives no account-existence oracle,
+and demo credentials are correctly `import.meta.env.DEV`-gated out of the built
+bundle. All seven fixes are pinned by `tests/test_security_hardening.py`.
+
+### `POST /scenarios/{id}/run` had never worked
+
+The **third** occurrence of the RLS-after-COMMIT hazard in section 1c. The route
+assigned `run.scenario_id` after `SimulationRunService.create()` had already
+committed, then committed again — and by then the session had no identity, the
+`simulation_runs` policy matched zero rows, and SQLAlchemy raised
+`StaleDataError: expected to update 1 row(s); 0 were matched`. The route
+returned 500, the background task was never scheduled, and the run sat at
+`queued` for ever.
+
+It went unnoticed because the `scenarios` table was **empty**: there was no UI to
+create a scenario, so the endpoint had never been called. It was found by
+building that UI and pressing the button. The link is now written by the INSERT,
+which avoids the hazard rather than working around it.
+
+### The measured record was being collected and not read
+
+`water_samples` carries **twenty determinands at 99-100 % coverage** — pH, EC,
+TDS, hardness, nitrate, fluoride, chloride, sulphate, Ca, Mg, Na, K, PO4, HCO3,
+CO3 — and **only `uranium_ppb` drove any logic**: 47 code references against 4
+each (pure model and schema plumbing) for every other parameter.
+
+That mattered more than it sounds, because **uranium exceeds its limit at zero of
+342 tested wells** (maximum 28.5 ppb against a 30 ppb limit), while **nitrate
+exceeds at 22 wells, peaking at 121 mg/L — 2.7 times the limit — and fluoride at
+32**. The single indicator on screen was the one indicator that never fired, and
+33 wells carrying a measured health exceedance were invisible.
+
+Now assessed against **IS 10500:2012** (`services/water_quality.py`,
+`GET /water-quality/*`). Nothing is modelled: every number is a laboratory
+measurement compared with a published limit.
+
+**Two things this must not be read as saying.** 71 % of sampled wells exceed
+*some* IS 10500 limit, and that figure alone misinforms — most of it is hardness,
+alkalinity and TDS, which is hard-rock aquifer chemistry rather than
+contamination, and no mine caused it. The health-significant count is therefore
+reported separately, and first. Second, **arsenic, iron and turbidity are 0 %
+populated** in the CGWB file and manganese has no column at all. The proposal
+names Fe, Mn and As explicitly, so this is a real data gap, reported as
+`not_tested` on every well rather than quietly passed over.
+
+**The composite WQI is a secondary figure, and says so.** Inverse-limit
+weighting is the published construction and it has a property that misleads: the
+weight is 1/limit, so the smallest-limit determinand dominates. Dasokhap
+(Hazaribagh) scores 132.7 — "Unsuitable for drinking" — on a fluoride reading of
+1.43 mg/L that is **below** its own permissible limit of 1.5, because fluoride
+carries 96 % of the score. Found by reading a real well on the finished screen,
+not by inspecting the formula. `dominated_by` now ships with every score and the
+UI prints it beside the band.
+
+### Nine years of level readings fed one static raster
+
+`groundwater_level_readings` holds **8,345 measurements from 415 stations,
+2013-2021** — the only genuinely temporal data in the project — and was read
+solely to bake the flow field, averaging the time axis away. It is now analysed
+with **Theil-Sen slope and the Mann-Kendall test**
+(`services/groundwater_trends.py`), chosen because these series are short,
+irregularly spaced, seasonally forced and contain outliers: every assumption
+ordinary least squares needs is violated, and OLS would report a confident slope
+regardless.
+
+**The result is undramatic, and that is the finding:** of 331 testable stations,
+**5 are declining, 20 recovering and 306 stable**. 84 have too short a record to
+test and are reported as *"not enough record"*, never as stable. Fastest decline
+0.785 m/yr (Chapodia, Dumka). Median seasonal swing 2.38 m.
+
+### 25 of 115 endpoints had no UI
+
+Including the entire Scenarios feature, all five `/ingest/*` routes, dataset
+backup and restore (which section 4c records as "no restore has ever been
+tested" — it could not be, from the portal), `PUT /isr-points/{id}` (so a
+mistyped site could only be corrected by a cascading delete that also destroys
+every run filed against it), and user role editing.
+
+Closed for Scenarios, ingest, restore points, site edit, role edit and
+monitoring-well registration. **Deliberately left without UI**, because each is
+superseded rather than missing: `GET /water-samples` and `POST
+/water-samples/bulk` (the water-quality surface returns strictly more, and bulk
+upload goes through `/ingest/water-quality/csv`); `GET /advisories/{id}`,
+`GET /scenarios/{id}`, `GET /users/{id}` and `GET /field-observations/{id}` (the
+list responses already carry every field); `GET /isr-points/{id}/simulations`
+(superseded by `/simulations/runs?isr_id=`); `GET /simulations/{sim_id}` (the
+legacy `simulations` table, 0 rows); and `GET /ml/health` plus
+`GET /groundwater/method` (operational probes — and `method` is embedded in the
+`/trends` response the page already renders).
 
 ---
 
@@ -256,9 +370,21 @@ and the engine rate limit is per host, so every user behind a gateway shares one
 Written down because they are the ones most likely to be overstated in a report or a
 presentation:
 
-- **Not "real-time".** There is no sensor ingest, no telemetry, no closed loop. The
-  proposal's CPS framing is not satisfied by what exists; this is a screening and
-  preparedness tool over historical CGWB data.
+- **Not "real-time".** There is no sensor ingest, no telemetry, no closed loop.
+  The proposal's CPS framing is **not satisfied** by what exists; this is a
+  screening and preparedness tool over historical CGWB data. R13 considered
+  building a telemetry-ingest contract fed by a replay of the existing series and
+  **deliberately did not**: a 2013-2021 replay dressed as a live feed would be
+  the single change in this project most likely to be read as a capability it
+  does not have. The honest position is that this deliverable is unmet, not
+  partially met.
+- **The level trends are not a forecast.** Theil-Sen describes what the
+  measurements did between 2013 and 2021. Nothing is extrapolated forward, and a
+  station with fewer than 8 readings or under 3 years of record gets no trend at
+  all rather than an uncertain one.
+- **The IS 10500 assessment is not a health determination.** It compares a
+  laboratory value with a published limit. It says nothing about exposure,
+  duration, treatment at the point of use, or what anybody actually drinks.
 - **Not "validated".** Benchmarked against exact analytical solutions, yes. Validated
   against a real plume, never — see §0.
 - **Not "scalable to other mining contexts", yet.** The architecture is built for it (the

@@ -39,13 +39,17 @@ function sectionsFor(role: Role | undefined): NavGroup[] {
   add("Map", [
     isStaff(role) && { to: "/console", label: "Console" },
     canRunSim(role) && { to: "/compare", label: "Compare sites" },
+    canRunSim(role) && { to: "/scenarios", label: "Scenarios" },
   ]);
 
   add("Data", [
     (canSubmit(role) || canReview(role)) && { to: "/field", label: "Field data" },
     isStaff(role) && { to: "/data", label: "Data & gaps" },
+    isStaff(role) && { to: "/water-quality", label: "Water quality" },
+    isStaff(role) && { to: "/groundwater", label: "Groundwater levels" },
     isStaff(role) && { to: "/network-plan", label: "Monitoring plan" },
     canAdmin(role) && { to: "/datasets", label: "Dataset manager" },
+    canAdmin(role) && { to: "/ingest", label: "Bulk ingest" },
   ]);
 
   add("Decisions", [

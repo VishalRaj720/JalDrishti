@@ -1,3 +1,31 @@
+# JalDrishti — local stack: PostGIS + the API.
+#
+# AUDIT 2026-08-24, finding #2. The previous version of this file pointed the
+# RUNNING API at the `postgres` superuser and hard-coded a real password.
+# Postgres skips row-level security entirely for a superuser, so every one of
+# the 21 policies from migrations 0009/0010 existed, reviewed cleanly, and
+# enforced NOTHING. Anyone who ran `docker-compose up` got a system that
+# believed it had row-level security and did not — the exact failure the
+# two-role design in docs/DEPLOYMENT.md §2.2 exists to prevent, shipped as the
+# default way to run the project.
+#
+# Two roles now, as the application expects:
+#   postgres         — owner. Migrations, CREATE EXTENSION, DDL. Nothing else.
+#   jaldrishti_app   — what the API connects as. NOSUPERUSER, NOBYPASSRLS.
+#
+# Passwords come from the environment and have no defaults, so an unset value
+# fails loudly at `docker-compose up` instead of silently starting on a
+# published one. Create a `.env` beside this file:
+#
+#   POSTGRES_PASSWORD=<choose one>
+#   APP_DB_PASSWORD=<choose a different one>
+#   JWT_SECRET=<python -c "import secrets;print(secrets.token_urlsafe(64))">
+#
+# Then:  docker-compose up --build
+#
+# The API refuses to start if it finds itself on a bypassing role — watch for
+# "Row-level security active: 21 policies … (no bypass)" in the backend logs.
+
 services:
   # ── PostgreSQL + PostGIS ──────────────────────────────────────
   db:
@@ -6,7 +34,8 @@ services:
     environment:
       POSTGRES_DB: groundwater_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "040812"
+      # `:?` — compose aborts with this message if the variable is unset.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env; there is deliberately no default}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -17,25 +46,77 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── FastAPI Backend ───────────────────────────────────────────
-  # Celery/Redis and the never-built ml-service were removed in the
-  # Month-1 slim-down. Simulations run as in-process background tasks.
+  # ── One-shot schema setup ─────────────────────────────────────
+  #
+  # Separate from the API service because it needs the OWNER connection, and
+  # the API must never have one. It creates the PostGIS extension and enum
+  # types, creates the restricted app role, then applies the migrations that
+  # install the RLS policies. Idempotent: safe to re-run, and it is re-run on
+  # every `up` so a schema change lands without a manual step.
+  migrate:
+    build:
+      # Repo root, NOT ./backend — the engine and Datasets/ live above it and
+      # ml_pipeline_adapter resolves REPO_ROOT three levels up from itself.
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: jaldrishti_migrate
+    env_file:
+      - ./backend/.env
+    environment:
+      APP_ENV: development
+      MIGRATION_DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/groundwater_db
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/groundwater_db
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: groundwater_db
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python -m scripts.init_db &&
+             python -m scripts.create_app_role --password '${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}' &&
+             alembic upgrade head"
+    restart: "no"
+
+  # ── FastAPI backend ───────────────────────────────────────────
+  # Celery/Redis and the never-built ml-service were removed in the Month-1
+  # slim-down. Simulations run as in-process background tasks.
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      # Repo root, NOT ./backend — the engine and Datasets/ live above it and
+      # ml_pipeline_adapter resolves REPO_ROOT three levels up from itself.
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: jaldrishti_backend
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:040812@db:5432/groundwater_db
+      # THE RESTRICTED ROLE. This is the line the audit was about — changing it
+      # back to `postgres` silently disables every row-level security policy in
+      # the database, and nothing in the UI would look different.
+      DATABASE_URL: postgresql+asyncpg://jaldrishti_app:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/groundwater_db
+      # The owner URL is NOT given to this service. It has no DDL to do, and
+      # withholding it means a compromised API process cannot drop a policy that
+      # constrains it.
+      DB_HOST: db
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env; generate with python -c "import secrets;print(secrets.token_urlsafe(64))"}
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
-      - ./backend:/app
+      # Source mount + --reload: this file is a DEVELOPMENT stack. For a real
+      # deployment build an image and drop both, or the container serves
+      # whatever happens to be in the working tree.
+      #
+      # Mounted at /app/backend to match the image layout — mounting it at /app
+      # would hide ml_pipeline/ and Datasets/ and break every simulation.
+      - ./backend:/app/backend
+      - ./ml_pipeline:/app/ml_pipeline
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:

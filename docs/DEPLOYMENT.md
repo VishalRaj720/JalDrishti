@@ -1,9 +1,24 @@
 # Deploying JalDrishti
 
-**Written:** 2026-08-19 (R10). Verified against this checkout, a live PostGIS
-database and a running API — not written from memory.
+**Written:** 2026-08-19 (R10). **Revised 2026-08-24 (R13)** after a
+deployment-readiness audit that found several statements here had gone stale and
+several controls this document told you to rely on were enforcing nothing.
+Verified against this checkout, a live PostGIS database and a running API — not
+written from memory.
+
+> **What changed on 2026-08-24, and why you should re-read §3 and §8 even if you
+> read this before.** The migration head is `0022`, not `0019`. `regulator` is a
+> live role again, not a retired one. `POST /auth/refresh` exists, so the
+> 15-minute token is no longer a trap. And `RATE_LIMIT_PER_MINUTE`, which §3
+> told you to "keep a real limit", was **applied to nothing** until it was
+> wired — see `LIMITATIONS.md` §4d, S-1.
 
 ---
+
+> **Want the steps rather than the reasoning?**
+> [`DEPLOY_WALKTHROUGH.md`](DEPLOY_WALKTHROUGH.md) is the click-by-click
+> version — which site to open, what to paste, what to check before moving
+> on. This file explains *why* it is shaped that way.
 
 ## 0. The question, answered directly
 
@@ -126,11 +141,22 @@ stop the service — so nothing will stop you shipping past it except reading it
 cd backend && alembic upgrade head        # uses MIGRATION_DATABASE_URL
 ```
 
-Head is `0019_retire_regulator`. Note that `0019` **cannot** drop the
-`regulator` label from the `userrole` enum — PostgreSQL will not remove an enum
-value inside a transaction — so the label remains in the type forever. The role
-is retired in the *application vocabulary* only, and `tests/test_p6_roles.py`
-is what keeps it that way. Do not "tidy up" by reintroducing it.
+Head is **`0022_regulator_single_admin`**.
+
+Two things that migration does, both of which affect how you set the deployment
+up:
+
+* **`regulator` is a live role again.** `0019` retired it and `0022` restored it
+  with a narrower job — deciding on what a field officer submits. An earlier
+  version of this document said it was retired; that is no longer true.
+* **`admin` is pinned to exactly one account.** Any surplus administrator is
+  demoted to `analyst` rather than deleted. Create the real one with
+  `python -m scripts.bootstrap_admin`; it cannot be assigned from the portal, and
+  the Administration screen deliberately offers no role control for it.
+
+Note that `0019` could not drop the `regulator` label from the `userrole` enum —
+PostgreSQL will not remove an enum value inside a transaction — which is the only
+reason restoring the role in `0022` was possible at all.
 
 ---
 
@@ -150,8 +176,23 @@ manager, never through a committed file.
 | `JWT_SECRET`, `JWT_REFRESH_SECRET` | **rotate these.** Generate fresh: `python -c "import secrets;print(secrets.token_urlsafe(64))"`. Note the names — these are the JWT signing secrets; there is no `SECRET_KEY` in this codebase |
 | `APP_ENV` | `production` |
 | `CORS_ORIGINS` | only if you chose Option B; the exact frontend origin, never `*` |
-| `RATE_LIMIT_PER_MINUTE` | slowapi; keep a real limit |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | **set this deliberately.** The local `.env` uses `15`; the code default is `480`. There is **no refresh endpoint** — a 401 clears the token and forces a re-login — so 15 minutes means users are signed out mid-task with no recovery. Use `480` unless you build a refresh flow |
+| `RATE_LIMIT_PER_MINUTE` | General API bucket, per authenticated user (per IP when anonymous). Default `300`. Raised from 60 because the Console legitimately loads ~14 map layers in a burst on one navigation |
+| `AUTH_RATE_LIMIT_PER_MINUTE` | **The one that matters.** Applies to `POST /auth/login` and `POST /citizen/register`. Default `10`. Until 2026-08-24 neither had any limit at all: 120 logins in 5.7 s produced zero 429s |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | The local `.env` uses `15`; the code default is `480`. `POST /auth/refresh` now exists and slides an active session, so 15 is no longer a trap — but it is still a short window for someone filling in a long form. `480` is the safer choice |
+| `DOCS_ENABLED` | Default **false in production**. `/docs`, `/redoc` and `/openapi.json` publish the full route inventory and every role guard. Set `true` only if you deliberately want them public |
+| `METRICS_TOKEN` | Bearer token for `/metrics`. With `APP_ENV=production` and no token, metrics are **not mounted at all** |
+| `HSTS_ENABLED` | Default false. Turn it on **only** once TLS terminates in front of the service — sent over plain HTTP it pins browsers to a scheme the host cannot answer |
+| `ALLOW_INERT_RLS` | Escape hatch for the row-level-security startup check. Setting it is a decision to write down, not a convenience |
+
+### The startup refuses to run a misconfigured production
+
+With `APP_ENV=production` the API will **not start** if `JWT_SECRET` is unset,
+still the placeholder from `config.py`, or shorter than 32 characters; if
+`DATABASE_URL` is empty; or if `CORS_ORIGINS` contains `*`. This is deliberate:
+a token forged with the published default secret arrives as a valid
+administrator, and no row-level-security policy can refuse a request that is
+correctly signed as one. You will see the reasons listed in the log and the
+process will exit.
 
 ### Keys present in `.env` that this deployment does **not** need
 
@@ -290,13 +331,17 @@ often cap storage below what the seeded geodata needs — check before committin
 
 ## 8. Pre-deployment checklist
 
-- [ ] `alembic upgrade head` applied with `MIGRATION_DATABASE_URL` (head = `0019_retire_regulator`)
+- [ ] `alembic upgrade head` applied with `MIGRATION_DATABASE_URL` (head = `0022_regulator_single_admin`)
 - [ ] `python -m scripts.create_app_role` run; `DATABASE_URL` points at `jaldrishti_app`
 - [ ] Startup log reads **`Row-level security active: 19 policies … (no bypass)`** — not `INERT`
 - [ ] `JWT_SECRET` and `JWT_REFRESH_SECRET` rotated to fresh random values
 - [ ] `APP_ENV=production`
-- [ ] Demo accounts removed, and the demo-credential list removed from `Login.tsx`
-- [ ] A real admin account exists with a strong password
+- [ ] Demo accounts removed (`analyst@`, `regulator@`, `field@`, `citizen@` — all `*.local`)
+- [ ] A real admin account exists, created by `python -m scripts.bootstrap_admin`
+- [ ] `AUTH_RATE_LIMIT_PER_MINUTE` set, and a 429 observed after that many failed logins
+- [ ] `DOCS_ENABLED` left false, and `GET /openapi.json` confirmed to 404
+- [ ] Security headers confirmed on a live response (`nosniff`, `X-Frame-Options`, CSP)
+- [ ] `HSTS_ENABLED=true` **only** once TLS is terminating in front of the service
 - [ ] Gateway configured (Option A) **or** `VITE_API_BASE` implemented and `CORS_ORIGINS` set (Option B)
 - [ ] SPA fallback to `index.html` configured for client-side routes
 - [ ] Gateway read timeout ≥ 60 s (lifecycle traces)

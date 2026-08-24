@@ -86,7 +86,7 @@ export default function DataGaps() {
           <p className="muted small">{matrix.data.what_this_is}</p>
 
           <TableScroll>
-            <table className="tbl compact">
+            <table className="grid">
               <thead>
                 <tr>
                   <th>District</th>
@@ -161,7 +161,7 @@ export default function DataGaps() {
         {recs.data && (
           <>
             <TableScroll>
-              <table className="tbl compact">
+              <table className="grid">
                 <thead>
                   <tr>
                     <th>#</th><th>Priority</th><th>Block</th><th>District</th>

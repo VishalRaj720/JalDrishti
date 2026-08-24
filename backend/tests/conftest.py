@@ -20,6 +20,7 @@ from sqlalchemy.pool import NullPool
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
+from app.ratelimit import limiter
 from app.models.user import User, UserRole
 from app.services.auth import hash_password, create_access_token
 from scripts.init_db import _ENUMS, _create_enum_statements
@@ -36,6 +37,25 @@ TEST_DB_URL = os.getenv(
 # "another operation is in progress").
 test_engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _disable_rate_limiting():
+    """Turn the rate limiter off for the suite, and say why.
+
+    Every request in these tests arrives from the same ASGI transport, so they
+    all share one bucket. The suite makes far more than `RATE_LIMIT_PER_MINUTE`
+    requests, and once the limiter became real (2026-08-24) that turned into
+    spurious 429s in tests that are not about rate limiting at all.
+
+    Switched off here rather than raised to a large number, because a limit high
+    enough never to trip is a limit that is not being tested either way. The
+    tests that DO exercise it re-enable it around themselves — see
+    `test_rate_limiting.py`.
+    """
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
 
 
 @pytest.fixture(scope="session", autouse=True)

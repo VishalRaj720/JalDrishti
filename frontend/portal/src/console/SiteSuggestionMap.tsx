@@ -80,7 +80,7 @@ export default function SiteSuggestionMap({ blockId }: { blockId: string }) {
       {q.data && (
         <>
           <div className="sec">Candidate coordinates</div>
-          <table className="tbl compact">
+          <table className="grid">
             <thead>
               <tr><th>#</th><th>Latitude</th><th>Longitude</th>
                 <th>Nearest uranium result</th></tr>

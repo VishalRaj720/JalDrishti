@@ -20,15 +20,34 @@
  */
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, type NetworkPlan } from "../api/client";
 import { ErrorNote, Loading, TableScroll } from "../components/bits";
+import { canRunSim, useAuth } from "../auth";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
 
 const CENTRE: [number, number] = [23.4, 85.6];
 
 export default function NetworkPlanPage() {
+  const { me } = useAuth();
+  const qc = useQueryClient();
+  //: Registering a well is placing a piece of the monitoring network, which is
+  //: the same authority as placing an ISR site — analyst or admin.
+  const mayRegister = canRunSim(me?.role);
+
+  const register = useMutation({
+    mutationFn: (body: {
+      name: string; latitude: number; longitude: number; block_id: string;
+    }) => api.post<{ id: string; name: string }>("/monitoring-wells", body),
+    onSuccess: () => {
+      // The plan ranks blocks by how badly they are OBSERVED, and a new well
+      // changes that ranking, so the plan itself has to be refetched.
+      qc.invalidateQueries({ queryKey: ["network-plan"] });
+      qc.invalidateQueries({ queryKey: ["gap-recommendations"] });
+    },
+  });
+
   const el = useRef<HTMLDivElement | null>(null);
   const map = useRef<L.Map | null>(null);
   const groups = useRef<{ blocks?: L.LayerGroup; proposed?: L.LayerGroup;
@@ -207,10 +226,11 @@ export default function NetworkPlanPage() {
           <section className="card">
             <h2>The proposal, block by block</h2>
             <TableScroll>
-              <table className="tbl compact">
+              <table className="grid">
                 <thead>
                   <tr><th>Priority</th><th>Block</th><th>District</th>
-                    <th>Wells today</th><th>Proposed</th><th>Coordinates</th></tr>
+                    <th>Wells today</th><th>Proposed</th><th>Coordinates</th>
+                    {mayRegister && <th />}</tr>
                 </thead>
                 <tbody>
                   {plan.data.blocks.map((b) => (
@@ -223,11 +243,55 @@ export default function NetworkPlanPage() {
                       <td className="mono small">
                         {b.sites.map((s) => `${s.lat}, ${s.lon}`).join(" · ")}
                       </td>
+                      {/* `POST /monitoring-wells` was implemented and had no
+                          caller: the plan could recommend a coordinate and
+                          nobody could act on it without curl. This is the one
+                          screen where the button belongs, because the
+                          coordinate it registers is the one just recommended. */}
+                      {mayRegister && (
+                        <td>
+                          {b.sites.map((s) => (
+                            <button key={s.rank} className="btn ghost small"
+                              disabled={register.isPending}
+                              title={`Register a monitoring well at ${s.lat}, ${s.lon}`}
+                              onClick={() => {
+                                const name = window.prompt(
+                                  `Register a monitoring well at ${s.lat}, ${s.lon} `
+                                  + `(${b.block}, ${b.district})?
+
+`
+                                  + `This records the well in the portal. It does NOT `
+                                  + `drill it, and it does not add any sample — the `
+                                  + `block stays a monitoring gap until water is `
+                                  + `actually analysed there.
+
+Name for the well:`,
+                                  `${b.block} proposed ${s.rank}`);
+                                if (name && name.trim()) {
+                                  register.mutate({
+                                    name: name.trim(), latitude: s.lat,
+                                    longitude: s.lon, block_id: b.block_id,
+                                  });
+                                }
+                              }}>
+                              Register #{s.rank}
+                            </button>
+                          ))}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </TableScroll>
+            <ErrorNote error={register.error} />
+            {register.isSuccess && (
+              <div className="banner" style={{ marginTop: 10 }}>
+                Well registered. It appears on the Console map immediately, and
+                this plan has been re-ranked — but the block is still a
+                monitoring gap until a sample from it is actually analysed.
+              </div>
+            )}
             <div className="banner warn" style={{ marginTop: 10 }}>
               <b>Not a survey.</b> {plan.data.caveat}
             </div>
