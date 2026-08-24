@@ -179,7 +179,7 @@ export default function Compare() {
               <Empty>Identical inputs.</Empty>
             ) : (
               <TableScroll>
-                <table className="tbl compact">
+                <table className="grid">
                   <thead><tr><th>Parameter</th><th>A</th><th>B</th></tr></thead>
                   <tbody>
                     {Object.entries(cmp.data.input_delta).map(([k, v]) => (
@@ -207,7 +207,7 @@ export default function Compare() {
               <Empty>No metric changed.</Empty>
             ) : (
               <TableScroll>
-                <table className="tbl compact">
+                <table className="grid">
                   <thead>
                     <tr><th>Metric</th><th>A</th><th>B</th><th>Change</th></tr>
                   </thead>
@@ -238,7 +238,7 @@ export default function Compare() {
           <section className="card">
             <h2>Provenance</h2>
             <TableScroll>
-              <table className="tbl compact">
+              <table className="grid">
                 <thead><tr><th /><th>Run A</th><th>Run B</th></tr></thead>
                 <tbody>
                   <tr>

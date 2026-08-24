@@ -18,7 +18,8 @@ from fastapi import APIRouter
 from app.api.v1 import (
     advisories, auth, citizen, audit, lifecycle, preview, dataset_sync, datasets, data_gaps, model_ops,
     field_observations, ml, public_risk, scenarios, users, districts, isr_points,
-    simulations, ingest, monitoring_wells, water_samples,
+    simulations, ingest, monitoring_wells, water_samples, water_quality,
+    groundwater,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -43,3 +44,7 @@ api_router.include_router(simulations.router)
 api_router.include_router(ingest.router)
 api_router.include_router(monitoring_wells.router)
 api_router.include_router(water_samples.router)
+# AUDIT 2026-08-24: the platform stored twenty determinands and assessed one.
+# These two routers read what was already being collected.
+api_router.include_router(water_quality.router)
+api_router.include_router(groundwater.router)

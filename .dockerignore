@@ -1,0 +1,55 @@
+# Mirrors the Datasets/ entries in .gitignore.
+#
+# docs/DEPLOYMENT.md §4: a `docker build` over the working tree would drag
+# ~1.1 GB of BUILD-TIME rasters into the image. Nothing here is read at runtime
+# — `load_flow_field()` reads the precomputed, git-tracked
+# ml_pipeline/data_prep/artifacts/*.npz, so a clean clone serves correctly
+# without the DEM.
+#
+# Deploy from a git clone, not from a working directory.
+
+.git
+.gitignore
+.claude
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+myvenv/
+venv/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/portal/dist/
+
+# Secrets — never in an image layer
+.env
+*.env
+backend/.env
+
+# Database dumps: every argon2 hash, the whole audit log, every account.
+backups/
+Datasets.before-restore-*/
+
+# Build-time only rasters (671 MB DEM + 362 MB HydroRIVERS)
+Datasets/jharkhand_glo30_dem.tif
+Datasets/HydroRIVERS_v10_as_shp/
+Datasets/naquim_reference/Jharkhand_NAQUIM_Reports/
+Datasets/phase1_sources/*.pdf
+Datasets/.backups/
+
+# Local-only docs and the untracked audit record
+docs/local/
+
+# Generated + scratch
+backend/reports/
+ml_pipeline/outputs/
+ml_pipeline/ml/artifact_bundles/
+.report_build/
+fetch_data/
+utilities/
+frontend/screenshots/

@@ -14,7 +14,7 @@
  * resident can act on.
  */
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { api, type WqStandard } from "../api/client";
 import { isStaff, useAuth } from "../auth";
 import { Loading, TableScroll } from "../components/bits";
 
@@ -35,8 +35,36 @@ const PLAIN: Array<{ q: string; a: string }> = [
   },
   {
     q: "What is the safe limit?",
-    a: "30 parts per billion (ppb) of uranium in drinking water, the Bureau of Indian "
-     + "Standards limit, which matches the World Health Organization guideline.",
+    a: "For uranium, 30 parts per billion (ppb) in drinking water — the Bureau of "
+     + "Indian Standards limit, which matches the World Health Organization "
+     + "guideline. But uranium is not the only thing tested for. Every sample is "
+     + "now judged against IS 10500:2012, the national drinking-water standard, "
+     + "across fifteen measured determinands. The full table is below.",
+  },
+  {
+    q: "My water passed for uranium. Does that mean it is safe?",
+    a: "Not on its own, and this is worth being blunt about. Across the 342 wells "
+     + "tested for uranium in Jharkhand, NOT ONE exceeds the 30 ppb limit. But 22 "
+     + "wells exceed the nitrate limit and 32 exceed the fluoride limit — and "
+     + "those are health limits, not taste ones. A well can be fine for uranium "
+     + "and still be unsafe to drink.",
+  },
+  {
+    q: "Most wells here exceed some limit. Is the water polluted?",
+    a: "Mostly no, and the distinction matters. About seven in ten sampled wells "
+     + "exceed some IS 10500 limit, but the great majority of that is hardness, "
+     + "alkalinity and dissolved solids — the natural chemistry of hard-rock "
+     + "aquifers. It affects taste, scaling and soap, not health, and no mine "
+     + "caused it. The number to look at is the health count, which is much "
+     + "smaller and which this platform reports separately.",
+  },
+  {
+    q: "Is arsenic tested?",
+    a: "No, and that is a gap worth naming. The published CGWB dataset this "
+     + "platform carries has empty arsenic, iron and turbidity columns for all "
+     + "397 samples, and no manganese column at all. Those wells are reported as "
+     + "'not tested' for those substances — never as safe. Absence of a test is "
+     + "not a clean result.",
   },
   {
     q: "My block says “No data”. Does that mean the water is safe?",
@@ -83,6 +111,15 @@ export default function Methods() {
   // The engine's own register — technical, and shown only to staff. A citizen
   // reading "beta (dual-porosity capacity ratio) has no Singhbhum measurement
   // behind it" learns nothing they can use.
+  /** The drinking-water standard, readable by EVERY signed-in role including
+   *  `citizen` — on the same principle as `/ml/assumptions` for staff: a
+   *  threshold that decides what somebody is told about their own water should
+   *  be inspectable by them, not just by the people who run the system. */
+  const standard = useQuery({
+    queryKey: ["wq-standard"], staleTime: 3_600_000,
+    queryFn: () => api.get<WqStandard>("/water-quality/standard"),
+  });
+
   const assumptions = useQuery({
     queryKey: ["ml", "assumptions"], enabled: staff, staleTime: 3_600_000,
     queryFn: () => api.get<any>("/ml/assumptions"),
@@ -149,6 +186,58 @@ export default function Methods() {
             </tbody>
           </table>
         </TableScroll>
+      </div>
+
+      {/* The drinking-water standard, for everyone. Placed BEFORE the staff-only
+          engine register because this is the part a resident came for: it is the
+          rule their own water is judged against. */}
+      <div className="card">
+        <div className="card-title">The drinking-water standard</div>
+        {standard.isLoading && <Loading />}
+        {standard.data && (
+          <>
+            <div className="muted small" style={{ marginBottom: 10 }}>
+              {standard.data.standard}. <strong>Acceptable</strong> is what water
+              should meet. <strong>Permissible</strong> is tolerated only where no
+              better source exists — and “no relaxation” means there is no such
+              allowance. {standard.data.not_tested_rule}
+            </div>
+            <TableScroll>
+              <table className="grid">
+                <thead>
+                  <tr>
+                    <th>Substance</th>
+                    <th>Unit</th>
+                    <th style={{ textAlign: "right" }}>Acceptable</th>
+                    <th style={{ textAlign: "right" }}>Permissible</th>
+                    <th>Why it matters</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {standard.data.determinands.map((d) => (
+                    <tr key={d.key}>
+                      <td>
+                        {d.label}{" "}
+                        {d.health && <span className="chip danger">health</span>}
+                      </td>
+                      <td className="muted small">{d.unit}</td>
+                      <td style={{ textAlign: "right" }}>
+                        {d.range ? `${d.range[0]}–${d.range[1]}`
+                          : d.acceptable ?? "—"}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {d.permissible ?? (
+                          <span className="muted small">{d.relaxation || "—"}</span>
+                        )}
+                      </td>
+                      <td className="muted small">{d.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
+          </>
+        )}
       </div>
 
       {staff && (

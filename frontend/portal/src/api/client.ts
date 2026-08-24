@@ -57,6 +57,44 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/**
+ * Multipart upload — the ONE request shape `request` cannot make.
+ *
+ * `request` sets `Content-Type: application/json` on every call, which is right
+ * for the other 100-odd endpoints and fatal for these five: a multipart body
+ * needs a boundary parameter that only the browser can generate, so the header
+ * must be left UNSET rather than set to `multipart/form-data`. Setting it by
+ * hand produces a boundary-less content type and FastAPI rejects the body.
+ *
+ * Everything else is deliberately identical to `request` — same bearer header,
+ * same 401 handling, same error shape — because this is still the one place the
+ * portal talks to the backend.
+ */
+export async function upload<T>(path: string, file: File): Promise<T> {
+  const token = getToken();
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch(`/api/v1${path}`, {
+    method: "POST",
+    cache: "no-store",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body,
+  });
+  if (res.status === 401) {
+    clearToken();
+    throw new ApiError(401, "Session expired — sign in again.");
+  }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const b = await res.json();
+      detail = typeof b.detail === "string" ? b.detail : JSON.stringify(b.detail);
+    } catch { /* non-JSON body */ }
+    throw new ApiError(res.status, detail);
+  }
+  return res.json() as Promise<T>;
+}
+
 export const api = {
   get: <T>(p: string) => request<T>(p),
   post: <T>(p: string, body?: unknown) =>
@@ -721,4 +759,169 @@ export interface BlockSummary {
   measured: number; unknown: number;
   safe_limit_ppb: number; coverage_pct: number;
   headline: string; what_unknown_means: string; what_this_is: string;
+}
+
+// ── Multi-parameter water quality (IS 10500:2012) ────────────────────
+//
+// Added 2026-08-24. The platform stored twenty determinands and assessed one;
+// these types cover the other nineteen. Nothing here is modelled — every value
+// is a laboratory measurement compared against a published limit, which is why
+// there is no band, no interval and no extrapolation flag anywhere in it.
+
+/** `not_tested` is NOT a pass, and `no_limit` is NOT a pass either. A UI that
+ *  colours either of them green is the bug this vocabulary exists to prevent. */
+export type WqStatus =
+  | "above_permissible" | "above_acceptable" | "acceptable"
+  | "no_limit" | "not_tested";
+
+export interface WqParameter {
+  key: string; label: string; unit: string;
+  value: number | null;
+  status: WqStatus;
+  acceptable: number | null;
+  permissible: number | null;
+  /** Present only for pH, which fails in both directions. */
+  range: [number | null, number | null] | null;
+  times_limit: number | null;
+  derived: boolean;
+  /** Health-significant (uranium, fluoride, nitrate, arsenic, iron) as opposed
+   *  to aesthetic/general. The two must never be merged in a headline. */
+  health: boolean;
+  relaxation: string;
+  source: string;
+  note: string;
+}
+
+export interface WqSummary {
+  status: WqStatus;
+  tested: number;
+  regulated_tested: number;
+  not_tested: number;
+  exceedances: number;
+  above_permissible: number;
+  health_exceedances: number;
+  /** The determinand responsible for the classification, named. */
+  driver: {
+    key: string; label: string; value: number | null;
+    unit: string; times_limit: number | null; status: WqStatus;
+  } | null;
+  exceeded: string[];
+}
+
+export interface Wqi {
+  score: number; band: string;
+  parameters_used: string[]; parameters_possible: string[];
+  coverage: number;
+  /** Which determinand actually produced the score. The weight is 1/limit, so
+   *  the smallest-limit determinand dominates: fluoride can carry 96 % of a
+   *  well's score and push it to "Unsuitable for drinking" while sitting BELOW
+   *  its own permissible limit. Never render the band without this. */
+  dominated_by: { key: string; label: string; share: number | null; why: string } | null;
+  scale: string; caveat: string;
+}
+
+export interface WqWell {
+  well_id: string; well_name: string;
+  latitude: number | null; longitude: number | null;
+  block_id: string | null; block: string | null;
+  district_id: string | null; district: string | null;
+  sampled_at: string | null;
+  wqi: Wqi | null;
+  parameters: WqParameter[];
+  summary: WqSummary;
+}
+
+export interface WqRollup {
+  wells: number;
+  health_exceedance_wells: number;
+  health_exceedances: Array<{ key: string; label: string; wells: number }>;
+  aesthetic_only_wells: number;
+  interpretation: string;
+  above_permissible: number;
+  above_acceptable: number;
+  acceptable: number;
+  not_tested: number;
+  any_exceedance: number;
+  worst_status: WqStatus;
+  top_exceedances: Array<{ key: string; label: string; wells: number; pct: number }>;
+  median_wqi: number | null;
+  wqi_wells: number;
+}
+
+export interface WqDistrict extends WqRollup { id: string; name: string }
+export interface WqBlock extends WqRollup { id: string; name: string; district: string | null }
+
+export interface WqStandard {
+  standard: string;
+  columns: Record<string, string>;
+  determinands: Array<{
+    key: string; label: string; unit: string;
+    acceptable: number | null; permissible: number | null;
+    range: [number | null, number | null] | null;
+    relaxation: string; health: boolean;
+    measured: boolean; derived: boolean;
+    source: string; note: string;
+  }>;
+  wqi_weights: Record<string, { weight: number; standard: number; unit: string; why: string }>;
+  not_tested_rule: string;
+  what_this_is: string;
+}
+
+// ── Groundwater level trends (CGWB 2013–2021) ────────────────────────
+//
+// The only genuinely temporal dataset in the project. `slope_m_per_year` is a
+// change in DEPTH BELOW GROUND, so a POSITIVE slope means the water table is
+// FALLING. `direction` carries that in words precisely so no caller has to
+// remember the sign.
+
+export interface GwSeasonal {
+  pre_monsoon_depth_m: number | null;
+  post_monsoon_depth_m: number | null;
+  swing_m: number | null;
+  pre_n: number; post_n: number;
+  note: string;
+}
+
+export interface GwStation {
+  station_id: string; station: string; village: string | null;
+  latitude: number | null; longitude: number | null;
+  block: string | null; district: string | null;
+  readings: number;
+  first: string | null; last: string | null; span_years: number | null;
+  /** null when the record is too short — see `insufficient_data`. */
+  trend: "declining" | "recovering" | "stable" | null;
+  slope_m_per_year: number | null;
+  direction: string | null;
+  p_value: number | null;
+  significant: boolean | null;
+  mean_depth_m: number | null;
+  min_depth_m: number | null;
+  max_depth_m: number | null;
+  seasonal: GwSeasonal | null;
+  /** The reason no trend was computed. Never treat this as "stable". */
+  insufficient_data: string | null;
+}
+
+export interface GwSummary {
+  stations: number;
+  analysed: number;
+  insufficient_data: number;
+  by_trend: Record<string, number>;
+  declining: number;
+  fastest_decline_m_per_year: number | null;
+  median_seasonal_swing_m: number | null;
+  coverage_note: string;
+}
+
+export interface GwTrends {
+  count: number;
+  stations: GwStation[];
+  summary: GwSummary;
+  method: Record<string, string>;
+  computed_seconds_ago: number;
+}
+
+export interface GwStationDetail extends GwStation {
+  series: Array<{ at: string; depth_m: number }>;
+  method: Record<string, string>;
 }

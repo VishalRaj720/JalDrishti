@@ -7,12 +7,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
 from slowapi.errors import RateLimitExceeded
 from loguru import logger
 
-from app.config import settings
+from app.config import settings, _require_production_secrets
+from app.ratelimit import limiter
 from app.api.router import api_router
 from app.exceptions import AppException
 from app.services import audit
@@ -30,46 +31,9 @@ logger.add(
     serialize=False,
 )
 
-# ── Rate limiter ──────────────────────────────────────────────────
-
-
-def _rate_limit_key(request: Request) -> str:
-    """Per USER when we know who they are, per IP when we do not.
-
-    DEPLOYMENT AUDIT. `get_remote_address` reads `request.client.host`, which
-    behind a reverse proxy is the PROXY — so every authenticated user shared one
-    bucket and the first busy user locked out everybody else. That is not a
-    tuning problem, it is the limiter measuring the wrong thing.
-
-    The subject claim is taken from the bearer token WITHOUT verifying it: this
-    is a bucket key, not an authorisation decision, and a forged token still has
-    to pass `get_current_user` before it reaches anything. The worst a bad token
-    can do here is give itself its own bucket, which is what an unauthenticated
-    caller gets anyway.
-
-    Anonymous traffic still keys on the address — so for the public surface,
-    `--proxy-headers --forwarded-allow-ips=<gateway>` on uvicorn remains
-    necessary or all of it shares one bucket. `docs/DEPLOYMENT.md` §6 says so.
-    """
-    auth = request.headers.get("authorization", "")
-    if auth.startswith("Bearer "):
-        token = auth[7:]
-        parts = token.split(".")
-        if len(parts) == 3:
-            import base64
-            import json as _json
-            try:
-                pad = parts[1] + "=" * (-len(parts[1]) % 4)
-                sub = _json.loads(base64.urlsafe_b64decode(pad)).get("sub")
-                if sub:
-                    return f"user:{sub}"
-            except Exception:  # noqa: BLE001 — malformed token, fall through to IP
-                pass
-    return f"ip:{get_remote_address(request)}"
-
-
-limiter = Limiter(key_func=_rate_limit_key,
-                  default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"])
+# The rate limiter lives in `app.ratelimit`: the routers decorate individual
+# endpoints with it, and `main` imports the routers, so defining it here would
+# be an import cycle.
 
 
 def _rls_verdict(*, user: str, is_super: bool, bypasses: bool, n_policies: int,
@@ -175,10 +139,35 @@ async def _reap_orphaned_runs() -> None:
         logger.warning(f"Could not reap orphaned simulation runs: {exc}")
 
 
+def _enforce_production_secrets() -> None:
+    """Refuse to start production on placeholder secrets.
+
+    AUDIT 2026-08-24, finding #3. `_warn_if_rls_is_inert` already refuses to
+    start production with unenforced row-level security; this is the same idea
+    applied to the control that sits IN FRONT of it. A token forged with the
+    published default secret arrives as a valid administrator, and RLS serves it
+    faithfully -- the database cannot tell a real admin from a minted one, so no
+    policy below can compensate for a known signing key.
+
+    Development is untouched: a laptop on the default secret is the normal case,
+    and blocking it would help nobody.
+    """
+    if not settings.is_production:
+        return
+    problems = _require_production_secrets(settings)
+    if not problems:
+        return
+    message = ("Refusing to start with APP_ENV=production:\n  - "
+               + "\n  - ".join(problems))
+    logger.critical(message)
+    raise RuntimeError(message)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown events."""
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION} [{settings.APP_ENV}]")
+    _enforce_production_secrets()
     await _warn_if_rls_is_inert()
     await _reap_orphaned_runs()
     yield
@@ -186,6 +175,20 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # AUDIT 2026-08-24, finding #6. Swagger and the OpenAPI schema publish the
+    # full route inventory, every request/response shape and every role guard --
+    # a reconnaissance gift on a public host, and they were served
+    # unconditionally. Development keeps them, because they are how you work on
+    # this API; production opts back in with DOCS_ENABLED.
+    _expose_docs = settings.DOCS_ENABLED or not settings.is_production
+    _docs_url = "/docs" if _expose_docs else None
+    _redoc_url = "/redoc" if _expose_docs else None
+    # /openapi.json has to go too: on its own it reconstructs everything /docs
+    # renders, so hiding only the HTML page would be theatre.
+    _openapi_url = "/openapi.json" if _expose_docs else None
+    if not _expose_docs:
+        logger.info("API docs disabled (production; set DOCS_ENABLED=true to serve them)")
+
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -193,20 +196,32 @@ def create_app() -> FastAPI:
             "JalDrishti – Groundwater Contamination ISR Impact Assessment Platform. "
             "Supports spatial queries, async simulations, ML predictions, and RBAC."
         ),
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=_docs_url,
+        redoc_url=_redoc_url,
+        openapi_url=_openapi_url,
         lifespan=lifespan,
     )
 
     # ── Rate limiting ─────────────────────────────────────────────
+    # AUDIT 2026-08-24, finding #1. Both of these lines were already here, and
+    # neither one applies a limit: slowapi enforces `default_limits` from
+    # SlowAPIMiddleware, and without it the Limiter is a configured object that
+    # nothing ever consults. Measured before the fix: 120 POST /auth/login in
+    # 5.7 s, zero 429s.
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
 
     # ── CORS ──────────────────────────────────────────────────────
     # Frontend uses JWT in Authorization headers (not cookies), so
     # allow_credentials=False is correct and permits allow_origins=["*"].
     # In production, restrict to the specific deployed origins.
-    origins = settings.cors_origins_list if settings.APP_ENV == "production" else ["*"]
+    # AUDIT finding #7: this tested `== "production"` while the metrics block
+    # below tested `.lower() in ("production", "prod")`. With `APP_ENV=prod` the
+    # metrics guard engaged and CORS still fell through to every origin -- two
+    # controls disagreeing about which environment they were in. One definition
+    # now, on Settings.
+    origins = settings.cors_origins_list if settings.is_production else ["*"]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -227,6 +242,46 @@ def create_app() -> FastAPI:
     # Default-deny is the right shape: a new router is safe on the day it is
     # written, and the handful of genuinely public, genuinely cacheable layers
     # opt out by setting their own header, which this will not overwrite.
+    # -- Security headers (AUDIT 2026-08-24, finding #5) -----------
+    #
+    # There were none at all -- verified against a live response rather than
+    # assumed. Each of these closes a specific hole rather than being decoration:
+    #
+    #   nosniff          stops a browser re-interpreting a JSON error body as
+    #                    HTML and executing script inside it
+    #   DENY             this API is never legitimately framed, and framing it
+    #                    is how a clickjack gets an admin to click Publish
+    #   no-referrer      request paths carry site UUIDs; a Referer header would
+    #                    leak them to wherever the user navigates next
+    #   CSP              applies to what THIS service serves (error bodies, and
+    #                    Swagger when enabled). The SPA is served by the gateway
+    #                    and carries its own policy.
+    #
+    # `setdefault`, not assignment: a route that has deliberately set its own
+    # value knows something this middleware does not.
+    #
+    # HSTS is opt-in. Sent over plain HTTP it pins the browser to a scheme the
+    # host cannot answer, which breaks the deployment it was meant to protect.
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        # Swagger legitimately loads its own bundled CSS/JS, so the strict
+        # policy would blank the page it is trying to protect.
+        if request.url.path not in ("/docs", "/redoc"):
+            response.headers.setdefault(
+                "Content-Security-Policy",
+                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+        if settings.HSTS_ENABLED:
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                f"max-age={settings.HSTS_MAX_AGE}; includeSubDomains")
+        return response
+
     @app.middleware("http")
     async def cache_policy(request: Request, call_next):
         response = await call_next(request)
@@ -281,7 +336,7 @@ def create_app() -> FastAPI:
     #   token set        -> exposed, requires `Authorization: Bearer <token>`
     #   dev, no token    -> exposed openly (a token on a laptop protects nothing)
     #   production, none -> NOT MOUNTED, and says so at startup
-    _is_prod = settings.APP_ENV.lower() in ("production", "prod")
+    _is_prod = settings.is_production
     if not settings.METRICS_ENABLED:
         logger.info("Prometheus metrics disabled by METRICS_ENABLED=false")
     elif _is_prod and not settings.METRICS_TOKEN:
@@ -349,7 +404,11 @@ def create_app() -> FastAPI:
         )
 
     # ── Health & root ─────────────────────────────────────────────
+    # Exempt from the rate limiter: a liveness probe that starts answering 429
+    # gets the container killed by its own orchestrator, which turns a busy
+    # minute into an outage.
     @app.get("/health", tags=["Health"])
+    @limiter.exempt
     async def health():
         return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 

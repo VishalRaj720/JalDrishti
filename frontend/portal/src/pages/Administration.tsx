@@ -153,6 +153,17 @@ export default function Administration() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
   });
 
+  /** `PUT /users/{id}` has always existed and nothing called it, so the only
+   *  way to change somebody's role was to delete the account and recreate it —
+   *  which loses the identity every audit entry is attributed to. Role is the
+   *  one field worth editing in place; username and email are identity, and
+   *  password resets belong in the invitation flow the design calls for. */
+  const setRole = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: Role }) =>
+      api.put(`/users/${id}`, { role }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+
   const byRole = (r: Role) => (users.data ?? []).filter((u) => u.role === r).length;
 
   return (
@@ -178,7 +189,7 @@ export default function Administration() {
         <div className="grid-4">
           <div className="field">
             <label>Username</label>
-            <input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
+            <input type="text" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
           </div>
           <div className="field">
             <label>Email</label>
@@ -221,12 +232,75 @@ export default function Administration() {
                 <td>{u.username}</td>
                 <td className="mono">{u.email}</td>
                 <td>
-                  <span className="role-pill" style={{ color: ROLE_COLOUR[u.role] }}>
-                    {ROLE_LABEL[u.role]}
-                  </span>
+                  <div className="row">
+                    <span className="role-pill" style={{ color: ROLE_COLOUR[u.role] }}>
+                      {ROLE_LABEL[u.role]}
+                    </span>
+                    {/* NO role control for an administrator.
+                        `ROLES` deliberately omits `admin` — migration 0022 pins
+                        the account to exactly one, and it is created by
+                        `scripts/bootstrap_admin`, not assigned from a dropdown.
+                        Rendering the select anyway was a bug caught in
+                        verification: with no matching <option>, the browser
+                        falls back to the FIRST one, so the sole administrator's
+                        row displayed "Regulator" and a stray change event would
+                        have demoted them with no way back through this UI. */}
+                    {u.role === "admin" ? (
+                      <span className="muted small">
+                        Set by <code>scripts/bootstrap_admin</code>; exactly one
+                        account holds it.
+                      </span>
+                    ) : (
+                    <select
+                      value={u.role}
+                      disabled={setRole.isPending}
+                      aria-label={`Change role for ${u.username}`}
+                      onChange={(e) => {
+                        const role = e.target.value as Role;
+                        if (role === u.role) return;
+                        if (window.confirm(
+                          `Change ${u.username} from ${ROLE_LABEL[u.role]} to `
+                          + `${ROLE_LABEL[role]}?
+
+The new role takes effect on `
+                          + `their very next request — the role is re-read from the `
+                          + `database rather than trusted from their token, so they `
+                          + `do not need to sign in again.`)) {
+                          setRole.mutate({ id: u.id, role });
+                        } else {
+                          e.target.value = u.role;   // revert the visible choice
+                        }
+                      }}
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                      ))}
+                    </select>
+                    )}
+                  </div>
                 </td>
                 <td style={{ textAlign: "right" }}>
-                  <button className="btn ghost danger" onClick={() => remove.mutate(u.id)}>
+                  {/* Was a one-click delete with no confirmation at all. */}
+                  <button
+                    className="btn ghost danger"
+                    disabled={remove.isPending || u.role === "admin"}
+                    title={u.role === "admin"
+                      ? "The sole administrator cannot be removed here — you would lock yourself out of every admin surface."
+                      : undefined}
+                    onClick={() => {
+                      if (window.prompt(
+                        `Delete the account ${u.email}?
+
+`
+                        + `Their past actions stay in the audit trail, but the `
+                        + `account itself is gone and cannot be restored.
+
+`
+                        + `Type DELETE to confirm.`) === "DELETE") {
+                        remove.mutate(u.id);
+                      }
+                    }}
+                  >
                     Remove
                   </button>
                 </td>
@@ -236,17 +310,15 @@ export default function Administration() {
         </table>
       </div>
       <ErrorNote error={remove.error} />
+      <ErrorNote error={setRole.error} />
 
       <Planned
         label="Organisation invitations, API keys and rate-limit tiers"
         phase="P2 follow-up"
         why="Organisations exist in the schema and users are assigned to one, but there is no invitation or key-management endpoint."
       />
-      <Planned
-        label="Bulk data ingest (GeoJSON / CSV upload)"
-        phase="admin tooling"
-        why="The five ingest endpoints exist and are admin-only; the upload UI is not built."
-      />
+      {/* Built 2026-08-24 — see pages/Ingest.tsx. The five endpoints had been
+          admin-only and callable only by curl. */}
     </div>
   );
 }

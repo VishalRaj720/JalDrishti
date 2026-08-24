@@ -31,12 +31,14 @@ from app.services.auth import create_access_token
 from app.services import audit
 from app.exceptions import AppException
 from app.dependencies import get_current_user
+from app.ratelimit import AUTH_RATE_LIMIT, limiter
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit(AUTH_RATE_LIMIT)
 async def login(
     payload: LoginRequest,
     request: Request,

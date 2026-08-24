@@ -381,7 +381,10 @@ def test_the_rate_limiter_keys_on_the_user_not_the_proxy():
     """
     import types
 
-    from app.main import _rate_limit_key
+    # Moved to `app.ratelimit` on 2026-08-24: the routers decorate individual
+    # endpoints with the limiter, and `main` imports the routers, so keeping
+    # it in `main` would have been an import cycle.
+    from app.ratelimit import rate_limit_key as _rate_limit_key
     from app.models.user import UserRole
     from app.services.auth import create_access_token
 
@@ -409,7 +412,10 @@ def test_a_malformed_token_does_not_break_the_limiter():
     fall back to the address rather than raising inside middleware."""
     import types
 
-    from app.main import _rate_limit_key
+    # Moved to `app.ratelimit` on 2026-08-24: the routers decorate individual
+    # endpoints with the limiter, and `main` imports the routers, so keeping
+    # it in `main` would have been an import cycle.
+    from app.ratelimit import rate_limit_key as _rate_limit_key
 
     r = types.SimpleNamespace(headers={"authorization": "Bearer not.a.jwt"},
                               client=types.SimpleNamespace(host="10.0.0.5"))

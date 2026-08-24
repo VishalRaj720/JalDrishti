@@ -125,7 +125,8 @@ class SimulationRunService:
         return site
 
     async def create(self, *, actor: User, isr_id: uuid.UUID,
-                     params: dict[str, Any], ip: Optional[str] = None
+                     params: dict[str, Any], ip: Optional[str] = None,
+                     scenario_id: Optional[uuid.UUID] = None
                      ) -> SimulationRun:
         await self._isr(isr_id)
         # P2, second enforcement point. `RunRequest` already refuses anything
@@ -148,6 +149,26 @@ class SimulationRunService:
             species=params.get("species") or "uranium_ppb",
             request=dict(params),
             created_by=actor.id,
+            # SET HERE, IN THE SAME INSERT, and not by the caller afterwards.
+            #
+            # `POST /scenarios/{id}/run` used to assign `run.scenario_id` after
+            # this method returned and commit a second time. That never worked:
+            # `set_rls_context` uses SET LOCAL, which Postgres discards at
+            # COMMIT, so by the second commit the session had no identity, the
+            # `simulation_runs` policy matched zero rows, and SQLAlchemy raised
+            # StaleDataError ("expected to update 1 row(s); 0 were matched").
+            # The route 500'd, the background task was never scheduled, and the
+            # run sat at `queued` for ever.
+            #
+            # It went unnoticed because the scenarios table was empty -- there
+            # was no UI to create one, so the endpoint had never been called.
+            # See LIMITATIONS.md 1c: after any commit the RLS context is gone
+            # until it is set again, and this is the third occurrence of it.
+            #
+            # Writing it in the INSERT avoids the whole hazard rather than
+            # re-establishing context around a second write: one statement, one
+            # transaction, nothing to remember.
+            scenario_id=scenario_id,
         )
         self.db.add(run)
         await self.db.flush()

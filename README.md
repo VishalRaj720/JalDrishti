@@ -26,8 +26,8 @@ decision-support prototype.
 
 | Part | What it is | State |
 |---|---|---|
-| `ml_pipeline/` | The physics + ML engine. Domenico/Ogata-Banks transport, Tang matrix diffusion, dual-porosity retardation; XGBoost P10/P50/P90 heads with Mondrian split-conformal calibration | **332 tests.** Transport kernel benchmarked against an exact solution; bands validated on the serving distribution |
-| `backend/` | FastAPI + PostgreSQL/PostGIS. JWT + 4-role RBAC with Postgres row-level security, provenance spine, immutable audit log, field-observation review, dataset sync | **203 tests.** Runs the real engine; every stored run pins model card, artifact bundle and git SHA |
+| `ml_pipeline/` | The physics + ML engine. Domenico/Ogata-Banks transport, Tang matrix diffusion, dual-porosity retardation; XGBoost P10/P50/P90 heads with Mondrian split-conformal calibration | **338 tests.** Transport kernel benchmarked against an exact solution; bands validated on the serving distribution |
+| `backend/` | FastAPI + PostgreSQL/PostGIS. JWT + 5-role RBAC with Postgres row-level security, provenance spine, immutable audit log, field-observation review, dataset sync, IS 10500 water-quality assessment, groundwater level trends | **402 tests.** Runs the real engine; every stored run pins model card, artifact bundle and git SHA |
 | `frontend/portal/` | The portal SPA — Vite + React 18 + TypeScript + Leaflet | Typechecks and builds clean |
 
 **The engine is the authority.** The ML surrogate was trained on that engine's own output,
@@ -44,7 +44,8 @@ because `tools/sync_docs.py`, `validation/end_to_end_audit.py` and
 |---|---|
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | **What this system does not know.** Open findings, permanent blockers, claims not to make |
 | [`docs/PRODUCT_DESIGN.md`](docs/PRODUCT_DESIGN.md) | How the three components become one product |
-| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Shipping it: architecture, database roles, secrets, checklist |
+| [`docs/DEPLOY_WALKTHROUGH.md`](docs/DEPLOY_WALKTHROUGH.md) | **Start here to deploy.** The click-by-click: which site, what to type, what to check |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | The architecture behind it: the two database roles, the secrets, why one origin |
 | [`docs/roles.md`](docs/roles.md) | The four roles + a generated role × endpoint matrix |
 | [`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md) | The portal's sections and responsive contract |
 | [`ml_pipeline/ARCHITECTURE.md`](ml_pipeline/ARCHITECTURE.md) | The surrogate explained from zero |
@@ -56,18 +57,31 @@ because `tools/sync_docs.py`, `validation/end_to_end_audit.py` and
 summarised because several findings were later **retracted**, and code comments cite them
 by name (`review2.md V-8`) as stable identifiers.
 
-## The four roles
+## The five roles
 
 | Role | Labelled | Can |
 |---|---|---|
-| `admin` | Admin | Everything: publishes advisories, reviews field evidence, syncs datasets, reads audit |
-| `analyst` | Analyst | Registers sites, runs the engine, proposes publications |
+| `admin` | Admin | Everything: publishes advisories, syncs datasets, edits the dataset files, operates the model, reads audit, manages accounts |
+| `regulator` | Regulator | Decides on what a field officer submits — approve or reject. Reads everything staff can read, **writes nothing else** |
+| `analyst` | Analyst | Registers sites, runs the engine, saves scenarios, proposes publications |
 | `field_officer` | Data Submitter | Submits uranium-ore occurrences and observations for review |
 | `citizen` | Resident | Measured results for their area, published advisories, alerts. No coordinates, no model internals |
 
-`regulator` was retired in migration `0019`; its duties merged into `admin`. The enum
-label still exists in Postgres because a value cannot be dropped transactionally, but it
-is gone from the application vocabulary and `tests/test_p6_roles.py` enforces that.
+`regulator` was retired in migration `0019` and **restored in `0022`** with a
+narrower, real job. The reason merging it into `admin` was wrong: the person who
+accepts evidence into the record should not also be the person who operates the
+pipeline that consumes it. A regulator gets the same 403 a citizen would on every
+dataset, model and account route.
+
+Migration `0022` also **pins `admin` to exactly one account**. A surplus
+administrator is demoted to `analyst` rather than deleted, the account is created
+by `scripts/bootstrap_admin`, and the Administration screen offers no role
+control for it — so the sole admin cannot be demoted or removed by a stray click.
+
+The full role x endpoint matrix is generated from the live app into
+[`docs/roles.md`](docs/roles.md). Regenerate it with
+`python -m scripts.authz_matrix` after adding any route, or
+`tests/test_authz_matrix.py` fails.
 
 ---
 
@@ -142,10 +156,18 @@ uvicorn app.main:app --reload
 `seed` is idempotent: users dedupe by email, ISR points by name, geodata by file
 checksum. Swagger UI at `http://localhost:8000/docs`.
 
-Routes under `/api/v1`: `/auth`, `/users`, `/districts`, `/isr-points`, `/simulations`,
-`/preview`, `/lifecycle`, `/scenarios`, `/advisories`, `/citizen`, `/public/risk`,
-`/field-observations`, `/dataset-sync`, `/datasets`, `/model-ops`, `/monitoring-wells`,
-`/water-samples`, `/ingest`, `/audit`, `/ml`; plus `/health`, `/docs`, `/metrics`.
+Routes under `/api/v1`: `/auth`, `/users`, `/districts`, `/isr-points`,
+`/simulations`, `/preview`, `/lifecycle`, `/scenarios`, `/advisories`,
+`/citizen`, `/public/risk`, `/field-observations`, `/data-gaps`, `/dataset-sync`,
+`/datasets`, `/model-ops`, `/monitoring-wells`, `/water-samples`,
+**`/water-quality`**, **`/groundwater`**, `/ingest`, `/audit`, `/ml`; plus
+`/health` and `/metrics`. `/docs` and `/openapi.json` are served in development
+and **not in production** unless `DOCS_ENABLED=true`.
+
+`/water-quality/*` assesses every measured determinand against **IS 10500:2012**,
+and `/groundwater/*` reports Theil-Sen level trends over the 2013-2021 CGWB
+station record. Both read data the platform was already collecting; neither
+involves the model, and neither predicts anything.
 
 `/api/v1/ml/*` re-serves the `ml_pipeline` engine behind the portal's JWT, role guards,
 rate limiter and audit middleware, so the browser never talks to the pipeline's own
@@ -197,10 +219,15 @@ Brings up `db` (PostGIS) + `backend`.
 
 | Role | Email | Password |
 |---|---|---|
-| admin | `admin@jaldrishti.local` | `admin123` |
 | analyst | `analyst@jaldrishti.local` | `analyst123` |
+| regulator | `regulator@jaldrishti.local` | `regulator123` |
 | field_officer | `field@jaldrishti.local` | `field123` |
 | citizen | `citizen@jaldrishti.local` | `citizen123` |
+
+**There is no seeded admin.** Migration `0022` pins the role to one account and
+`scripts/bootstrap_admin` is the only way to create it — it never accepts a
+password on the command line, never prints one, and refuses anything under the
+minimum length.
 
 > **These must not survive into production.** They are weak, public, and listed on the
 > login screen. [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) §5 covers removing them.
@@ -212,7 +239,7 @@ JalDrishti/
 ├── ml_pipeline/          The engine: physics, synthetic generator, ML, dashboard API
 ├── backend/              FastAPI app, alembic migrations, seed, tests
 ├── frontend/
-│   ├── portal/           The portal SPA — Vite + React + TS + Leaflet
+│   ├── portal/           The portal SPA — Vite + React + TS + Leaflet (21 screens)
 │   ├── JalDrishti.html   Original static prototype, kept as visual reference
 │   └── ml_pipeline/      Vanilla JS + Leaflet UI for the engine's own dashboard
 ├── Datasets/             Jharkhand geology, water quality/levels, rivers, DEM, NAQUIM refs

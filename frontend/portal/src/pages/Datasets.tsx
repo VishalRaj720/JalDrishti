@@ -36,6 +36,12 @@ export default function Datasets() {
   const [offset, setOffset] = useState(0);
   const [banner, setBanner] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  /** `GET /datasets/{key}/backups` and `POST /datasets/{key}/restore` were
+   *  implemented with no caller. LIMITATIONS.md records that "backups are
+   *  undefined and no restore has ever been tested" — it could not be, from
+   *  the portal. Every edit and delete on this screen already writes a
+   *  restore point; nothing could read them back. */
+  const [showBackups, setShowBackups] = useState(false);
 
   const list = useQuery({
     queryKey: ["datasets"],
@@ -107,6 +113,26 @@ export default function Datasets() {
     onSuccess: (r) => { setProblem(null); setBanner(r.message); refresh(); },
     onError: (e: Error) => setProblem(e.message),
   });
+  const fileBackups = useQuery({
+    queryKey: ["dataset-backups", key],
+    enabled: !!key && showBackups,
+    queryFn: () => api.get<{
+      key: string;
+      backups: Array<{ name: string; ref: string; size_bytes: number; created_at: string }>;
+    }>(`/datasets/${key}/backups`),
+  });
+
+  const restoreFile = useMutation({
+    mutationFn: (name: string) => api.post<{ message: string }>(
+      `/datasets/${key}/restore?backup_name=${encodeURIComponent(name)}`),
+    onSuccess: (r) => {
+      setProblem(null); setBanner(r.message);
+      qc.invalidateQueries({ queryKey: ["dataset-backups", key] });
+      refresh();
+    },
+    onError: (e: Error) => setProblem(e.message),
+  });
+
   const backup = useMutation({
     mutationFn: (label: string) =>
       api.post<{ message: string }>(
@@ -168,7 +194,7 @@ export default function Datasets() {
             )}
           </h2>
           <TableScroll>
-            <table className="tbl compact">
+            <table className="grid">
               <thead>
                 <tr><th>Task</th><th>Started</th><th>Took</th><th>State</th><th>Result</th></tr>
               </thead>
@@ -329,6 +355,82 @@ export default function Datasets() {
           </div>
           <p className="muted small">{rows.data?.editable_note}</p>
 
+          {/* Restore points. Every edit and delete above writes one; until now
+              nothing could list or use them. */}
+          <div className="row wrap" style={{ marginBottom: 8 }}>
+            <button className="btn ghost small"
+                    onClick={() => setShowBackups((v) => !v)}>
+              {showBackups ? "Hide restore points" : "Restore points"}
+            </button>
+            {showBackups && fileBackups.data && (
+              <span className="muted small">
+                {fileBackups.data.backups.length} saved
+              </span>
+            )}
+          </div>
+
+          {showBackups && (
+            <div className="card" style={{ marginBottom: 10 }}>
+              {fileBackups.isLoading && <Loading />}
+              <ErrorNote error={fileBackups.error} />
+              {fileBackups.data?.backups.length === 0 && (
+                <p className="muted small">
+                  No restore points yet. One is written automatically before every
+                  row edit, row delete and sync — so this fills up as soon as the
+                  file is changed.
+                </p>
+              )}
+              {!!fileBackups.data?.backups.length && (
+                <>
+                  <div className="banner warn" style={{ marginBottom: 8 }}>
+                    Restoring replaces the whole file. The current version is backed
+                    up first, so a restore is itself reversible — but rows added
+                    since the chosen point will be gone from what the engine reads,
+                    and any observation synced into them returns to unsynced.
+                  </div>
+                  <TableScroll>
+                    <table className="grid">
+                      <thead>
+                        <tr><th>Saved</th><th>Reference</th>
+                            <th style={{ textAlign: "right" }}>Size</th><th /></tr>
+                      </thead>
+                      <tbody>
+                        {fileBackups.data.backups.map((b) => (
+                          <tr key={b.name}>
+                            <td>{new Date(b.created_at).toLocaleString()}</td>
+                            <td className="mono small">{b.ref}</td>
+                            <td style={{ textAlign: "right" }}>
+                              {(b.size_bytes / 1024).toFixed(0)} KB
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <button className="btn ghost small"
+                                disabled={restoreFile.isPending}
+                                onClick={() => {
+                                  if (window.prompt(
+                                    `Restore ${sel.label} from the copy saved `
+                                    + `${new Date(b.created_at).toLocaleString()}?
+
+`
+                                    + `The current file is backed up first.
+
+`
+                                    + `Type RESTORE to confirm.`) === "RESTORE") {
+                                    restoreFile.mutate(b.name);
+                                  }
+                                }}>
+                                Restore
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableScroll>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="row gap wrap">
             <input className="input" placeholder="Filter rows…" value={q}
               onChange={(e) => { setQ(e.target.value); setOffset(0); }} />
@@ -348,7 +450,7 @@ export default function Datasets() {
           {rows.data && rows.data.rows.length > 0 && (
             <>
               <TableScroll>
-                <table className="tbl compact">
+                <table className="grid">
                   <thead>
                     <tr>
                       <th>Source</th>
@@ -457,7 +559,7 @@ export default function Datasets() {
                 runs served earlier.
               </p>
               <TableScroll>
-                <table className="tbl compact">
+                <table className="grid">
                   <thead>
                     <tr><th>Metric</th><th>n</th><th>Median rel. diff</th>
                       <th>P90</th><th>State</th></tr>
@@ -500,7 +602,7 @@ export default function Datasets() {
           )}
           {model.data.backups.length > 0 && (
             <TableScroll>
-              <table className="tbl compact">
+              <table className="grid">
                 <thead>
                   <tr><th>Bundle</th><th>Created</th><th>Files</th><th>Size</th>
                     <th>Model card</th><th /></tr>
