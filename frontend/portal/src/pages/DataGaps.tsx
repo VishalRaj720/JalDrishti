@@ -12,7 +12,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type GapMatrix, type Recommendations, type PublicDistrictRisk, type SyncStatus } from "../api/client";
 import { canSync, useAuth } from "../auth";
-import { ErrorNote, Loading, Planned, TableScroll, Tile } from "../components/bits";
+import { ErrorNote, Loading, Planned, TableScroll, Tile, useRevealOnOpen } from "../components/bits";
 import SiteSuggestionMap from "../console/SiteSuggestionMap";
 
 interface PendingItem {
@@ -52,6 +52,9 @@ export default function DataGaps() {
   const covered = districts.filter((d) => d.wells >= 10);
 
   const [siteFor, setSiteFor] = useState<{ id: string; name: string } | null>(null);
+  //: The suggestion map renders below a 20-row table; without this the
+  //: button appears to do nothing.
+  const siteRef = useRevealOnOpen(siteFor?.id ?? null);
 
   /** One column per KIND of gap. Each carries the capability it denies and the
    *  limitation it forces, so LIMITATIONS.md can be read off the data instead of
@@ -195,7 +198,7 @@ export default function DataGaps() {
             </TableScroll>
 
             {siteFor && (
-              <div className="card" style={{ marginTop: 12 }}>
+              <div ref={siteRef} className="card" style={{ marginTop: 12 }}>
                 <div className="row between">
                   <div className="sec" style={{ margin: 0 }}>
                     Where to put a well in {siteFor.name}

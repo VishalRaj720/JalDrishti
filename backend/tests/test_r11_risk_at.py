@@ -92,7 +92,16 @@ async def test_sampled_but_untested_is_a_gap_not_a_clean_result(
     assert b["inside_jharkhand"] is True
     assert b["samples"] >= 1
     assert b["uranium_tests"] == 0
-    assert b["band"] == "Not tested for uranium", (
+    # R14 widened the band from uranium alone to every measured HEALTH
+    # determinand, so the label for this case is now "Not tested" rather than
+    # "Not tested for uranium" — this fixture analyses NOTHING (only pH), so
+    # naming uranium specifically would understate the gap. The guarantee the
+    # test exists for is unchanged and is asserted below it: whatever the label
+    # says, it must never read as a clean result.
+    assert b["band"] == "Not tested", (
         f"band was {b['band']!r} — a sampled-but-unanalysed block must never "
         f"read as a clean result")
+    assert b["band"] not in ("Low concern", "No data")
     assert "not a clean result" in b["what_it_means"]
+    # and the specific substances nobody looked for are named
+    assert "uranium" in b["untested_health"]

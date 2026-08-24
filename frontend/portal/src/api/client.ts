@@ -417,7 +417,12 @@ export interface Subscription {
  */
 export interface CitizenAlert {
   id: string;
-  kind: "measured_exceedance" | "published_screening" | "aquifer_pathway";
+  /** `aquifer_breach_due` (R14) is the only kind that fires on ELAPSED TIME
+   *  rather than on an event: a published screening's own modelled
+   *  breakthrough date has passed. It is still about a mine that does not
+   *  exist, and its copy says so throughout. */
+  kind: "measured_exceedance" | "published_screening" | "aquifer_pathway"
+      | "aquifer_breach_due";
   headline: string;
   body: string;
   severity: "info" | "warning" | "high";

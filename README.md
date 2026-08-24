@@ -62,7 +62,7 @@ by name (`review2.md V-8`) as stable identifiers.
 | Role | Labelled | Can |
 |---|---|---|
 | `admin` | Admin | Everything: publishes advisories, syncs datasets, edits the dataset files, operates the model, reads audit, manages accounts |
-| `regulator` | Regulator | Decides on what a field officer submits — approve or reject. Reads everything staff can read, **writes nothing else** |
+| `regulator` | Regulator | Decides on what a field officer submits — approve or reject. **Runs the model** (R14): pin, predict, preview, lifecycle, sweep, scenarios, site registration. Cannot publish to citizens, write datasets, operate the model or manage accounts |
 | `analyst` | Analyst | Registers sites, runs the engine, saves scenarios, proposes publications |
 | `field_officer` | Data Submitter | Submits uranium-ore occurrences and observations for review |
 | `citizen` | Resident | Measured results for their area, published advisories, alerts. No coordinates, no model internals |
@@ -168,6 +168,15 @@ and **not in production** unless `DOCS_ENABLED=true`.
 and `/groundwater/*` reports Theil-Sen level trends over the 2013-2021 CGWB
 station record. Both read data the platform was already collecting; neither
 involves the model, and neither predicts anything.
+
+**The citizen surface bands on health, not on uranium (R14).** `/public/risk/*`
+judges a block on every measured health-significant determinand — uranium,
+nitrate and fluoride. That is not a refinement: statewide maximum uranium is
+28.5 ppb against a 30 ppb limit, so the old uranium-only band **could not colour
+a single district red**, while 22 wells exceeded the nitrate limit. Fourteen of
+twenty-four districts move once nitrate and fluoride are read. Every response
+carries `band_driver` (which substance decided it) and `untested_health` (which
+were never analysed — arsenic and iron, nowhere in the state).
 
 `/api/v1/ml/*` re-serves the `ml_pipeline` engine behind the portal's JWT, role guards,
 rate limiter and audit middleware, so the browser never talks to the pipeline's own

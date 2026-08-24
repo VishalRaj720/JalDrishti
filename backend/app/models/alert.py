@@ -89,7 +89,7 @@ class Alert(Base):
     __table_args__ = (
         CheckConstraint(
             "kind IN ('measured_exceedance','published_screening',"
-            "'aquifer_pathway')",
+            "'aquifer_pathway','aquifer_breach_due')",
             name="ck_alert_kind"),
         CheckConstraint("severity IN ('info','warning','high')",
                         name="ck_alert_severity"),

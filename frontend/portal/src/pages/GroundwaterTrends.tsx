@@ -23,7 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   api, type GwStation, type GwStationDetail, type GwSummary, type GwTrends,
 } from "../api/client";
-import { ErrorNote, Loading, TableScroll, Tile } from "../components/bits";
+import { ErrorNote, Loading, TableScroll, Tile, useRevealOnOpen } from "../components/bits";
 
 const NUM: React.CSSProperties = {
   textAlign: "right", fontVariantNumeric: "tabular-nums",
@@ -108,6 +108,8 @@ function Series({ detail }: { detail: GwStationDetail }) {
 
 export default function GroundwaterTrends() {
   const [openId, setOpenId] = useState<string | null>(null);
+  //: The series chart renders below a 415-row station table.
+  const seriesRef = useRevealOnOpen(openId);
   const [filter, setFilter] = useState<string>("");
   const [showMethod, setShowMethod] = useState(false);
   /** The district roll-up answers a different question from the station list:
@@ -315,7 +317,7 @@ export default function GroundwaterTrends() {
       )}
 
       {openId && !byDistrict && (
-        <div className="card" style={{ marginTop: 14 }}>
+        <div ref={seriesRef} className="card" style={{ marginTop: 14 }}>
           {detail.isLoading && <Loading />}
           <ErrorNote error={detail.error} />
           {detail.data && (

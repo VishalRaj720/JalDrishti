@@ -26,7 +26,7 @@ import {
   api, type WqBlock, type WqDistrict, type WqStandard, type WqStatus,
   type WqWell,
 } from "../api/client";
-import { ErrorNote, Loading, TableScroll, Tile } from "../components/bits";
+import { ErrorNote, Loading, TableScroll, Tile, useRevealOnOpen } from "../components/bits";
 
 /** One vocabulary for the five statuses, used by every table on this screen. */
 const STATUS: Record<WqStatus, { label: string; cls: string; glyph: string }> = {
@@ -75,6 +75,13 @@ export default function WaterQuality() {
    *  in — it is what advisories and citizen alerts are scoped to — so the
    *  roll-up has to be available at that level too. */
   const [byBlock, setByBlock] = useState(false);
+
+  //: Two panels on this screen open from a table row and render below it. The
+  //: wells list sits under a 24-row district table; the parameter table sits
+  //: under a wells list that can run to hundreds of rows. Both were far enough
+  //: below the fold that the button read as broken.
+  const wellsRef = useRevealOnOpen(districtId);
+  const detailRef = useRevealOnOpen(openWell?.well_id ?? null);
 
   const districts = useQuery({
     queryKey: ["wq-districts"],
@@ -345,7 +352,7 @@ export default function WaterQuality() {
       )}
 
       {districtId && (
-        <>
+        <div ref={wellsRef}>
           <h2>Wells{wells.data ? ` — ${wells.data.count}` : ""}</h2>
           {wells.isLoading && <Loading />}
           <ErrorNote error={wells.error} />
@@ -399,14 +406,14 @@ export default function WaterQuality() {
               </table>
             </TableScroll>
           )}
-        </>
+        </div>
       )}
 
       {/* Inline rather than a modal: this project has no dialog primitive, and
           the full determinand table is the reason someone came to this screen —
           it should be linkable, scrollable and printable with everything else. */}
       {openWell && (
-        <div className="card" style={{ marginTop: 14 }}>
+        <div ref={detailRef} className="card" style={{ marginTop: 14 }}>
           <div className="row wrap" style={{ alignItems: "baseline" }}>
             <h2 style={{ margin: 0 }}>{openWell.well_name}</h2>
             <span className="spacer grow" />

@@ -36,15 +36,27 @@ const CENTRE: [number, number] = [23.6, 85.3];
 
 /** The four public bands, and the one colour vocabulary used for all of them.
  *  Grey for "No data" on purpose: it must not read as green. */
+// Bands come from the server, which since 2026-08-25 judges a block on every
+// measured HEALTH determinand — uranium, nitrate and fluoride — rather than
+// uranium alone. That change matters here more than anywhere: statewide maximum
+// uranium is 28.5 ppb against a 30 ppb limit, so under the old rule this map
+// could not colour a single district red no matter what was in the water.
+// Fourteen of twenty-four are, once nitrate and fluoride are read.
 const BAND_COLOUR: Record<string, string> = {
   "High concern": "#f2555a",
   "Moderate concern": "#f5a524",
   "Low concern": "#3ecf8e",
+  // Grey, never green. Sampled but not analysed for any health determinand is
+  // the absence of evidence, and colouring it as a pass is the single most
+  // misleading thing this map could do.
+  "Not tested": "#8b919c",
+  "Not tested for uranium": "#8b919c",
   "No data": "#8b919c",
 };
-const BANDS = ["High concern", "Moderate concern", "Low concern", "No data"];
+const BANDS = ["High concern", "Moderate concern", "Low concern",
+               "Not tested", "No data"];
 
-type Key = "districts" | "blocks" | "wells" | "screenings";
+type Key = "districts" | "blocks" | "wells" | "screenings" | "ore";
 
 export default function CitizenMap() {
   const { me } = useAuth();
@@ -56,6 +68,9 @@ export default function CitizenMap() {
   const { collapsed, toggle: toggleRail } = useRail(map);
   const [on, setOn] = useState<Record<Key, boolean>>({
     districts: true, blocks: false, wells: true, screenings: true,
+    // Off by default: it is context, and turning it on should be the
+    // reader's choice rather than something they have to switch off.
+    ore: false,
   });
   const [screening, setScreening] = useState<Record<string, any> | null>(null);
   const [basemap, setBasemap] = useState<BasemapKey>("light");
@@ -123,6 +138,14 @@ export default function CitizenMap() {
     staleTime: 3_600_000,
   });
 
+  // Known uranium deposits (GSI / UDEPO). Published government reference data
+  // about rock, not the location of a hypothetical mine — see the comment on
+  // `GET /citizen/ore` for why one is shown here and the other never is.
+  const ore = useQuery({
+    queryKey: ["pub-geo", "ore"], enabled: on.ore, staleTime: 3_600_000,
+    queryFn: () => api.get<FeatureCollection>("/citizen/ore"),
+  });
+
   const screenings = useQuery({
     queryKey: ["pub-geo", "screenings"], enabled: on.screenings,
     queryFn: () => api.get<FeatureCollection>("/citizen/advisories/geojson"),
@@ -150,7 +173,7 @@ export default function CitizenMap() {
     L.control.zoom({ position: "topright" }).addTo(m);
     addScaleControl(m);
     basemapCtl.current = attachBasemaps(m, "light");
-    for (const k of ["districts", "blocks", "wells", "screenings"] as Key[]) {
+    for (const k of ["districts", "blocks", "wells", "screenings", "ore"] as Key[]) {
       groups.current[k] = L.layerGroup().addTo(m);
     }
     // ── tap anywhere ──
@@ -197,13 +220,45 @@ export default function CitizenMap() {
   useEffect(() => {
     const m = map.current;
     if (!m) return;
-    for (const k of ["districts", "blocks", "wells", "screenings"] as Key[]) {
+    for (const k of ["districts", "blocks", "wells", "screenings", "ore"] as Key[]) {
       const g = groups.current[k];
       if (!g) continue;
       if (on[k]) { if (!m.hasLayer(g)) g.addTo(m); }
       else if (m.hasLayer(g)) m.removeLayer(g);
     }
   }, [on]);
+
+  // ── known uranium deposits ──
+  //
+  // Drawn UNDER the screenings and in a flat amber with no fill hatch, so it
+  // reads as background geology rather than as another assessment. This is
+  // where the uranium already is; it is not a claim that anything is happening
+  // there.
+  useEffect(() => {
+    const g = groups.current.ore;
+    if (!g) return;
+    g.clearLayers();
+    if (!on.ore || !ore.data) return;
+    L.geoJSON(ore.data as any, {
+      interactive: false,
+      pointToLayer: (_f, latlng) =>
+        L.circleMarker(latlng, { radius: 5, weight: 1.2 }),
+      style: {
+        color: "#d08700", weight: 1.6, fillColor: "#f5c451", fillOpacity: 0.35,
+      },
+      onEachFeature: (f, layer) => {
+        const p: any = f.properties ?? {};
+        layer.bindTooltip(
+          `<b>${p.name ?? "Uranium deposit"}</b>`
+          + (p.ore_zone ? `<br/>${p.ore_zone}` : "")
+          + (p.uranium_grade_pct != null
+            ? `<br/>grade ${p.uranium_grade_pct}%` : "")
+          + `<br/><span class="muted">a known uranium deposit (GSI/UDEPO)`
+          + ` — not a mine</span>`,
+          { className: "plume-tip", sticky: true });
+      },
+    }).addTo(g);
+  }, [ore.data, on.ore]);
 
   // ── published screenings ──
   //
@@ -227,10 +282,53 @@ export default function CitizenMap() {
       },
       onEachFeature: (f, layer) => {
         const p: any = f.properties ?? {};
-        layer.bindTooltip(
-          `<b>${p.headline ?? "Published screening"}</b><br/>`
-          + `modelled area ${Number(p.footprint_ha ?? 0).toFixed(1)} ha`
-          + `<br/><span class="muted">a modelled scenario, not a measurement</span>`,
+        // R14: the footprint used to say only how many hectares it covered.
+        // A resident told a screening reaches them then asks how big the
+        // modelled operation was, how long it would run, how far the
+        // contamination travelled, and whether it reaches the shallow water
+        // they actually drink. All four were already stored on the run.
+        const yrs = (n: unknown) =>
+          n === null || n === undefined ? "—" : `${Number(n)} yr`;
+        const spread = p.spread ?? {};
+        const shallow = p.shallow_water ?? {};
+
+        const lines = [
+          `<b>${p.headline ?? "Published screening"}</b>`,
+          `modelled area ${Number(p.footprint_ha ?? 0).toFixed(1)} ha`,
+          `mine operates ${yrs(p.operation_years)}`
+            + ` · assessed at ${yrs(p.evaluated_at_years)}`
+            + ` · clean-up ${yrs(p.restoration_years)}`,
+        ];
+
+        if (spread.recorded) {
+          lines.push(
+            `travels ${spread.furthest_travel_m ?? "—"} m`
+            + (spread.peak_concentration != null
+              ? ` · peak ${Number(spread.peak_concentration).toFixed(0)}`
+                + ` (limit ${spread.threshold ?? "—"})`
+              : ""));
+        } else {
+          lines.push(`<span class="muted">extent not recorded</span>`);
+        }
+
+        if (shallow.recorded) {
+          lines.push(
+            shallow.years_to_breakthrough != null
+              ? `reaches shallow water in ~${Number(shallow.years_to_breakthrough).toFixed(0)} yr`
+                + (shallow.probability != null
+                  ? ` (${Math.round(Number(shallow.probability) * 100)}% likely)`
+                  : "")
+              : `no upward pathway modelled`);
+        } else {
+          // LIMITATIONS 4b: absence of the record is NOT a finding of no
+          // pathway, and must never render as reassurance.
+          lines.push(`<span class="muted">shallow-water effect not assessed</span>`);
+        }
+
+        lines.push(`<span class="muted">a modelled scenario for a mine that does`
+          + ` not exist — not a measurement</span>`);
+
+        layer.bindTooltip(lines.join("<br/>"),
           { className: "plume-tip", sticky: true });
         layer.on("click", () => { setSel(null); setPin(null); setScreening(p); setDrawerHidden(false); });
       },
@@ -251,7 +349,8 @@ export default function CitizenMap() {
       onEachFeature: (f, layer) => {
         const p = f.properties as any;
         layer.bindTooltip(
-          `<b>${p.name}</b><br/>${p.wells} well(s) tested · ${p.band}`,
+          `<b>${p.name}</b><br/>${p.wells} well(s) tested · ${p.band}`
+          + (p.band_driver ? ` (${p.band_driver})` : ""),
           { sticky: true });
         layer.on("click", () => {
           if (modeRef.current !== "area") return;
@@ -277,7 +376,8 @@ export default function CitizenMap() {
         const p = f.properties as any;
         layer.bindTooltip(
           `<b>${p.name}</b> <span class="muted">${p.district}</span><br/>`
-          + `${p.wells} well(s) tested · ${p.band}`, { sticky: true });
+          + `${p.wells} well(s) tested · ${p.band}`
+          + (p.band_driver ? ` (${p.band_driver})` : ""), { sticky: true });
         layer.on("click", () => {
           if (modeRef.current !== "area") return;
           setScreening(null); setSel({ ...p, kind: "Block" }); setDrawerHidden(false);
@@ -415,7 +515,10 @@ export default function CitizenMap() {
 
         <div className="rail-head">Show on the map</div>
         {([["districts", "Districts"], ["blocks", "Blocks"], ["wells", "Monitoring wells"],
-           ["screenings", "Published assessments"]] as const)
+           ["screenings", "Published assessments"],
+           // Labelled "Uranium deposits", never "ore zones": the second is
+           // industry vocabulary and this control is read by residents.
+           ["ore", "Uranium deposits"]] as const)
           .map(([k, label]) => (
             <div className="layer-row" key={k}>
               <button className="toggle" data-on={on[k]} aria-label={`Toggle ${label}`}

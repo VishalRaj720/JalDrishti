@@ -34,7 +34,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_analyst_or_admin
+from app.dependencies import require_simulation_roles
 from app.engine_bounds import BOUNDS as B
 from app.exceptions import AppException
 from app.models.user import User
@@ -61,7 +61,7 @@ async def preview_run(
     isr_id: uuid.UUID,
     payload: PreviewRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_analyst_or_admin),
+    _: User = Depends(require_simulation_roles),
 ) -> dict[str, Any]:
     """Run a registered site and return the result WITHOUT storing it."""
     from app.services import ml_pipeline_adapter as mlp
