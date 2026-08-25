@@ -297,16 +297,24 @@ SELECT count(*) FROM pg_policies WHERE schemaname = 'public';   -- expect 21
   | Field                  | Value                     |
   | ---------------------- | ------------------------- |
   | Framework preset       | `Vite`                    |
-  | Build command          | `npm ci && npm run build` |
-  | Build output directory | `frontend/portal/dist`    |
   | Root directory         | `frontend/portal`         |
+  | Build command          | `npm ci && npm run build` |
+  | Build output directory | `dist`                    |
+
+   **The output directory is relative to the root directory, not to the repo.**
+   An earlier revision of this table paired root `frontend/portal` with output
+   `frontend/portal/dist`, which Pages resolves as
+   `frontend/portal/frontend/portal/dist` and fails to find. Set root, then
+   `dist`.
 
    The build runs `tsc -b && vite build` and then a guard that greps `dist/` for
    credentials and **fails the build** if any are found. If the build fails on
    `no-credentials-in-bundle`, do not work around it — something secret reached
    the bundle.
 3. **Save and Deploy.** You get `https://<project>.pages.dev`.
-4. **Route `/api/*` to Render.** Create `frontend/portal/public/_redirects`:
+4. **Routing is already committed.** `frontend/portal/public/_redirects` exists
+   and carries the real API hostname, so Pages picks it up on the first build —
+   there is nothing to create here. It contains:
   ```
    /api/*  https://jaldrishti-api.onrender.com/api/:splat  200
    /*      /index.html                                     200
@@ -314,8 +322,11 @@ SELECT count(*) FROM pg_policies WHERE schemaname = 'public';   -- expect 21
    The first line is the proxy that makes this one origin — status `200`, not
    `301`, so it rewrites rather than redirects. The second is the SPA fallback:
    without it a refresh on `/report/:siteId` returns 404, because that route
-   exists only in the browser.
-   Commit it and let Pages rebuild.
+   exists only in the browser. Order matters — `/*` first would swallow
+   `/api/*` too.
+
+   If you ever move the API to a different host, this file is the one place to
+   change.
 5. Confirm the rewrite works:
   ```bash
    curl -o /dev/null -w "%{http_code}\n" https://<project>.pages.dev/api/v1/public/risk/districts
