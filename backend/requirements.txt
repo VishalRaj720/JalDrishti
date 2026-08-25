@@ -36,6 +36,31 @@ scipy==1.13.1
 scikit-learn==1.5.2
 joblib==1.4.2
 
+# ml_pipeline runtime deps.
+#
+# The API imports the engine IN-PROCESS (services/ml_pipeline_adapter.py), so
+# whatever the engine needs at runtime must be installed HERE -- the Docker
+# image installs this file and never ml_pipeline/requirements.txt. Both of
+# these were missing, and both fail only once a simulation actually runs, which
+# is why a green /health and a working district map proved nothing:
+#
+#   xgboost    -- ml/predict.py loads band_*.joblib with joblib.load(), and
+#                 those pickles reference xgboost. Without it EVERY ML
+#                 prediction fails at model load, not at import.
+#   matplotlib -- dashboard/plume_geometry.py imports it inside the contour
+#                 function (with the Agg backend, no GUI) to trace closed
+#                 plume rings. Lazy, so the module imports fine and the call
+#                 is what raises. This is the one that surfaced in production.
+#
+# NOT added, deliberately, though ml_pipeline/requirements.txt lists them:
+#   shap                -- training/interpretability only; dashboard/server.py
+#                          never reaches shap_analysis or shap_bar_charts.
+#   streamlit, plotly   -- imported nowhere in ml_pipeline at all; stale
+#                          entries from the Phase 4 dashboard that was replaced.
+# Adding those would put ~250 MB in the image to be imported by nothing.
+xgboost==3.3.0
+matplotlib==3.10.9
+
 # Metrics
 prometheus-fastapi-instrumentator==7.0.0
 
