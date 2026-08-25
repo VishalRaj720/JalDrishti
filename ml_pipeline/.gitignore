@@ -3,7 +3,27 @@ outputs/*.json
 outputs/*.joblib
 outputs/*.png
 outputs/_*.txt
-ml/artifacts/*.joblib
+# ml/artifacts/*.joblib is DELIBERATELY NOT ignored below, unlike outputs/.
+#
+# Deployment audit 2026-08-25. This line used to read `ml/artifacts/*.joblib`
+# too, and it swept up the production model bundle along with the training
+# scratch it was presumably meant for -- `outputs/` and `ml/artifacts/` are
+# different directories with different jobs; only the first is scratch.
+# The bundle these nine files make up (pex_regressor.joblib plus a p10/p50/p90
+# head for each of three targets) is what `ml/predict.py::MLSurrogate` loads at
+# import, and it is genuinely small: 12 MB total, ordinary for git, nowhere
+# near LFS territory.
+#
+# The result: `docs/DEPLOYMENT.md`'s own artifact table said this directory
+# was needed at runtime while noting only 32 KB of it was tracked, and nothing
+# ever connected those two facts, because nobody had deployed from a clean
+# `git clone` until Render did. `GET /api/v1/ml/health` came back
+# `"ml_surrogate":"unavailable: FileNotFoundError"` -- the engine ran, the
+# XGBoost band models (a separate artifact) loaded, but every ML-surrogate
+# prediction was silently falling through to the analytical-only path.
+#
+# The SHAP png stays ignored -- shap_analysis.py only WRITES it, as a training
+# diagnostic; nothing at request time reads it.
 ml/artifacts/*.png
 __pycache__/
 *.pyc
