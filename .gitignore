@@ -11,6 +11,11 @@ yarn-error.log*
 # `.localenv` your local superuser password, `.globalenv` the Neon owner and
 # app-role passwords. Neither may ever be tracked. See backend/.localenv.
 .localenv
+# Wrangler's local dev state and its local secrets file. `.wrangler/` is a cache
+# of the local Workers runtime; `.dev.vars` is the Workers equivalent of .env.
+.wrangler/
+.dev.vars
+.dev.vars.*
 .globalenv
 .env.local
 .env.development.local

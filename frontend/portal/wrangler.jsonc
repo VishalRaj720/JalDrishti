@@ -1,0 +1,29 @@
+{
+  // Cloudflare Workers deployment for the JalDrishti portal.
+  //
+  // Cloudflare moved new-project creation from Pages to Workers, so the portal
+  // ships as a Worker with static assets rather than as a Pages project. The
+  // architecture is unchanged -- one hostname, /api/* reaching the Render API,
+  // no CORS -- but the routing lives here and in worker/index.js instead of in
+  // public/_redirects, which cannot proxy an external origin under Workers.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jaldrishti",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-08-25",
+
+  "assets": {
+    // Relative to this file, i.e. frontend/portal/dist -- what `npm run build`
+    // emits after tsc, vite build and the no-credentials-in-bundle guard.
+    "directory": "./dist",
+    // Lets worker/index.js serve the bundle for non-/api paths.
+    "binding": "ASSETS",
+    // Routes like /report/:siteId exist only in the browser; without this a
+    // refresh on one is a 404 because there is no such file to serve.
+    "not_found_handling": "single-page-application",
+    // WITHOUT THIS LINE THE API IS UNREACHABLE. The asset router runs before
+    // the Worker by default, and the SPA fallback above would answer /api/*
+    // with index.html -- HTTP 200 and a page of HTML where JSON was expected.
+    // Naming the prefix here sends only these requests to the Worker first.
+    "run_worker_first": ["/api/*"]
+  }
+}
