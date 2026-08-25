@@ -141,7 +141,8 @@ stop the service — so nothing will stop you shipping past it except reading it
 cd backend && alembic upgrade head        # uses MIGRATION_DATABASE_URL
 ```
 
-Head is **`0022_regulator_single_admin`**.
+Head is **`0023_breach_due_alert`**. (`0022_regulator_single_admin` was the
+head when this section was written; `0023` has since been added.)
 
 Two things that migration does, both of which affect how you set the deployment
 up:
@@ -173,6 +174,18 @@ manager, never through a committed file.
 |---|---|
 | `DATABASE_URL` | the **`jaldrishti_app`** role — see §2.2 |
 | `MIGRATION_DATABASE_URL` | the owner role; needed only when migrating |
+
+> **Managed Postgres and TLS — the shape of the URL matters.** SQLAlchemy's
+> asyncpg dialect passes query parameters straight to `asyncpg.connect()`
+> without translating them, so a hosted provider's `?sslmode=require` (Neon,
+> Supabase and Render all hand you one) raises
+> `TypeError: connect() got an unexpected keyword argument 'sslmode'`. asyncpg
+> spells it `?ssl=require`. And `MIGRATION_DATABASE_URL` should carry **no** SSL
+> parameter, because alembic reads it through psycopg2 while `scripts/init_db`
+> and `scripts/seed` read the same string through asyncpg — the two drivers
+> disagree on the spelling, and both default to `prefer`, which negotiates TLS
+> against any provider that refuses plaintext. See `DEPLOY_WALKTHROUGH.md`
+> step 1.
 | `JWT_SECRET`, `JWT_REFRESH_SECRET` | **rotate these.** Generate fresh: `python -c "import secrets;print(secrets.token_urlsafe(64))"`. Note the names — these are the JWT signing secrets; there is no `SECRET_KEY` in this codebase |
 | `APP_ENV` | `production` |
 | `CORS_ORIGINS` | only if you chose Option B; the exact frontend origin, never `*` |
@@ -245,29 +258,76 @@ python -m scripts.init_db      # PostGIS extension + enum types + tables
 python -m scripts.seed         # idempotent: users + ISR points + Jharkhand geodata
 ```
 
-### The demo accounts must not survive into production
+### The four demo accounts are deliberate. The admin is not one of them.
 
-`scripts/seed.py` creates one account per role with **weak, public passwords**
-(`admin123`, `analyst123`, `field123`, `citizen123`), and the login screen
-`frontend/portal/src/pages/Login.tsx` **lists all four on screen with their
-passwords** as click-to-fill buttons. That is correct for a fellowship demo and
-unacceptable on a public host — it is a documented administrator credential.
+`scripts/seed.py` creates **four** accounts with weak, public passwords, and
+`frontend/portal/src/pages/Login.tsx` lists them on screen as click-to-fill
+buttons:
 
-Before any deployment reachable from the internet:
+| Account | Password | Role |
+|---|---|---|
+| `analyst@jaldrishti.local` | `analyst123` | `analyst` |
+| `regulator@jaldrishti.local` | `regulator123` | `regulator` |
+| `field@jaldrishti.local` | `field123` | `field_officer` |
+| `citizen@jaldrishti.local` | `citizen123` | `citizen` |
 
-1. Create a real admin account with a strong password.
-2. Delete or disable the four seeded accounts.
-3. Remove the `DEMO_USERS` block from `Login.tsx` (or gate it on
-   `import.meta.env.DEV`) and rebuild the frontend.
+**This is intended and should stay.** JalDrishti is a fellowship demonstrator;
+an evaluator who cannot sign in cannot evaluate it, and a role-aware portal
+whose roles nobody can try is a screenshot rather than a system. The decision
+(2026-08-25) is that these four stay public and the deployment is shared openly.
 
-If you are deploying only for a supervised demo, keep them — but then keep the
-deployment behind authentication or an unlisted URL, and never point a public
-link at it.
+**There is a fifth account, and it is not seeded.** `admin` is created only by
+`python -m scripts.bootstrap_admin`, is pinned to exactly one row by the
+`uq_single_admin` partial index in migration `0022`, and cannot be assigned from
+the portal. It stays under the operator's control, with a password that exists
+nowhere in this repository.
 
-> **Fixed in R10:** `seed.py` previously also created a `regulator` account,
-> which would have reintroduced the role migration `0019` retired on every clean
-> install. That address is now in `RETIRED_USER_EMAILS`, so a reseed removes it
-> rather than minting it.
+#### What a stranger holding these four passwords can actually do
+
+Verified against the generated matrix in `docs/roles.md` §5, not assumed:
+
+| They can | They cannot |
+|---|---|
+| Submit field observations, and withdraw them (`field_officer`) | Sync anything into `Datasets/` — every `POST /dataset-sync/*` is admin-only |
+| Approve or reject those submissions (`regulator`) | Publish an advisory — `POST /advisories/{id}/decision` is admin-only |
+| Draft advisories and publish-runs (`analyst`) | Replace reference geography — all five `POST /ingest/*` are admin-only |
+| Create and edit hypothetical ISR points, create monitoring wells, save scenarios, run predictions (`analyst`) | Delete an ISR point, factory-reset, run model operations, or read the audit log |
+| Subscribe to blocks and read alerts (`citizen`) | Create an account with any elevated role, or a second admin |
+
+The shape of that table is the safeguard: **the demo roles propose, the admin
+disposes.** Every path that changes the authoritative record passes through the
+one account whose password you hold. Everything the others do lands in the audit
+log, and `AUTH_RATE_LIMIT_PER_MINUTE` throttles credential-stuffing against
+passwords that are, by design, published.
+
+#### What this posture costs, stated plainly
+
+Two writes reach real tables with no admin in the loop. Expect them rather than
+discover them:
+
+* `POST /api/v1/monitoring-wells` (admin + analyst) inserts into the
+  authoritative `monitoring_wells` table.
+* `POST` / `PUT /api/v1/isr-points` (admin + regulator + analyst) creates and
+  edits hypothetical ISR sites. `DELETE` is admin-only, so the seeded site
+  cannot be removed, but new ones can appear.
+
+So a public demo database will accumulate junk. That is the accepted trade, not
+a defect. `python -m scripts.seed` is idempotent and
+`POST /model-ops/factory-reset` exists precisely so the operator can flush
+accumulated demo state — run one of them when the deployment gets noisy. Nothing
+a demo user does can reach `Datasets/`, the model artifacts, or the audit trail.
+
+**Do not reuse these passwords anywhere else, and do not add a fifth demo
+account at a higher privilege.** The posture holds only because the admin sits
+outside the published set.
+
+> **Corrected 2026-08-25.** An earlier revision of this section said `seed.py`
+> no longer creates a `regulator` account, because `0019` had retired the role.
+> That is stale: migration `0022` restored `regulator` with a narrower job and
+> the seed mints the account again on purpose — confirmed in a live seed run,
+> which logged `created regulator: regulator@jaldrishti.local`.
+> `RETIRED_USER_EMAILS` now holds only `viewer@jaldrishti.local`.
+
 
 ---
 
@@ -331,7 +391,7 @@ often cap storage below what the seeded geodata needs — check before committin
 
 ## 8. Pre-deployment checklist
 
-- [ ] `alembic upgrade head` applied with `MIGRATION_DATABASE_URL` (head = `0022_regulator_single_admin`)
+- [ ] `alembic upgrade head` applied with `MIGRATION_DATABASE_URL` (head = `0023_breach_due_alert`)
 - [ ] `python -m scripts.create_app_role` run; `DATABASE_URL` points at `jaldrishti_app`
 - [ ] Startup log reads **`Row-level security active: 19 policies … (no bypass)`** — not `INERT`
 - [ ] `JWT_SECRET` and `JWT_REFRESH_SECRET` rotated to fresh random values

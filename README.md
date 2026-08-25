@@ -126,21 +126,41 @@ python -m scripts.create_app_role --password 'choose-a-real-one'
 That creates `jaldrishti_app` — `NOSUPERUSER`, `NOBYPASSRLS`, DML only, no ownership, so
 it cannot drop a policy that constrains it.
 
-Then `backend/.env` (defaults live in `app/config.py`):
+#### Two environment profiles, one `.env`
 
-```env
-APP_ENV=development
-# What the running API connects as — restricted, so RLS applies.
-DATABASE_URL=postgresql+asyncpg://jaldrishti_app:YOUR_APP_PASSWORD@localhost:5432/groundwater_db
-# Owner role, used only by alembic and scripts/init_db (CREATE EXTENSION, DDL).
-MIGRATION_DATABASE_URL=postgresql+asyncpg://postgres:YOUR_PASSWORD@localhost:5432/groundwater_db
-DB_NAME=groundwater_db
-DB_USER=postgres
-DB_PASSWORD=YOUR_PASSWORD
-JWT_SECRET=change-this-secret
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-RATE_LIMIT_PER_MINUTE=60
+`app/config.py` reads **`.env` and nothing else**. Rather than hand-editing it
+every time you move between your laptop and the deployed database, keep two
+complete profiles beside it and copy the one you want:
+
+| File | Points at | Use it for |
+|---|---|---|
+| `backend/.localenv` | your local PostgreSQL | development, **and the test suite** |
+| `backend/.globalenv` | the Neon database | migrations, seeding, `bootstrap_admin`, and as the reference for the API host's environment variables |
+| `backend/.env` | whichever you last copied | the only file actually loaded |
+
+```bash
+cp backend/.localenv backend/.env      # work locally
+cp backend/.globalenv backend/.env     # act on the deployed database
 ```
+
+On Windows: `copy backend\.localenv backend\.env`.
+
+All three are gitignored — `.localenv` and `.globalenv` hold **real** passwords,
+so treat them exactly like `.env`. Neither is loaded automatically; they are
+templates you copy.
+
+**Which profile am I on?**
+
+```bash
+cd backend && python -c "from app.config import settings; print(settings.APP_ENV, settings.DB_HOST)"
+```
+
+**`pytest` only works under `.localenv`.** The suite creates a database using
+`DB_USER`/`DB_PASSWORD`, which under `.globalenv` are the Neon owner credentials
+— so a stray `pytest` would create a database inside the production project.
+`tests/conftest.py` refuses to run when `DB_HOST` is not local and tells you to
+switch. That guard is not a formality: it exists because the failure is silent
+and would simply have worked.
 
 At startup the API logs `Row-level security active: N policies, connected as
 'jaldrishti_app' (no bypass)`. If it instead warns **`ROW-LEVEL SECURITY IS INERT`**,
@@ -238,8 +258,33 @@ Brings up `db` (PostGIS) + `backend`.
 password on the command line, never prints one, and refuses anything under the
 minimum length.
 
-> **These must not survive into production.** They are weak, public, and listed on the
-> login screen. [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) §5 covers removing them.
+### Trying the deployed portal
+
+**This table is the published home for these credentials, and deliberately so.**
+JalDrishti is a fellowship demonstrator: an evaluator who cannot sign in cannot
+evaluate it, so the four accounts above are meant to be used by anyone who wants
+to walk the roles.
+
+They are **not** printed on the deployed login screen. `Login.tsx` gates the
+click-to-fill list on `import.meta.env.DEV`, which Vite resolves at compile time,
+so a production build eliminates the branch entirely — and
+`frontend/portal/tests/no-credentials-in-bundle.mjs` fails `npm run build` if any
+of these strings reaches `dist/`. That guard stays, because it was added after a
+working **admin** password shipped in a bundle and was readable via view-source.
+Publishing here rather than in the artifact keeps the control armed while still
+letting people in.
+
+**The admin account is not on this list and never will be.** Every path that
+changes the authoritative record — dataset sync, ingest, advisory publication,
+factory reset, model operations, the audit log — is admin-only. The four demo
+roles can propose; only the operator disposes.
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) §5 has the verified capability matrix
+and the accepted costs of this posture.
+
+> Expect a public demo database to accumulate junk: `analyst` can create
+> monitoring wells and hypothetical ISR points. That is the trade, not a defect.
+> `python -m scripts.seed` is idempotent and `POST /model-ops/factory-reset`
+> exists to flush it.
 
 ## Repository layout
 

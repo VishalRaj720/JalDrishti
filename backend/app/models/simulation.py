@@ -1,4 +1,10 @@
-"""Simulation, SimulationAquifer, PlumeParameter models."""
+"""The `simulations` table.
+
+`SimulationAquifer` and `PlumeParameter` used to live here. Migration
+`0024_drop_vestigial_sim` dropped both: created by `0001_initial`, never read
+and never written by any route, service or query in the repository. See that
+migration for why an empty `plume_parameters` was worse than no table at all.
+"""
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -7,18 +13,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.database import Base
 from app.models.base import UUIDPrimaryKeyMixin
-
-
-class SimulationAquifer(Base):
-    """Junction table linking simulations to impacted aquifers."""
-    __tablename__ = "simulation_aquifers"
-
-    simulation_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("simulations.id", ondelete="CASCADE"), primary_key=True
-    )
-    aquifer_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("aquifers.id", ondelete="CASCADE"), primary_key=True
-    )
 
 
 class Simulation(UUIDPrimaryKeyMixin, Base):
@@ -47,26 +41,3 @@ class Simulation(UUIDPrimaryKeyMixin, Base):
 
     # Relationships
     isr_point: Mapped[object] = relationship("IsrPoint", back_populates="simulations")
-    impacted_aquifers: Mapped[list] = relationship(
-        "Aquifer",
-        secondary="simulation_aquifers",
-        lazy="select",
-    )
-    plume_parameters: Mapped[Optional[object]] = relationship(
-        "PlumeParameter", back_populates="simulation", uselist=False
-    )
-
-
-class PlumeParameter(UUIDPrimaryKeyMixin, Base):
-    """Optional physics parameters for the plume transport model."""
-    __tablename__ = "plume_parameters"
-
-    simulation_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("simulations.id", ondelete="CASCADE"), nullable=False, unique=True
-    )
-    dispersivity_longitudinal: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    dispersivity_transverse: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    retardation_factor: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    decay_constant: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-
-    simulation: Mapped[object] = relationship("Simulation", back_populates="plume_parameters")

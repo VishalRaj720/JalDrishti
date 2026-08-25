@@ -212,9 +212,3 @@ class SimulationResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
-
-class PlumeParameterCreate(BaseModel):
-    dispersivity_longitudinal: Optional[float] = None
-    dispersivity_transverse: Optional[float] = None
-    retardation_factor: Optional[float] = None
-    decay_constant: Optional[float] = None

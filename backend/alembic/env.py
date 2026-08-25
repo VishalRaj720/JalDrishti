@@ -78,6 +78,31 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_schemas=False,
+            # ONE TRANSACTION PER MIGRATION, not one for the whole run.
+            #
+            # Deployment audit 2026-08-25, found on the first migration of a
+            # genuinely empty database. `0007` runs
+            # `ALTER TYPE userrole ADD VALUE 'citizen'`; `0008` then runs
+            # `UPDATE users SET role = 'citizen'`. PostgreSQL permits ADD VALUE
+            # inside a transaction but refuses to let the new label be USED
+            # until that transaction has committed:
+            #
+            #   psycopg2.errors.UnsafeNewEnumValueUsage:
+            #   unsafe use of new value "citizen" of enum type userrole
+            #
+            # With a single run-wide transaction the two migrations share one,
+            # so `alembic upgrade head` could never reach head from scratch --
+            # and the whole run rolled back, leaving no `alembic_version` row to
+            # show how far it got. It went unnoticed because every existing
+            # database was migrated INCREMENTALLY as the migrations were
+            # written, which committed 0007 long before 0008 was authored.
+            #
+            # This does mean a failure now leaves earlier migrations applied
+            # rather than rolling the run back. That is the standard Alembic
+            # trade and the right one here: `alembic upgrade head` is resumable,
+            # whereas an enum split across two migrations is not fixable at all
+            # under a shared transaction.
+            transaction_per_migration=True,
         )
         with context.begin_transaction():
             context.run_migrations()

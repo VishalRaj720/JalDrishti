@@ -157,6 +157,25 @@ export default function Login() {
           </div>
         )}
 
+        {/*
+          Production build: DEMO is empty (dead-code-eliminated with the
+          `import.meta.env.DEV` branch above), so the click-to-fill list is gone
+          and no password reaches the bundle -- which is what
+          `tests/no-credentials-in-bundle.mjs` enforces. But this is a public
+          demonstrator, and an evaluator who cannot find an account cannot walk
+          the roles. So point at where the credentials ARE published instead of
+          reprinting them here. No email, no password, nothing the guard's
+          FORBIDDEN list would match.
+        */}
+        {mode === "in" && DEMO.length === 0 && (
+          <div className="muted small" style={{ marginTop: 12, textAlign: "center" }}>
+            Demonstration accounts for each role are listed in the{" "}
+            <a href="https://github.com/VishalRaj720/JalDrishti#demo-accounts"
+               target="_blank" rel="noreferrer noopener">project README</a>.
+            The administrator account is not among them.
+          </div>
+        )}
+
         {/* Design §4.5 rule 6 — the premise is never more than one glance away. */}
         <div className="banner warn" style={{ marginTop: 15 }}>
           <strong>No ISR uranium mine operates in Jharkhand.</strong> Every site in this

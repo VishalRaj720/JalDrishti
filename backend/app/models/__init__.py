@@ -13,7 +13,7 @@ from app.models.district import District  # noqa: F401
 from app.models.block import Block  # noqa: F401
 from app.models.aquifer import Aquifer, AquiferType  # noqa: F401
 from app.models.isr_point import IsrPoint  # noqa: F401
-from app.models.simulation import Simulation, SimulationAquifer, PlumeParameter  # noqa: F401
+from app.models.simulation import Simulation  # noqa: F401
 from app.models.monitoring_station import MonitoringStation, GroundwaterLevelReading  # noqa: F401
 
 # Data ingestion + Month 3 monitoring
@@ -40,7 +40,7 @@ __all__ = [
     "Block",
     "Aquifer", "AquiferType",
     "IsrPoint",
-    "Simulation", "SimulationAquifer", "PlumeParameter",
+    "Simulation",
     "MonitoringStation", "GroundwaterLevelReading",
     "DataSource",
     "MonitoringWell",
