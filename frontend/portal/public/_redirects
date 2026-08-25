@@ -1,0 +1,16 @@
+# Cloudflare Pages routing. Order matters: first match wins.
+#
+# 1. THE PROXY that makes this one origin.
+#    The portal calls `/api/v1/...` as a same-origin RELATIVE path -- no fetch
+#    in the codebase names a host -- so routing that prefix to Render is what
+#    joins the two services. Status 200, not 301: Pages must REWRITE (fetch it
+#    server-side and return the body) rather than redirect, because a redirect
+#    would send the browser cross-origin and reintroduce CORS, preflight, and a
+#    whole class of production-only failure.
+/api/*  https://jaldrishti-api.onrender.com/api/:splat  200
+
+# 2. THE SPA FALLBACK. Every other path returns index.html so the React router
+#    can resolve it in the browser. Without this, a refresh on /report/:siteId
+#    is a 404 -- that route exists only client-side, and Pages has no file there.
+#    Must come SECOND: placed first it would swallow /api/* as well.
+/*      /index.html                                     200
