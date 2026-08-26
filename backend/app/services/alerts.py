@@ -31,17 +31,23 @@ from typing import Any, Mapping, Optional
 
 from loguru import logger
 
-# Shared with the citizen band so the two surfaces phrase a list the same way.
-from app.api.v1.public_risk import _join_and
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.advisory import Advisory
 from app.models.alert import Alert, AlertRead, BlockSubscription
+# Shared with the citizen band so the two surfaces phrase a list the same way.
+# This used to import `_join_and` from `api.v1.public_risk` — a service reaching
+# up into an API module for a rule that belongs to neither. Both now take it
+# from the service that owns the banding.
+from app.services.health_bands import URANIUM_LIMIT_PPB, join_and as _join_and
 
-#: BIS / WHO drinking-water limit for uranium. Matches the public risk API's
-#: banding rule and `ml_pipeline`'s own `EXCURSION_THRESHOLDS`.
-URANIUM_LIMIT_PPB = 30.0
+#: `URANIUM_LIMIT_PPB` is re-exported above rather than redeclared as of
+#: 2026-08-26. It was a third literal `30.0` in the codebase, and `citizen.py`
+#: imports the limit from HERE — so a change to the banding limit that missed
+#: this line would have moved the public map and left the citizen page still
+#: reporting against the old one. It matches `ml_pipeline`'s own
+#: `EXCURSION_THRESHOLDS`.
 
 
 class AlertService:

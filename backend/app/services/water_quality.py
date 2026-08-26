@@ -168,7 +168,23 @@ STANDARD: tuple[Determinand, ...] = (
     Determinand(
         key="iron", column="iron_ppm", label="Iron", unit="mg/L",
         acceptable=0.3, permissible=None, source=_BIS,
-        relaxation="No relaxation",
+        relaxation="No relaxation", health=True,
+        # `health=True` WAS MISSING UNTIL 2026-08-26, and it was the only member
+        # of the stated health set without it. The omission contradicted three
+        # places that all read from this same registry: the `interpretation`
+        # string this module returns names the set as "uranium, fluoride,
+        # nitrate, arsenic, iron"; `public_risk.py` calls iron a health
+        # determinand in two comments and lists it unconditionally in
+        # `UNTESTED`; and the alert scanner queries `iron_ppm > 0.3` alongside
+        # the other four.
+        #
+        # Nothing was miscounted, because iron is 0 of 397 measured and a
+        # determinand that never has a value can never exceed. What it did do
+        # was render iron under "General and aesthetic determinands" on the
+        # water-quality screen, directly below a sentence naming iron as
+        # health-significant. The flag would have started mattering the moment
+        # anyone ingested an iron result — an exceedance counted as an aesthetic
+        # one, in the aggregate a health officer is meant to read first.
         note="Also unmeasured in this dataset — 0 of 397 samples carry a value."),
     Determinand(
         key="ph", column="ph", label="pH", unit="pH units",

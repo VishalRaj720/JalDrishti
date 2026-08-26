@@ -46,6 +46,7 @@ from app.models.advisory import Advisory
 from app.models.user import User, UserRole
 from app.services import audit
 from app.ratelimit import AUTH_RATE_LIMIT, limiter
+from app.services import health_bands
 from app.services.alerts import URANIUM_LIMIT_PPB, AlertService
 from app.services.auth import create_access_token, hash_password
 
@@ -593,72 +594,68 @@ async def my_area(
         return {"blocks": [], "unread": 0,
                 "what_this_is": "Choose your block to see what has been measured there."}
 
+    # THE BAND HERE USED TO BE UNIQUE TO THIS ENDPOINT, AND THAT WAS THE BUG.
+    #
+    # Until 2026-08-26 this handler carried its own ladder over `max_u` alone,
+    # with its own prose. `/public/risk/*` had banded on uranium, nitrate and
+    # fluoride since 2026-08-25. Uranium exceeds its limit at zero of the state's
+    # uranium-tested wells while nitrate exceeds at 22 and fluoride at 32, so the
+    # divergence was not academic: a resident of a block over the fluoride limit
+    # saw "High concern" on the public map and "Low concern" here, on the page
+    # they open to check their own drinking water. Both were correct about the
+    # rule they had been handed, which is what made it survive two reviews.
+    #
+    # There is now one rule, in `services/health_bands.py`, and this endpoint
+    # applies it exactly as the public map does — same SQL, same explanation,
+    # same statement of what nobody analysed.
     ids = [s["id"] for s in subs]
-    measured = (await db.execute(text("""
-        SELECT b.id::text AS block_id,
-               count(DISTINCT mw.id) AS wells,
-               count(ws.id) AS samples,
-               max(ws.uranium_ppb) AS max_uranium_ppb,
-               max(ws.sampled_at) AS last_sampled
-        FROM blocks b
-        LEFT JOIN monitoring_wells mw ON mw.block_id = b.id
-        LEFT JOIN water_samples ws ON ws.well_id = mw.id
-        WHERE b.id = ANY(:ids)
-        GROUP BY b.id
-    """), {"ids": [uuid.UUID(i) for i in ids]})).mappings().all()
+    measured = (await db.execute(text(f"""
+        WITH per_block AS (
+            SELECT b.id::text        AS block_id,
+                   count(DISTINCT w.id) AS wells,
+                   count(s.id)          AS samples,
+                   max(s.sampled_at)    AS last_sampled,
+                   {health_bands.HEALTH_MAXES}
+            FROM blocks b
+            LEFT JOIN monitoring_wells w ON w.block_id = b.id
+            LEFT JOIN water_samples s    ON s.well_id = w.id
+            WHERE b.id = ANY(:ids)
+            GROUP BY b.id
+        )
+        SELECT block_id, wells, samples, last_sampled,
+               n_u, n_no3, n_f,
+               round(max_u::numeric, 1)   AS max_uranium_ppb,
+               round(max_no3::numeric, 1) AS max_nitrate_mg_l,
+               round(max_f::numeric, 2)   AS max_fluoride_mg_l,
+               {health_bands.BANDS}    AS band,
+               {health_bands.DRIVER}   AS band_driver,
+               {health_bands.UNTESTED} AS untested_health
+        FROM per_block
+    """), dict(health_bands.band_params(),
+               ids=[uuid.UUID(i) for i in ids]))).mappings().all()
     by_block = {m["block_id"]: dict(m) for m in measured}
 
     out = []
     for s in subs:
         m = by_block.get(s["id"], {})
-        mx = m.get("max_uranium_ppb")
+        wells = int(m.get("wells") or 0)
         samples = int(m.get("samples") or 0)
-        if mx is None:
-            # TWO DIFFERENT GAPS, and conflating them produced a screen that
-            # said "no sample from this block is in the dataset" directly above
-            # "2 wells tested · 2 samples". Found in browser verification.
-            #
-            # A block can have samples that were never analysed for uranium —
-            # the CGWB quality file does not report every determinand at every
-            # well. Telling a resident nothing was sampled when wells near them
-            # were sampled (just not for this) is the kind of confidently wrong
-            # public statement this product exists not to make.
-            band = "No data"
-            if samples > 0:
-                means = (
-                    f"{samples} groundwater sample{'s' if samples != 1 else ''} from "
-                    f"this block {'are' if samples != 1 else 'is'} in the government "
-                    f"dataset, but none was analysed for uranium. So nothing here can "
-                    f"tell you about uranium either way — that is a gap in testing, "
-                    f"not a clean result.")
-            else:
-                means = (
-                    "No groundwater sample from this block is in the government "
-                    "dataset used here. That is a gap in monitoring — it is not a "
-                    "clean result.")
-        elif mx >= URANIUM_LIMIT_PPB:
-            band, means = "High concern", (
-                f"The highest uranium reading from a tested well here is "
-                f"{mx:.1f} ppb. The safe limit for drinking water is "
-                f"{URANIUM_LIMIT_PPB:.0f} ppb, so at least one well is above it.")
-        elif mx >= URANIUM_LIMIT_PPB / 2:
-            band, means = "Moderate concern", (
-                f"The highest uranium reading here is {mx:.1f} ppb — below the "
-                f"{URANIUM_LIMIT_PPB:.0f} ppb safe limit, but close enough that it "
-                f"is worth watching.")
-        else:
-            band, means = "Low concern", (
-                f"The highest uranium reading from a tested well here is "
-                f"{mx:.1f} ppb, well below the {URANIUM_LIMIT_PPB:.0f} ppb "
-                f"safe limit.")
+        # `describe` returns the band it settled on, which is not always the one
+        # the SQL produced — a block with samples but no health determinand
+        # analysed is `Not tested`, not `No data`. Use the returned value.
+        band, means, untested = health_bands.describe(m, wells=wells, samples=samples)
 
         out.append({
             **s,
-            "wells": int(m.get("wells") or 0),
-            "samples": int(m.get("samples") or 0),
-            "max_uranium_ppb": round(float(mx), 2) if mx is not None else None,
+            "wells": wells,
+            "samples": samples,
+            "max_uranium_ppb": m.get("max_uranium_ppb"),
+            "max_nitrate_mg_l": m.get("max_nitrate_mg_l"),
+            "max_fluoride_mg_l": m.get("max_fluoride_mg_l"),
             "last_sampled": m.get("last_sampled"),
             "band": band,
+            "band_driver": m.get("band_driver"),
+            "untested_health": untested,
             "what_it_means": means,
         })
 
@@ -666,7 +663,24 @@ async def my_area(
         "blocks": out,
         "unread": await svc.unread_count(me.id),
         "safe_limit_ppb": URANIUM_LIMIT_PPB,
+        # The first three keys match `/public/risk/at` exactly, name for name,
+        # because they mean the same thing and two citizen surfaces disagreeing
+        # about the shape of a limit is how they came to disagree about a band.
+        #
+        # `fluoride_acceptable_mg_l` is the fourth. Fluoride is the one health
+        # determinand here with a real band between its two limits — 1.0 is what
+        # water should meet, 1.5 is tolerated only where no other source exists
+        # — and a client drawing that band needs the lower number. Serving it is
+        # the alternative to the portal hard-coding a 1.0 of its own, which is
+        # the same duplication this whole change exists to remove.
+        "limits": {
+            "uranium_ppb": health_bands.URANIUM_LIMIT_PPB,
+            "nitrate_mg_l": health_bands.NITRATE_LIMIT_MG_L,
+            "fluoride_mg_l": health_bands.FLUORIDE_PERMISSIBLE_MG_L,
+            "fluoride_acceptable_mg_l": health_bands.FLUORIDE_ACCEPTABLE_MG_L,
+        },
         "what_this_is": (
             "These are real test results from government groundwater sampling — "
-            "measurements, not predictions."),
+            "measurements, not predictions. An area is judged on uranium, nitrate "
+            "and fluoride together, the same way the public map judges it."),
     }

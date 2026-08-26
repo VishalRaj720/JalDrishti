@@ -5,6 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import "./styles/theme.css";
 import "./styles/layout.css";
+// Composed readouts (the determinand scale, the composition bar, the queue,
+// the coverage grid). Last, so it can lean on the tokens and the primitives
+// the two above establish.
+import "./styles/instruments.css";
 
 import {
   AuthProvider, canAdmin, canAudit, canPublish, canReview, canRunSim, canSubmit,

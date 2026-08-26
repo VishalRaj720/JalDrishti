@@ -1,0 +1,488 @@
+/* Instruments — the shared readouts that replace tile walls and long tables.
+ *
+ * WHY A THIRD STYLESHEET. `theme.css` is the token layer and the primitives
+ * every screen already uses; `layout.css` is the shell, the map and the
+ * responsive contract. What follows is neither: it is a small set of COMPOSED
+ * readouts — a determinand scale, a proportion bar, a statement block, a work
+ * queue, a coverage grid — that exist because eighteen screens had converged on
+ * two shapes, a grid of tiles and a long table, and neither answers a question
+ * at a glance.
+ *
+ * THREE RULES HOLD THROUGHOUT, and they are the same rules the rest of the
+ * product is built on:
+ *
+ *   1. NOTHING HERE INVENTS A NUMBER. Every bar length, marker position and
+ *      zone boundary is computed from a value the API returned. Where a value
+ *      is missing, that absence is DRAWN — see the `.gap` treatment below —
+ *      rather than defaulted to zero, hidden, or coloured as a pass.
+ *
+ *   2. STATE IS NEVER CARRIED BY COLOUR ALONE. Every tone here pairs its hue
+ *      with a second channel: a glyph, a border style, or the 45° hatch that
+ *      marks a gap. A greyscale screenshot of any of these must still be
+ *      readable, because roughly 1 in 12 men cannot separate the amber from
+ *      the red and this ramp is the product's entire risk vocabulary.
+ *
+ *   3. TOKENS ONLY. No literal hex, no literal px outside the scales in
+ *      `theme.css`. That is what lets `.report-doc.printing` swap the whole
+ *      palette to a light document for PDF capture and have these follow
+ *      without a single call site knowing it is being printed.
+ */
+
+/* ── the statement block ─────────────────────────────────────────────
+ *
+ * What replaces a `grid-4` of tiles at the top of a screen. A tile wall makes
+ * every number equally important, which is the same as making none of them
+ * important; the reader has to compare four boxes to work out what the screen
+ * is telling them. A statement leads with ONE sentence — the answer — and puts
+ * the supporting figures beneath it as a reading, not as furniture.
+ *
+ * It sits on the page background with a rule under it rather than inside a
+ * card, because it is not a component of the page, it is the page's opening.  */
+.stmt {
+  margin-bottom: var(--s-5);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+.stmt-eyebrow {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: var(--s-2);
+}
+.stmt-line {
+  font-size: var(--fs-xl); line-height: var(--lh-tight); font-weight: 650;
+  letter-spacing: -.01em; max-width: 46ch; margin: 0;
+}
+.stmt-line .hl { color: var(--accent-text); }
+.stmt-line .hl.danger { color: var(--danger); }
+.stmt-line .hl.warn   { color: var(--warn); }
+.stmt-line .hl.ok     { color: var(--ok); }
+.stmt-line .hl.gap    { color: var(--muted); }
+.stmt-sub {
+  margin: var(--s-2) 0 0; color: var(--muted); font-size: var(--fs-sm);
+  line-height: var(--lh-base); max-width: 78ch;
+}
+
+/* The supporting figures. A row of readouts separated by rules, not boxes —
+   the visual weight belongs to the statement above them. */
+.stmt-readouts {
+  display: flex; flex-wrap: wrap; gap: var(--s-5);
+  margin-top: var(--s-4);
+}
+.readout { min-width: 0; }
+.readout-l {
+  font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); font-weight: 700; margin-bottom: 3px;
+}
+.readout-v {
+  font-size: var(--fs-2xl); font-weight: 700; line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+}
+.readout-v .u { font-size: var(--fs-sm); font-weight: 400; color: var(--muted); }
+.readout-s { font-size: var(--fs-2xs); color: var(--muted); margin-top: 2px; }
+.readout.danger .readout-v { color: var(--danger); }
+.readout.warn   .readout-v { color: var(--warn); }
+.readout.ok     .readout-v { color: var(--ok); }
+.readout.info   .readout-v { color: var(--accent-text); }
+/* A gap is grey and it says so in words underneath. It is never green, and it
+   is never dropped for being zero — a zero here is a fact worth stating. */
+.readout.gap    .readout-v { color: var(--muted); }
+
+/* ── the determinand scale ───────────────────────────────────────────
+ *
+ * The distinctive readout of this product, and the one place a measurement
+ * gets to be a picture rather than a cell in a row.
+ *
+ * A number in a table — "1.42 mg/L" — requires the reader to already know that
+ * fluoride's acceptable limit is 1.0 and its permissible limit is 1.5, and to
+ * know that "permissible" for fluoride carries NO relaxation. The scale draws
+ * all four facts at once: where the value sits, where the two thresholds are,
+ * which zone that puts it in, and how far past the limit it is.
+ *
+ * It is honest for one specific reason: EVERY BOUNDARY ON IT IS PUBLISHED LAW.
+ * The zones come from IS 10500:2012 as served by `/water-quality/standard`, not
+ * from a designer's sense of what looks alarming.
+ *
+ * OFF-SCALE IS DRAWN, NOT CLAMPED. The track ends at twice the governing limit.
+ * A well at 8× the limit would otherwise squash both thresholds into the first
+ * few pixels and make every exceedance look identical; instead the marker pins
+ * to the end with a ▶ and the real number stays in the readout. The reader
+ * loses no information and the threshold zone stays legible.                  */
+.ds {
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.ds:last-child { border-bottom: none; }
+
+.ds-head {
+  display: flex; align-items: baseline; gap: var(--s-2);
+  margin-bottom: 7px; flex-wrap: wrap;
+}
+.ds-label { font-size: var(--fs-base); font-weight: 600; }
+.ds-value {
+  margin-left: auto; font-variant-numeric: tabular-nums;
+  font-size: var(--fs-lg); font-weight: 700; white-space: nowrap;
+}
+.ds-value .u { font-size: var(--fs-xs); color: var(--muted); font-weight: 400; }
+.ds.above_permissible .ds-value { color: var(--danger); }
+.ds.above_acceptable  .ds-value { color: var(--warn); }
+.ds.acceptable        .ds-value { color: var(--ok); }
+.ds.not_tested        .ds-value,
+.ds.no_limit          .ds-value { color: var(--muted); }
+
+/* The track. Zones are absolutely positioned percentages of it, so the whole
+   thing is fluid and needs no viewBox or measurement pass. */
+.ds-track {
+  position: relative; height: 8px; border-radius: var(--r-pill);
+  background: var(--card2); border: 1px solid var(--line);
+  margin: var(--s-4) 0 var(--s-2);
+}
+.ds-zone {
+  position: absolute; top: 0; bottom: 0;
+  /* Zones are a wash, not a fill: the marker is the subject and a saturated
+     band behind it competes for the eye. */
+  opacity: .34;
+}
+.ds-zone:first-of-type { border-radius: var(--r-pill) 0 0 var(--r-pill); }
+.ds-zone:last-of-type  { border-radius: 0 var(--r-pill) var(--r-pill) 0; }
+.ds-zone.ok     { background: var(--ok); }
+.ds-zone.warn   { background: var(--warn); }
+.ds-zone.danger { background: var(--danger); }
+
+/* A threshold. The line is the fact; the label under it is the number. Both
+   are drawn in full-strength ink because a limit is the thing a reader is
+   checking against, not background. */
+.ds-thr {
+  position: absolute; top: -4px; bottom: -4px; width: 1px;
+  background: var(--text); opacity: .5;
+}
+.ds-thr-l {
+  position: absolute; top: calc(100% + 5px);
+  transform: translateX(-50%); white-space: nowrap;
+  font-size: var(--fs-2xs); color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The value. A needle with a cap, so it reads as an instrument reading rather
+   than as a progress bar's end. */
+.ds-mark {
+  position: absolute; top: 50%; width: 3px; height: 20px;
+  transform: translate(-50%, -50%); border-radius: 2px;
+  background: var(--text);
+  box-shadow: 0 0 0 2px var(--card);
+}
+.ds.above_permissible .ds-mark { background: var(--danger); }
+.ds.above_acceptable  .ds-mark { background: var(--warn); }
+.ds.acceptable        .ds-mark { background: var(--ok); }
+/* Pinned to the end of the track, pointing off it. The glyph is the carrier;
+   the colour is confirmation. */
+.ds-mark.off::after {
+  content: "▶"; position: absolute; left: 5px; top: 50%;
+  transform: translateY(-50%); font-size: var(--fs-xs); color: var(--danger);
+}
+
+/* THE GAP STATE. Not tested is not a reading, so it does not get a track with
+   a marker at zero — that is the single most misleading thing this component
+   could draw. It gets an empty dashed channel and the words. */
+.ds.not_tested .ds-track {
+  background: transparent; border-style: dashed; border-color: var(--muted);
+  opacity: .8;
+}
+.ds-gap-note {
+  font-size: var(--fs-xs); color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.ds-foot {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  margin-top: var(--s-4); font-size: var(--fs-xs); color: var(--muted);
+  flex-wrap: wrap;
+}
+.ds-foot .x { font-variant-numeric: tabular-nums; }
+.ds-foot .x.over { color: var(--danger); font-weight: 700; }
+
+/* Denser variant for a drawer or a phone: the thresholds keep their labels,
+   everything else tightens. */
+.ds.compact { padding: var(--s-2) 0; }
+.ds.compact .ds-track { margin: var(--s-3) 0 var(--s-2); height: 6px; }
+.ds.compact .ds-value { font-size: var(--fs-md); }
+.ds.compact .ds-mark { height: 16px; }
+
+/* ── composition bar ─────────────────────────────────────────────────
+ *
+ * Counts that sum to a whole — wells within limits, above acceptable, above
+ * permissible, never tested — as one bar rather than four tiles. The point is
+ * the PROPORTION, which four separate numbers make the reader compute.
+ *
+ * The gap segment is hatched. That is deliberate and it is the reason this
+ * component exists rather than a generic stacked bar: an untested share must be
+ * visibly a different KIND of thing from a measured share, not merely a
+ * different colour of the same thing.                                         */
+.comp { margin: var(--s-3) 0; }
+.comp-bar {
+  display: flex; height: 14px; border-radius: var(--r-sm); overflow: hidden;
+  border: 1px solid var(--line); background: var(--card2);
+}
+.comp-seg { min-width: 2px; transition: flex-basis .2s ease-out; }
+.comp-seg.ok     { background: var(--ok); }
+.comp-seg.warn   { background: var(--warn); }
+.comp-seg.danger { background: var(--danger); }
+.comp-seg.info   { background: var(--accent); }
+.comp-seg.gap {
+  background: repeating-linear-gradient(
+    45deg, var(--muted) 0 2px, transparent 2px 6px);
+  border-left: 1px solid var(--muted);
+}
+.comp-key {
+  display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4);
+  margin-top: var(--s-2); font-size: var(--fs-xs);
+}
+.comp-key-item { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.comp-key-item b {
+  color: var(--text); font-variant-numeric: tabular-nums; font-weight: 700;
+}
+.comp-sw {
+  width: 10px; height: 10px; border-radius: 2px; flex: 0 0 10px;
+  border: 1px solid transparent;
+}
+.comp-sw.ok     { background: var(--ok); }
+.comp-sw.warn   { background: var(--warn); }
+.comp-sw.danger { background: var(--danger); }
+.comp-sw.info   { background: var(--accent); }
+.comp-sw.gap {
+  background: repeating-linear-gradient(
+    45deg, var(--muted) 0 2px, transparent 2px 5px);
+  border-color: var(--muted);
+}
+
+/* ── ranked bars ─────────────────────────────────────────────────────
+ *
+ * "Which determinand fails most often" is a ranking, and a ranking read from a
+ * three-column table requires comparing digits. The bar does that comparison
+ * for the reader; the count stays beside it because the exact figure is what
+ * gets quoted.
+ *
+ * The track is drawn even at 0 % so a determinand that never exceeds still
+ * occupies a row — its absence from the ranking is information.               */
+.rank { display: grid; gap: var(--s-2); }
+.rank-row {
+  display: grid; grid-template-columns: minmax(130px, 1.1fr) minmax(60px, 2fr) auto;
+  gap: var(--s-3); align-items: center;
+}
+.rank-l {
+  font-size: var(--fs-sm); display: flex; align-items: center; gap: 6px;
+  min-width: 0; overflow-wrap: anywhere;
+}
+.rank-track {
+  height: 8px; border-radius: var(--r-pill); background: var(--card2);
+  border: 1px solid var(--line); overflow: hidden;
+}
+.rank-fill { height: 100%; border-radius: var(--r-pill); }
+.rank-fill.danger { background: var(--danger); }
+.rank-fill.warn   { background: var(--warn); }
+.rank-fill.info   { background: var(--accent); }
+.rank-n {
+  font-size: var(--fs-xs); color: var(--muted); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.rank-n b { color: var(--text); font-weight: 700; }
+
+/* A composition bar small enough to live in a table cell, so a 24-row district
+   table can be scanned by shape instead of by reading four numeric columns. */
+.comp-mini {
+  display: flex; height: 7px; width: 92px; border-radius: 2px;
+  overflow: hidden; background: var(--card2); border: 1px solid var(--line);
+}
+
+@media (max-width: 639px) {
+  .rank-row { grid-template-columns: 1fr auto; }
+  /* The bar is the first thing to go on a narrow screen: the label and the
+     count still carry the whole fact, the bar only made it faster. */
+  .rank-row .rank-track { display: none; }
+}
+
+/* ── work queue ──────────────────────────────────────────────────────
+ *
+ * The landing-screen shape for "what needs my attention". A queue is a list of
+ * things to DO, so each row is one decision: what it is, what it is about, how
+ * old it is, and the control that acts on it. Rows are full width because a
+ * queue in a half-width card next to another half-width card reads as two
+ * competing lists rather than one ordered one.                                */
+.queue { display: grid; gap: var(--s-2); }
+.queue-item {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3); border-radius: var(--r-md);
+  background: var(--card); border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  width: 100%; text-align: left; font-family: inherit; color: inherit;
+  cursor: pointer;
+}
+.queue-item:hover { border-color: var(--accent); }
+.queue-item.danger { border-left-color: var(--danger); }
+.queue-item.warn   { border-left-color: var(--warn); }
+.queue-item.ok     { border-left-color: var(--ok); }
+.queue-item.info   { border-left-color: var(--accent); }
+.queue-main { min-width: 0; flex: 1; }
+.queue-t {
+  font-size: var(--fs-md); font-weight: 600; line-height: var(--lh-snug);
+  overflow-wrap: anywhere;
+}
+.queue-m {
+  font-size: var(--fs-xs); color: var(--muted); margin-top: 3px;
+  line-height: var(--lh-snug);
+}
+.queue-side { display: flex; align-items: center; gap: var(--s-2); flex: none; }
+
+/* The empty queue is a RESULT, not a blank. "Nothing is waiting on you" is
+   information a reviewer wants; an empty div is not. */
+.queue-clear {
+  padding: var(--s-4); border-radius: var(--r-md);
+  border: 1px dashed var(--line); color: var(--muted);
+  font-size: var(--fs-sm); text-align: center;
+}
+
+/* ── coverage grid ───────────────────────────────────────────────────
+ *
+ * Data gaps, drawn. One row per district, one cell per KIND of gap, intensity
+ * by count — but the count stays printed inside the cell, because a heat map
+ * whose numbers are only in a tooltip is a picture of data rather than data.
+ *
+ * A zero cell is deliberately quiet and a non-zero cell is deliberately loud:
+ * the reader is scanning for where the holes are, and the holes are the
+ * subject of the screen.                                                       */
+.cov { width: 100%; border-collapse: separate; border-spacing: 0; }
+.cov th {
+  font-size: var(--fs-2xs); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; text-align: center;
+  padding: 0 var(--s-1) var(--s-2); vertical-align: bottom; line-height: var(--lh-snug);
+}
+.cov th.name { text-align: left; }
+.cov td { padding: 2px var(--s-1); }
+.cov td.name {
+  font-size: var(--fs-sm); white-space: nowrap; padding-right: var(--s-3);
+  max-width: 160px; overflow: hidden; text-overflow: ellipsis;
+}
+.cov td.num {
+  font-size: var(--fs-xs); color: var(--muted);
+  font-variant-numeric: tabular-nums; text-align: right; padding-right: var(--s-3);
+}
+.cov-cell {
+  display: block; border-radius: var(--r-sm); text-align: center;
+  font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
+  padding: 5px 0; min-width: 34px; border: 1px solid transparent;
+}
+.cov-cell.zero { color: var(--muted); opacity: .45; }
+/* Four steps, not a continuous ramp: a reader comparing two districts is
+   asking "worse or not", and a continuous ramp answers a question nobody has
+   while making the four bands indistinguishable. The border thickens with the
+   step so the scale survives greyscale. */
+.cov-cell.s1 { background: rgba(245,165,36,.14); color: var(--warn); border-color: rgba(245,165,36,.3); }
+.cov-cell.s2 { background: rgba(245,165,36,.26); color: var(--warn); border-color: rgba(245,165,36,.55); }
+.cov-cell.s3 { background: rgba(242,85,90,.20); color: var(--danger); border-color: rgba(242,85,90,.5); }
+.cov-cell.s4 {
+  background: rgba(242,85,90,.34); color: var(--danger);
+  border-color: var(--danger); border-width: 2px; font-weight: 700;
+}
+.cov tr.total td { border-top: 1px solid var(--line); padding-top: var(--s-2); }
+.cov tr.total td.name { font-weight: 700; }
+
+/* ── freshness ───────────────────────────────────────────────────────
+ *
+ * How long ago something was measured, as a chip. Age matters here more than
+ * in most products: a 2013 sample is the newest evidence some blocks have, and
+ * a screen that prints the date without saying it is eleven years old lets the
+ * reader assume it is current.                                                 */
+.fresh {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: .03em;
+  padding: 2px var(--s-2); border-radius: var(--r-pill);
+  border: 1px solid currentColor; white-space: nowrap;
+}
+.fresh.recent { color: var(--ok); }
+.fresh.aging  { color: var(--warn); }
+.fresh.stale  { color: var(--danger); }
+.fresh.never  { color: var(--muted); border-style: dashed; }
+
+/* ── section head ────────────────────────────────────────────────────
+ *
+ * One shape for every section heading, so density does not drift screen to
+ * screen. The description is part of the heading, not a paragraph after it —
+ * several of these sections need a sentence of framing before their first
+ * number is safe to read.                                                      */
+.sh {
+  display: flex; align-items: flex-start; gap: var(--s-3);
+  margin: var(--s-6) 0 var(--s-3);
+}
+.sh:first-child { margin-top: 0; }
+.sh-main { flex: 1; min-width: 0; }
+.sh h2 {
+  margin: 0; font-size: var(--fs-lg); font-weight: 700;
+  line-height: var(--lh-tight);
+}
+.sh p {
+  margin: var(--s-1) 0 0; color: var(--muted);
+  font-size: var(--fs-sm); line-height: var(--lh-base); max-width: 78ch;
+}
+.sh-act { flex: none; display: flex; gap: var(--s-2); align-items: center; }
+
+/* ── citizen verdict ─────────────────────────────────────────────────
+ *
+ * The single most-read element in the product: the answer to "is my water
+ * safe", for someone with no technical vocabulary, on a phone.
+ *
+ * It is a full-bleed block with one enormous band word because the alternative
+ * — a chip in the corner of a card — makes the reader hunt for the verdict
+ * among the evidence. The evidence follows underneath; the answer comes first.
+ *
+ * `.gap` is the case this element is really designed around. When nobody has
+ * tested a block, the verdict is NOT a reassuring pale card: it is a hatched
+ * block saying so, at the same size the other verdicts get, because "we do not
+ * know" deserves the same prominence as "we do".                              */
+.verdict {
+  border-radius: var(--r-lg); border: 1px solid var(--line);
+  border-left-width: 4px; padding: var(--s-4) var(--s-5);
+  background: var(--card); margin-bottom: var(--s-3);
+}
+.verdict.high { border-left-color: var(--danger); }
+.verdict.moderate { border-left-color: var(--warn); }
+.verdict.low { border-left-color: var(--ok); }
+.verdict.none {
+  border-left-color: var(--muted); border-left-style: dashed;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    repeating-linear-gradient(45deg, var(--card2) 0 6px, var(--card) 6px 12px) border-box;
+}
+.verdict-place {
+  display: flex; align-items: baseline; gap: var(--s-2); flex-wrap: wrap;
+  margin-bottom: var(--s-3);
+}
+.verdict-place b { font-size: var(--fs-lg); font-weight: 700; }
+.verdict-place span { color: var(--muted); font-size: var(--fs-sm); }
+.verdict-word {
+  font-size: var(--fs-3xl); font-weight: 800; line-height: 1.05;
+  letter-spacing: -.02em; display: flex; align-items: center; gap: var(--s-3);
+}
+.verdict.high .verdict-word { color: var(--danger); }
+.verdict.moderate .verdict-word { color: var(--warn); }
+.verdict.low .verdict-word { color: var(--ok); }
+.verdict.none .verdict-word { color: var(--muted); }
+.verdict-word .g { font-size: var(--fs-2xl); }
+.verdict-say {
+  margin: var(--s-3) 0 0; line-height: var(--lh-loose);
+  font-size: var(--fs-md); max-width: 60ch;
+}
+.verdict-evidence {
+  display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5);
+  margin-top: var(--s-4); padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 767px) {
+  .stmt-line { font-size: var(--fs-lg); }
+  .stmt-readouts { gap: var(--s-4); }
+  .readout-v { font-size: var(--fs-xl); }
+  .verdict { padding: var(--s-4); }
+  .verdict-word { font-size: var(--fs-2xl); }
+  /* The scale keeps its thresholds on a phone — they are the reason it is
+     worth drawing — but loses the second line of foot notes. */
+  .ds-foot { gap: var(--s-2); }
+  .cov td.name { max-width: 96px; }
+  .queue-item { align-items: flex-start; flex-wrap: wrap; }
+}

@@ -287,8 +287,16 @@ def test_not_tested_band_is_distinct_from_low_concern_and_no_data():
     for band in ("Not tested", "No data"):
         out = pr._explain_multi({"band": band}, wells=2)
         assert "not a clean result" in out.lower()
-    # and the CASE ladder distinguishes them by whether anything was sampled
-    assert "health_tests = 0 AND max_u IS NULL" in pr._BANDS
+    # and the CASE ladder distinguishes them by whether anything was sampled.
+    #
+    # THIS ASSERTION USED TO READ `health_tests = 0 AND max_u IS NULL`, which is
+    # what the ladder said — and the sentence above it was false while it did.
+    # `health_tests` counts non-null uranium results among the three, so
+    # `health_tests = 0` already implies `max_u IS NULL`: the 'Not tested'
+    # branch was unreachable, and every banding query returned 'No data' for a
+    # block that had been sampled and simply never analysed. `samples` is the
+    # only term that separates the two, which is what the ladder now tests on.
+    assert "health_tests = 0 AND samples = 0" in pr._BANDS
     assert "'No data'" in pr._BANDS and "'Not tested'" in pr._BANDS
 
 

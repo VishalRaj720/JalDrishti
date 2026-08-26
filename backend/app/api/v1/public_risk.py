@@ -27,108 +27,38 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.services import health_bands as hb
 
 router = APIRouter(prefix="/public/risk", tags=["Public (citizen)"])
 
-# BIS/WHO drinking-water limit for uranium, the same threshold the rest of the
-# platform uses. Bands are plain language on purpose (design §4.4): a citizen
-# screen shows "Moderate concern", never a P10-P90 band.
-URANIUM_LIMIT_PPB = 30.0
-
-# ── Health limits, IS 10500:2012 ─────────────────────────────────────
+# ── the banding rule ─────────────────────────────────────────────────
 #
-# Kept in step with `services/water_quality.py`, which owns the full
-# eighteen-determinand registry. Only the HEALTH-significant ones band a block:
-# hardness, alkalinity and TDS exceed at two-thirds of Jharkhand's wells and are
-# hard-rock aquifer chemistry, not contamination. Banding a village "High
-# concern" for hard water would bury the wells that carry a real nitrate load.
-NITRATE_LIMIT_MG_L = 45.0     # "No relaxation" — any exceedance is the worst class
-FLUORIDE_ACCEPTABLE_MG_L = 1.0
-FLUORIDE_PERMISSIBLE_MG_L = 1.5
-
-#: Arsenic and iron are health determinands with NO data in the CGWB file
-#: (0 of 397 samples). They are deliberately absent from the band expression
-#: rather than defaulted to a pass — a block whose arsenic was never measured
-#: must not be banded on the assumption that it is clean. `health_tests` counts
-#: only what was actually analysed, and a block with none reads "Not tested".
-
-#: Columns every banding query must compute. Kept as one string so the six
-#: queries that band cannot drift apart.
-_HEALTH_MAXES = """
-                   max(s.uranium_ppb)    AS max_u,
-                   max(s.nitrate_mg_l)   AS max_no3,
-                   max(s.fluoride_mg_l)  AS max_f,
-                   count(s.uranium_ppb)  AS n_u,
-                   count(s.nitrate_mg_l) AS n_no3,
-                   count(s.fluoride_mg_l) AS n_f,
-                   count(s.uranium_ppb)
-                     + count(s.nitrate_mg_l)
-                     + count(s.fluoride_mg_l) AS health_tests
-"""
-
-# THE BAND, ACROSS EVERY MEASURED HEALTH DETERMINAND.
+# MOVED TO `services/health_bands.py` ON 2026-08-26, and re-exported here under
+# the private names this module has always used.
 #
-# Until 2026-08-25 this read `max_u` alone, and that was actively misleading:
-# uranium exceeds its limit at ZERO of 342 tested wells in Jharkhand, while
-# nitrate exceeds at 22 (peak 121 mg/L, 2.7x the limit) and fluoride at 32. The
-# public map therefore told residents of those blocks "Low concern" on the
-# strength of the one determinand that never fires.
+# It moved because it was not one rule. `/citizen/my-area` carried a second,
+# uranium-only implementation of the same idea, so a block over the fluoride
+# limit read "High concern" on the public map and "Low concern" on the page a
+# resident opens to check their own water. A rule that can be stated in two
+# places will eventually be stated two ways; this one already had been.
 #
-# `Not tested` is a distinct band from `No data` and from `Low concern`: a block
-# with wells and samples but no health determinand analysed has not been shown
-# to be safe. Neither may ever render green.
-_BANDS = """
-    CASE
-        WHEN health_tests = 0 AND max_u IS NULL THEN 'No data'
-        WHEN health_tests = 0                   THEN 'Not tested'
-        WHEN max_u   >= :limit                  THEN 'High concern'
-        WHEN max_no3 >  :no3_limit              THEN 'High concern'
-        WHEN max_f   >  :f_permissible          THEN 'High concern'
-        WHEN max_f   >  :f_acceptable           THEN 'Moderate concern'
-        WHEN max_u   >= :limit * 0.5            THEN 'Moderate concern'
-        ELSE                                         'Low concern'
-    END
-"""
+# The aliases are not vestigial politeness. `tests/test_r14_citizen_safety.py`
+# reaches for `pr._BANDS`, `pr._UNTESTED`, `pr._band_params`, `pr._explain_multi`
+# and `pr._join_and` by name, and those tests pin the properties that keep a
+# monitoring gap from rendering as a pass. Keeping the names is what lets the
+# rule move without loosening a single one of them.
+URANIUM_LIMIT_PPB = hb.URANIUM_LIMIT_PPB
+NITRATE_LIMIT_MG_L = hb.NITRATE_LIMIT_MG_L
+FLUORIDE_ACCEPTABLE_MG_L = hb.FLUORIDE_ACCEPTABLE_MG_L
+FLUORIDE_PERMISSIBLE_MG_L = hb.FLUORIDE_PERMISSIBLE_MG_L
 
-#: Which determinand set the band, so a citizen is told WHAT is wrong rather
-#: than only that something is. Mirrors the CASE above, in the same order.
-_DRIVER = """
-    CASE
-        WHEN health_tests = 0                   THEN NULL
-        WHEN max_u   >= :limit                  THEN 'uranium'
-        WHEN max_no3 >  :no3_limit              THEN 'nitrate'
-        WHEN max_f   >  :f_permissible          THEN 'fluoride'
-        WHEN max_f   >  :f_acceptable           THEN 'fluoride'
-        WHEN max_u   >= :limit * 0.5            THEN 'uranium'
-        ELSE                                         NULL
-    END
-"""
-
-
-#: Which health determinands were never analysed here.
-#:
-#: Arsenic and iron are 0 % populated statewide, so they are listed
-#: unconditionally — no block in Jharkhand has been cleared for them, and a
-#: "Low concern" band that silently means "clean for the three we happened to
-#: measure" is the failure LIMITATIONS.md section 3 exists to prevent.
-_UNTESTED = """
-    array_remove(ARRAY[
-        CASE WHEN n_u   = 0 THEN 'uranium'  END,
-        CASE WHEN n_no3 = 0 THEN 'nitrate'  END,
-        CASE WHEN n_f   = 0 THEN 'fluoride' END,
-        'arsenic', 'iron'
-    ], NULL)
-"""
-
-
-def _band_params() -> dict:
-    """Every banding query binds the same four limits."""
-    return {
-        "limit": URANIUM_LIMIT_PPB,
-        "no3_limit": NITRATE_LIMIT_MG_L,
-        "f_acceptable": FLUORIDE_ACCEPTABLE_MG_L,
-        "f_permissible": FLUORIDE_PERMISSIBLE_MG_L,
-    }
+_HEALTH_MAXES = hb.HEALTH_MAXES
+_BANDS = hb.BANDS
+_DRIVER = hb.DRIVER
+_UNTESTED = hb.UNTESTED
+_band_params = hb.band_params
+_join_and = hb.join_and
+_explain_multi = hb.explain_multi
 
 _CACHE = "public, max-age=3600"
 
@@ -154,94 +84,23 @@ def _collection(rows) -> dict[str, Any]:
     }
 
 
-def _explain(band: str, n: int) -> str:
-    # This text is read by the public, so it says "the 1 well" rather than
-    # "the 1 wells" — many blocks have a single sampled well.
-    wells = "well" if n == 1 else "wells"
-    if band == "No data":
-        return ("No groundwater samples have been collected here yet, so there "
-                "is nothing to report. That is a gap in monitoring, not a "
-                "clean result.")
-    if band == "High concern":
-        one_of = "The" if n == 1 else "At least one of the"
-        return (f"{one_of} {n} {wells} sampled here measured uranium "
-                f"at or above the {URANIUM_LIMIT_PPB:g} ppb safe limit for "
-                f"drinking water. Contact your block water office about testing.")
-    if band == "Moderate concern":
-        return (f"Uranium was found in the {n} {wells} sampled here at more than "
-                f"half the {URANIUM_LIMIT_PPB:g} ppb safe limit, but below it. "
-                f"Worth watching; not currently over the limit.")
-    return (f"Uranium in the {n} {wells} sampled here was well below the "
-            f"{URANIUM_LIMIT_PPB:g} ppb safe limit.")
-
-
-def _join_and(items: list[str]) -> str:
-    """'a', 'a and b', 'a, b and c' — this text is read by the public."""
-    if not items:
-        return ""
-    if len(items) == 1:
-        return items[0]
-    return ", ".join(items[:-1]) + " and " + items[-1]
-
-
-def _explain_multi(d: dict, wells: int) -> str:
-    """Plain-language reading of a multi-determinand band.
-
-    Names the substance that set the band. "High concern" with no explanation
-    of WHAT is high is not actionable — a resident can boil water for bacteria
-    but cannot boil out fluoride, and the advice differs by determinand.
-    """
-    band, driver = d.get("band"), d.get("band_driver")
-    w = "well" if wells == 1 else "wells"
-
-    if band == "No data":
-        return ("No groundwater samples have been collected here yet, so there "
-                "is nothing to report. That is a gap in monitoring, not a clean "
-                "result.")
-    if band == "Not tested":
-        return ("Samples were collected here but not analysed for any "
-                "drinking-water health substance. That is a gap in testing, not "
-                "a clean result.")
-
-    detail = {
-        "uranium": (f"uranium at {d.get('max_uranium_ppb')} ppb against a "
-                    f"{URANIUM_LIMIT_PPB:g} ppb limit"),
-        "nitrate": (f"nitrate at {d.get('max_nitrate_mg_l')} mg/L against a "
-                    f"{NITRATE_LIMIT_MG_L:g} mg/L limit"),
-        "fluoride": (f"fluoride at {d.get('max_fluoride_mg_l')} mg/L against a "
-                     f"{FLUORIDE_ACCEPTABLE_MG_L:g} mg/L limit "
-                     f"({FLUORIDE_PERMISSIBLE_MG_L:g} where no other source "
-                     f"exists)"),
-    }.get(driver or "", "")
-
-    if band == "High concern":
-        advice = {
-            "nitrate": ("Nitrate is mainly a risk to infants under six months. "
-                        "Do not use this water to make formula feed."),
-            "fluoride": ("Long-term fluoride exposure causes dental and skeletal "
-                         "fluorosis. Boiling does not remove it."),
-            "uranium": "Boiling does not remove uranium.",
-        }.get(driver or "", "")
-        return (f"Testing of the {wells} {w} here found {detail}. {advice} "
-                f"Contact your block water office about testing and about an "
-                f"alternative supply.").strip()
-
-    if band == "Moderate concern":
-        return (f"Testing of the {wells} {w} here found {detail}. It is not over "
-                f"the limit where no other source exists, but it is worth "
-                f"watching and worth asking your block water office about.")
-
-    # Name only what was ACTUALLY analysed. Saying "uranium, nitrate and
-    # fluoride were all within limits" at a block where uranium was never
-    # measured contradicts the gap sentence appended right after it, and the
-    # reassuring half is the half a reader remembers.
-    measured = [n for n, c in (("uranium", d.get("n_u")),
-                               ("nitrate", d.get("n_no3")),
-                               ("fluoride", d.get("n_f"))) if int(c or 0) > 0]
-    return (f"{_join_and(measured).capitalize()} in the {wells} {w} sampled here "
-            f"{'was' if len(measured) == 1 else 'were'} within the "
-            f"drinking-water limits.")
-
+# `_explain`, `_join_and` and `_explain_multi` USED TO BE DEFINED HERE.
+#
+# `_join_and` and `_explain_multi` moved to `services/health_bands.py` and are
+# re-exported at the top of this module, so nothing that called them changed.
+#
+# `_explain` was DELETED, not moved, and that is the second half of the
+# 2026-08-26 banding fix. It was a uranium-only reading of a band that has been
+# multi-determinand since 2026-08-25, and three handlers still called it:
+# `/geojson/blocks`, `/{district_id}` and the block popups the citizen map draws
+# from them. A block banded "High concern" because its fluoride sat above the
+# permissible limit was handed the sentence "Uranium in the 2 wells sampled here
+# was well below the 30 ppb safe limit" — beneath the words "High concern", in
+# the same card, both generated from the same row.
+#
+# There is no version of that function worth keeping. Every caller now uses
+# `hb.describe`, which reads the band it was actually given, names the
+# determinand that set it, and states what nobody analysed.
 
 _DISCLAIMER = (
     "No uranium mine of the type this platform models operates in Jharkhand. "
@@ -373,6 +232,7 @@ async def block_geojson(response: Response, db: AsyncSession = Depends(get_db),
             GROUP BY b.id, b.name, b.geometry, d.name
         )
         SELECT id::text, name, district, wells, samples,
+               n_u, n_no3, n_f,
                round(max_u::numeric, 1) AS max_uranium_ppb,
                {_BANDS} AS band,
                {_DRIVER} AS band_driver,
@@ -384,10 +244,15 @@ async def block_geojson(response: Response, db: AsyncSession = Depends(get_db),
     """), dict(_band_params(),
                d=str(district_id) if district_id else None))).mappings().all()
 
+    # `n_u`/`n_no3`/`n_f` are projected for `describe`, which needs to know what
+    # was actually analysed — both to separate "sampled but never analysed" from
+    # "no samples at all", and to name only the determinands a "Low concern"
+    # block was genuinely cleared for.
     out = _collection(rows)
     for f in out["features"]:
-        f["properties"]["what_it_means"] = _explain(
-            f["properties"]["band"], f["properties"]["wells"])
+        p = f["properties"]
+        p["band"], p["what_it_means"], p["untested_health"] = hb.describe(
+            p, wells=int(p.get("wells") or 0), samples=int(p.get("samples") or 0))
     response.headers["Cache-Control"] = _CACHE
     return out
 
@@ -522,25 +387,11 @@ async def risk_at_point(
     # away a real nitrate measurement because a different determinand is missing
     # tells a resident less than the data supports. So the band now reports what
     # WAS measured, and the gap is stated alongside it rather than replacing it.
-    untested = list(d.get("untested_health") or [])
-    health_tested = int(d.get("n_u") or 0) + int(d.get("n_no3") or 0) \
-        + int(d.get("n_f") or 0)
-
-    if samples and not health_tested:
-        explanation = (
-            f"The {wells} well{'' if wells == 1 else 's'} here have been sampled, "
-            f"but none of those samples were analysed for uranium, nitrate or "
-            f"fluoride. There is no drinking-water health result to report — "
-            f"that is a gap in testing, not a clean result.")
-        d["band"] = "Not tested"
-    else:
-        explanation = _explain_multi(d, wells)
-
-    if untested and samples:
-        explanation += (
-            f" Not every substance was analysed here: no result for "
-            f"{_join_and(untested)}. A substance nobody measured has not been "
-            f"shown to be safe.")
+    #
+    # The three steps this used to spell out inline now live in `hb.describe`,
+    # which is what `/citizen/my-area` and `/geojson/blocks` call too. They were
+    # correct only here, which is precisely how the surfaces drifted.
+    d["band"], explanation, untested = hb.describe(d, wells=wells, samples=samples)
 
     nearest = (await db.execute(text("""
         SELECT w.name, b.name AS block,
@@ -718,6 +569,7 @@ async def district_detail(district_id: uuid.UUID, response: Response,
             GROUP BY b.id, b.name
         )
         SELECT id::text, name, wells, samples, last_sampled,
+               n_u, n_no3, n_f,
                round(max_u::numeric, 1) AS max_uranium_ppb,
                {_BANDS} AS band,
                {_DRIVER} AS band_driver,
@@ -730,7 +582,8 @@ async def district_detail(district_id: uuid.UUID, response: Response,
     blocks: list[dict[str, Any]] = []
     for r in rows:
         d = dict(r)
-        d["what_it_means"] = _explain(d["band"], d["wells"])
+        d["band"], d["what_it_means"], d["untested_health"] = hb.describe(
+            d, wells=int(d.get("wells") or 0), samples=int(d.get("samples") or 0))
         blocks.append(d)
 
     response.headers["Cache-Control"] = _CACHE
@@ -739,5 +592,8 @@ async def district_detail(district_id: uuid.UUID, response: Response,
         "unit": "ppb", "safe_limit": URANIUM_LIMIT_PPB,
         "blocks": blocks,
         "what_this_is": _DISCLAIMER,
-        "data_gap": sum(1 for b in blocks if b["band"] == "No data"),
+        # Counted AFTER `describe`, which can move a block from 'No data' to
+        # 'Not tested'. Counting the raw SQL band here would report a block that
+        # has been sampled as one that never was.
+        "data_gap": sum(1 for b in blocks if b["band"] in ("No data", "Not tested")),
     }

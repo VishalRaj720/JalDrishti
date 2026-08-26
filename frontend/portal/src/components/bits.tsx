@@ -154,12 +154,30 @@ export function RiskBand({
   return <span className={`band ${b.band}`}>{b.label}</span>;
 }
 
-/** Maps the API's band strings onto the `.band` classes. */
-export const BAND_BY_LABEL: Record<string, "high" | "moderate" | "low" | "none"> = {
+export type BandKey = "high" | "moderate" | "low" | "none";
+
+/** Maps the API's band strings onto the `.band` classes.
+ *
+ *  The three "we did not measure it" strings are listed EXPLICITLY rather than
+ *  left to the `?? "none"` fallback at the call site. They are the strings this
+ *  map exists to get right — a future band the server adds should surface as an
+ *  obvious miss, not quietly inherit the grey that means "no evidence". */
+export const BAND_BY_LABEL: Record<string, BandKey> = {
   "High concern": "high",
   "Moderate concern": "moderate",
   "Low concern": "low",
   "No data": "none",
+  "Not tested": "none",
+  "Not tested for uranium": "none",
+};
+
+export const bandKey = (label: string): BandKey => BAND_BY_LABEL[label] ?? "none";
+
+/** The non-colour carrier for each band, matching `.band::before` in theme.css.
+ *  Exported so a readout too large for a chip can draw the same glyph rather
+ *  than inventing a second symbol set. */
+export const BAND_GLYPH: Record<BandKey, string> = {
+  high: "▲", moderate: "◆", low: "●", none: "○",
 };
 
 /** A labelled form control with an optional hint and error. */

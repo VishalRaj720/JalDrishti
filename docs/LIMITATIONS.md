@@ -454,6 +454,67 @@ then **verifies it moved** and jumps if it did not.
 
 ---
 
+## 4f. R15 (2026-08-26) — the band R14 fixed had only been fixed on one surface
+
+Section 4e says "the citizen surface stops banding on uranium alone". That was
+true of `/public/risk/*` and false of `/citizen/my-area`, which is the screen a
+resident who has signed in and followed their own block actually opens.
+
+`my_area` carried its own copy of the rule: its own SQL over `max(uranium_ppb)`,
+its own three-rung ladder, its own prose. R14 rewrote the other implementation
+and left this one alone, so for a day the product shipped **two citizen bands
+that disagreed on the same block**:
+
+| Block condition | Public map | My Area |
+|---|---|---|
+| fluoride 1.8 mg/L, uranium 2.5 ppb | **High concern** | **Low concern** |
+| nitrate 121 mg/L, uranium absent | **High concern** | **No data** |
+
+Neither endpoint was wrong about the rule it had been handed. That is what made
+it survive the review that produced 4e: reading either file on its own shows
+correct code.
+
+### Three further copies of the same split, found with it
+
+* **`_explain` was uranium-only prose on a multi-determinand band.** Three
+  handlers — `/geojson/blocks`, `/{district_id}` and the map popups drawn from
+  them — banded on all three determinands and then explained the result with a
+  sentence about uranium. A block banded High concern on fluoride was captioned
+  "Uranium in the 2 wells sampled here was well below the 30 ppb safe limit",
+  directly beneath the words "High concern". The function is deleted, not moved.
+* **The `Not tested` band of 4e was unreachable.** The ladder read
+  `health_tests = 0 AND max_u IS NULL`, and `health_tests` counts non-null
+  uranium results among the three — so the first condition already implied the
+  second and every query returned `No data` for a block that had been sampled
+  and never analysed. `/at` patched it in Python; the other four handlers did
+  not. The ladder now tests `samples = 0`, which is the only term that
+  distinguishes the two, and `/blocks/summary` — which had always split them
+  correctly with its own FILTER clauses — agrees with the band expression for
+  the first time.
+* **`iron` was the one member of the health set without `health=True`.** The
+  `interpretation` sentence returned by the same module names it; `public_risk`
+  calls it a health determinand twice; the alert scanner queries it. Iron is 0
+  of 397 measured so no count moved, but it rendered under "general and
+  aesthetic" on the water-quality screen, below a sentence naming it as
+  health-significant — and the flag would have decided a real exceedance the
+  moment anyone ingested an iron result.
+
+### What now holds
+
+The limits, the SQL that applies them, and the plain-language reading of the
+result live in `app/services/health_bands.py`. `public_risk.py` re-exports them
+under the private names its tests already reach for; `citizen.py` and
+`alerts.py` import them. `tests/test_r15_one_band_rule.py` asserts the sharing
+by **identity** rather than equality, and fails if `my_area` starts deciding a
+band string of its own again.
+
+The residual limitation is unchanged and worth restating: this band reads three
+determinands because three are populated. Arsenic and iron are 0 % populated
+statewide, so every `untested_health` array names them, and no block in
+Jharkhand has been cleared for either.
+
+---
+
 ## 4a. The aquifer-reach alert, and what bounds it
 
 Publishing now raises a second kind of alert — `aquifer_pathway` — for blocks

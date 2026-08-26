@@ -183,3 +183,92 @@ The portal must not imply capability it lacks:
 
 Each appears as a disabled control with a "planned" chip and the phase, so a reviewer can
 see the intended shape without being misled about what runs today.
+
+---
+
+## 8. R15 — instrument readouts, and what §§1–7 above got wrong
+
+**Date:** 2026-08-26. Everything above this line was written 2026-08-12 and parts of it
+have been stale for months. Corrections first, because a reader trusting §§3–7 will
+otherwise look for screens that no longer exist:
+
+- **There is no "Simulation Studio".** P2 merged it and the Map Console into one
+  `/console` with two modes on one canvas (pin, site). §3 and §6 still describe two.
+- **Alerts are not "Planned · P7".** They ship: `/alerts`, the header bell, and
+  `/citizen/alerts/*`. §7's table is wrong about this.
+- **`regulator` was not retired.** §4 describes a regulator landing screen, §2's token
+  table omitted the role, and `auth.tsx` restored it. Migration `0019` retired it;
+  migration `0022` brought it back with a narrower job — accept or reject what a data
+  submitter files, plus (from 2026-08-25) run a screening. It may not publish, ingest,
+  administer, or read the audit log.
+
+### What R15 changed
+
+Every screen had converged on two shapes: a `grid-4` of tiles, and a long table. Both are
+correct and neither answers a question at a glance. Three shared readouts now carry that
+work, defined in `components/instruments.tsx` with `styles/instruments.css`:
+
+| Readout | Replaces | Rule it encodes |
+|---|---|---|
+| **Determinand scale** | a row in a parameter table | draws the IS 10500 acceptable/permissible marks the value is judged against; the track ends at 2× the governing limit and off-scale values pin to the end rather than clamping silently; `not_tested` renders a dashed empty channel with NO marker, because a marker at zero is a reading |
+| **Composition bar** | a `grid-4` of counts | proportion, with the never-analysed share HATCHED so an unmeasured share reads as a different kind of thing from a measured one |
+| **Statement** | the tile wall at the top of a screen | one sentence naming what the screen is for, with the figures beneath it as a reading rather than eight equally-weighted boxes |
+
+Plus a work queue, a ranked bar, a coverage grid (four steps, per-column scaling, counts
+still printed), a freshness chip, and the citizen verdict block.
+
+Screens restructured: **Overview** (five role variants, `regulator` split out into its
+own), **My Area**, **Water Quality**, **Data & Gaps**. `/console` was deliberately left
+alone — it was already map-first and its rules are §§5–5c above.
+
+### Four defects found by pulling the screens apart
+
+1. **`--role-regulator` was undefined** while `auth.tsx` referenced it. An undefined
+   custom property is invalid at computed-value time, which resolves per property: the
+   role pill (inherited `color`) fell back to `--text`, and the avatar (non-inherited
+   `background`) fell back to `transparent`, putting `--on-accent` near-black text on the
+   near-black panel. A regulator's account button was invisible. Token added at `#a78bfa`
+   — measured in-browser at 6.5:1 as text on `--panel` and 7.0:1 as a fill behind
+   `--on-accent`.
+2. **`regulator` rendered the admin screen**, issuing `GET /users` (403 on every sign-in)
+   and offering a tile routing to `/admin`, which the guard then refused.
+3. **The `/health` chip could never have worked.** It fetched a bare `/health`, but the
+   API is same-origin only under `/api/*` — the Vite proxy and `run_worker_first` both
+   route that prefix and nothing else — so it received the SPA's own index.html and
+   `.json()` threw. It had always shown an amber "API unknown": a reported fault that did
+   not exist. Replaced with model state from `/model-ops/model`.
+4. **A stale `Planned` card** on Data & Gaps claimed the monitoring-plan optimisation was
+   not implemented, directly below the section that implements it.
+
+### Two API inconsistencies the UI first worked around, then had fixed
+
+Both were named on screen in the first pass rather than smoothed over, and both
+were fixed in the backend the same day. Recorded here because the workaround and
+the fix are different states and the code comments reference both.
+
+- **`GET /citizen/my-area` banded on uranium ALONE**, while `/public/risk/*` had
+  banded on uranium, nitrate and fluoride since 2026-08-25. The same block could
+  read "Low concern" in My Area and "High concern" on the public map, correctly,
+  on one dataset. The UI's first response was to state which determinand its
+  verdict rested on. The rule now lives once in
+  `app/services/health_bands.py`, both endpoints apply it, and My Area draws all
+  three determinands against their published limits instead of one. See
+  `docs/LIMITATIONS.md` §4f.
+- **`iron` was missing `health=True`** in `water_quality.py`'s `STANDARD`, though
+  the interpretation string the same module returns names it in the health set.
+  Fixed; iron now groups with the other four health determinands on the
+  water-quality screen.
+
+While fixing the first, two further copies of the same split surfaced: `_explain`
+was uranium-only prose captioning a multi-determinand band on three handlers
+(deleted), and the `Not tested` band was unreachable in the SQL ladder because
+`health_tests = 0` already implied `max_u IS NULL` (now tested on `samples = 0`).
+
+### One frontend rule that came out of the fix
+
+`undefined` and `null` are different findings on a citizen surface and the code
+distinguishes them. `null` means the server looked and nothing was analysed —
+draw the gap. `undefined` means the response never carried the field, which is
+what an older API returns, and drawing "Not tested" for it would **invent** a
+monitoring gap. A fabricated gap is a false statement even though it errs toward
+caution, so My Area renders a determinand's scale only when the field is present.

@@ -62,13 +62,38 @@
   --scrim: rgba(6, 7, 10, .66);
 
   /* Role identity. Distinct hues so a screenshot is unambiguous about who is
-     looking. `regulator` was RETIRED from the application vocabulary in R7
-     (migration 0019) and has no token here — a colour for a role that cannot
-     sign in is an invitation to reintroduce it. */
-  --role-admin:   #f2555a;
-  --role-analyst: #3d7eff;
-  --role-field:   #3ecf8e;
-  --role-citizen: #f5a524;
+     looking — and screenshots of this product end up in audit records, so two
+     roles sharing a hue is a real cost, not a cosmetic one.
+
+     `--role-regulator` WAS ABSENT, and the comment that stood here explained
+     why: R7 retired the role in migration `0019`, and a colour for a role that
+     cannot sign in invites reintroducing it. Migration `0022` then RESTORED
+     `regulator` with a narrower job — deciding on field-officer submissions,
+     reading broadly, writing nothing else — and the token was never added back.
+
+     That was not a cosmetic omission. `auth.tsx` still mapped the role to
+     `var(--role-regulator)`, and an undefined custom property is invalid at
+     computed-value time, which resolves DIFFERENTLY per property:
+
+       · `.role-pill` uses it as `color`, an inherited property, so the pill
+         fell back to `--text` and a regulator's identity chip was
+         indistinguishable from ordinary text.
+       · `.avatar` uses it as `background`, which is NOT inherited, so it fell
+         back to `transparent`. With the avatar's own `color: var(--on-accent)`
+         (#05101f) that put near-black text on the near-black `--panel`: the
+         account button was invisible, with nothing anywhere reporting a fault.
+
+     Violet because it is the only family carrying no CHROME meaning yet. It is
+     used on the map for the ML envelope and the fracture-strike ticks, but role
+     colour never leaves the header — a 30px avatar and a text chip — so the two
+     vocabularies do not share a visual field. Contrast is checked both ways a
+     role token is used: 6.5:1 as text on `--panel`, and 7.0:1 as a fill behind
+     `--on-accent`. Both clear AA; keep any replacement above 4.5:1 on both. */
+  --role-admin:     #f2555a;
+  --role-regulator: #a78bfa;
+  --role-analyst:   #3d7eff;
+  --role-field:     #3ecf8e;
+  --role-citizen:   #f5a524;
 
   /* ── risk bands ─────────────────────────────────────────────────────
      One vocabulary, used by chips, lists, legends and map geometry alike.

@@ -446,10 +446,21 @@ async def test_sampled_but_not_for_uranium_is_not_called_unsampled(
     area = (await client.get("/api/v1/citizen/my-area", headers=_tok(tok))).json()
     b = next(x for x in area["blocks"] if x["id"] == a_block["id"])
 
-    assert b["band"] == "No data"
+    # THE BAND IS NOW "Not tested", NOT "No data" — a strengthening, not a
+    # relaxation. 2026-08-26 put this endpoint on the same rule as the public
+    # map, which has always had a separate band for "sampled, but nothing was
+    # analysed". That is a different failure from "nobody has been here", and it
+    # has a different fix: one needs a lab determination on a sample that
+    # already exists, the other needs a well. What must not change, and is
+    # asserted below exactly as before, is that neither may read as a pass.
+    assert b["band"] == "Not tested"
     assert b["samples"] > 0, "fixture did not create a sample"
     # It must NOT claim the block is unsampled while reporting samples.
-    assert "No groundwater sample from this block" not in b["what_it_means"], (
+    assert "No groundwater sample" not in b["what_it_means"], (
         "the block reports samples and simultaneously says none exist")
-    assert "none was analysed for uranium" in b["what_it_means"]
+    assert "no groundwater samples have been collected" not in b["what_it_means"].lower(), (
+        "the block reports samples and simultaneously says none exist")
+    # It must say what was not analysed, naming the determinands.
+    assert "not analysed" in b["what_it_means"] or "none of those samples" in b["what_it_means"]
+    assert "uranium" in b["what_it_means"]
     assert "not a clean result" in b["what_it_means"]

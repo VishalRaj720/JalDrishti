@@ -315,9 +315,34 @@ export interface Advisory {
   withdrawn_at: string | null;
 }
 
+/**
+ * A district as the public surface sees it.
+ *
+ * THE FOUR FIELDS ADDED 2026-08-26 WERE ALWAYS IN THE RESPONSE. `/public/risk/
+ * districts` has banded on uranium, nitrate AND fluoride since 2026-08-25 and
+ * has returned the driver, the two other maxima and the never-analysed list
+ * alongside the band the whole time. This type declared six fields, so every
+ * caller silently discarded the rest — which meant the UI could tell a reader a
+ * district was "High concern" and had no way to say what made it one.
+ *
+ * They are OPTIONAL rather than required. Nothing about the endpoint changed;
+ * only this description of it did, and a required field would make an older
+ * cached response a type error rather than a missing caption.
+ *
+ * `untested_health` is the load-bearing one. Arsenic and iron are 0 % populated
+ * statewide, so the server lists them unconditionally — a "Low concern" band
+ * here means "clean for the ones we happened to measure", and this array is how
+ * a screen says so instead of implying otherwise.
+ */
 export interface PublicDistrictRisk {
   id: string; name: string; wells: number; samples: number;
   max_uranium_ppb: number | null; band: string;
+  /** Which determinand set the band — "uranium" | "nitrate" | "fluoride" | null. */
+  band_driver?: string | null;
+  max_nitrate_mg_l?: number | null;
+  max_fluoride_mg_l?: number | null;
+  /** Health determinands never analysed here. Always includes arsenic and iron. */
+  untested_health?: string[];
 }
 
 // ── the ML engine, proxied under /api/v1/ml ──────────────────────────
@@ -438,17 +463,49 @@ export interface CitizenAlert {
   is_read: boolean;
 }
 
+/**
+ * One followed block, as the citizen surface reports it.
+ *
+ * BANDED ON THREE DETERMINANDS SINCE 2026-08-26, not on uranium alone.
+ * `/citizen/my-area` used to run its own uranium-only ladder while the public
+ * map judged uranium, nitrate and fluoride — so the same block could read "Low
+ * concern" here and "High concern" there, both correct against the rule each
+ * had been given. Both now apply `services/health_bands.py`, and the extra
+ * fields below are what that shared rule already computed and this endpoint
+ * previously threw away.
+ */
 export interface MyAreaBlock {
   id: string; name: string; district: string | null;
   wells: number; samples: number;
-  max_uranium_ppb: number | null; last_sampled: string | null;
-  band: string; what_it_means: string;
+  max_uranium_ppb: number | null;
+  max_nitrate_mg_l?: number | null;
+  max_fluoride_mg_l?: number | null;
+  last_sampled: string | null;
+  band: string;
+  /** Which determinand set the band — "uranium" | "nitrate" | "fluoride" | null. */
+  band_driver?: string | null;
+  /** Health determinands never analysed here. Always includes arsenic and iron. */
+  untested_health?: string[];
+  what_it_means: string;
+}
+
+/** The limits the bands are drawn against, served rather than hard-coded.
+ *  The first three names match `/public/risk/at` exactly. */
+export interface HealthLimits {
+  uranium_ppb: number;
+  nitrate_mg_l: number;
+  /** Fluoride's PERMISSIBLE limit — tolerated only where no other source exists. */
+  fluoride_mg_l: number;
+  /** Fluoride's acceptable limit. The only determinand here with a real band
+   *  between two limits, so a client drawing that band needs both numbers. */
+  fluoride_acceptable_mg_l: number;
 }
 
 export interface MyArea {
   blocks: MyAreaBlock[];
   unread: number;
   safe_limit_ppb?: number;
+  limits?: HealthLimits;
   what_this_is: string;
 }
 
