@@ -256,6 +256,21 @@ SELECT count(*) FROM pg_policies WHERE schemaname = 'public';   -- expect 21
   | `DOCS_ENABLED`                | `false`                                                       |
   | `HSTS_ENABLED`                | `true`                                                        |
   | `CORS_ORIGINS`                | your final portal origin, e.g. `https://jaldrishti.pages.dev` |
+  | `PORTAL_URL`                  | the same origin — used in alert emails' "open the portal" link |
+  | `SMTP_HOST`                   | `smtp-relay.brevo.com` (see step 4b)                          |
+  | `SMTP_PORT`                   | `587`                                                         |
+  | `SMTP_USER`                   | your Brevo account email                                      |
+  | `SMTP_PASSWORD`               | the Brevo **SMTP key** from *SMTP & API → SMTP*, not your login password |
+  | `ALERT_FROM_EMAIL`            | the sender you verified in Brevo (*Senders & IP*)             |
+  | `ALERT_SCAN_INTERVAL_HOURS`   | `24`                                                          |
+
+   **4b. Alert email (R16).** Sign up at [brevo.com](https://www.brevo.com)
+   (free: 300 emails/day, any recipient once a sender is verified). Under
+   *Senders & IP → Senders*, add and verify the address you will send from.
+   Under *SMTP & API → SMTP*, generate an SMTP key. Those two values are
+   `ALERT_FROM_EMAIL` and `SMTP_PASSWORD` above. Until they are set the API
+   starts fine, alerts reach the portal inbox, and *Administration → Alert
+   delivery* reads "Email not configured" with the count that is waiting.
 
    Do **not** set `MIGRATION_DATABASE_URL` here. The running API has no DDL to
    do, and withholding it means a compromised process cannot drop a policy that

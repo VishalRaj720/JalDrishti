@@ -8,10 +8,11 @@ The rule this file exists to enforce: *if a model misses a threshold, report it 
 than moving the threshold.* Nothing below has been softened to make the project look
 finished.
 
-**Last consolidated:** 2026-08-25. Sources: the ML pipeline readiness review
+**Last consolidated:** 2026-09-16. Sources: the ML pipeline readiness review
 (2026-08-12), the R10 audit (2026-08-19), the **R13 deployment-readiness audit
-(2026-08-24)** and the **R14 pre-deployment changes (2026-08-25)**, which reviewed the whole repository against the proposal, swept
-every endpoint against every role, and drove the portal end to end. The full chronological review record — including findings
+(2026-08-24)**, the **R14 pre-deployment changes (2026-08-25)**, R15 (2026-08-26)
+and **R16 (2026-09-16)**, which reviewed the deployed portal against the
+proposal's deliverables and the eight monthly reports. The full chronological review record — including findings
 that were later **retracted**, which is why it is kept rather than summarised — lives in
 `docs/local/audit-record/` and is not tracked in git.
 
@@ -515,6 +516,70 @@ Jharkhand has been cleared for either.
 
 ---
 
+## 4g. R16 (2026-09-16) — the alert system had every gate and no exit
+
+Found while reviewing the deployed portal against the proposal, whose third
+deliverable reads *"a user-friendly interface for stakeholders to input data and
+receive vulnerability assessments **and alerts**"*.
+
+**What was true on the deployed database.** Publication raised the right alerts
+for the right blocks (§1c, §4a, §4e), and wrote them to a table a resident could
+read only by signing in, opening the bell, and having earlier *followed* the
+block that later turned out to be affected. The Alerts screen said so in its
+subtitle — *"this portal does not send SMS or email."* `PRODUCT_DESIGN.md`
+§4.4 C3 had specified email delivery; it had never been built. Registration
+took a username, an email and a password and nothing about where the person
+lived. The measured-exceedance scan had **never been run** on the deployed
+database: 32 wells over a health limit, zero alerts. The Jaduguda site had no
+`injection_start_date`, so the breach-due alert could never count. Three sites
+named `Isr1`, `Try1` and `try2` sat on the public map.
+
+**What changed** (migration `0025`, `services/notify.py`, `main.py`):
+
+* `users.home_block_id` — registration asks where the person lives (block by
+  name, or a point resolved by `ST_Contains`) and subscribes the account to it
+  in the same transaction. A point outside every block is a 422, not an account
+  with no area.
+* `alert_deliveries` — one row per (alert, user, channel) attempt with status
+  and address. The unique index makes delivery idempotent; the status column
+  makes a failed relay visible. RLS-scoped to the row's own user.
+* Email via plain SMTP, stdlib in a thread, no dependency. Publication, the
+  admin scans and the scheduler all call `deliver_pending`. With `SMTP_HOST`
+  unset it sends nothing, records nothing, and reports the backlog — a visible
+  number on the Administration screen rather than a silent no-op, which is the
+  fourth time this codebase has needed that cure.
+* An in-process scheduler runs the measured scan and delivery every
+  `ALERT_SCAN_INTERVAL_HOURS`. **The breach-due scan is deliberately not
+  automated**: it is dry-run by default for a stated reason (§4e), and the
+  Administration screen shows when one is due.
+* `/public/risk/blocks/search`, `/blocks/at` and `/public/risk/advisories` are
+  unauthenticated — what registration needs before an account exists, and what
+  the front page shows before anyone signs in. Published text only; the
+  `advisories_read` policy refuses a draft before the code sees it.
+* `scripts/seed_demo_story` puts one complete story into an empty deployment,
+  through the service layer, as the single admin loaded by role.
+
+**What is still true, and must be said:**
+
+* **No SMS.** Email only. A resident without email is reached only through the
+  portal, and the proposal's "local communities" include people with neither.
+* **Email requires a provider the operator configures.** The code is done; the
+  channel is open only once `SMTP_*` and a verified sender are set on the host.
+  Until then the Administration screen says "Email not configured" and counts
+  what is waiting.
+* **Demo addresses on `.local` are skipped**, not sent, so the four README
+  accounts never receive anything — a real address does.
+* **The scheduler is in-process.** On a host that sleeps the API (Render's free
+  tier), it runs only while the API is awake. The backlog count is how you tell.
+* **The CARTO basemaps had begun watermarking every tile** ("API KEY REQUIRED")
+  for browser requests while serving clean tiles to `curl`, so nothing in the
+  code looked wrong. Replaced with OpenStreetMap and Esri sources, verified
+  with browser-shaped headers. Keyless remains the rule.
+* The portal's root is now a public front page, and the theme is light by
+  default with dark one click away. Neither changes a number.
+
+---
+
 ## 4a. The aquifer-reach alert, and what bounds it
 
 Publishing now raises a second kind of alert — `aquifer_pathway` — for blocks
@@ -598,14 +663,15 @@ and the engine rate limit is per host, so every user behind a gateway shares one
 Written down because they are the ones most likely to be overstated in a report or a
 presentation:
 
-- **Not "real-time".** There is no sensor ingest, no telemetry, no closed loop.
-  The proposal's CPS framing is **not satisfied** by what exists; this is a
+- **Not "real-time".** There is no sensor ingest and no telemetry. This is a
   screening and preparedness tool over historical CGWB data. R13 considered
   building a telemetry-ingest contract fed by a replay of the existing series and
   **deliberately did not**: a 2013-2021 replay dressed as a live feed would be
   the single change in this project most likely to be read as a capability it
-  does not have. The honest position is that this deliverable is unmet, not
-  partially met.
+  does not have. **What R16 did close is the other half of the CPS claim** —
+  threshold → alert → notification → acknowledgement now runs end to end on the
+  manual/CGWB record (§4g). The sensing layer remains a 415-station manual
+  network; say "CPS-ready decision support", never "a live CPS loop".
 - **The level trends are not a forecast.** Theil-Sen describes what the
   measurements did between 2013 and 2021. Nothing is extrapolated forward, and a
   station with fewer than 8 readings or under 3 years of record gets no trend at

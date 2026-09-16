@@ -196,6 +196,10 @@ manager, never through a committed file.
 | `METRICS_TOKEN` | Bearer token for `/metrics`. With `APP_ENV=production` and no token, metrics are **not mounted at all** |
 | `HSTS_ENABLED` | Default false. Turn it on **only** once TLS terminates in front of the service — sent over plain HTTP it pins browsers to a scheme the host cannot answer |
 | `ALLOW_INERT_RLS` | Escape hatch for the row-level-security startup check. Setting it is a decision to write down, not a convenience |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_STARTTLS` | **R16 — alert email.** Plain SMTP so the provider is a deployment choice. Brevo: `smtp-relay.brevo.com`, `587`, your Brevo login, the SMTP key (not the account password), `true`. Unset → alerts still land in the portal inbox and the Administration screen shows how many are waiting |
+| `ALERT_FROM_EMAIL`, `ALERT_FROM_NAME` | The sender. **Must be an address the provider has verified**, or the relay refuses it and every delivery records `failed` |
+| `PORTAL_URL` | The portal's public origin, e.g. `https://jaldrishti.letsmailvishal111.workers.dev`. Only used in the email's "open in the portal" link — the API never learns its own front-end origin otherwise |
+| `ALERT_SCAN_INTERVAL_HOURS` | Default `24`. The in-process scheduler runs the measured-exceedance scan and delivery this often; `0` disables it and leaves the admin buttons |
 
 ### The startup refuses to run a misconfigured production
 

@@ -65,7 +65,7 @@ by name (`review2.md V-8`) as stable identifiers.
 | `regulator` | Regulator | Decides on what a field officer submits — approve or reject. **Runs the model** (R14): pin, predict, preview, lifecycle, sweep, scenarios, site registration. Cannot publish to citizens, write datasets, operate the model or manage accounts |
 | `analyst` | Analyst | Registers sites, runs the engine, saves scenarios, proposes publications |
 | `field_officer` | Data Submitter | Submits uranium-ore occurrences and observations for review |
-| `citizen` | Resident | Measured results for their area, published advisories, alerts. No coordinates, no model internals |
+| `citizen` | Resident | Measured results for their area, published advisories, alerts — in the portal and **by email** (R16). Registers with a home block, so the account follows its own area from the start. No coordinates, no model internals |
 
 `regulator` was retired in migration `0019` and **restored in `0022`** with a
 narrower, real job. The reason merging it into `admin` was wrong: the person who
@@ -176,6 +176,16 @@ uvicorn app.main:app --reload
 `seed` is idempotent: users dedupe by email, ISR points by name, geodata by file
 checksum. Swagger UI at `http://localhost:8000/docs`.
 
+```bash
+python -m scripts.seed_demo_story          # optional: one published screening + real alerts
+```
+
+`seed_demo_story` (R16) puts one complete story into an otherwise empty
+deployment: removes throwaway sites, runs the engine for the Jaduguda site,
+proposes and publishes as the single admin (loaded by role from the database —
+it never takes a password), runs the measured-exceedance scan, delivers, and
+gives the demo citizen a home block. Idempotent; `--dry-run` reports only.
+
 Routes under `/api/v1`: `/auth`, `/users`, `/districts`, `/isr-points`,
 `/simulations`, `/preview`, `/lifecycle`, `/scenarios`, `/advisories`,
 `/citizen`, `/public/risk`, `/field-observations`, `/data-gaps`, `/dataset-sync`,
@@ -219,7 +229,10 @@ Needs the backend on :8000 — Vite proxies `/api` to it.
 cd frontend/portal && npm install && npm run dev
 ```
 
-Open `http://localhost:5173`. The **Console** is the main working surface: three
+Open `http://localhost:5173`. The root is a **public front page** (R16): live
+figures from the public record, the district map, the published screenings and
+the premise, with sign-in and registration behind it. Signed in, the **Console**
+is the main working surface: three
 basemaps, every layer toggleable, and an ISR/District mode toggle that decides what a
 click means. In ISR mode a click **anywhere in Jharkhand** resolves the hydrogeology
 there, runs the engine live with the plume drawn on the map, and offers to register the
@@ -293,8 +306,7 @@ JalDrishti/
 ├── ml_pipeline/          The engine: physics, synthetic generator, ML, dashboard API
 ├── backend/              FastAPI app, alembic migrations, seed, tests
 ├── frontend/
-│   ├── portal/           The portal SPA — Vite + React + TS + Leaflet (21 screens)
-│   ├── JalDrishti.html   Original static prototype, kept as visual reference
+│   ├── portal/           The portal SPA — Vite + React + TS + Leaflet (22 screens)
 │   └── ml_pipeline/      Vanilla JS + Leaflet UI for the engine's own dashboard
 ├── Datasets/             Jharkhand geology, water quality/levels, rivers, DEM, NAQUIM refs
 ├── fetch_data/           Download/ETL scripts for those datasets
