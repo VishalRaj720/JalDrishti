@@ -2,6 +2,7 @@
 JalDrishti FastAPI Application
 Groundwater contamination impact assessment platform.
 """
+import asyncio
 import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
@@ -139,6 +140,59 @@ async def _reap_orphaned_runs() -> None:
         logger.warning(f"Could not reap orphaned simulation runs: {exc}")
 
 
+async def _alert_cycle() -> dict:
+    """One pass: scan the measured record, then deliver whatever is undelivered.
+
+    The breach-due scan is NOT here. It is the only alert that fires on elapsed
+    time rather than on an event, and `POST /citizen/alerts/scan-breach-due`
+    defaults to a dry run for exactly that reason -- the operator should see
+    who would be told before anyone is. Automating it would undo that decision
+    quietly, so it stays a deliberate admin act and the Administration screen
+    shows when one is due.
+    """
+    from app.database import AsyncSessionLocal, set_rls_context
+    from app.services.alerts import AlertService
+    from app.services.notify import deliver_pending
+    async with AsyncSessionLocal() as db:
+        await set_rls_context(db, bypass=True)
+        scan = await AlertService(db).scan_measured_exceedances()
+    delivery = await deliver_pending()
+    return {"scan": scan, "delivery": delivery}
+
+
+async def _alert_scheduler() -> None:
+    """Run `_alert_cycle` every ALERT_SCAN_INTERVAL_HOURS, forever.
+
+    R16. The scans used to be admin buttons only, on the argument that "a cron
+    job that silently stops is worse than a button nobody pressed". That
+    argument was right about silence and wrong about the remedy: on the
+    deployed database the button had never been pressed, thirty-two wells sat
+    over a health limit, and the alerts table was empty. So both now exist --
+    the buttons for a deliberate run, and this loop so a resident is not
+    waiting on an operator's memory. The loop logs every pass, and
+    `GET /citizen/alerts/delivery-status` reports the backlog, so a stopped
+    loop is visible as a growing number rather than as nothing.
+
+    Runs in-process, like the simulation tasks: this deployment has no worker
+    tier. The first pass waits a minute so a cold start is not slowed by it.
+    """
+    interval = float(settings.ALERT_SCAN_INTERVAL_HOURS or 0) * 3600.0
+    if interval <= 0:
+        logger.info("alert scheduler: disabled (ALERT_SCAN_INTERVAL_HOURS=0)")
+        return
+    await asyncio.sleep(60)
+    while True:
+        try:
+            out = await _alert_cycle()
+            logger.info(f"alert scheduler: {out['scan'].get('alerts_created', 0)} "
+                        f"new alert(s); delivery {out['delivery']}")
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 -- a failed pass must not end the loop
+            logger.error(f"alert scheduler pass failed: {exc}")
+        await asyncio.sleep(interval)
+
+
 def _enforce_production_secrets() -> None:
     """Refuse to start production on placeholder secrets.
 
@@ -170,7 +224,9 @@ async def lifespan(app: FastAPI):
     _enforce_production_secrets()
     await _warn_if_rls_is_inert()
     await _reap_orphaned_runs()
+    scheduler = asyncio.create_task(_alert_scheduler(), name="alert-scheduler")
     yield
+    scheduler.cancel()
     logger.info("Shutting down.")
 
 
