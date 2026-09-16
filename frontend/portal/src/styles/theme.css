@@ -29,6 +29,14 @@
  *   · BREAKPOINTS as named tokens, because the citizen surface is read on a
  *     phone and the staff console on a desktop, from one codebase.
  *
+ * R16: TWO THEMES, ONE TOKEN SET. `:root` below is the dark set the portal
+ * shipped with. `:root[data-theme="light"]` at the end of this block overrides
+ * the same names, and `src/theme.tsx` sets the attribute on <html>. Light is
+ * the default. No component reads a hex value; if one does, it is a bug in
+ * both themes. The shadows and the translucent map-overlay "glass" were the
+ * hardcoded rgba() values that made a light theme impossible before, so they
+ * are tokens now too (`--shadow-*`, `--glass`).
+ *
  * ACCENT CONTRAST, stated because it is easy to undo by accident. #3D7EFF is a
  * mid blue: excellent as a FILL with near-black text on it (~4.9:1), and
  * marginal as small TEXT on a dark surface (~4.4:1). So there are two tokens.
@@ -60,6 +68,15 @@
 
   /* Backdrop behind off-canvas panels on small screens. */
   --scrim: rgba(6, 7, 10, .66);
+
+  /* Elevation and glass. Dark surfaces need heavy shadows to separate at all;
+     light ones need a fraction of it or every card looks like it is floating. */
+  --shadow-md: 0 12px 34px rgba(0,0,0,.5);
+  --shadow-lg: 0 26px 60px rgba(0,0,0,.55);
+  --shadow-side: 0 0 40px rgba(0,0,0,.5);
+  --glass: rgba(15,16,19,.88);
+  --hero-glow: #171b22;
+  --on-danger: #fff;
 
   /* Role identity. Distinct hues so a screenshot is unambiguous about who is
      looking — and screenshots of this product end up in audit records, so two
@@ -115,15 +132,19 @@
   --s-8: 40px;
 
   /* ── type scale ─────────────────────────────────────────────────── */
-  --fs-2xs: 10px;   /* uppercase eyebrow labels only */
-  --fs-xs:  11px;   /* captions, legend rows, table headers */
-  --fs-sm:  12px;   /* secondary body, chips, muted notes */
-  --fs-base:13px;   /* body default */
-  --fs-md:  14px;   /* emphasised body, inputs */
-  --fs-lg:  16px;   /* card/drawer headings */
-  --fs-xl:  20px;   /* page titles */
-  --fs-2xl: 26px;   /* metric values, tile numbers */
-  --fs-3xl: 32px;   /* citizen hero numbers */
+  /* R16: one notch larger throughout. 13px body read fine on a 27-inch
+     monitor at arm's length and not at all from the back of a room, and
+     residents read this on phones. The scale keeps its ratios; the rail and
+     drawer widths below were widened to match. */
+  --fs-2xs: 10.5px; /* uppercase eyebrow labels only */
+  --fs-xs:  12px;   /* captions, legend rows, table headers */
+  --fs-sm:  13px;   /* secondary body, chips, muted notes */
+  --fs-base:14px;   /* body default */
+  --fs-md:  15px;   /* emphasised body, inputs */
+  --fs-lg:  17px;   /* card/drawer headings */
+  --fs-xl:  22px;   /* page titles */
+  --fs-2xl: 28px;   /* metric values, tile numbers */
+  --fs-3xl: 36px;   /* citizen hero numbers */
 
   --lh-tight: 1.2;
   --lh-snug:  1.4;
@@ -131,11 +152,12 @@
   --lh-loose: 1.7;   /* citizen prose — read by non-specialists */
 
   /* ── layout ─────────────────────────────────────────────────────── */
-  --header-h: 56px;
-  --rail-w:   340px;
-  --drawer-w: 460px;
+  --header-h: 58px;
+  --rail-w:   360px;
+  --drawer-w: 480px;
   --r-sm: 6px; --r-md: 8px; --r-lg: 11px; --r-pill: 999px;
-  --mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: "JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Minimum comfortable touch target. Applied to controls on coarse pointers
      rather than everywhere, so the desktop console stays dense. */
@@ -149,10 +171,48 @@
        --bp-xl  1280px  full three-column console                             */
 }
 
+/* ── LIGHT THEME (default; see src/theme.tsx) ─────────────────────── */
+:root[data-theme="light"] {
+  --bg:      #f5f6f8;
+  --panel:   #ffffff;
+  --card:    #ffffff;
+  --card2:   #f0f2f5;
+  --line:    #dfe3ea;
+  --text:    #161a21;
+  --muted:   #5b6573;
+
+  --accent:      #2563eb;
+  --accent-text: #1d4ed8;
+  --accent-soft: rgba(37,99,235,.10);
+  --accent-line: rgba(37,99,235,.38);
+  --on-accent:   #ffffff;
+
+  --danger:  #d12f35;
+  --warn:    #b45309;
+  --ok:      #15803d;
+  --frac:    #c2410c;
+  --porous:  #2563eb;
+
+  --scrim: rgba(20, 24, 31, .45);
+  --shadow-md: 0 10px 30px rgba(22,28,40,.14);
+  --shadow-lg: 0 24px 60px rgba(22,28,40,.18);
+  --shadow-side: 0 0 40px rgba(22,28,40,.16);
+  --glass: rgba(255,255,255,.92);
+  --hero-glow: #e6eefc;
+
+  --role-admin:     #c62828;
+  --role-regulator: #6d28d9;
+  --role-analyst:   #1d4ed8;
+  --role-field:     #15803d;
+  --role-citizen:   #b45309;
+}
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+html { color-scheme: dark; }
+html[data-theme="light"] { color-scheme: light; }
 body {
-  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--sans);
   font-size: var(--fs-md);
   line-height: var(--lh-base);
   background: var(--bg);
@@ -248,23 +308,26 @@ a { color: var(--accent-text); }
 .banner.danger { border-left-color: var(--danger); background: rgba(242,85,90,.09); }
 .banner.ok     { border-left-color: var(--ok);     background: rgba(62,207,142,.08); }
 
-button.btn {
+.btn {
   background: var(--card2); color: var(--text);
   border: 1px solid var(--line); border-radius: var(--r-sm);
   padding: 7px var(--s-3); font-size: var(--fs-sm); cursor: pointer;
-  font-family: inherit; transition: .15s;
+  font-family: inherit; transition: .15s; text-decoration: none; line-height: 1.3;
   display: inline-flex; align-items: center; gap: 6px; justify-content: center;
 }
-button.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); }
-button.btn.primary {
+/* Anchors styled as buttons (the landing page's calls to action). */
+a.btn { color: var(--text); }
+a.btn.primary { color: var(--on-accent); }
+.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); }
+.btn.primary {
   background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700;
 }
-button.btn.primary:hover:not(:disabled) { background: #5b93ff; color: var(--on-accent); }
-button.btn.ghost { background: transparent; }
-button.btn.danger { color: var(--danger); border-color: rgba(242,85,90,.4); }
-button.btn.danger:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
-button.btn:disabled { opacity: .45; cursor: not-allowed; }
-button.btn.lg { padding: 10px var(--s-4); font-size: var(--fs-base); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); color: var(--on-accent); }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--danger); border-color: rgba(242,85,90,.4); }
+.btn.danger:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.lg { padding: 10px var(--s-4); font-size: var(--fs-base); }
 
 .seg { display: flex; gap: var(--s-1); flex-wrap: wrap; }
 .seg button {
@@ -369,7 +432,7 @@ table.grid tr:last-child td { border-bottom: none; }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #3a3f48; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
 /* Screen-reader-only text, for the icon-only controls the console relies on. */
 .sr-only {
@@ -380,7 +443,7 @@ table.grid tr:last-child td { border-bottom: none; }
 /* On a coarse pointer every interactive control gets a real touch target.
    Scoped to the pointer type so the desktop console keeps its density. */
 @media (pointer: coarse) {
-  button.btn, .seg button, .demo-user, .rail-btn {
+  .btn, .seg button, .demo-user, .rail-btn {
     min-height: var(--touch);
   }
   input[type=text], input[type=email], input[type=password], input[type=number],

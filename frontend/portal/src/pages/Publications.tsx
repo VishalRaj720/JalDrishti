@@ -202,7 +202,7 @@ export default function Publications() {
         <p>
           {reviewer
             ? "Screenings proposed for the public. Publishing makes one visible to residents of the blocks its modelled footprint actually reaches — and puts your name on it."
-            : "Screenings you and your colleagues have proposed, and what a regulator decided. Publishing is a regulator decision."}
+            : "Screenings you and your colleagues have proposed, and what was decided. Publishing to residents is the administrator's decision alone; it alerts every block the modelled footprint reaches."}
         </p>
       </div>
 

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Role, type SyncStatus } from "../api/client";
 import {
   ROLE_COLOUR, ROLE_LABEL, canAdmin, canAudit, canPublish, canReview, canRunSim,
   canSubmit, isStaff, useAuth,
 } from "../auth";
+import { Icon, Mark } from "./icons";
+import { ThemeToggle } from "../theme";
 
 /**
  * The nav, grouped.
@@ -82,9 +84,8 @@ function sectionsFor(role: Role | undefined): NavGroup[] {
 /**
  * Unread alerts, on every screen.
  *
- * Delivery is in-portal only — no SMS, no email — so this bell is the entire
- * notification channel. If it is not visible everywhere, an alert about a well
- * over the safe limit reaches nobody.
+ * Since R16 alerts are also emailed, but the bell stays on every screen: a
+ * person who is signed in and reading is the person most likely to act on one.
  */
 function AlertBell() {
   const nav = useNavigate();
@@ -98,7 +99,7 @@ function AlertBell() {
   return (
     <button className="bell" onClick={() => nav("/alerts")}
             aria-label={n ? `${n} unread alerts` : "Alerts"}>
-      <span aria-hidden>🔔</span>
+      <Icon name="bell" size={17} />
       {n > 0 && <span className="count">{n > 99 ? "99+" : n}</span>}
     </button>
   );
@@ -120,7 +121,7 @@ function SyncPill() {
       title={`${data.message} ${data.note}`}
       onClick={() => nav("/data")}
     >
-      <span aria-hidden>{n ? "🟡" : "🟢"}</span>
+      <span className="dot" aria-hidden />
       <span>{n ? `${n} not in model` : "Model in sync"}</span>
     </button>
   );
@@ -160,15 +161,18 @@ export default function Shell() {
     <div className="shell">
       <header className="hdr">
         <button className="nav-btn" onClick={() => setNav((v) => !v)}
-                aria-label="Sections" aria-expanded={nav}>☰</button>
+                aria-label="Sections" aria-expanded={nav}>
+          <Icon name={nav ? "close" : "menu"} size={20} />
+        </button>
 
-        <div className="hdr-brand">
-          <div className="hdr-mark" aria-hidden>💧</div>
+        <Link to="/welcome" className="hdr-brand" title="Front page"
+              style={{ textDecoration: "none", color: "inherit" }}>
+          <Mark size={30} />
           <div>
             <div className="hdr-name">JalDrishti</div>
-            <div className="hdr-sub">ISR Groundwater Portal</div>
+            <div className="hdr-sub">Groundwater screening · Jharkhand</div>
           </div>
-        </div>
+        </Link>
 
         <nav className="hdr-nav">
           {sections.map((g) => (
@@ -186,7 +190,7 @@ export default function Shell() {
                   aria-expanded={openGroup === g.label}
                   aria-haspopup="true"
                 >
-                  {g.label}<span className="caret" aria-hidden>▾</span>
+                  {g.label}<Icon name="chevron" size={13} className="ico caret" />
                 </button>
                 {openGroup === g.label && (
                   <div className="nav-drop" role="menu">
@@ -205,6 +209,7 @@ export default function Shell() {
 
         <div className="hdr-right">
           {isStaff(me?.role) && <SyncPill />}
+          <ThemeToggle compact />
           <AlertBell />
           <span className="role-pill" style={{ color: colour }}>
             {me ? ROLE_LABEL[me.role] : "—"}

@@ -1,0 +1,167 @@
+/* JalDrishti portal — the front page, and the two R16 controls that ride on
+ * the same tokens (the block finder and the theme toggle).
+ *
+ * The landing page is a document, not an application surface: it scrolls,
+ * it has sections a reader jumps between, and its measure is the width of a
+ * paragraph rather than the width of a rail. So it gets its own layout rules
+ * instead of borrowing the console's, and everything below is bounded by
+ * `.landing` so none of it can leak into the app shell.
+ */
+
+.landing {
+  min-height: 100%; overflow-y: auto; background: var(--bg); color: var(--text);
+  font-size: var(--fs-md); line-height: var(--lh-base);
+  -webkit-font-smoothing: antialiased;
+}
+.landing section, .landing header, .landing footer {
+  padding-inline: clamp(16px, 4vw, 56px);
+}
+.landing h1, .landing h2, .landing h3 { margin: 0; letter-spacing: -.015em; line-height: var(--lh-tight); }
+.landing p { margin: 0; }
+.landing .eyebrow {
+  font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted);
+}
+.landing .accent { color: var(--accent-text); }
+.landing .ico { flex: 0 0 auto; }
+
+/* ── header ── */
+.ld-head {
+  position: sticky; top: 0; z-index: 20; height: var(--header-h);
+  display: flex; align-items: center; gap: var(--s-5);
+  background: var(--glass); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.ld-nav { display: flex; gap: 2px; flex: 1; min-width: 0; overflow: hidden; }
+.ld-nav a {
+  padding: 7px var(--s-3); border-radius: var(--r-sm); color: var(--muted);
+  text-decoration: none; font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
+}
+.ld-nav a:hover { color: var(--text); background: var(--card2); }
+@media (max-width: 900px) { .ld-nav { display: none; } }
+
+/* ── hero ── */
+.ld-hero {
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .9fr);
+  gap: clamp(24px, 4vw, 56px); align-items: center;
+  padding-block: clamp(36px, 7vw, 88px);
+  background:
+    radial-gradient(900px 520px at 12% -10%, var(--hero-glow) 0%, transparent 60%),
+    var(--bg);
+}
+.ld-hero h1 {
+  font-size: clamp(30px, 4.4vw, 52px); font-weight: 800; margin: 14px 0 18px;
+  max-width: 18ch;
+}
+.ld-hero .lede { font-size: clamp(15px, 1.35vw, 18px); line-height: 1.6; max-width: 58ch; color: var(--text); }
+.ld-hero .lede, .landing .ld-section-head p { color: var(--muted); }
+.ld-hero .lede { color: color-mix(in srgb, var(--text) 82%, var(--muted)); }
+
+.ld-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  padding: 16px; border: 1px solid var(--line); border-radius: 16px;
+  background: var(--panel); box-shadow: var(--shadow-lg);
+}
+.ld-stat { padding: 12px 14px; border-radius: var(--r-md); background: var(--card2); }
+.ld-stat .v { font-size: var(--fs-3xl); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.ld-stat .k { font-size: var(--fs-xs); color: var(--muted); margin-top: 6px; line-height: var(--lh-snug); }
+.ld-stat.danger .v { color: var(--danger); }
+.ld-stat-note { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--muted); padding: 2px 4px 0; }
+@media (max-width: 860px) {
+  .ld-hero { grid-template-columns: 1fr; }
+  .ld-hero h1 { max-width: none; }
+}
+
+/* ── premise ── */
+.ld-premise {
+  display: flex; gap: 14px; align-items: flex-start;
+  margin-inline: clamp(16px, 4vw, 56px); padding: 16px 18px !important;
+  border-radius: var(--r-lg); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 9%, var(--panel));
+  color: var(--text); line-height: var(--lh-base);
+}
+.ld-premise .ico { color: var(--warn); margin-top: 2px; }
+
+/* ── sections ── */
+.ld-section { padding-block: clamp(36px, 6vw, 72px); border-top: 1px solid var(--line); margin-top: clamp(28px, 5vw, 56px); }
+.ld-section:first-of-type { border-top: 0; }
+.ld-section-head { max-width: 72ch; margin-bottom: 22px; }
+.ld-section-head h2 { font-size: clamp(22px, 2.6vw, 30px); font-weight: 750; margin-bottom: 8px; }
+.ld-section-head p { font-size: var(--fs-md); line-height: var(--lh-base); }
+
+/* ── map ── */
+.ld-map-wrap {
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px;
+  border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--panel);
+}
+.ld-map { height: clamp(360px, 52vh, 560px); min-width: 0; }
+.ld-map-side { padding: 18px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.ld-band { font-size: var(--fs-xl); font-weight: 800; }
+.ld-dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; font-size: var(--fs-sm); }
+.ld-dl dt { color: var(--muted); }
+.ld-dl dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.ld-legend { display: grid; gap: 6px; margin-top: 12px; font-size: var(--fs-sm); }
+.ld-legend .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; margin-right: 8px; }
+@media (max-width: 860px) {
+  .ld-map-wrap { grid-template-columns: 1fr; }
+  .ld-map-side { border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* ── how it works ── */
+.ld-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.ld-step { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.ld-step .n {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-text); margin-bottom: 12px;
+}
+.ld-step h3 { font-size: var(--fs-lg); font-weight: 700; margin-bottom: 8px; }
+.ld-step p { color: var(--muted); font-size: var(--fs-sm); line-height: var(--lh-base); }
+@media (max-width: 860px) { .ld-steps { grid-template-columns: 1fr; } }
+
+/* ── published ── */
+.ld-pubs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.ld-pub { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); display: grid; gap: 10px; }
+.ld-pub h3 { font-size: var(--fs-lg); font-weight: 700; }
+.ld-pub p { color: var(--muted); font-size: var(--fs-sm); line-height: var(--lh-base); }
+.ld-empty { padding: 20px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); }
+@media (max-width: 860px) { .ld-pubs { grid-template-columns: 1fr; } }
+
+/* ── roles ── */
+.ld-roles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.ld-role { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.ld-role h3 { font-size: var(--fs-md); font-weight: 700; margin: 6px 0 8px; }
+.ld-role p { color: var(--muted); font-size: var(--fs-xs); line-height: var(--lh-base); }
+@media (max-width: 1100px) { .ld-roles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .ld-roles { grid-template-columns: 1fr; } }
+
+/* ── what it is not ── */
+.ld-honest ul { margin: 0 0 14px; padding-left: 20px; max-width: 78ch; display: grid; gap: 10px; line-height: var(--lh-base); }
+.ld-honest li::marker { color: var(--warn); }
+.ld-honest code { font-family: var(--mono); font-size: var(--fs-xs); background: var(--card2); padding: 1px 6px; border-radius: 4px; }
+
+/* ── footer ── */
+.ld-foot {
+  padding-block: 26px; border-top: 1px solid var(--line); margin-top: 40px;
+  display: grid; gap: 8px; font-size: var(--fs-sm); color: var(--muted);
+}
+
+/* ── the block finder (registration + My Area) ─────────────────────── */
+.block-finder .row { gap: 8px; }
+.block-finder input { flex: 1; min-width: 0; }
+.block-finder .hint { font-size: var(--fs-2xs); color: var(--muted); margin-top: 6px; line-height: var(--lh-snug); }
+.block-finder .hint.danger { color: var(--danger); }
+.block-results {
+  margin-top: 8px; max-height: 220px; overflow-y: auto;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card);
+}
+.block-chosen {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: var(--r-md);
+}
+.block-chosen .ico { color: var(--accent-text); }
+.block-chosen .nm { font-weight: 600; font-size: var(--fs-base); }
+.block-chosen .mt { font-size: var(--fs-xs); color: var(--muted); }
+
+/* ── theme toggle ── */
+.theme-toggle { padding-inline: 9px; }
+.small-link { font-size: var(--fs-xs); }

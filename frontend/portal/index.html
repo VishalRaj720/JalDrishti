@@ -3,7 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JalDrishti — ISR Groundwater Monitoring Portal</title>
+    <meta name="description" content="JalDrishti — groundwater screening and monitoring for Jharkhand. Real CGWB measurements judged against IS 10500, and a physics-grounded model of how contamination from a hypothetical uranium in-situ recovery operation would spread. No ISR mine operates in Jharkhand." />
+    <meta name="color-scheme" content="light dark" />
+    <title>JalDrishti — Groundwater screening &amp; monitoring, Jharkhand</title>
+    <!--
+      Theme before paint. src/theme.tsx owns the choice; this only replays the
+      stored value so the first frame is not the wrong colour. Light by default.
+    -->
+    <script>
+      (function () {
+        var t = "light";
+        try { var v = localStorage.getItem("jaldrishti.theme"); if (v === "dark" || v === "light") t = v; } catch (e) {}
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   </head>
   <body>

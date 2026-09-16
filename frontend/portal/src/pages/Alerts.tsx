@@ -15,13 +15,13 @@
  * A resident who cannot tell them apart will either panic at the second or
  * ignore the first, and both failures would be ours.
  *
- * Delivery is in-portal only. There is no notification service, so the screen
- * says that plainly rather than implying an SMS is on its way.
+ * R16: alerts are ALSO emailed to the address on the account (services/
+ * notify.py), and this screen says so -- and says where to turn that off.
  */
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { api, type CitizenAlert } from "../api/client";
+import { api, citizen, type CitizenAlert } from "../api/client";
 import { Empty, ErrorNote, Loading } from "../components/bits";
 
 type Filter = "all" | "measured_exceedance" | "published_screening"
@@ -86,6 +86,8 @@ export default function Alerts() {
     },
   });
 
+  const profile = useQuery({ queryKey: ["citizen-me"], queryFn: citizen.me, retry: false });
+
   const alerts = inbox.data?.alerts ?? [];
   const measured = alerts.filter((a) => a.kind === "measured_exceedance").length;
 
@@ -94,16 +96,21 @@ export default function Alerts() {
       <div className="page-head">
         <h1>Your alerts</h1>
         <p>
-          For the areas you follow. Alerts appear here only — this portal does not
-          send SMS or email.
+          For the areas you follow.{" "}
+          {profile.data?.alert_email_opt_in === false
+            ? "Email delivery is turned off for your account; alerts appear here only."
+            : profile.data?.email
+              ? `New alerts are also emailed to ${profile.data.email}.`
+              : "New alerts are also emailed to the address on your account."}{" "}
+          Change that, or the areas you follow, from <a href="/my-area">My area</a>.
         </p>
       </div>
 
       {measured > 0 && filter !== "published_screening" && (
         <div className="banner danger" style={{ marginBottom: 14 }}>
           <strong>
-            {measured} well{measured === 1 ? "" : "s"} near you tested above the safe
-            limit for uranium.
+            {measured} well{measured === 1 ? "" : "s"} near you tested above a
+            drinking-water limit.
           </strong>{" "}
           These are real laboratory results from government sampling, not predictions.
         </div>

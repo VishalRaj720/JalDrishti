@@ -44,58 +44,81 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
-  api, type HealthLimits, type MyArea as MyAreaData, type MyAreaBlock,
-  type PublicAdvisory, type Subscription, type WqStatus,
+  api, citizen, type BlockRef, type HealthLimits, type MyArea as MyAreaData,
+  type MyAreaBlock, type PublicAdvisory, type Subscription, type WqStatus,
 } from "../api/client";
 import { Empty, ErrorNote, Loading } from "../components/bits";
+import BlockFinder from "../components/BlockFinder";
+import { Icon } from "../components/icons";
 import {
   DeterminandScale, Freshness, Readout, SectionHead, Verdict,
 } from "../components/instruments";
 
-function BlockPicker({ onDone }: { onDone: () => void }) {
+/**
+ * Follow an area. R16: the same finder registration uses, so "use my
+ * location" works here too. The FIRST area an account follows becomes its
+ * home block (`PUT /citizen/me/home`), which is what alert delivery keys on;
+ * later ones are plain follows.
+ */
+function BlockPicker({ onDone, asHome }: { onDone: () => void; asHome: boolean }) {
   const qc = useQueryClient();
-  const [q, setQ] = useState("");
-
-  const results = useQuery({
-    queryKey: ["citizen-blocks", q],
-    queryFn: () => api.get<Array<{ id: string; name: string; district: string | null }>>(
-      `/citizen/blocks?q=${encodeURIComponent(q)}&limit=30`),
-  });
+  const [chosen, setChosen] = useState<BlockRef | null>(null);
 
   const add = useMutation({
-    mutationFn: (block_id: string) => api.post("/citizen/subscriptions", { block_id }),
+    mutationFn: (b: BlockRef) => asHome
+      ? citizen.setHome({ block_id: b.id })
+      : api.post("/citizen/subscriptions", { block_id: b.id }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-area"] });
       qc.invalidateQueries({ queryKey: ["citizen-subs"] });
+      qc.invalidateQueries({ queryKey: ["citizen-me"] });
       onDone();
     },
   });
 
   return (
     <div className="card">
-      <div className="card-title">Find your area</div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} autoFocus
-             placeholder="Type your block or district name…"
-             aria-label="Search for your block" />
+      <div className="card-title">{asHome ? "Where do you live?" : "Follow another area"}</div>
+      <BlockFinder value={chosen} onChange={setChosen} autoFocus />
       <div className="muted small" style={{ margin: "8px 0" }}>
         Choose the <strong>block</strong> you live in. Blocks are the smallest areas
         this data covers — there is no village-level groundwater dataset available,
         so we do not pretend to offer one.
       </div>
-      {results.isLoading && <Loading />}
-      {results.data?.length === 0 && (
-        <div className="muted small">No block matches “{q}”.</div>
-      )}
-      {results.data?.map((b) => (
-        <button key={b.id} className="list-item" onClick={() => add.mutate(b.id)}>
-          <div>
-            <div className="nm">{b.name}</div>
-            <div className="mt">{b.district ?? ""}</div>
-          </div>
-          <span className="chip info">Follow</span>
+      <div className="row" style={{ gap: 8 }}>
+        <button className="btn primary" disabled={!chosen || add.isPending}
+                onClick={() => chosen && add.mutate(chosen)}>
+          {add.isPending ? "Following…" : asHome ? "Set as my area" : "Follow"}
         </button>
-      ))}
+        <button className="btn ghost" onClick={onDone}>Cancel</button>
+      </div>
       <ErrorNote error={add.error} />
+    </div>
+  );
+}
+
+/** Email delivery on or off, with the address it goes to. */
+function DeliveryPreference() {
+  const qc = useQueryClient();
+  const me = useQuery({ queryKey: ["citizen-me"], queryFn: citizen.me });
+  const set = useMutation({
+    mutationFn: (on: boolean) => citizen.setPreferences(on),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["citizen-me"] }),
+  });
+  if (!me.data) return null;
+  const on = me.data.alert_email_opt_in;
+  return (
+    <div className="row wrap" style={{ gap: 10, marginTop: 10 }}>
+      <Icon name="mail" size={16} />
+      <span className="small">
+        {on ? <>Alerts are emailed to <strong>{me.data.email}</strong>.</>
+            : <>Email delivery is <strong>off</strong>; alerts appear here only.</>}
+      </span>
+      <button className="btn ghost" disabled={set.isPending}
+              onClick={() => set.mutate(!on)}>
+        {on ? "Turn email off" : "Turn email on"}
+      </button>
+      <ErrorNote error={set.error} />
     </div>
   );
 }
@@ -314,7 +337,7 @@ export default function MyArea() {
         </div>
       )}
 
-      {picking && <BlockPicker onDone={() => setPicking(false)} />}
+      {picking && <BlockPicker onDone={() => setPicking(false)} asHome={blocks.length === 0} />}
 
       {/* ── MEASURED FIRST. This is real, and it is about water people drink. ── */}
       {blocks.map((b) => (
@@ -386,13 +409,14 @@ export default function MyArea() {
             )}
           </div>
           <div className="prose muted" style={{ marginBottom: 10 }}>
-            You are told here when a well near you tests above the safe limit, and when
-            an assessment is published for your area. Alerts appear in this portal only
-            — we do not send SMS or email.
+            You are told here when a well near you tests above a drinking-water limit,
+            and when a screening is published for your area — and the same alert is
+            emailed to you, so you do not have to be signed in to hear about it.
           </div>
           <button className="btn primary" onClick={() => nav("/alerts")}>
             Open my alerts
           </button>
+          <DeliveryPreference />
         </div>
       )}
 
