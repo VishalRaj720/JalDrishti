@@ -111,18 +111,19 @@ async def ingest_water_quality_csv(
 
 # ── Data-quality report ───────────────────────────────────────────────────────
 
-_REPORT_PATH = Path(__file__).resolve().parents[3] / "reports" / "data_quality_report.json"
 
 
 @router.get("/data-quality-report")
-async def get_data_quality_report(_=Depends(require_any_role)):
-    """Return the most recent seed-script data-quality report (if present)."""
-    if not _REPORT_PATH.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="No data_quality_report.json yet. Run `python -m scripts.seed`.",
-        )
-    try:
-        return json.loads(_REPORT_PATH.read_text())
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Corrupt report file: {e}")
+async def get_data_quality_report(db: AsyncSession = Depends(get_db),
+                                  _=Depends(require_any_role)):
+    """The data-quality report, computed from the database this API serves.
+
+    R16: this used to read `reports/data_quality_report.json`, a file the seed
+    script writes on whichever machine ran it. The deployed database was seeded
+    from a laptop, so the deployed API had no file and told the administrator to
+    run the seed -- on a host where the result would be discarded at the next
+    deploy. Counts and null-rates over existing tables are cheaper to compute
+    than to store, and computed they cannot describe a different database.
+    """
+    from app.services.data_quality import build_quality_report
+    return await build_quality_report(db)

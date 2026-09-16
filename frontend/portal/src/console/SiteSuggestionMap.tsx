@@ -33,8 +33,8 @@ export default function SiteSuggestionMap({ blockId }: { blockId: string }) {
   useEffect(() => {
     if (!el.current || map.current) return;
     const m = L.map(el.current, { zoomControl: true, scrollWheelZoom: false });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: "© OpenStreetMap, © CARTO", maxZoom: 19,
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors", maxZoom: 19,
     }).addTo(m);
     layer.current = L.layerGroup().addTo(m);
     map.current = m;

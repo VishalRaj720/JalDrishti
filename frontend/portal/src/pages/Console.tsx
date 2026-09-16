@@ -27,7 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  api, type District, type EngineBounds, type FeatureCollection, type IsrPoint,
+  api, fetchLifecycle, type District, type EngineBounds, type FeatureCollection, type IsrPoint,
   type Lifecycle, type LiveRun, type ObservationMap, type PinInfo, type PreviewRun,
   type PublicDistrictRisk, type SimRun, type DeletionImpact,
 } from "../api/client";
@@ -245,12 +245,17 @@ export default function Console() {
     },
   });
 
-  /** The whole-lifecycle trace: what happens over time at fixed inputs. */
+  /** The whole-lifecycle trace: what happens over time at fixed inputs.
+   *  One request per species (see `fetchLifecycle`); the chart fills in as
+   *  each line arrives rather than after the slowest. */
+  const [lifecyclePartial, setLifecyclePartial] = useState<Lifecycle | null>(null);
   const lifecycle = useMutation({
-    mutationFn: () => api.post<Lifecycle>(`/simulations/${siteId}/lifecycle`, {
-      time_years: runYears, restoration_years: runRestoration, points: 12,
-    }),
+    mutationFn: () => fetchLifecycle(siteId, {
+      time_years: runYears, restoration_years: runRestoration, points: 8,
+    }, setLifecyclePartial),
+    onMutate: () => setLifecyclePartial(null),
   });
+  const lifecycleShown = lifecycle.data ?? lifecyclePartial;
 
   /**
    * The sweep — "how many years of restoration is enough", answered as a curve.
@@ -1156,13 +1161,15 @@ This also destroys ${n} stored run(s) `
           </div>
           <button className="btn block" disabled={lifecycle.isPending}
                   onClick={() => lifecycle.mutate()}>
-            {lifecycle.isPending ? "Tracing all four contaminants…" : "Plot the lifecycle"}
+            {lifecycle.isPending
+              ? `Tracing contaminant ${(lifecyclePartial?.series.length ?? 0) + 1} of 4…`
+              : "Plot the lifecycle"}
           </button>
           <ErrorNote error={lifecycle.error} />
-          {lifecycle.data && (
+          {lifecycleShown && (
             <div style={{ marginTop: 10 }}>
-              <LifecycleChart data={lifecycle.data} />
-              <LifecycleNarrative data={lifecycle.data} />
+              <LifecycleChart data={lifecycleShown} />
+              {lifecycle.data && <LifecycleNarrative data={lifecycle.data} />}
             </div>
           )}
 

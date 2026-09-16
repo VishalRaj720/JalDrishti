@@ -319,3 +319,32 @@ def test_the_scheduler_is_wired_and_does_not_automate_the_breach_due_scan():
     cycle = inspect.getsource(main._alert_cycle)
     assert "scan_measured_exceedances" in cycle
     assert "scan_breach_due" not in cycle
+
+
+# ── found on the deployed portal after R16 shipped ───────────────────
+
+@pytest.mark.asyncio
+async def test_every_alert_kind_is_filterable(client, db_session, a_block):
+    """The inbox's `kind` filter admitted two of the four kinds, so the Alerts
+    screen's "Shared aquifer" tab returned a 422 to every resident."""
+    _, tok = await _user(db_session, f"k{uuid.uuid4().hex[:5]}", UserRole.citizen)
+    h = {"Authorization": f"Bearer {tok}"}
+    for kind in ("measured_exceedance", "published_screening",
+                 "aquifer_pathway", "aquifer_breach_due"):
+        r = await client.get(f"/api/v1/citizen/alerts?kind={kind}", headers=h)
+        assert r.status_code == 200, (kind, r.text)
+
+
+@pytest.mark.asyncio
+async def test_data_quality_report_needs_no_file(client, db_session, a_block):
+    """The report is computed from the database, not read from a JSON the seed
+    wrote on some other machine -- the deployed host had no such file and told
+    the administrator to run the seed there."""
+    _, tok = await _user(db_session, f"q{uuid.uuid4().hex[:5]}", UserRole.analyst)
+    r = await client.get("/api/v1/ingest/data-quality-report",
+                         headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["source"].startswith("computed live")
+    assert body["row_counts"]["blocks"] >= 1
+    assert "uranium_ppb" in body["water_sample_null_rates"] or body["row_counts"]["water_samples"] == 0

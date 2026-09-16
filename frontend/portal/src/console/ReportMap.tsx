@@ -17,8 +17,10 @@
  *
  * · **`crossOrigin` on the tiles.** The PDF path rasterises this element
  *   through html2canvas, and a tile without CORS headers taints the canvas and
- *   comes out blank. CARTO serves `Access-Control-Allow-Origin: *`, so opting
- *   in is all that is required.
+ *   comes out blank. OpenStreetMap's tile server sends
+ *   `Access-Control-Allow-Origin: *` (verified 2026-09-16), so opting in is
+ *   all that is required. This was CARTO until that date -- see
+ *   `map/basemaps.ts` for why every CARTO tile now carries a watermark.
  *
  * · **Scroll-wheel zoom is off.** This sits inside a long scrolling document;
  *   a map that swallows the wheel traps the reader inside the figure.
@@ -46,12 +48,10 @@ export default function ReportMap({
       center: [lat, lon], zoom: 13, zoomControl: true,
       scrollWheelZoom: false, attributionControl: true,
     });
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      {
-        attribution: "&copy; OpenStreetMap &copy; CARTO",
-        subdomains: "abcd", maxZoom: 19, crossOrigin: true,
-      }).addTo(m);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 19, crossOrigin: true,
+    }).addTo(m);
     addScaleControl(m);
     createPlumePanes(m);
     // FeatureGroup rather than LayerGroup purely for `getBounds()` — the figure
@@ -115,8 +115,8 @@ export default function ReportMap({
               {an?.area_ha != null && <> — <b>{fmt(an.area_ha, 1)} ha</b></>}
               {an?.migration_m != null && <>, reaching <b>{fmt(an.migration_m, 0)} m</b> from
               the wellfield</>}. This is <b>model output for a hypothetical operation</b>,
-              not a measurement and not a plan. Base map © OpenStreetMap contributors,
-              © CARTO.</>
+              not a measurement and not a plan. Base map © OpenStreetMap
+              contributors.</>
           : <>No modelled extent to draw for this run — the engine declined to
               produce a source term here, which is reported above rather than
               drawn as an empty area.</>}
