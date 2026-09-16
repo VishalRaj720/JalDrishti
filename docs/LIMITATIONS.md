@@ -35,6 +35,7 @@ not quantify structural model error, and nothing in this product can.
 
 | Item | Status | Why |
 |---|---|---|
+| **Plume extent rests on β, an unmeasured matrix-storage ratio; the band samples inside the assumption** | 🔴 **Open — see §1d** | Every value in the served β range keeps the plume within 30 m; β = 0.5 gives 61 m, β = 0.1 puts 665 ppb at the monitoring ring. The tool's own porosities imply β = 3, not the served 10. Correction requires a retrain and is scheduled, not done |
 | **Per-species R²(log) ≥ 0.60 — radium migration (0.516), compliance (0.431)** | 🔴 **Fails the project's own Gate-4 bar** | Not a tuning failure, a label-shape property. Radium's migration label is **81.8 % exact zeros**, compliance **95.8 % pinned at the 23 mBq/L background**. A squared-error regressor on `log1p` cannot fit a point mass, and R² divides by a near-zero SST. Both *improved* over the previous model (0.475→0.516, 0.403→0.431). The remedy is a **zero-inflated / two-stage head** — a new ML approach, not yet authorised |
 
 **Why this does not invalidate the product:** the analytical engine serves the
@@ -42,6 +43,84 @@ authoritative central value for radium, and the conformal bands on those cells c
 0.891–0.986 field-resampled — all above the 0.80 gate. The product shows both, and labels
 which engine produced which. **If you consider that gate binding for release, the
 pipeline is not ready** until the two-stage head is built.
+
+---
+
+## 1d. Open (2026-09-16) — the plume's extent rests on one unmeasured number, and the band does not cover it
+
+**Raised by the project owner from the published Jaduguda report:** *"the spread
+is only 1 to 10 m — is the impact really that small?"* Rechecked against the
+engine itself rather than argued about.
+
+**What the served run says.** Jaduguda site, uranium, 8 yr operation, 3 yr
+sweep, evaluated at 20 yr: footprint 8.2 ha (of which 7.9 ha is the leach zone
+itself), **migration 11.7 m** beyond the wellfield, 1 ppb at the monitoring ring
+(= background), ML band 0–32 m. Resolved inputs: K at ore depth 0.53 m/day,
+gradient 0.00185, mobile porosity 0.0075 → fracture-water velocity ≈ 47 m/yr;
+**effective retardation 900**; natural attenuation 0.28/yr.
+
+**What decides it.** The same run with one input changed at a time
+(analytical engine, `ml_pipeline.dashboard.server.api_predict`, 2026-09-16):
+
+| Change | Migration | At ring | R_eff |
+|---|---|---|---|
+| as served (β = 10, k = 0.28/yr) | 11.7 m | 1 ppb | 900 |
+| attenuation off (k = 0) | 13.7 m | 1 ppb | 900 |
+| horizon 50 yr | 17.1 m | 1 ppb | 900 |
+| gradient ×5 (0.01) | 39.6 m | 1 ppb | 900 |
+| β = 20 / β = 2 (the Monte-Carlo range) | 8.0 m / 28.3 m | 1 ppb | 1,799 / 181 |
+| **β = 3 (what the tool's own porosities imply)** | **22.5 m** | 1 ppb | 271 |
+| β = 0.5 | 61 m | 1 ppb | 46 |
+| β = 0.1 | 153 m | **665 ppb** | 10 |
+| β = 0 (no matrix storage) | **938 m** | **2,644 ppb** | 1 |
+| sulfate, as served / β = 0 | 37 m / 741 m | 227 / 722 mg/L | 56 / 1 |
+
+Attenuation, the gradient and the horizon barely move the answer. **One
+parameter does: β, the dual-porosity capacity ratio** — how much contaminant
+the rock matrix between fractures stores per unit of fracture water. The engine
+applies it as `R_eff = 1 + β·R_m` (Goltz & Roberts 1986; `effective_capacity_
+ratio`), with R_m ≈ 90 for uranium at Kd = 1 L/kg and 3 % matrix porosity, and
+a pinned transfer rate that reaches that equilibrium in ~2.7 yr.
+
+Three things about β are already on record and now matter together:
+
+1. **No Jharkhand measurement constrains it** (§2, fidelity matrix row 3.4:
+   no packer or tracer test for the Singhbhum Shear Zone is published). The
+   value is a foreign-analogue literature range, (2, 8, 20), served at its
+   mean, 10.
+2. **The tool's own porosities imply 3, not 10.** β is defined as
+   θ_immobile/θ_mobile; with total porosity 0.03 and mobile 0.0075 that is
+   3.0. The engine carries two statements of matrix capacity that disagree by
+   a factor of three.
+3. **The engine's own docstring says the pinned transfer rate over-retards
+   uranium at early time** (`matrix_transfer_omega`: physically ~13.7 yr to
+   load the matrix, pinned to reach it in 2.7). Over a 20-year horizon that
+   is most of the run.
+
+**The consequence for what the product claims.** The P10–P90 band is drawn
+from a Monte Carlo that samples β *within* (2, 8, 20). Every value in that
+range leaves the plume inside 30 m. The band therefore expresses the
+parameter's uncertainty **inside an assumption**, not the uncertainty *of* the
+assumption — exactly the structural error §0 says no band here quantifies.
+A reader of the 0–32 m band would not learn that a β of 0.5 — a defensible
+value for a poorly connected matrix over two decades — gives 61 m, or that
+β of 0.1 puts 665 ppb at the monitoring ring.
+
+**Direction of the error.** Small-plume, not large. Every candidate correction
+makes the served extent larger: deriving β from the tool's own porosities
+(×2), a diffusive rather than first-order matrix clock (the docstring's own
+"rigorous upgrade"), or a lower β prior. None makes it smaller. So the served
+figures should be read as **the immobile end of a range this tool cannot yet
+bound**, and the report says so (R16).
+
+**What is not being done, and why.** β is a training feature; changing its
+prior or the clock invalidates every label the surrogate learned from, so the
+remedy is a re-bake, retrain, conformal recalibration and `sync_docs` — hours
+of compute plus validation, and a fourth sanctioned change to the frozen
+pipeline. That is a deliberate decision, not a same-day fix. The recommended
+change, when made: β prior (0.3, 3, 20) with the central value derived from
+the resolved porosities, and the diffusive clock in place of the first-order
+one. Until then the sensitivity table above is the honest statement.
 
 ---
 

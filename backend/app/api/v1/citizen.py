@@ -315,7 +315,12 @@ async def unsubscribe(
 @router.get("/alerts")
 async def list_alerts(
     response: Response,
-    kind: Optional[Literal["measured_exceedance", "published_screening"]] = Query(None),
+    # All four kinds. The filter admitted only the first two, so the Alerts
+    # screen's "Shared aquifer" tab -- added with migration 0021 -- returned a
+    # 422 to every resident who clicked it, and the "Timetable passed" kind
+    # (0023) could not be filtered for at all. Found on the deployed portal.
+    kind: Optional[Literal["measured_exceedance", "published_screening",
+                           "aquifer_pathway", "aquifer_breach_due"]] = Query(None),
     limit: int = Query(100, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     me: User = Depends(get_current_user),

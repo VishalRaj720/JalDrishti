@@ -51,6 +51,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       /* non-JSON body; statusText is all we have */
     }
+    // A gateway timeout (Cloudflare 524, Render 502) arrives with an empty
+    // body and often an empty statusText, and an ErrorNote rendered "" as a
+    // thin red bar with nothing in it -- which is how the report's chart
+    // sections looked on the deployed host. Say what happened.
+    if (!detail || !detail.trim()) {
+      detail = res.status === 524 || res.status === 504 || res.status === 502
+        ? `The engine did not answer in time (HTTP ${res.status}). The deployed ` +
+          `host is slow after idling; wait a moment and try again.`
+        : `Request failed (HTTP ${res.status}).`;
+    }
     throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;
@@ -604,6 +614,45 @@ export interface LifecycleSeries {
    *  zero while the others do not. */
   suppressed: string | null;
   points: LifecyclePoint[];
+}
+
+export const LIFECYCLE_SPECIES = [
+  "uranium_ppb", "sulfate_mg_l", "tds_mg_l", "radium_226_mbq_l",
+] as const;
+
+/**
+ * Fetch a lifecycle trace ONE SPECIES PER REQUEST, merging as they arrive.
+ *
+ * R16. One request for all four species at 12 points is 48 engine
+ * evaluations. Locally that is ten seconds; on the deployed host (0.1 vCPU)
+ * it measured 198 s, and the gateway in front of it closes the connection at
+ * 100 s -- so the Console's lifecycle and both of the report's charts had
+ * never rendered in production. Nothing was wrong with the physics or the
+ * endpoint; the request was simply too large for the pipe.
+ *
+ * Splitting by species keeps every request inside the limit (8 points x 1
+ * species ~ 35 s there), and `onPartial` lets the caller draw the first line
+ * while the rest compute, which is what a reader wants anyway: uranium first.
+ */
+export async function fetchLifecycle(
+  siteId: string,
+  body: { time_years: number; restoration_years: number; points?: number; species?: readonly string[] },
+  onPartial?: (partial: Lifecycle) => void,
+): Promise<Lifecycle> {
+  const species = body.species ?? LIFECYCLE_SPECIES;
+  let merged: Lifecycle | undefined;
+  for (const sp of species) {
+    const part: Lifecycle = await api.post<Lifecycle>(`/simulations/${siteId}/lifecycle`, {
+      time_years: body.time_years, restoration_years: body.restoration_years,
+      points: body.points ?? 8, species: [sp],
+    });
+    merged = merged === undefined
+      ? part
+      : { ...merged, series: [...merged.series, ...part.series] };
+    onPartial?.(merged);
+  }
+  if (merged === undefined) throw new ApiError(0, "No species requested.");
+  return merged;
 }
 
 export interface Lifecycle {

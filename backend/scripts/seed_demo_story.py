@@ -216,6 +216,28 @@ async def step_citizen(db, site: IsrPoint, email: str, dry: bool) -> None:
         INSERT INTO block_subscriptions (user_id, block_id)
         VALUES (:u, :b) ON CONFLICT (user_id, block_id) DO NOTHING
     """), {"u": str(cit.id), "b": block[0]})
+
+    # Also follow the block carrying the WORST measured exceedance, so the
+    # demonstration inbox holds both channels side by side -- a laboratory
+    # result and a modelled screening -- which is the distinction the Alerts
+    # screen exists to keep visible. The block is chosen from the alerts the
+    # scan just raised, by how far over the limit the driving reading was.
+    worst = (await db.execute(text("""
+        SELECT a.block_id::text, b.name, d.name AS district, a.headline
+        FROM alerts a
+        JOIN blocks b ON b.id = a.block_id
+        LEFT JOIN districts d ON d.id = b.district_id
+        WHERE a.kind = 'measured_exceedance'
+        ORDER BY (a.severity = 'high') DESC, a.measured_value DESC NULLS LAST
+        LIMIT 1
+    """))).first()
+    if worst is not None:
+        logger.info(f"{email}: also following {worst[1]} ({worst[2]}) -- "
+                    f"\"{worst[3]}\"")
+        await db.execute(text("""
+            INSERT INTO block_subscriptions (user_id, block_id)
+            VALUES (:u, :b) ON CONFLICT (user_id, block_id) DO NOTHING
+        """), {"u": str(cit.id), "b": worst[0]})
     await db.commit()
     await set_rls_context(db, bypass=True)
 

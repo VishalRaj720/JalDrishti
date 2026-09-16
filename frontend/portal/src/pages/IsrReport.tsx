@@ -30,7 +30,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  api, type Advisory, type IsrPoint, type Lifecycle, type PreviewRun, type SimRun,
+  api, fetchLifecycle, type Advisory, type IsrPoint, type Lifecycle, type PreviewRun, type SimRun,
   type VerticalScreening,
 } from "../api/client";
 import { canRunSim, useAuth } from "../auth";
@@ -75,11 +75,18 @@ export default function IsrReport() {
     queryFn: () => api.get<SimRun[]>(`/simulations/runs?isr_id=${siteId}&limit=10`),
   });
 
+  // One species per request, merged as they arrive (see `fetchLifecycle` for
+  // why: the deployed host needs ~4 s per evaluation and the gateway closes at
+  // 100 s, so the old single request never completed there and this section
+  // of the report had never rendered in production).
+  const [lifecyclePartial, setLifecyclePartial] = useState<Lifecycle | null>(null);
   const lifecycle = useMutation({
-    mutationFn: () => api.post<Lifecycle>(`/simulations/${siteId}/lifecycle`, {
-      time_years: horizon, restoration_years: restoration, points: 12,
-    }),
+    mutationFn: () => fetchLifecycle(siteId!, {
+      time_years: horizon, restoration_years: restoration, points: 8,
+    }, setLifecyclePartial),
+    onMutate: () => setLifecyclePartial(null),
   });
+  const lifecycleShown = lifecycle.data ?? lifecyclePartial;
   const detail = useMutation({
     mutationFn: () => api.post<PreviewRun>(`/simulations/${siteId}/preview`, {
       species: "uranium_ppb", time_years: horizon, restoration_years: restoration,
@@ -96,7 +103,7 @@ export default function IsrReport() {
    */
   const sweep = useMutation({
     mutationFn: () => api.post<Sweep>(`/simulations/${siteId}/sweep`, {
-      axis: "restoration", species: "uranium_ppb", points: 6, time_years: horizon,
+      axis: "restoration", species: "uranium_ppb", points: 5, time_years: horizon,
     }),
   });
 
@@ -122,10 +129,15 @@ export default function IsrReport() {
    */
   useEffect(() => {
     if (!siteId || !mayRun) return;
-    const t = setTimeout(() => {
-      lifecycle.mutate();
-      detail.mutate();
-      sweep.mutate();
+    // SEQUENTIAL, cheapest first. The three used to fire together; on a
+    // single-worker host they queue behind each other, so the 4 s detail
+    // waited on the 200 s lifecycle and every section timed out at once.
+    // Detail carries the numbers the summary needs, so it goes first; the
+    // sweep is 5 evaluations; the lifecycle is last and fills in per species.
+    const t = setTimeout(async () => {
+      try { await detail.mutateAsync(); } catch { /* shown by ErrorNote */ }
+      try { await sweep.mutateAsync(); } catch { /* shown by ErrorNote */ }
+      try { await lifecycle.mutateAsync(); } catch { /* shown by ErrorNote */ }
     }, 450);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -327,6 +339,20 @@ export default function IsrReport() {
                   </p>
                 )}
 
+                {(detail.data?.hydro as any)?.regime === "fractured" && (
+                  <p>
+                    <b>What decides the extent.</b> In fractured rock this engine retards
+                    the plume by how much contaminant the rock matrix between fractures
+                    stores (the capacity ratio β, served here as{" "}
+                    {fmt((detail.data?.hydro as any)?.dual_porosity_beta, 0)}; effective
+                    retardation {fmt((detail.data?.hydro as any)?.retardation_effective, 0)}×).
+                    No Jharkhand measurement constrains β, and the uncertainty band does
+                    not span it: with weaker matrix storage the same operation reaches
+                    tens to hundreds of metres. Read the figures above as the immobile
+                    end of a range this tool cannot yet bound — see{" "}
+                    <code>docs/LIMITATIONS.md</code> §1d.
+                  </p>
+                )}
                 <p>
                   Every value above comes from the <b>analytical physics engine</b>,
                   which is the authority in this product. The machine-learning surrogate
@@ -498,12 +524,14 @@ export default function IsrReport() {
         {mayRun && (
           <section className="card">
             <div className="card-title">All four contaminants, across the operation</div>
-            {lifecycle.isPending && <Loading label="Tracing four contaminants…" />}
+            {lifecycle.isPending && (
+              <Loading label={`Tracing contaminant ${(lifecyclePartial?.series.length ?? 0) + 1} of 4…`} />
+            )}
             <ErrorNote error={lifecycle.error} />
-            {lifecycle.data && (
+            {lifecycleShown && (
               <>
-                <LifecycleChart data={lifecycle.data} />
-                <LifecycleNarrative data={lifecycle.data} />
+                <LifecycleChart data={lifecycleShown} />
+                {lifecycle.data && <LifecycleNarrative data={lifecycle.data} />}
               </>
             )}
           </section>
@@ -563,8 +591,11 @@ export default function IsrReport() {
             <AffectedBlocks advisory={published} />
             <div className="muted small" style={{ marginTop: 8 }}>
               Published for {SPECIES_NAME[published.species] ?? published.species} at{" "}
-              {fmt(published.time_years, 0)} yr with a {fmt(published.restoration_years, 0)} yr
-              sweep. Changing the sliders above does not change what was published — that
+              {fmt(published.time_years, 0)} yr
+              {published.restoration_years
+                ? ` with a ${fmt(published.restoration_years, 0)} yr sweep`
+                : " with no restoration sweep"}.
+              Changing the sliders above does not change what was published — that
               record is fixed to the run behind it.
             </div>
           </section>
