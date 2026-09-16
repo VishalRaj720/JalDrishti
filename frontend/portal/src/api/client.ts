@@ -520,10 +520,64 @@ export interface PublicAdvisory {
   what_this_is: string;
 }
 
+/** A block as the public search and the home-block endpoints return it. */
+export interface BlockRef { id: string; name: string; district: string | null }
+
+export interface CitizenProfile {
+  id: string; username: string; email: string; role: Role;
+  home_block: BlockRef | null;
+  alert_email_opt_in: boolean;
+}
+
 export const citizen = {
-  register: (username: string, email: string, password: string) =>
-    api.post<{ access_token: string; role: Role }>(
-      "/citizen/register", { username, email, password }),
+  /** R16: registration carries WHERE THE PERSON LIVES, so the account is
+   *  following its own block from the first second. Either a block id from
+   *  `pub.blocksSearch`, or a point the server resolves to a block. */
+  register: (username: string, email: string, password: string,
+             home?: { home_block_id?: string; lat?: number; lon?: number }) =>
+    api.post<{ access_token: string; role: Role; home_block: BlockRef | null }>(
+      "/citizen/register", { username, email, password, ...(home ?? {}) }),
+  me: () => api.get<CitizenProfile>("/citizen/me"),
+  setHome: (home: { block_id?: string; lat?: number; lon?: number }) =>
+    api.put<{ home_block: BlockRef; subscribed: true }>("/citizen/me/home", home),
+  setPreferences: (alert_email_opt_in: boolean) =>
+    api.put<{ alert_email_opt_in: boolean }>("/citizen/me/preferences", { alert_email_opt_in }),
+};
+
+/** What the operator's delivery panel reads. Admin only. */
+export interface DeliveryStatus {
+  configured: boolean; provider_host: string | null; from_email: string | null;
+  pending: number; sent: number; failed: number; skipped: number;
+  last_sent_at: string | null; last_failed_at: string | null;
+  subscribers: number; blocks_followed: number; alerts_total: number;
+  scheduler_interval_hours: number; checked_at: string; note: string;
+}
+
+export interface DeliveryResult {
+  configured: boolean; sent: number; failed: number; pending: number; skipped: number;
+}
+
+// ── R16: the unauthenticated surface ─────────────────────────────────
+//
+// Everything here works with no token at all. Registration asks where a person
+// lives before an account exists, and the landing page shows the public record
+// before anyone signs in, so neither can depend on `Authorization`.
+
+export interface PublishedAdvisoryPublic {
+  id: string; headline: string; what_it_means: string; what_to_do: string | null;
+  published_at: string | null; footprint_ha: number | null;
+  species: string; time_years: number | null;
+  blocks: Array<{ name: string; district: string | null; overlap_ha: number | null }>;
+  what_this_is: string;
+}
+
+export const pub = {
+  blocksSearch: (q: string, limit = 20) =>
+    api.get<BlockRef[]>(`/public/risk/blocks/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  blockAt: (lat: number, lon: number) =>
+    api.get<BlockRef>(`/public/risk/blocks/at?lat=${lat}&lon=${lon}`),
+  advisories: () =>
+    api.get<{ count: number; advisories: PublishedAdvisoryPublic[] }>("/public/risk/advisories"),
 };
 
 // ── R4/R5: lifecycle traces and ephemeral runs ───────────────────────

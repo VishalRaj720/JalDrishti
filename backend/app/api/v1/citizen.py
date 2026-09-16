@@ -40,7 +40,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_db, set_rls_context
 from app.dependencies import get_current_user, require_admin
 from app.models.advisory import Advisory
 from app.models.user import User, UserRole
@@ -56,10 +56,20 @@ router = APIRouter(prefix="/citizen", tags=["Citizen"])
 # ── registration ─────────────────────────────────────────────────────
 
 class CitizenRegister(BaseModel):
-    """Note what is NOT here: `role`. See the module docstring."""
+    """Note what is NOT here: `role`. See the module docstring.
+
+    R16 adds WHERE THE PERSON LIVES, because an alert system that does not know
+    that cannot alert anyone. Either a block id (from the public block search)
+    or a map point (resolved to a block here by point-in-polygon); the account
+    is subscribed to the result on the spot. Both optional: an account with no
+    home block is still an account, it just follows nothing yet.
+    """
     username: str = Field(..., min_length=3, max_length=60)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
+    home_block_id: Optional[uuid.UUID] = None
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lon: Optional[float] = Field(None, ge=-180, le=180)
 
 
 class TokenAndUser(BaseModel):
@@ -69,6 +79,27 @@ class TokenAndUser(BaseModel):
     username: str
     email: str
     role: str
+    home_block: Optional[dict[str, Any]] = None
+
+
+async def _block_at(db: AsyncSession, lat: float, lon: float) -> Optional[Mapping[str, Any]]:
+    """The block containing a point, or None outside every block polygon."""
+    return (await db.execute(text("""
+        SELECT b.id::text AS id, b.name, d.name AS district
+        FROM blocks b
+        LEFT JOIN districts d ON d.id = b.district_id
+        WHERE b.geometry IS NOT NULL
+          AND ST_Contains(b.geometry, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326))
+        LIMIT 1
+    """), {"lat": lat, "lon": lon})).mappings().first()
+
+
+async def _block_by_id(db: AsyncSession, block_id: uuid.UUID) -> Optional[Mapping[str, Any]]:
+    return (await db.execute(text("""
+        SELECT b.id::text AS id, b.name, d.name AS district
+        FROM blocks b LEFT JOIN districts d ON d.id = b.district_id
+        WHERE b.id = :bid
+    """), {"bid": str(block_id)})).mappings().first()
 
 
 @router.post("/register", response_model=TokenAndUser,
@@ -90,6 +121,21 @@ async def register_citizen(
         raise HTTPException(status_code=409,
                             detail="That email address cannot be registered.")
 
+    # Resolve the home block BEFORE creating the account, so a bad block id or
+    # a point outside Jharkhand is a 422 and not an account with no area.
+    home: Optional[Mapping[str, Any]] = None
+    if payload.home_block_id is not None:
+        home = await _block_by_id(db, payload.home_block_id)
+        if home is None:
+            raise HTTPException(status_code=422, detail="That block does not exist.")
+    elif payload.lat is not None and payload.lon is not None:
+        home = await _block_at(db, payload.lat, payload.lon)
+        if home is None:
+            raise HTTPException(
+                status_code=422,
+                detail=("That location is not inside any Jharkhand block. Choose "
+                        "your block by name instead."))
+
     user = User(
         username=payload.username.strip(),
         email=payload.email.lower(),
@@ -97,10 +143,22 @@ async def register_citizen(
         # HARD-PINNED. Not a default, not a fallback — there is no path by which
         # a request can influence this.
         role=UserRole.citizen,
+        home_block_id=uuid.UUID(home["id"]) if home else None,
     )
     db.add(user)
     try:
         await db.flush()
+        # The subscription is written in the SAME transaction as the account,
+        # under the same anonymous context. `block_subscriptions_own` allows a
+        # row whose user_id matches `app.current_user_id`, which is empty here
+        # -- so set the context to the new user for the remainder of this
+        # transaction. It is discarded at the commit below.
+        if home is not None:
+            await set_rls_context(db, role="citizen", user_id=str(user.id))
+            await db.execute(text("""
+                INSERT INTO block_subscriptions (user_id, block_id)
+                VALUES (:uid, :bid) ON CONFLICT (user_id, block_id) DO NOTHING
+            """), {"uid": str(user.id), "bid": home["id"]})
         await db.commit()
     except Exception:
         await db.rollback()
@@ -111,12 +169,82 @@ async def register_citizen(
         action="citizen.register", entity_type="users", entity_id=str(user.id),
         actor_id=user.id, actor_label=user.email,
         ip_address=(request.client.host if request.client else None),
-        detail={"role": "citizen"},
+        detail={"role": "citizen", "home_block": dict(home) if home else None},
     )
     return TokenAndUser(
         access_token=create_access_token(str(user.id), user.role),
         id=user.id, username=user.username, email=user.email, role=user.role.value,
+        home_block=dict(home) if home else None,
     )
+
+
+# ── the account's own area and preferences ───────────────────────────
+
+class HomeUpdate(BaseModel):
+    """Set or change where the account holder lives. One of the two."""
+    block_id: Optional[uuid.UUID] = None
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lon: Optional[float] = Field(None, ge=-180, le=180)
+
+
+@router.get("/me")
+async def my_profile(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    me: User = Depends(get_current_user),
+):
+    """Home block and delivery preference, for the account screen."""
+    response.headers["Cache-Control"] = "no-store"
+    home = await _block_by_id(db, me.home_block_id) if me.home_block_id else None
+    return {"id": str(me.id), "username": me.username, "email": me.email,
+            "role": me.role.value,
+            "home_block": dict(home) if home else None,
+            "alert_email_opt_in": bool(me.alert_email_opt_in)}
+
+
+@router.put("/me/home")
+async def set_home(
+    payload: HomeUpdate,
+    db: AsyncSession = Depends(get_db),
+    me: User = Depends(get_current_user),
+):
+    """Set the home block and follow it. Existing follows are kept: moving
+    house does not unsubscribe you from a block you still care about."""
+    if payload.block_id is not None:
+        home = await _block_by_id(db, payload.block_id)
+        if home is None:
+            raise HTTPException(status_code=422, detail="That block does not exist.")
+    elif payload.lat is not None and payload.lon is not None:
+        home = await _block_at(db, payload.lat, payload.lon)
+        if home is None:
+            raise HTTPException(
+                status_code=422,
+                detail="That location is not inside any Jharkhand block.")
+    else:
+        raise HTTPException(status_code=422, detail="Give a block id or a lat/lon.")
+
+    me.home_block_id = uuid.UUID(home["id"])
+    await db.execute(text("""
+        INSERT INTO block_subscriptions (user_id, block_id)
+        VALUES (:uid, :bid) ON CONFLICT (user_id, block_id) DO NOTHING
+    """), {"uid": str(me.id), "bid": home["id"]})
+    await db.commit()
+    return {"home_block": dict(home), "subscribed": True}
+
+
+class PreferencesUpdate(BaseModel):
+    alert_email_opt_in: bool
+
+
+@router.put("/me/preferences")
+async def set_preferences(
+    payload: PreferencesUpdate,
+    db: AsyncSession = Depends(get_db),
+    me: User = Depends(get_current_user),
+):
+    me.alert_email_opt_in = bool(payload.alert_email_opt_in)
+    await db.commit()
+    return {"alert_email_opt_in": me.alert_email_opt_in}
 
 
 # ── finding your block ───────────────────────────────────────────────
@@ -253,9 +381,13 @@ async def scan_measured(
     # Raising alerts is system work the admin authorised, not a privilege the
     # admin's own session should carry.
     from app.database import AsyncSessionLocal, set_rls_context
+    from app.services.notify import deliver_pending
     async with AsyncSessionLocal() as adb:
         await set_rls_context(adb, bypass=True)
-        return await AlertService(adb).scan_measured_exceedances()
+        result = await AlertService(adb).scan_measured_exceedances()
+    # R16: raising is half the job. Deliver to whoever follows those blocks.
+    result["delivery"] = await deliver_pending()
+    return result
 
 
 @router.post("/alerts/scan-breach-due")
@@ -275,9 +407,38 @@ async def scan_breach_due(
     is written the way it is.
     """
     from app.database import AsyncSessionLocal, set_rls_context
+    from app.services.notify import deliver_pending
     async with AsyncSessionLocal() as adb:
         await set_rls_context(adb, bypass=True)
-        return await AlertService(adb).scan_breach_due(dry_run=dry_run)
+        result = await AlertService(adb).scan_breach_due(dry_run=dry_run)
+    if not dry_run:
+        result["delivery"] = await deliver_pending()
+    return result
+
+
+@router.get("/alerts/delivery-status")
+async def alert_delivery_status(
+    response: Response,
+    _: User = Depends(require_admin),
+):
+    """Is off-portal delivery configured, and is it keeping up. Admin only.
+
+    The number that matters is `pending`: alerts that exist, have a subscriber
+    with an email address, and have not gone out. With SMTP unconfigured it
+    grows and says so; a stopped scheduler shows the same way.
+    """
+    from app.services.notify import delivery_status
+    response.headers["Cache-Control"] = "no-store"
+    return await delivery_status()
+
+
+@router.post("/alerts/deliver")
+async def alert_deliver_now(
+    _: User = Depends(require_admin),
+):
+    """Send every undelivered alert email now. Admin only, idempotent."""
+    from app.services.notify import deliver_pending
+    return await deliver_pending()
 
 
 # ── published screenings, as a citizen sees them ─────────────────────

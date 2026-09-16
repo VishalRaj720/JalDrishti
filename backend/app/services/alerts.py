@@ -889,7 +889,15 @@ async def raise_for_advisory(advisory_id: uuid.UUID) -> dict[str, Any]:
         # after any commit, the context is gone until it is set again.
         await set_rls_context(db, bypass=True)
         aquifer = await svc.announce_aquifer_reach(adv, run)
-        return {"footprint_alerts": footprint, "aquifer_reach": aquifer}
+
+    # R16: a row in `alerts` is not a notification. Deliver what was just
+    # raised to the people who follow those blocks, and report the outcome
+    # alongside the counts so the publish response says whether anyone was
+    # actually told. Own session inside; never raises.
+    from app.services.notify import deliver_pending
+    delivery = await deliver_pending()
+    return {"footprint_alerts": footprint, "aquifer_reach": aquifer,
+            "delivery": delivery}
 
 # Re-exported so importers do not need the model module for a type check.
 __all__ = ["AlertService", "raise_for_advisory", "Alert", "AlertRead",

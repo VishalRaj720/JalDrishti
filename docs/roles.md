@@ -231,12 +231,17 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/citizen/advisories` | ● | ● | ● | ● | ● |
 | `GET /api/v1/citizen/advisories/geojson` | ● | ● | ● | ● | ● |
 | `GET /api/v1/citizen/alerts` | ● | ● | ● | ● | ● |
+| `POST /api/v1/citizen/alerts/deliver` | ● | · | · | · | · |
+| `GET /api/v1/citizen/alerts/delivery-status` | ● | · | · | · | · |
 | `POST /api/v1/citizen/alerts/read-all` | ● | ● | ● | ● | ● |
 | `POST /api/v1/citizen/alerts/scan-breach-due` | ● | · | · | · | · |
 | `POST /api/v1/citizen/alerts/scan-measured` | ● | · | · | · | · |
 | `GET /api/v1/citizen/alerts/unread-count` | ● | ● | ● | ● | ● |
 | `POST /api/v1/citizen/alerts/{alert_id}/read` | ● | ● | ● | ● | ● |
 | `GET /api/v1/citizen/blocks` | ● | ● | ● | ● | ● |
+| `GET /api/v1/citizen/me` | ● | ● | ● | ● | ● |
+| `PUT /api/v1/citizen/me/home` | ● | ● | ● | ● | ● |
+| `PUT /api/v1/citizen/me/preferences` | ● | ● | ● | ● | ● |
 | `GET /api/v1/citizen/my-area` | ● | ● | ● | ● | ● |
 | `GET /api/v1/citizen/ore` | ● | ● | ● | ● | ● |
 | `POST /api/v1/citizen/register` | ○ | ○ | ○ | ○ | ○ |
@@ -310,7 +315,10 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/model-ops/status` | ● | ● | ● | ● | · |
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | · | ● | · | · |
+| `GET /api/v1/public/risk/advisories` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/at` | ○ | ○ | ○ | ○ | ○ |
+| `GET /api/v1/public/risk/blocks/at` | ○ | ○ | ○ | ○ | ○ |
+| `GET /api/v1/public/risk/blocks/search` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/blocks/summary` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/districts` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/geojson/blocks` | ○ | ○ | ○ | ○ | ○ |
@@ -349,7 +357,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 116/128 · **regulator** 78/128 · **analyst** 80/128 · **field_officer** 67/128 · **citizen** 15/128
+Reachable endpoints per role — **admin** 121/136 · **regulator** 81/136 · **analyst** 83/136 · **field_officer** 70/136 · **citizen** 18/136
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

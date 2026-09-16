@@ -58,14 +58,21 @@ def test_ml_artifacts_are_unchanged():
     """No part of this feature retrains or rewrites a model artifact."""
     baseline_path = BACKEND_DIR / "tests" / "ml_artifact_hashes.json"
     artifacts = REPO_ROOT / "ml_pipeline" / "ml" / "artifacts"
+    # Plots are excluded. `ml_pipeline/.gitignore` drops `ml/artifacts/*.png`,
+    # so a SHAP figure that happens to exist on the machine that wrote the
+    # baseline is absent from every fresh clone, and the check failed there on
+    # a file that is not a model artifact at all. Found 2026-09-16 in a
+    # worktree; the joblib heads, metrics and model card are what this guards.
     current = {
         p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in sorted(artifacts.iterdir()) if p.is_file()
+        for p in sorted(artifacts.iterdir())
+        if p.is_file() and p.suffix.lower() != ".png"
     }
     if not baseline_path.exists():
         baseline_path.write_text(json.dumps(current, indent=1))
         pytest.skip("baseline written")
-    baseline = json.loads(baseline_path.read_text())
+    baseline = {k: v for k, v in json.loads(baseline_path.read_text()).items()
+                if not k.lower().endswith(".png")}
     changed = {k for k in baseline if baseline[k] != current.get(k)}
     missing = set(baseline) - set(current)
     assert not changed and not missing, (

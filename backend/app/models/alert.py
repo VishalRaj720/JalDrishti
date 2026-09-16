@@ -122,6 +122,47 @@ class Alert(Base):
     )
 
 
+class AlertDelivery(Base):
+    """One attempt to put one alert in front of one person, off-portal.
+
+    The inbox is per-block; this is per-person, because delivery is. The
+    unique index on (alert, user, channel) is what makes `notify.deliver_pending`
+    idempotent: re-running it after a crash sends nothing twice. `status` is
+    what makes a failed SMTP attempt visible instead of silently dropped —
+    the operator's delivery panel counts them.
+
+    RLS-scoped to the row's own user (migration 0025), because an address and
+    a block together say where a named person lives.
+    """
+    __tablename__ = "alert_deliveries"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"))
+    alert_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("alerts.id", ondelete="CASCADE"),
+        nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False)
+    address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("channel IN ('email')", name="ck_delivery_channel"),
+        CheckConstraint("status IN ('sent','failed','skipped')",
+                        name="ck_delivery_status"),
+        # Load-bearing for ON CONFLICT DO NOTHING; see `Alert.__table_args__`.
+        Index("uq_alert_delivery", "alert_id", "user_id", "channel", unique=True),
+        Index("ix_alert_deliveries_user", "user_id"),
+        Index("ix_alert_deliveries_created", "created_at"),
+    )
+
+
 class AlertRead(Base):
     __tablename__ = "alert_reads"
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-12 · **Scope:** the government-facing SPA (`frontend/portal/`)
 **Inputs:** `PRODUCT_DESIGN.md`, the `ml_pipeline` dashboard (map + side panel),
-`frontend/JalDrishti.html` (navigation patterns), and the TEXMiN–BIT Sindri fellowship
+`frontend/JalDrishti.html` (navigation patterns; the static prototype was removed from the tree in R16 and lives in git history), and the TEXMiN–BIT Sindri fellowship
 proposal.
 
 ---

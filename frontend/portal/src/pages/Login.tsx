@@ -9,8 +9,11 @@
  * and no `role` field in its schema at all.
  */
 import { useState, type FormEvent } from "react";
-import { citizen, setToken, type Role } from "../api/client";
+import { Link } from "react-router-dom";
+import { citizen, setToken, type BlockRef, type Role } from "../api/client";
 import { ROLE_COLOUR, ROLE_LABEL, useAuth } from "../auth";
+import BlockFinder from "../components/BlockFinder";
+import { Icon, Mark } from "../components/icons";
 
 /**
  * Demonstration accounts, one per role, for local development ONLY.
@@ -45,12 +48,15 @@ const DEMO: Array<{ email: string; password: string; role: Role }> =
       ]
     : [];
 
-export default function Login() {
+export default function Login({ initialMode = "in" }: { initialMode?: "in" | "up" }) {
   const { signIn, error } = useAuth();
-  const [mode, setMode] = useState<"in" | "up">("in");
+  const [mode, setMode] = useState<"in" | "up">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  // R16: where the person lives. Optional, but asked up front, because an
+  // account that follows nothing receives nothing.
+  const [home, setHome] = useState<BlockRef | null>(null);
   const [busy, setBusy] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
 
@@ -62,7 +68,8 @@ export default function Login() {
       if (mode === "in") {
         await signIn(email, password);
       } else {
-        const r = await citizen.register(username, email, password);
+        const r = await citizen.register(username, email, password,
+                                         home ? { home_block_id: home.id } : undefined);
         // Registering signs you in. A second sign-in step after creating an
         // account is a drop-off point that buys nothing.
         setToken(r.access_token);
@@ -82,11 +89,18 @@ export default function Login() {
     <div className="login">
       <form className="login-card" onSubmit={submit}>
         <div className="row" style={{ marginBottom: 14 }}>
-          <div className="hdr-mark" style={{ width: 36, height: 36 }} aria-hidden>💧</div>
-          <div>
-            <h1 className="hdr-name" style={{ fontSize: "var(--fs-xl)" }}>JalDrishti</h1>
-            <div className="hdr-sub">ISR Groundwater Monitoring Portal</div>
-          </div>
+          <Link to="/" className="row" style={{ textDecoration: "none", color: "inherit", gap: 10 }}>
+            <Mark size={36} />
+            <div>
+              <h1 className="hdr-name" style={{ fontSize: "var(--fs-xl)" }}>JalDrishti</h1>
+              <div className="hdr-sub">Groundwater screening · Jharkhand</div>
+            </div>
+          </Link>
+          <span className="spacer grow" />
+          <Link to="/" className="btn ghost small-link" aria-label="Back to the front page"
+                style={{ whiteSpace: "nowrap" }}>
+            <Icon name="arrow" size={15} style={{ transform: "rotate(180deg)" }} /> Front page
+          </Link>
         </div>
 
         <div className="seg" style={{ marginBottom: 16 }}>
@@ -114,6 +128,15 @@ export default function Login() {
               <label htmlFor="u">Your name</label>
               <input id="u" value={username} autoComplete="name" required
                      minLength={3} onChange={(ev) => setUsername(ev.target.value)} />
+            </div>
+            <div className="field">
+              <label>Where do you live?</label>
+              <BlockFinder value={home} onChange={setHome} />
+              <div className="hint">
+                Your account will follow this block, so you are told when a well
+                there tests over a limit or a screening is published for it. You can
+                change it later, and follow more areas.
+              </div>
             </div>
           </>
         )}

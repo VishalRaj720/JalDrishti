@@ -537,6 +537,111 @@ async def block_summary(response: Response, db: AsyncSession = Depends(get_db)):
     }
 
 
+# ── R16: the two things a person needs BEFORE they have an account ────
+#
+# Both sit under /public/risk because they are unauthenticated by design, and
+# both are declared before `/{district_id}` because that route would otherwise
+# try to parse "advisories" as a UUID.
+
+@router.get("/blocks/search")
+async def public_block_search(
+    response: Response,
+    q: str = Query("", max_length=80),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Find a block by name, without signing in.
+
+    Registration asks where a person lives (migration 0025). That question is
+    asked before an account exists, so the search behind it cannot require one.
+    Names and districts only -- a block name is public geography.
+    """
+    response.headers["Cache-Control"] = _CACHE
+    rows = (await db.execute(text("""
+        SELECT b.id::text AS id, b.name, d.name AS district
+        FROM blocks b
+        LEFT JOIN districts d ON d.id = b.district_id
+        WHERE (:q = '' OR b.name ILIKE :like OR d.name ILIKE :like)
+        ORDER BY (b.name ILIKE :starts) DESC, b.name
+        LIMIT :cap
+    """), {"q": q.strip(), "like": f"%{q.strip()}%",
+           "starts": f"{q.strip()}%", "cap": limit})).mappings().all()
+    return [dict(r) for r in rows]
+
+
+@router.get("/blocks/at")
+async def public_block_at(
+    response: Response,
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+    db: AsyncSession = Depends(get_db),
+):
+    """The block containing a point, for "use my location" at registration."""
+    response.headers["Cache-Control"] = "no-store"
+    row = (await db.execute(text("""
+        SELECT b.id::text AS id, b.name, d.name AS district
+        FROM blocks b
+        LEFT JOIN districts d ON d.id = b.district_id
+        WHERE b.geometry IS NOT NULL
+          AND ST_Contains(b.geometry, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326))
+        LIMIT 1
+    """), {"lat": lat, "lon": lon})).mappings().first()
+    if row is None:
+        raise HTTPException(status_code=404,
+                            detail="That point is not inside any Jharkhand block.")
+    return dict(row)
+
+
+_PUBLISHED_WHAT_THIS_IS = (
+    "A modelled assessment published by the authority operating this platform: "
+    "what the model expects would happen to groundwater if a uranium in-situ "
+    "recovery operation were run at a location in this area. No such mine "
+    "operates in Jharkhand. This is preparedness screening, not a report of an "
+    "event, and it carries no site coordinate."
+)
+
+
+@router.get("/advisories")
+async def public_advisories(response: Response,
+                            db: AsyncSession = Depends(get_db)):
+    """Every PUBLISHED screening, without signing in.
+
+    The same shape `/citizen/advisories` returns to a signed-in resident, and
+    strictly nothing more: headline, plain-language meaning, what to do, the
+    blocks the footprint touches and the hectares involved. Never the ISR
+    coordinate, the run, the model card or a band (design section 2). The
+    `advisories_read` policy admits `status = 'published'` to an anonymous
+    session, so no context is needed here and a draft cannot leak: the
+    database refuses it before this code sees it.
+    """
+    response.headers["Cache-Control"] = "public, max-age=300"
+    rows = (await db.execute(text("""
+        SELECT a.id::text AS id, a.headline, a.what_it_means, a.what_to_do,
+               a.published_at, a.footprint_ha, a.affected_blocks, a.species,
+               a.time_years
+        FROM advisories a
+        WHERE a.status = 'published'
+        ORDER BY a.published_at DESC
+        LIMIT 100
+    """))).mappings().all()
+    out = []
+    for a in rows:
+        blocks = a["affected_blocks"] or []
+        if isinstance(blocks, str):
+            import json as _json
+            blocks = _json.loads(blocks)
+        out.append({
+            "id": a["id"], "headline": a["headline"],
+            "what_it_means": a["what_it_means"], "what_to_do": a["what_to_do"],
+            "published_at": a["published_at"], "footprint_ha": a["footprint_ha"],
+            "species": a["species"], "time_years": a["time_years"],
+            "blocks": [{"name": b.get("name"), "district": b.get("district"),
+                        "overlap_ha": b.get("overlap_ha")} for b in blocks],
+            "what_this_is": _PUBLISHED_WHAT_THIS_IS,
+        })
+    return {"count": len(out), "advisories": out}
+
+
 @router.get("/{district_id}")
 async def district_detail(district_id: uuid.UUID, response: Response,
                           db: AsyncSession = Depends(get_db)):

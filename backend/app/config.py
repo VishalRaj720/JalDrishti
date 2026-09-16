@@ -112,6 +112,28 @@ class Settings(BaseSettings):
     HSTS_ENABLED: bool = False
     HSTS_MAX_AGE: int = 31_536_000
 
+    # ── Alert delivery (R16) ─────────────────────────────────────────
+    # Plain SMTP, so the provider is a deployment choice rather than a code
+    # dependency: Brevo (smtp-relay.brevo.com:587, 300/day free), Mailjet,
+    # SES, or a Gmail app password all fit the same five values. With
+    # SMTP_HOST empty the mailer reports itself unconfigured, alerts still
+    # land in the portal inbox, and the operator's delivery panel counts how
+    # many are waiting -- a visible backlog rather than a silent no-op, which
+    # is the failure mode this codebase has had three times already.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_STARTTLS: bool = True
+    ALERT_FROM_EMAIL: str = ""          # must be a sender the provider has verified
+    ALERT_FROM_NAME: str = "JalDrishti groundwater alerts"
+    #: Where the email's "open in the portal" link points. The API never learns
+    #: the portal's origin otherwise (the Worker proxies /api/* to it).
+    PORTAL_URL: str = "http://localhost:5173"
+    #: Hours between automatic runs of the measured-exceedance scan and the
+    #: delivery job. 0 disables the scheduler; the admin buttons still work.
+    ALERT_SCAN_INTERVAL_HOURS: float = 24.0
+
     # S3
     S3_BUCKET: str = ""
     S3_ENDPOINT_URL: str = ""

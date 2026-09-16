@@ -9,6 +9,8 @@ import "./styles/layout.css";
 // the coverage grid). Last, so it can lean on the tokens and the primitives
 // the two above establish.
 import "./styles/instruments.css";
+// The front page and the two R16 controls (block finder, theme toggle).
+import "./styles/landing.css";
 
 import {
   AuthProvider, canAdmin, canAudit, canPublish, canReview, canRunSim, canSubmit,
@@ -17,6 +19,7 @@ import {
 import type { Role } from "./api/client";
 import Shell from "./components/Shell";
 import Login from "./pages/Login";
+import Landing from "./pages/Landing";
 import Overview from "./pages/Overview";
 import Console from "./pages/Console";
 import Publications from "./pages/Publications";
@@ -69,10 +72,25 @@ function Gate() {
   if (loading) {
     return <div className="login"><span className="spinner" /></div>;
   }
-  if (!me) return <Login />;
+  if (!me) {
+    // R16: the root URL is the front page, not a sign-in card. A deep link to
+    // any app screen still lands on the sign-in form and, once signed in, on
+    // that screen -- the router keeps the path.
+    return (
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Login initialMode="up" />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    );
+  }
 
   return (
     <Routes>
+      {/* Signed in, the front page is still reachable by name -- outside the
+          shell, because it carries its own header. */}
+      <Route path="/welcome" element={<Landing />} />
       <Route element={<Shell />}>
         <Route path="/overview" element={<Overview />} />
         {/* P2 merged /map and /studio into one Console. The old paths redirect

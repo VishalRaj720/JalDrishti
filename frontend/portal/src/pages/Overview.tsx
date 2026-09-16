@@ -752,9 +752,9 @@ function CitizenOverview() {
             <button className="btn ghost" onClick={() => nav("/alerts")}>Open →</button>
           </div>
           <div className="prose muted">
-            You are told when a well near you tests above the safe limit, and when an
-            assessment is published for your area. Alerts appear in this portal only —
-            no SMS, no email.
+            You are told when a well near you tests above a drinking-water limit, and
+            when a screening is published for your area — here, and by email to the
+            address on your account.
           </div>
         </div>
         <div className="card">

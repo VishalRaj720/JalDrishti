@@ -12,8 +12,15 @@
  * an office, and dark basemaps make a pale choropleth hard to separate from
  * the ground beneath it.
  *
- * All three sources are keyless. That is deliberate: an API key would be a
- * deployment secret for something that must keep working on a demo laptop.
+ * ALL SOURCES ARE KEYLESS, and this was re-verified on 2026-09-16 for a reason.
+ * The light and dark layers were CARTO (`basemaps.cartocdn.com`) until that
+ * date. CARTO now serves an "API KEY REQUIRED" watermark tile to requests it
+ * recognises as coming from a browser, while still serving a clean tile to
+ * `curl` — so nothing in this file looked wrong and every map in the deployed
+ * portal was stamped with the words across it. The replacements below were
+ * each checked with browser-shaped request headers (Referer, Sec-Fetch-*), not
+ * just a bare fetch. An API key would be a deployment secret for something that
+ * must keep working on a demo laptop, so a keyless source is still the rule.
  */
 import L from "leaflet";
 
@@ -23,42 +30,51 @@ export const BASEMAP_LABEL: Record<BasemapKey, string> = {
   light: "Map", dark: "Dark", satellite: "Satellite",
 };
 
-const OSM_CARTO = "&copy; OpenStreetMap &copy; CARTO";
+const OSM = "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors";
+const ESRI = "Tiles &copy; Esri";
+
+const esri = (service: string, opts: L.TileLayerOptions = {}) =>
+  L.tileLayer(
+    `https://server.arcgisonline.com/ArcGIS/rest/services/${service}/MapServer/tile/{z}/{y}/{x}`,
+    { attribution: ESRI, maxZoom: 19, ...opts });
 
 /** Build a fresh set. Leaflet layers are bound to one map, so each map needs
  *  its own instances rather than sharing module-level singletons. */
 export function makeBasemaps(): Record<BasemapKey, L.TileLayer> {
   return {
-    light: L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      { attribution: OSM_CARTO, subdomains: "abcd", maxZoom: 19 }),
-    dark: L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      { attribution: OSM_CARTO, subdomains: "abcd", maxZoom: 19 }),
-    satellite: L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      { attribution: "Tiles &copy; Esri — Esri, Maxar, Earthstar Geographics", maxZoom: 19 }),
+    // OpenStreetMap's own render. The densest settlement labelling available
+    // for rural Jharkhand without a key — village names matter more here than
+    // anywhere else in the product, because a resident locates their block by
+    // them. No `{s}` subdomains: OSM retired them.
+    light: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { attribution: OSM, maxZoom: 19 }),
+    // Esri's dark canvas is imagery-free and label-free by design; labels are
+    // a separate reference layer (see `makeLabels`) so they can sit in their
+    // own pane above every overlay. Native tiles stop at z16; `maxNativeZoom`
+    // lets Leaflet over-zoom them rather than blanking the map at z17+.
+    dark: esri("Canvas/World_Dark_Gray_Base", { maxNativeZoom: 16 }),
+    satellite: esri("World_Imagery",
+      { attribution: "Tiles &copy; Esri — Esri, Maxar, Earthstar Geographics" }),
   };
 }
 
 /**
- * Place names and roads for the satellite view.
+ * Place names and roads for the two basemaps that ship without them.
  *
- * Esri's World_Imagery is imagery only — no labels. Without this, switching to
- * satellite loses every settlement name, which is the opposite of what someone
- * switches to satellite to do (locate a village against real ground). The two
- * CARTO basemaps already carry their own labels, so this rides on top of the
- * imagery alone.
+ * Esri's World_Imagery and Dark_Gray_Base are both label-free. Without this,
+ * switching to either loses every settlement name, which is the opposite of
+ * what someone switches to satellite to do (locate a village against real
+ * ground). OSM carries its own labels, so it gets no overlay.
  */
-export function makeSatelliteLabels(): L.LayerGroup {
-  const ref = (name: string) =>
-    L.tileLayer(
-      `https://server.arcgisonline.com/ArcGIS/rest/services/${name}/MapServer/tile/{z}/{y}/{x}`,
-      { attribution: "Labels &copy; Esri", maxZoom: 19, pane: "paneLabels" });
-  return L.layerGroup([
-    ref("Reference/World_Boundaries_and_Places"),
-    ref("Reference/World_Transportation"),
-  ]);
+export function makeLabels(kind: Exclude<BasemapKey, "light">): L.LayerGroup {
+  const ref = (name: string, opts: L.TileLayerOptions = {}) =>
+    esri(name, { attribution: "Labels &copy; Esri", pane: "paneLabels", ...opts });
+  return kind === "satellite"
+    ? L.layerGroup([
+        ref("Reference/World_Boundaries_and_Places"),
+        ref("Reference/World_Transportation"),
+      ])
+    : L.layerGroup([ref("Canvas/World_Dark_Gray_Reference", { maxNativeZoom: 16 })]);
 }
 
 /**
@@ -77,21 +93,24 @@ export function attachBasemaps(map: L.Map, initial: BasemapKey = "light") {
     p.style.pointerEvents = "none";
   }
   const maps = makeBasemaps();
-  const labels = makeSatelliteLabels();
+  const labels: Partial<Record<BasemapKey, L.LayerGroup>> = {
+    dark: makeLabels("dark"),
+    satellite: makeLabels("satellite"),
+  };
   let current: BasemapKey = initial;
 
   maps[current].addTo(map);
-  if (current === "satellite") labels.addTo(map);
+  labels[current]?.addTo(map);
 
   return {
     get current() { return current; },
     set(next: BasemapKey) {
       if (next === current) return;
       map.removeLayer(maps[current]);
-      if (current === "satellite") map.removeLayer(labels);
+      labels[current]?.remove();
       current = next;
       maps[current].addTo(map);
-      if (current === "satellite") labels.addTo(map);
+      labels[current]?.addTo(map);
       // Keep tiles behind everything after a swap.
       maps[current].bringToBack();
     },

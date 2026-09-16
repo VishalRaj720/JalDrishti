@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 import enum
 from typing import Optional
-from sqlalchemy import String, ForeignKey, func
+from sqlalchemy import Boolean, String, ForeignKey, func, text
 from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
@@ -41,3 +41,16 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("orgs.id", ondelete="RESTRICT"),
         nullable=True, index=True,
     )
+    #: Where the account holder lives (migration 0025). Set at citizen
+    #: registration and subscribes the account to that block, so an alert
+    #: about a resident's own water does not depend on their having followed
+    #: the block in advance. Staff accounts leave it NULL.
+    home_block_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("blocks.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    #: Email delivery of alerts. Defaults ON: a drinking-water warning that is
+    #: opt-in reaches nobody. `server_default` matches the migration so the
+    #: raw-SQL registration path and the ORM path agree.
+    alert_email_opt_in: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true"))

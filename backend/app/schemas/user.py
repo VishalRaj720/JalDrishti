@@ -55,5 +55,9 @@ class UserResponse(UserBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    # R16 (migration 0025). Where the account holder lives, and whether alert
+    # email is on. Both null/true for staff; the citizen surface reads them.
+    home_block_id: Optional[uuid.UUID] = None
+    alert_email_opt_in: bool = True
 
     model_config = {"from_attributes": True}
