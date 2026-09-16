@@ -157,7 +157,7 @@ export default function Landing() {
             <Link to="/overview" className="btn primary">Open the portal <Icon name="arrow" size={15} /></Link>
           ) : (
             <>
-              <Link to="/login" className="btn">Sign in</Link>
+              <Link to="/login" className="btn ld-signin">Sign in</Link>
               <Link to="/register" className="btn primary">Create an account</Link>
             </>
           )}

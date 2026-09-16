@@ -39,6 +39,18 @@
 }
 .ld-nav a:hover { color: var(--text); background: var(--card2); }
 @media (max-width: 900px) { .ld-nav { display: none; } }
+.ld-head .hdr-brand { flex: 0 1 auto; overflow: hidden; }
+.ld-head .hdr-name { white-space: nowrap; }
+.ld-head .row { flex: 0 0 auto; margin-left: auto; }
+@media (max-width: 560px) {
+  .ld-head { gap: var(--s-2); }
+  .ld-head .hdr-sub { display: none; }
+  .ld-head .btn { padding-inline: 10px; white-space: nowrap; }
+  .ld-head .theme-toggle span { display: none; }
+  /* Sign in is one tap away on the page itself; the header keeps the
+     primary action only, so the wordmark is not squeezed off. */
+  .ld-head .ld-signin { display: none; }
+}
 
 /* ── hero ── */
 .ld-hero {
