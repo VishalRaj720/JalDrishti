@@ -44,6 +44,7 @@ because `tools/sync_docs.py`, `validation/end_to_end_audit.py` and
 |---|---|
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | **What this system does not know.** Open findings, permanent blockers, claims not to make |
 | [`docs/PRODUCT_DESIGN.md`](docs/PRODUCT_DESIGN.md) | How the three components become one product |
+| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | **The eight-minute walkthrough** for a review panel — one storyline, every screen in order |
 | [`docs/DEPLOY_WALKTHROUGH.md`](docs/DEPLOY_WALKTHROUGH.md) | **Start here to deploy.** The click-by-click: which site, what to type, what to check |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | The architecture behind it: the two database roles, the secrets, why one origin |
 | [`docs/roles.md`](docs/roles.md) | The four roles + a generated role × endpoint matrix |
