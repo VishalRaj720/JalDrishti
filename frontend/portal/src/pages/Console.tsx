@@ -64,6 +64,8 @@ export default function Console() {
   const map = useRef<L.Map | null>(null);
   const groups = useRef<Record<Key, L.LayerGroup>>({} as never);
   const plumeGroup = useRef<L.LayerGroup | null>(null);
+  // The last result the map was fitted to; see the plume effect.
+  const lastFitted = useRef<any>(null);
   const pinMarker = useRef<L.Marker | null>(null);
   const basemapCtl = useRef<{ set: (k: BasemapKey) => void } | null>(null);
 
@@ -596,8 +598,23 @@ export default function Console() {
     const r = mode === "pin" ? live
       : mode === "site" ? (showStored ? storedPlume : previewPlume)
       : null;
-    if (!r) { g.clearLayers(); return; }
+    if (!r) { g.clearLayers(); lastFitted.current = null; return; }
     drawPlume(g, r, showBands);
+
+    // Bring the result into view the FIRST time each result is drawn. A
+    // typical footprint is a few hectares — a few hundred metres across — and
+    // the console opens at state scale, where that is smaller than the pin
+    // marker. Before this, "Run on this pin" completed with nothing visible
+    // changing on the map and the single most legible thing the product does
+    // read as a button that did nothing. Keyed on the result object, not on
+    // `showBands`, so toggling the envelope does not yank the view back.
+    const m = map.current;
+    if (m && r !== lastFitted.current) {
+      lastFitted.current = r;
+      const b = L.latLngBounds([]);
+      g.eachLayer((l: any) => { if (typeof l.getBounds === "function") b.extend(l.getBounds()); });
+      if (b.isValid()) m.fitBounds(b.pad(0.5), { maxZoom: 15 });
+    }
   }, [mode, live, storedPlume, previewPlume, showStored, showBands]);
 
   // The direction the plume travels, drawn on the map. The engine has always
