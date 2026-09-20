@@ -63,10 +63,14 @@ def test_ml_artifacts_are_unchanged():
     # baseline is absent from every fresh clone, and the check failed there on
     # a file that is not a model artifact at all. Found 2026-09-16 in a
     # worktree; the joblib heads, metrics and model card are what this guards.
+    # R17: `sensitivity*.json` are validation OUTPUTS written next to the
+    # model artifacts by `ml_pipeline.validation.sensitivity`; re-running that
+    # offline analysis must not read as a retrain.
     current = {
         p.name: hashlib.sha256(p.read_bytes()).hexdigest()
         for p in sorted(artifacts.iterdir())
         if p.is_file() and p.suffix.lower() != ".png"
+        and not p.name.startswith("sensitivity")
     }
     if not baseline_path.exists():
         baseline_path.write_text(json.dumps(current, indent=1))

@@ -116,3 +116,4 @@ Datasets/.backups/
 # public. Also the tree that `--restore` moves aside before overwriting.
 backups/
 Datasets.before-restore-*/
+ml_pipeline/ml/artifacts_pre_r17/

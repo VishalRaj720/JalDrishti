@@ -4,43 +4,43 @@
   "top10": [
     {
       "feature": "source_conc_C0",
-      "importance": 0.73618
+      "importance": 0.72443
     },
     {
       "feature": "alpha_L",
-      "importance": 0.32027
+      "importance": 0.31383
     },
     {
       "feature": "wellfield_width_m",
-      "importance": 0.24771
+      "importance": 0.25143
     },
     {
       "feature": "residual_fraction",
-      "importance": 0.21599
-    },
-    {
-      "feature": "is_tds_mg_l",
-      "importance": 0.14998
-    },
-    {
-      "feature": "Kd_L_kg",
-      "importance": 0.1483
+      "importance": 0.22454
     },
     {
       "feature": "is_radium_226_mbq_l",
-      "importance": 0.10383
+      "importance": 0.13685
+    },
+    {
+      "feature": "is_tds_mg_l",
+      "importance": 0.13355
+    },
+    {
+      "feature": "Kd_L_kg",
+      "importance": 0.13098
     },
     {
       "feature": "Xc_m",
-      "importance": 0.09579
-    },
-    {
-      "feature": "pore_volumes_PV",
-      "importance": 0.08702
+      "importance": 0.10931
     },
     {
       "feature": "is_sulfate_mg_l",
-      "importance": 0.08361
+      "importance": 0.08658
+    },
+    {
+      "feature": "pore_volumes_PV",
+      "importance": 0.08437
     }
   ]
 }

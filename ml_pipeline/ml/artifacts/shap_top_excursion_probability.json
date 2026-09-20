@@ -4,43 +4,43 @@
   "top10": [
     {
       "feature": "Xc_m",
-      "importance": 0.20908
+      "importance": 0.22941
     },
     {
       "feature": "source_conc_C0",
-      "importance": 0.04341
+      "importance": 0.05089
     },
     {
       "feature": "residual_fraction",
-      "importance": 0.0233
+      "importance": 0.02816
     },
     {
       "feature": "is_tds_mg_l",
-      "importance": 0.02051
-    },
-    {
-      "feature": "contaminant_velocity_vc",
-      "importance": 0.0184
-    },
-    {
-      "feature": "dimensionless_time_tau",
-      "importance": 0.01609
+      "importance": 0.0279
     },
     {
       "feature": "D_T",
-      "importance": 0.01585
-    },
-    {
-      "feature": "containment_eta",
-      "importance": 0.01511
+      "importance": 0.02053
     },
     {
       "feature": "background_conc_Cb",
-      "importance": 0.01427
+      "importance": 0.01474
+    },
+    {
+      "feature": "containment_eta",
+      "importance": 0.01436
+    },
+    {
+      "feature": "dimensionless_time_tau",
+      "importance": 0.01435
     },
     {
       "feature": "is_sulfate_mg_l",
-      "importance": 0.01262
+      "importance": 0.01195
+    },
+    {
+      "feature": "Kd_L_kg",
+      "importance": 0.01009
     }
   ]
 }

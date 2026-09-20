@@ -8,11 +8,15 @@ The rule this file exists to enforce: *if a model misses a threshold, report it 
 than moving the threshold.* Nothing below has been softened to make the project look
 finished.
 
-**Last consolidated:** 2026-09-16. Sources: the ML pipeline readiness review
+**Last consolidated:** 2026-09-20. Sources: the ML pipeline readiness review
 (2026-08-12), the R10 audit (2026-08-19), the **R13 deployment-readiness audit
-(2026-08-24)**, the **R14 pre-deployment changes (2026-08-25)**, R15 (2026-08-26)
-and **R16 (2026-09-16)**, which reviewed the deployed portal against the
-proposal's deliverables and the eight monthly reports. The full chronological review record — including findings
+(2026-08-24)**, the **R14 pre-deployment changes (2026-08-25)**, R15 (2026-08-26),
+**R16 (2026-09-16)**, which reviewed the deployed portal against the
+proposal's deliverables and the eight monthly reports, and **R17 (2026-09-20)**,
+the pre-report audit (`docs/PRE_REPORT_AUDIT_AND_PLAN.md`) and the five items it
+implemented: the β retrain (§1d, now closed), alert tiers with a structured
+record (§4h), plume timeline frames (§4h), hydrochemical QA (§3, §4h) and the
+global sensitivity analysis (§1e). The full chronological review record — including findings
 that were later **retracted**, which is why it is kept rather than summarised — lives in
 `docs/local/audit-record/` and is not tracked in git.
 
@@ -35,8 +39,8 @@ not quantify structural model error, and nothing in this product can.
 
 | Item | Status | Why |
 |---|---|---|
-| **Plume extent rests on β, an unmeasured matrix-storage ratio; the band samples inside the assumption** | 🔴 **Open — see §1d** | Every value in the served β range keeps the plume within 30 m; β = 0.5 gives 61 m, β = 0.1 puts 665 ppb at the monitoring ring. The tool's own porosities imply β = 3, not the served 10. Correction requires a retrain and is scheduled, not done |
-| **Per-species R²(log) ≥ 0.60 — radium migration (0.516), compliance (0.431)** | 🔴 **Fails the project's own Gate-4 bar** | Not a tuning failure, a label-shape property. Radium's migration label is **81.8 % exact zeros**, compliance **95.8 % pinned at the 23 mBq/L background**. A squared-error regressor on `log1p` cannot fit a point mass, and R² divides by a near-zero SST. Both *improved* over the previous model (0.475→0.516, 0.403→0.431). The remedy is a **zero-inflated / two-stage head** — a new ML approach, not yet authorised |
+| ~~**Plume extent rests on β, an unmeasured matrix-storage ratio; the band samples inside the assumption**~~ | ✅ **Closed (R17, 2026-09-20) — see §1d** | β is now derived from the run's own porosities (3.0 at Jaduguda, 1–4 across the lithology table), the training prior is log-uniform on [0.3, 20] and the Monte-Carlo band spans a factor of 4 either side. The v4 retrain passes every gate. β is still not a *measurement* — §2 stands |
+| **Per-species R²(log) ≥ 0.60 — radium migration (0.515), compliance (0.227)** | 🔴 **Fails the project's own Gate-4 bar** | Not a tuning failure, a label-shape property. Radium's migration label is **81.8 % exact zeros**, compliance **95.8 % pinned at the 23 mBq/L background**. A squared-error regressor on `log1p` cannot fit a point mass, and R² divides by a near-zero SST. The v4 retrain (R17) left migration unchanged (0.516→0.515) and **worsened compliance (0.431→0.227)** — the wider β prior moved a few more radium scenarios off the background pin, and a point mass with a thin tail is exactly what this learner cannot fit. The remedy is a **zero-inflated / two-stage head** — a new ML approach, not authorised; the conformal band on those cells still covers (0.92–0.95 per cell, 0.879 field-resampled) |
 
 **Why this does not invalidate the product:** the analytical engine serves the
 authoritative central value for radium, and the conformal bands on those cells cover
@@ -46,7 +50,7 @@ pipeline is not ready** until the two-stage head is built.
 
 ---
 
-## 1d. Open (2026-09-16) — the plume's extent rests on one unmeasured number, and the band does not cover it
+## 1d. Closed (2026-09-20) — the plume's extent rested on one unmeasured number, and the band did not cover it
 
 **Raised by the project owner from the published Jaduguda report:** *"the spread
 is only 1 to 10 m — is the impact really that small?"* Rechecked against the
@@ -113,14 +117,91 @@ makes the served extent larger: deriving β from the tool's own porosities
 figures should be read as **the immobile end of a range this tool cannot yet
 bound**, and the report says so (R16).
 
-**What is not being done, and why.** β is a training feature; changing its
-prior or the clock invalidates every label the surrogate learned from, so the
-remedy is a re-bake, retrain, conformal recalibration and `sync_docs` — hours
-of compute plus validation, and a fourth sanctioned change to the frozen
-pipeline. That is a deliberate decision, not a same-day fix. The recommended
-change, when made: β prior (0.3, 3, 20) with the central value derived from
-the resolved porosities, and the diffusive clock in place of the first-order
-one. Until then the sensitivity table above is the honest statement.
+**What was done (R17, 2026-09-20) — the fourth sanctioned change to the frozen
+pipeline.** β is a training feature, so this was a re-bake (900 scenarios × 48
+draws, 18,000 rows, ~2 h), a retrain, a conformal recalibration, the
+field-resampled coverage gate and `sync_docs`. Three changes, in
+`config/parameters.py`, `dashboard/resolve.py` and `synthetic/generate.py`:
+
+1. **The served central β is derived, not served.** `β_por = (n_total −
+   φ_mobile)/φ_mobile` from the porosities the run already resolves with
+   provenance: 3.0 at Jaduguda, 1.0–4.0 across the lithology table, never 10.
+   This is a definition, not a calibration — it makes the engine's two
+   statements of matrix capacity agree. `hydro.beta_basis` says which path
+   produced the value; a user override still wins.
+2. **The training prior is log-uniform on [0.3, 20].** A scale parameter
+   spanning nearly two decades must not be sampled uniformly: U(2, 20) put
+   89 % of its mass above β = 4, above every value the porosity table can
+   produce, so the served values would have sat in the thin tail of the
+   support. The retrained fractured support is Rd ∈ [1.3, 21] and every
+   lithology's β_por lies inside it (test-pinned).
+3. **The Monte-Carlo band spans a factor of 4 either side** of the central
+   value, log-uniform, clipped to the prior — "the matrix may store four times
+   more or four times less than the porosities imply" — in place of a ±40 %
+   jitter inside the old assumption. Train and serve share one sampler.
+
+**The diffusive clock was evaluated and not adopted.** A diagnostic at the
+three reference sites (Jaduguda deposit, a belt point, Ranchi) compared the
+first-order Goltz–Roberts clock with the √t diffusive clock described in the
+config: fronts moved 2.1 → 2.0 m (uranium) and 31.2 → 30.2 m (sulfate). Both
+clocks reach the capacity cap `1 + β·R_m` within ~3–6 yr of a 20-yr horizon,
+so the front runs on the *capacity*, not the kinetics; β is the lever, the
+clock is not. The same diagnostic found the retarded-continuum branch governs
+at every site and species — the Tang early-arrival envelope never wins at 20 yr
+— which contradicts the config's earlier note that Tang "already governs for
+sorbing species" and is pinned by `test_r17_beta.py`.
+
+**Before and after** (`ml_pipeline/outputs/snapshot_{pre,post}_r17.json`,
+default site operation, 20 yr, analytical engine; ML P10–P90 migration band
+from the v3 and v4 surrogates):
+
+| Pin · species | β | Migration | Footprint | At the ring | ML band (migration) |
+|---|---|---|---|---|---|
+| Jaduguda · uranium | 10 → 3.0 | 10.6 → **20.5 m** | 9.3 → 9.6 ha | 1 → 1 ppb | 2–61 → 2–102 m |
+| Jaduguda · sulfate | 10 → 3.0 | 31.7 → **73.1 m** | 10.0 → 11.3 ha | 227 → 244 mg/L | 2–189 → 3–468 m |
+| Jaduguda · TDS | 10 → 3.0 | 114 → **254 m** | 12.7 → 17.6 ha | 2,253 → 4,428 mg/L | 5–848 → 15–2,136 m |
+| Jaduguda · radium | 10 → 3.0 | 0.3 → 0.6 m | 9.1 → 9.1 ha | 23 → 23 mBq/L | 0–1 → 0–2 m |
+| Mid-belt · sulfate | 10 → 2.0 | 19.0 → 60.7 m | 12.4 → 13.7 ha | 46 → 63 mg/L | 2–114 → 4–345 m |
+| Ranchi (non-belt) · sulfate | 10 → 2.0 | 8.8 → 25.3 m | 12.3 → 12.7 ha | 31 → 31 mg/L | 1–42 → 2–172 m |
+
+Uranium roughly doubles and stays within tens of metres — `R_m ≈ 90` still
+dominates `β·R_m` — while the lixiviant reagents (sulfate, TDS) move two to
+three times as far and the band now reaches into the hundreds of metres. That
+is the physically expected ordering and the reason NUREG-1569 rejects uranium
+as an excursion indicator; the engine's indicator panel already reflects it.
+The published Jaduguda advisory footprint is unchanged in kind: block
+intersection is done on the central contour, so the alert count does not
+inflate; the P90 envelope now feeds a separate `possible_reach` alert (§4h).
+
+**v3 → v4 surrogate** (`ml/artifacts/metrics.json`, all gates unchanged and
+passing): area R²(log) 0.892 → 0.894, migration 0.929 → 0.927, compliance
+0.957 → 0.947; scenario coverage 0.861 / 0.868 / 0.862; field-resampled
+coverage 0.883 / 0.875 / 0.879 (gate 0.80); on-manifold physics laws hold;
+excursion-probability R² 0.916. Baselines on the same folds (new in v4):
+ridge 0.56 / 0.77 / 0.74 and a depth-1 stump 0.38 / 0.51 / 0.50 against the
+surrogate's 0.89 / 0.93 / 0.95. The one regression — radium compliance — is
+in §1 above.
+
+**What is still true.** β is not measured. The central value now rests on
+lithology-typical porosities (Freeze & Cherry 1979) or a polygon's specific
+yield, and the factor-4 band is a judgement about how far typical values may
+be from local ones. Fidelity row 3.4 stands: a Singhbhum tracer test is the
+only thing that retires it. The sensitivity analysis in §1e says how much of
+the output variance it still carries.
+
+---
+
+## 1e. Global sensitivity (R17, 2026-09-20) — which assumptions carry the answer
+
+`ml_pipeline/validation/sensitivity.py` sweeps thirteen inputs (seven
+registered ungrounded constants that enter the plan-view solve, six resolved
+hydrogeological inputs with their Monte-Carlo ranges) at three reference sites
+for uranium and sulfate: one-at-a-time elasticities and Sobol first- and
+total-order indices (Saltelli design, N = 256, ~3,800 analytical evaluations
+per site and species). Results in `ml/artifacts/sensitivity.json` and the
+`sensitivity_*.png` figures; the summary table is reproduced in the report.
+The headline is reported there rather than here so this file does not
+hand-copy a number the artifact already carries.
 
 ---
 

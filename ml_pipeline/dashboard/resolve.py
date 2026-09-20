@@ -306,10 +306,24 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     kd = payload.get("kd_L_kg")
     if kd is None:
         kd = kd_central
+    # R17: the capacity ratio is DERIVED from the porosities this run resolves
+    # (theta_immobile / theta_mobile), not served from a literature range. The
+    # mobile porosity used is the one the transport will run on -- including a
+    # slider override -- so beta and phi_mobile cannot disagree about the same
+    # rock. See P.DUAL_POROSITY and LIMITATIONS.md section 1d.
     beta = payload.get("beta")
-    if beta is None:
-        beta = (sum(P.DUAL_POROSITY["beta_range"]) / 3.0
-                if regime in P.DUAL_POROSITY["enabled_for"] else 0.0)
+    if beta is not None:
+        beta_basis = "user_override"
+    elif regime in P.DUAL_POROSITY["enabled_for"]:
+        if P.DUAL_POROSITY.get("beta_from_porosity", True):
+            beta = P.beta_from_porosities(
+                n_total, _override(payload, "phi_mobile", phi_default))
+            beta_basis = "porosity_derived"
+        else:                                   # v3 behaviour, kept switchable
+            beta = sum(P.DUAL_POROSITY["beta_legacy_range"]) / 3.0
+            beta_basis = "legacy_literature_mean"
+    else:
+        beta, beta_basis = 0.0, "not_applicable_porous"
 
     # source signature (Texas-derived) midpoint; background from nearest well.
     # Radium has no Texas ISR series to transfer from and no radium column in
@@ -550,6 +564,15 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         # ambient far-field context only -- never applied to the plume Kd
         "kd_ambient_alkalinity_adjusted": round(float(_kd_ambient), 3),
         "dual_porosity_beta": round(inputs["beta"], 2),
+        # R17: where the served beta came from, and the band the Monte Carlo
+        # draws around it (so the UI can say "3.0, from the porosities; the
+        # band spans 0.75-12" instead of presenting a scalar as known).
+        "beta_basis": beta_basis,
+        "beta_band": ([round(max(inputs["beta"] / P.DUAL_POROSITY["beta_mc_factor"],
+                                 P.DUAL_POROSITY["beta_prior"][0]), 3),
+                       round(min(inputs["beta"] * P.DUAL_POROSITY["beta_mc_factor"],
+                                 P.DUAL_POROSITY["beta_prior"][1]), 3)]
+                      if regime in P.DUAL_POROSITY["enabled_for"] else None),
         "source_conc_C0": round(c0, 1),
         "background_conc_Cb": round(inputs["background_conc_Cb"], 2),
         "hco3_mg_l": (None if b.get("hco3_mg_l") != b.get("hco3_mg_l")

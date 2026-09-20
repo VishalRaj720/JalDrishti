@@ -4,43 +4,43 @@
   "top10": [
     {
       "feature": "Xc_m",
-      "importance": 1.28775
+      "importance": 1.31437
     },
     {
       "feature": "source_conc_C0",
-      "importance": 0.54663
+      "importance": 0.56577
     },
     {
       "feature": "residual_fraction",
-      "importance": 0.2849
+      "importance": 0.3084
     },
     {
       "feature": "is_radium_226_mbq_l",
-      "importance": 0.24951
+      "importance": 0.30209
     },
     {
       "feature": "is_tds_mg_l",
-      "importance": 0.19058
+      "importance": 0.2207
     },
     {
       "feature": "containment_eta",
-      "importance": 0.16394
+      "importance": 0.15942
     },
     {
       "feature": "is_sulfate_mg_l",
-      "importance": 0.11459
+      "importance": 0.11769
     },
     {
       "feature": "D_T",
-      "importance": 0.08854
-    },
-    {
-      "feature": "dimensionless_time_tau",
-      "importance": 0.08806
+      "importance": 0.09098
     },
     {
       "feature": "background_conc_Cb",
-      "importance": 0.07918
+      "importance": 0.08929
+    },
+    {
+      "feature": "alpha_T",
+      "importance": 0.07275
     }
   ]
 }

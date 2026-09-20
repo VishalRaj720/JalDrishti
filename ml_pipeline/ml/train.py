@@ -34,6 +34,10 @@ import pandas as pd
 import joblib
 from sklearn.model_selection import GroupKFold
 from sklearn.metrics import r2_score, mean_absolute_error
+from sklearn.linear_model import Ridge
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeRegressor
 import xgboost as xgb
 
 from ml_pipeline.ml.dataset import (
@@ -78,6 +82,46 @@ def _cal_eval_split(scenario_ids: np.ndarray) -> set:
 
 
 # --------------------------------------------------------------------------- #
+# R17: BASELINES, so the surrogate's skill is reported against something.
+#
+# A research report that presents an R² without a comparison invites "compared
+# with what?". Three reference models are fitted on the SAME features, the SAME
+# log1p target and the SAME GroupKFold folds as the P50 head, so the only thing
+# that differs is the learner:
+#   * mean          -- predict the training-fold mean (R² ~ 0 by construction;
+#                      the floor every model must clear);
+#   * ridge         -- a standardised linear model (does the physics-derived
+#                      feature set carry the answer linearly?);
+#   * stump         -- a depth-1 decision tree (a single threshold on the single
+#                      most informative feature: the weakest non-trivial learner).
+# They are diagnostics, written to metrics.json and never served.
+# --------------------------------------------------------------------------- #
+def _baselines(X: pd.DataFrame, y_log: np.ndarray, groups: np.ndarray) -> dict:
+    gkf = GroupKFold(n_splits=N_SPLITS)
+    out = {}
+    makers = {
+        "mean": None,
+        "ridge": lambda: make_pipeline(StandardScaler(), Ridge(alpha=1.0)),
+        "stump": lambda: DecisionTreeRegressor(max_depth=1, random_state=42),
+    }
+    for name, mk in makers.items():
+        oof = np.full(len(y_log), np.nan)
+        for tr, te in gkf.split(X, y_log, groups):
+            if mk is None:
+                oof[te] = float(np.mean(y_log[tr]))
+            else:
+                m = mk()
+                m.fit(X.iloc[tr], y_log[tr])
+                oof[te] = m.predict(X.iloc[te])
+        y_raw, p_raw = np.expm1(y_log), np.clip(np.expm1(oof), 0, None)
+        out[name] = {
+            "r2_log": round(float(r2_score(y_log, oof)), 4),
+            "r2": round(float(r2_score(y_raw, p_raw)), 4),
+            "mae": round(float(mean_absolute_error(y_raw, p_raw)), 4),
+        }
+    return out
+
+
 def train_band_target(df: pd.DataFrame, target: str, cfg: dict):
     """OOF-CV the three band models, conformalize honestly, refit on all rows."""
     sub = _subframe(df, cfg["censor_offscale"])
@@ -158,10 +202,17 @@ def train_band_target(df: pd.DataFrame, target: str, cfg: dict):
     tail = row_eval & (y90_raw >= np.quantile(y90_raw[row_eval], 0.95))
     cov_tail = float(np.mean(covered[tail])) if tail.any() else float("nan")
 
+    # R17: reference models on the same folds, same features, same target
+    baselines = _baselines(X, yt["p50"], groups)
+    baselines["surrogate_p50"] = {"r2_log": band_metrics["r2_log"],
+                                  "r2": band_metrics["r2"]["p50"],
+                                  "mae": band_metrics["mae"]["p50"]}
+
     metrics = {
         "n": int(len(sub)),
         "n_censored": int(len(df) - len(sub)),
         **band_metrics,
+        "baselines": baselines,
         "r2_p50_per_fold": fold_r2,
         "coverage": {"rows_eval": round(cov_rows, 4),
                      "scenarios_eval": round(cov_scen, 4),
@@ -273,6 +324,10 @@ def train_all():
         per_sp = "  ".join(f"{k.split('_')[0]}={v:.3f}"
                            for k, v in mt["r2_log_by_species"].items())
         print(f"        per-species R2log: {per_sp}")
+        bl = mt["baselines"]
+        print(f"        baselines R2log: mean={bl['mean']['r2_log']:.3f}  "
+              f"ridge={bl['ridge']['r2_log']:.3f}  stump={bl['stump']['r2_log']:.3f}  "
+              f"vs surrogate={bl['surrogate_p50']['r2_log']:.3f}")
         metrics["stress_polygon_cv"][target] = polygon_stress_cv(df, target, cfg)
         st = metrics["stress_polygon_cv"][target]
         print(f"        leave-aquifer-out R2(P50)={st['r2_p50']:.3f} "
@@ -304,9 +359,52 @@ def train_all():
                 "retardation_Rd": [float(sub["retardation_Rd"].min()), float(sub["retardation_Rd"].max())],
                 "K_m_day": [float(sub["K_m_day"].min()), float(sub["K_m_day"].max())],
             }
+    # R17: reproducibility -- the trained model is traceable to one bake
+    # (its meta and the SHA-256 of the CSV it was trained on), one commit, and
+    # the configuration that generated its labels.
+    import hashlib
+    import subprocess
+    from ml_pipeline.ml.dataset import TRAINING_CSV
+    csv_path = TRAINING_CSV
+    sha = hashlib.sha256()
+    with open(csv_path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            sha.update(chunk)
+    meta_path = csv_path.with_name("synthetic_meta.json")
+    bake_meta = json.loads(meta_path.read_text()) if meta_path.exists() else None
+    try:
+        git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"],
+                                          cwd=str(ARTIFACT_DIR), text=True,
+                                          stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        git_sha = None
+    reproducibility = {
+        "training_csv": csv_path.name,
+        "training_csv_sha256": sha.hexdigest(),
+        "training_rows": int(len(df)),
+        "training_scenarios": int(df[GROUP_COL].nunique()),
+        "bake_meta": bake_meta,
+        "trainer_git_sha": git_sha,
+        "trained_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "xgb_params": COMMON, "n_splits": N_SPLITS, "alpha": ALPHA,
+        "delta_inflate": DELTA_INFLATE, "cal_split_seed": CAL_SPLIT_SEED,
+        "beta_prior": list(P.DUAL_POROSITY["beta_prior"]),
+        "beta_mc_factor": P.DUAL_POROSITY["beta_mc_factor"],
+        "regenerate": ["python -m ml_pipeline.synthetic.generate --scenarios 900 --mc 48",
+                       "python -m ml_pipeline.ml.train",
+                       "python -m ml_pipeline.ml.shap_analysis",
+                       "python -m ml_pipeline.synthetic.generate --scenarios 120 --mc 48 "
+                       "--field-mix 1.0 --out ml_pipeline/outputs/field_batch.csv",
+                       "python -m ml_pipeline.validation.field_coverage --write-metrics",
+                       "python -m ml_pipeline.tools.sync_docs"],
+    }
     (ARTIFACT_DIR / "model_card.json").write_text(json.dumps({
-        "version": 3,                # v3 = E1 disc/anisotropy retrain (trained on E1 labels)
+        # v4 = R17 beta retrain: porosity-derived served beta, log-uniform
+        # [0.3, 20] training prior, factor-4 MC band (LIMITATIONS.md 1d).
+        # v3 was the E1 disc/anisotropy retrain.
+        "version": 4,
         "e1_geometry": True,
+        "reproducibility": reproducibility,
         "features": MODEL_FEATURES,
         "band_targets": list(BAND_TARGETS),
         "bands": list(BANDS),

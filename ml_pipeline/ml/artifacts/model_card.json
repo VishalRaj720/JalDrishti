@@ -1,6 +1,140 @@
 {
-  "version": 3,
+  "version": 4,
   "e1_geometry": true,
+  "reproducibility": {
+    "training_csv": "synthetic_training.csv",
+    "training_csv_sha256": "3a50ba19669ba5efdfec6bced1a8a440b6d98efaea07cba5213e1b53fd824fd5",
+    "training_rows": 18000,
+    "training_scenarios": 900,
+    "bake_meta": {
+      "version": 4,
+      "n_scenarios": 900,
+      "n_rows": 18000,
+      "n_mc": 48,
+      "seed": 42,
+      "mc_seed": 43,
+      "generator": "ml_pipeline.synthetic.generate",
+      "git_sha": "7af0326573acedfeab06dac89693988ad9b58e8e",
+      "beta_prior": [
+        0.3,
+        20.0
+      ],
+      "beta_mc_factor": 4.0,
+      "beta_sampling": "log_uniform_prior; mc log_uniform [beta/F, F*beta]",
+      "e1_geometry": true,
+      "field_mix_frac": 0.6,
+      "times_years": [
+        2.0,
+        5.0,
+        8.0,
+        12.0,
+        20.0
+      ],
+      "species": [
+        "uranium_ppb",
+        "sulfate_mg_l",
+        "tds_mg_l",
+        "radium_226_mbq_l"
+      ],
+      "feature_columns": [
+        "regime_is_fractured",
+        "domain_is_texas",
+        "K_m_day",
+        "gradient_i",
+        "phi_mobile",
+        "phi_total",
+        "darcy_flux_q",
+        "seepage_velocity_v",
+        "Kd_L_kg",
+        "retardation_Rd",
+        "contaminant_velocity_vc",
+        "alpha_L",
+        "alpha_T",
+        "anisotropy_ratio",
+        "D_L",
+        "D_T",
+        "peclet_L",
+        "pore_volumes_PV",
+        "dimensionless_time_tau",
+        "dual_porosity_beta",
+        "Q_in_m3_day",
+        "Q_out_m3_day",
+        "bleed_fraction",
+        "Q_net_m3_day",
+        "containment_eta",
+        "operation_days",
+        "wellfield_width_m",
+        "source_conc_C0",
+        "background_conc_Cb",
+        "downtime_fraction",
+        "gradient_seasonal_amp",
+        "restoration_years",
+        "residual_fraction",
+        "u_attenuation_k"
+      ],
+      "band_targets": [
+        "affected_area_ha_p10",
+        "affected_area_ha_p50",
+        "affected_area_ha_p90",
+        "max_migration_distance_m_p10",
+        "max_migration_distance_m_p50",
+        "max_migration_distance_m_p90",
+        "compliance_conc_p10",
+        "compliance_conc_p50",
+        "compliance_conc_p90"
+      ],
+      "point_target": "excursion_probability",
+      "regime_counts": {
+        "fractured": 9440,
+        "porous": 8560
+      },
+      "n_polygons": 23,
+      "mean_pex_by_species": {
+        "radium_226_mbq_l": 0.003,
+        "sulfate_mg_l": 0.297,
+        "tds_mg_l": 0.401,
+        "uranium_ppb": 0.152
+      },
+      "restoration_share": 0.5,
+      "compliance_buffer_m": 100.0,
+      "incremental_floor": 0.1,
+      "bis_thresholds": {
+        "uranium_ppb": 30.0,
+        "sulfate_mg_l": 400.0,
+        "tds_mg_l": 2000.0,
+        "radium_226_mbq_l": 1000.0
+      }
+    },
+    "trainer_git_sha": "7af0326573acedfeab06dac89693988ad9b58e8e",
+    "trained_at": "2026-09-20T06:58:58Z",
+    "xgb_params": {
+      "n_estimators": 450,
+      "max_depth": 5,
+      "learning_rate": 0.05,
+      "subsample": 0.85,
+      "colsample_bytree": 0.85,
+      "reg_lambda": 1.5,
+      "tree_method": "hist",
+      "random_state": 42
+    },
+    "n_splits": 5,
+    "alpha": 0.2,
+    "delta_inflate": 1.35,
+    "cal_split_seed": 0,
+    "beta_prior": [
+      0.3,
+      20.0
+    ],
+    "beta_mc_factor": 4.0,
+    "regenerate": [
+      "python -m ml_pipeline.synthetic.generate --scenarios 900 --mc 48",
+      "python -m ml_pipeline.ml.train",
+      "python -m ml_pipeline.ml.shap_analysis",
+      "python -m ml_pipeline.synthetic.generate --scenarios 120 --mc 48 --field-mix 1.0 --out ml_pipeline/outputs/field_batch.csv",
+      "python -m ml_pipeline.validation.field_coverage --write-metrics",
+      "python -m ml_pipeline.tools.sync_docs"
+    ]
+  },
   "features": [
     "regime_is_fractured",
     "K_m_day",
@@ -60,34 +194,34 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|radium_226_mbq_l": 0.64076,
-      "fractured|sulfate_mg_l": 0.92988,
-      "fractured|tds_mg_l": 1.19113,
-      "fractured|uranium_ppb": 0.19229,
-      "porous|radium_226_mbq_l": 0.61702,
-      "porous|sulfate_mg_l": 1.12099,
-      "porous|tds_mg_l": 1.27991,
-      "porous|uranium_ppb": 0.32276
+      "fractured|radium_226_mbq_l": 0.56335,
+      "fractured|sulfate_mg_l": 1.03194,
+      "fractured|tds_mg_l": 1.36362,
+      "fractured|uranium_ppb": 0.23079,
+      "porous|radium_226_mbq_l": 0.47443,
+      "porous|sulfate_mg_l": 1.10146,
+      "porous|tds_mg_l": 1.37911,
+      "porous|uranium_ppb": 0.30871
     },
     "max_migration_distance_m": {
-      "fractured|radium_226_mbq_l": 0.19143,
-      "fractured|sulfate_mg_l": 1.10404,
-      "fractured|tds_mg_l": 1.55758,
-      "fractured|uranium_ppb": 0.90442,
-      "porous|radium_226_mbq_l": 0.7105,
-      "porous|sulfate_mg_l": 1.68249,
-      "porous|tds_mg_l": 2.13396,
-      "porous|uranium_ppb": 0.95651
+      "fractured|radium_226_mbq_l": 0.23198,
+      "fractured|sulfate_mg_l": 1.17433,
+      "fractured|tds_mg_l": 1.53004,
+      "fractured|uranium_ppb": 0.85182,
+      "porous|radium_226_mbq_l": 0.52853,
+      "porous|sulfate_mg_l": 1.79868,
+      "porous|tds_mg_l": 1.95826,
+      "porous|uranium_ppb": 1.06925
     },
     "compliance_conc": {
-      "fractured|radium_226_mbq_l": 0.05821,
-      "fractured|sulfate_mg_l": 0.94976,
-      "fractured|tds_mg_l": 0.54544,
-      "fractured|uranium_ppb": 1.29993,
-      "porous|radium_226_mbq_l": 0.04467,
-      "porous|sulfate_mg_l": 1.46838,
-      "porous|tds_mg_l": 0.57887,
-      "porous|uranium_ppb": 2.04944
+      "fractured|radium_226_mbq_l": 0.06941,
+      "fractured|sulfate_mg_l": 1.22594,
+      "fractured|tds_mg_l": 0.65134,
+      "fractured|uranium_ppb": 1.82774,
+      "porous|radium_226_mbq_l": 0.04853,
+      "porous|sulfate_mg_l": 1.27147,
+      "porous|tds_mg_l": 0.62086,
+      "porous|uranium_ppb": 2.01064
     }
   },
   "monotone_maps": {
@@ -250,8 +384,8 @@
         0.025
       ],
       "retardation_Rd": [
-        3.0372735886811566,
-        20.921936607798788
+        1.3026203454753087,
+        20.639027022139526
       ],
       "K_m_day": [
         0.0443875111561223,

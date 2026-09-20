@@ -193,14 +193,22 @@ def test_extra_registry_keys_are_inert_to_the_generator():
 def test_existing_analytical_and_ml_outputs_are_unchanged(species):
     """Pinned against values captured BEFORE chloride was introduced, at the
     PIN operating point. If adding an excursion-only constituent had leaked
-    into the modelled species in any way, these would move."""
+    into the modelled species in any way, these would move.
+
+    R17: those values were captured with beta served at the v3 literature mean
+    (10). The serve path now derives beta from the porosities, so the legacy
+    value is passed EXPLICITLY -- the override path is unchanged physics -- and
+    this guard keeps testing what it was written for (chloride inertness)
+    instead of freezing the beta decision."""
     expected = {
         "uranium_ppb":      dict(area_ha=12.510, migration_m=12.9),
         "sulfate_mg_l":     dict(area_ha=13.184, migration_m=40.2),
         "tds_mg_l":         dict(area_ha=17.087, migration_m=139.3),
         "radium_226_mbq_l": dict(area_ha=12.325, migration_m=0.3),
     }[species]
-    j = client.post("/api/predict", json=dict(PIN, species=species)).json()
+    legacy_beta = sum(P.DUAL_POROSITY["beta_legacy_range"]) / 3.0
+    j = client.post("/api/predict",
+                    json=dict(PIN, species=species, beta=legacy_beta)).json()
     a = j["metrics"]["analytical"]
     assert a["area_ha"] == pytest.approx(expected["area_ha"], abs=0.05)
     assert a["migration_m"] == pytest.approx(expected["migration_m"], abs=0.5)

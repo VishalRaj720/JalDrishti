@@ -87,6 +87,42 @@ FIELD_MIX_FRAC = 0.60
 V_SAMPLE_RANGE = (0.35, 0.80)    # observed field circular-variance span
 
 
+def _git_sha() -> str | None:
+    """Commit the bake ran from, for the reproducibility record. None outside a
+    checkout -- never a guess."""
+    import subprocess
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=str(Path(__file__).resolve().parent),
+            stderr=subprocess.DEVNULL, text=True).strip()
+    except Exception:
+        return None
+
+
+# --------------------------------------------------------------------------- #
+# R17: dual-porosity capacity ratio sampling (train == serve)
+# --------------------------------------------------------------------------- #
+def beta_prior_sample(u: float) -> float:
+    """Scenario-level beta: LOG-uniform over P.DUAL_POROSITY['beta_prior'].
+    u in [0, 1) is the generator's uniform draw."""
+    lo, hi = P.DUAL_POROSITY["beta_prior"]
+    return float(math.exp(math.log(lo) + (math.log(hi) - math.log(lo)) * float(u)))
+
+
+def beta_mc_sample(beta_central: float, u: float) -> float:
+    """Per-draw beta for the parameter-uncertainty Monte Carlo: log-uniform on
+    [beta/F, F*beta] with F = P.DUAL_POROSITY['beta_mc_factor'], clipped to the
+    prior. Shared by the training labels (`_draw_params`) and the served
+    excursion probability (`predict_analytical` -> `excursion_probability`), so
+    the band a user sees is the band the surrogate was trained on."""
+    if beta_central <= 0.0:
+        return 0.0
+    F = float(P.DUAL_POROSITY["beta_mc_factor"])
+    lo, hi = P.DUAL_POROSITY["beta_prior"]
+    b = beta_central * math.exp((2.0 * float(u) - 1.0) * math.log(F))
+    return float(min(max(b, lo), hi))
+
+
 # --------------------------------------------------------------------------- #
 # Scenario sampling -- anchored to real Jharkhand polygons
 # --------------------------------------------------------------------------- #
@@ -177,9 +213,13 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
         rest_years = 0.0
         residual = {sp: 1.0 for sp in SPECIES}
 
-    # Dual-porosity capacity ratio (fractured only)
+    # Dual-porosity capacity ratio (fractured only). R17: LOG-uniform over the
+    # training prior so the surrogate's support covers the porosity-derived
+    # values the serve path now produces (1-4) as densely as the literature
+    # high end. v3 drew U(2, 20), which put 89% of its mass above beta = 4 and
+    # left every porosity-derived value in the thin tail of the support.
     if regime in P.DUAL_POROSITY["enabled_for"]:
-        beta = float(rng.uniform(P.DUAL_POROSITY["beta_range"][0], P.DUAL_POROSITY["beta_range"][2]))
+        beta = beta_prior_sample(float(rng.uniform()))
     else:
         beta = 0.0
 
@@ -302,7 +342,10 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     lo, mid, hi = P.kd_range_for(species, scn["regime"])
     kd = _kd_sample(float(draws["u_kd"][i]), lo, mid, hi)
     K = scn["K"] * float(np.clip(math.exp(MC_LNK_SIGMA * draws["z_K"][i]), *MC_K_CLIP))
-    beta = scn["beta"] * (0.6 + 0.8 * float(draws["u_beta"][i])) if fractured else 0.0
+    # R17: log-uniform factor-of-4 band around the scenario's central beta (was a
+    # multiplicative 0.6-1.4 jitter that expressed uncertainty inside the
+    # literature assumption rather than the uncertainty of it).
+    beta = beta_mc_sample(scn["beta"], float(draws["u_beta"][i])) if fractured else 0.0
     amp = scn.get("seasonal_amp", 0.0)
     g_lo, g_hi = max(0.3, 0.7 - amp), 1.3 + amp
     grad = scn["gradient"] * (g_lo + (g_hi - g_lo) * float(draws["u_grad"][i]))
@@ -564,7 +607,15 @@ def generate(n_scenarios: int = 900, times_years=DEFAULT_TIMES_YEARS,
     df.to_csv(out_csv, index=False)
 
     meta = {
-        "version": 3, "n_scenarios": n_scenarios, "n_rows": len(df), "n_mc": n_mc,
+        # v4 = R17 beta prior (log-uniform [0.3, 20], porosity-derived serving,
+        # factor-4 MC band). Every label depends on it, so the version moves.
+        "version": 4, "n_scenarios": n_scenarios, "n_rows": len(df), "n_mc": n_mc,
+        "seed": int(seed), "mc_seed": int(seed + 1),
+        "generator": "ml_pipeline.synthetic.generate",
+        "git_sha": _git_sha(),
+        "beta_prior": list(P.DUAL_POROSITY["beta_prior"]),
+        "beta_mc_factor": P.DUAL_POROSITY["beta_mc_factor"],
+        "beta_sampling": "log_uniform_prior; mc log_uniform [beta/F, F*beta]",
         "e1_geometry": True, "field_mix_frac": field_mix,
         "times_years": list(times_years), "species": list(SPECIES),
         "feature_columns": FEATURE_COLUMNS,

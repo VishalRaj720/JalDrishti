@@ -711,35 +711,35 @@ artifacts by discipline; it has to be mechanical.
 
 **These numbers are GENERATED from `ml/artifacts/metrics.json` by `python -m ml_pipeline.tools.sync_docs`. Do not hand-edit this block — edit the model, retrain, and re-run the generator.**
 
-Model card version 3 · 40 features · 3 band targets · species: radium_226_mbq_l, sulfate_mg_l, tds_mg_l, uranium_ppb
+Model card version 4 · 40 features · 3 band targets · species: radium_226_mbq_l, sulfate_mg_l, tds_mg_l, uranium_ppb
 
 | target | R² (P50, back-transformed) | R² (log) | scenario coverage | rows coverage |
 |---|---|---|---|---|
-| `affected_area_ha` | 0.7727 | 0.8923 | 0.8611 | 0.9534 |
-| `max_migration_distance_m` | 0.5433 | 0.9288 | 0.8822 | 0.9553 |
-| `compliance_conc` | -5.5828 | 0.9566 | 0.8606 | 0.9429 |
-| `excursion_probability` | 0.9155 | — | — | — |
+| `affected_area_ha` | 0.7947 | 0.8940 | 0.8606 | 0.9542 |
+| `max_migration_distance_m` | 0.4440 | 0.9269 | 0.8683 | 0.9485 |
+| `compliance_conc` | -3.9009 | 0.9471 | 0.8617 | 0.9454 |
+| `excursion_probability` | 0.9162 | — | — | — |
 
 **Per-species R² (log space).** The pooled back-transformed figure mixes ppb, mg/L and mBq/L, so its denominator depends on the species *mix* rather than on model quality — judge on these.
 
 | target | radium_226_mbq_l | sulfate_mg_l | tds_mg_l | uranium_ppb |
 |---|---|---|---|---|
-| `affected_area_ha` | 0.890 | 0.785 | 0.824 | 0.945 |
-| `max_migration_distance_m` | **0.516** | 0.888 | 0.892 | 0.932 |
-| `compliance_conc` | **0.431** | 0.904 | 0.968 | 0.859 |
+| `affected_area_ha` | 0.892 | 0.790 | 0.827 | 0.943 |
+| `max_migration_distance_m` | **0.515** | 0.878 | 0.890 | 0.929 |
+| `compliance_conc` | **0.227** | 0.917 | 0.961 | 0.849 |
 
 **Acceptance gates.** Per-species R²(log) ≥ 0.60; scenario coverage ≥ 0.80.
 
 - Coverage: all targets pass.
-- Per-species R²(log): **FAILS on 2 cell(s)** — `max_migration_distance_m` / radium_226_mbq_l = 0.516; `compliance_conc` / radium_226_mbq_l = 0.431. Reported as a miss, not reframed. The conformal bands on those cells still cover (see the coverage columns), and the ANALYTICAL engine serves the authoritative central value, so the failure is in the surrogate's point estimate, not in the uncertainty guarantee.
+- Per-species R²(log): **FAILS on 2 cell(s)** — `max_migration_distance_m` / radium_226_mbq_l = 0.515; `compliance_conc` / radium_226_mbq_l = 0.227. Reported as a miss, not reframed. The conformal bands on those cells still cover (see the coverage columns), and the ANALYTICAL engine serves the authoritative central value, so the failure is in the surrogate's point estimate, not in the uncertainty guarantee.
 
 **Field-resampled coverage** (the serving-distribution gate mandated by `E1_geometry_design.md` §6 gate 5): 120 scenarios pinned to the real flow/strike field, held out from training.
 
 | target | scenario coverage | rows | verdict |
 |---|---|---|---|
-| `affected_area_ha` | 0.8646 | 0.9599 | PASS |
-| `max_migration_distance_m` | 0.9042 | 0.9645 | PASS |
-| `compliance_conc` | 0.9125 | 0.9642 | PASS |
+| `affected_area_ha` | 0.8831 | 0.9617 | PASS |
+| `max_migration_distance_m` | 0.8747 | 0.9470 | PASS |
+| `compliance_conc` | 0.8792 | 0.9483 | PASS |
 
 <!-- END GENERATED: metrics -->
 

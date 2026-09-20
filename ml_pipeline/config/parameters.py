@@ -750,19 +750,78 @@ KD_RANGES = {  # L/kg
 #    asymptotic 1+beta at late time. [Goltz & Roberts 1986 first-order model]
 #
 # !! FIDELITY FLAW 3.4 -- beta AND omega ARE UNGROUNDED LOCALLY. !!
-# The capacity ratio beta (2-20) and the mass-transfer rate omega are generic
-# fractured-rock literature values, NOT Singhbhum measurements. beta sets the
-# apparent retardation of every fractured plume this tool draws (Rd ~ 1+beta,
-# which is where the UI's "Rd = 11" comes from), so it is one of the highest-
-# leverage numbers in the model AND one of the least locally supported. A single
-# local tracer test would anchor it. See the FRACTURE block above and
+# The capacity ratio beta and the mass-transfer rate omega have no Singhbhum
+# measurement behind them. beta sets the apparent retardation of every
+# fractured plume this tool draws (R_eff = 1 + beta*R_m), so it is one of the
+# highest-leverage numbers in the model AND one of the least locally supported.
+# A single local tracer test would anchor it. See the FRACTURE block above and
 # JHARKHAND_FIDELITY_MATRIX.md row 3.4.
+#
+# R17 (2026-09-20, LIMITATIONS.md section 1d) -- THE SERVED VALUE IS NO LONGER
+# A LITERATURE SCALAR. Until R17 the engine served beta at the mean of a
+# foreign-analogue range (2, 8, 20) = 10, while its own resolved porosities
+# implied a different number: beta is DEFINED as theta_immobile/theta_mobile,
+# and with the total (matrix) porosity n_total and the mobile (fracture)
+# porosity phi_mobile that the same run already resolves with provenance,
+#       beta_por = (n_total - phi_mobile) / phi_mobile
+# = 3.0 at Jaduguda (0.03, 0.0075) and 1-4 across the lithology table -- never
+# 10. The engine carried two statements of matrix capacity that disagreed by a
+# factor of three, and the plume extent (the report's headline) rested on the
+# unsupported one. Measured on the served Jaduguda uranium run at 20 yr:
+# migration 3.5 m at beta = 10, 6.5 m at beta_por = 3, 23 m at beta = 0.3;
+# sulfate 13 -> 31 -> 169 m with ring concentration 227 -> 693 mg/L.
+#
+# What R17 changed, and what it did not:
+#   * SERVED central beta = beta_por from the run's own porosities (in-support
+#     after the R17 retrain; `beta_from_porosities`). A user override still wins.
+#   * TRAINING prior = LOG-uniform on `beta_prior` = [0.3, 20]. A scale
+#     parameter spanning nearly two decades must not be sampled uniformly: the
+#     old U(2, 20) put 89% of its mass above beta = 4, i.e. above every value
+#     the porosity table can produce.
+#   * MONTE-CARLO band per scenario/run = log-uniform on [beta/F, F*beta],
+#     F = `beta_mc_factor` = 4, clipped to the prior -- "the matrix may store
+#     four times more or four times less than the porosities imply". The old
+#     multiplicative (0.6-1.4) jitter expressed uncertainty INSIDE the
+#     literature assumption, not the uncertainty OF it.
+#   * NOT changed: the first-order clock. A diagnostic (scratch, recorded in
+#     LIMITATIONS.md 1d) evaluated the diffusive sqrt(t) clock described in
+#     section 5a-ter at three reference sites: fronts moved 2.1 -> 2.0 m (U) and
+#     31.2 -> 30.2 m (SO4). Both clocks reach the capacity cap 1 + beta*R_m
+#     inside ~3-6 yr of a 20-yr horizon, so the front runs on the CAPACITY,
+#     not the kinetics. The same diagnostic found the continuum branch governs
+#     at every site and species -- the Tang envelope never wins at 20 yr --
+#     which is why beta, and not the aperture, is the lever.
+#   * beta stays a MODEL FEATURE (`dual_porosity_beta`); changing its prior
+#     invalidated every v3 label, hence the v4 re-bake + retrain.
+# `beta_legacy_range` records what v3 served, for the before/after table and
+# the tests that pin the change; nothing reads it at serve or train time.
 # ---------------------------------------------------------------------------
 DUAL_POROSITY = {
     "enabled_for": ("fractured",),
-    "beta_range": (2.0, 8.0, 20.0),   # (low, central, high) capacity ratio
-    "mass_transfer_omega": 1e-3,      # first-order rate [1/day], slow matrix diffusion
+    "beta_prior": (0.3, 20.0),          # log-uniform training prior (R17)
+    "beta_from_porosity": True,         # served central = (n_total - phi_m)/phi_m
+    "beta_mc_factor": 4.0,              # MC band: log-uniform [beta/4, 4*beta]
+    "beta_legacy_range": (2.0, 8.0, 20.0),   # v3 served its mean, 10 (record only)
+    "mass_transfer_omega": 1e-3,        # first-order rate [1/day], slow matrix diffusion
 }
+
+
+def beta_from_porosities(n_total: float, phi_mobile: float,
+                         prior: tuple[float, float] | None = None) -> float:
+    """Dual-porosity capacity ratio implied by the run's OWN porosities:
+    beta = theta_immobile / theta_mobile = (n_total - phi_mobile) / phi_mobile,
+    clipped to the training prior so the served value is always in-support.
+
+    This is a definition, not a calibration -- it makes the engine's two
+    statements of matrix capacity (the porosity table and the capacity ratio)
+    agree. It is still not a measurement: n_total and phi_mobile are lithology-
+    typical values (TOTAL_POROSITY / DEFAULT_EFFECTIVE_POROSITY, Freeze & Cherry
+    1979) or the aquifer polygon's specific yield, and the Monte-Carlo band
+    around it exists precisely because they are typical rather than local."""
+    lo, hi = prior if prior is not None else DUAL_POROSITY["beta_prior"]
+    phi_m = max(float(phi_mobile), 1e-6)
+    beta = (float(n_total) - phi_m) / phi_m
+    return float(min(max(beta, lo), hi))
 
 # ---------------------------------------------------------------------------
 # 5a-bis. SORBING dual-porosity capacity  [remediation 2026-08-05, review.md #2]
@@ -1732,9 +1791,13 @@ UNGROUNDED_PARAMETERS = {
                       "NUREG-1569's preferred mean+5sd / ASTM D6312 rules; the "
                       "CGWB file has one sample per well and cannot support them"),
     },
-    "DUAL_POROSITY.beta_range": {
+    "DUAL_POROSITY.beta_prior": {
         "value": None, "kind": "foreign_analogue_literature",
-        "leverage": "apparent retardation of every fractured plume (Rd ~ 1+beta)",
+        "leverage": ("effective retardation of every fractured plume, R_eff = "
+                     "1 + beta*R_m. R17: the served central value is derived "
+                     "from the run's own porosities (beta_from_porosities) and "
+                     "the P10-P90 band spans a factor of 4 either side; the "
+                     "[0.3, 20] prior and that factor are what remain ungrounded"),
         "grounding": "a Singhbhum tracer test (fidelity row 3.4 -- none published)",
     },
     "DUAL_POROSITY.mass_transfer_omega": {

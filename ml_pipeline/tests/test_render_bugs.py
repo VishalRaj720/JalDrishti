@@ -60,8 +60,13 @@ def test_a_contours_exclude_the_disc_so_no_welded_polygon():
 
 
 def test_a_metrics_are_untouched_by_the_display_change():
-    """The contour swap must not move a single reported number."""
-    j = _predict(species="tds_mg_l", operation_years=1.0)
+    """The contour swap must not move a single reported number.
+
+    R17: the pinned numbers were captured with beta served at the v3 literature
+    mean (10); the serve path now derives beta from the porosities. The legacy
+    value is passed explicitly so this stays a test of the DISPLAY change."""
+    legacy_beta = sum(P.DUAL_POROSITY["beta_legacy_range"]) / 3.0
+    j = _predict(species="tds_mg_l", operation_years=1.0, beta=legacy_beta)
     m = j["metrics"]["analytical"]
     assert m["area_ha"] == pytest.approx(13.33, abs=0.5)
     assert m["migration_m"] == pytest.approx(170.1, abs=2.0)
