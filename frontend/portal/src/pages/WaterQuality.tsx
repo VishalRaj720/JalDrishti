@@ -509,6 +509,48 @@ export default function WaterQuality() {
             </div>
           )}
 
+          {/* R17: the multi-year record behind this well, from the CGWB
+              2000-2021 open-data file. General chemistry only -- it carries
+              none of the health determinands -- so it explains the baseline
+              and its drift, never the band. */}
+          {openWell.history ? (
+            <div className="banner" style={{ marginBottom: 10 }}>
+              <strong>
+                Earlier record: {openWell.history.n} analyses,{" "}
+                {openWell.history.years[0]}–{openWell.history.years[openWell.history.years.length - 1]}
+              </strong>{" "}
+              at CGWB station {openWell.history.station}
+              {openWell.history.match.kind === "proximity"
+                ? ` (${openWell.history.match.distance_km} km away, matched by proximity)`
+                : openWell.history.match.distance_km > 0.5
+                  ? ` (same name; recorded coordinates ${openWell.history.match.distance_km} km apart)`
+                  : ""}.{" "}
+              {(["ec_us_cm", "chloride_mg_l", "sulphate_mg_l"] as const).map((k) => {
+                const t = openWell.history!.trends[k];
+                const label = k === "ec_us_cm" ? "EC" : k === "chloride_mg_l" ? "Chloride" : "Sulphate";
+                if (!t || t.status === "not_measured") return <span key={k}>{label}: not measured. </span>;
+                if (t.status === "insufficient_data")
+                  return <span key={k}>{label}: {t.n} value{t.n === 1 ? "" : "s"}, median {t.median} — a baseline, not a trend. </span>;
+                return (
+                  <span key={k}>
+                    {label}: <b>{t.status === "no_trend" ? "no trend" : t.status}</b>
+                    {t.status !== "no_trend" ? ` (${t.slope_per_year! > 0 ? "+" : ""}${t.slope_per_year}/yr, p=${t.mk_p})` : ""}
+                    , baseline {t.baseline_mean} ± {t.baseline_sd ?? "–"} over {t.n} analyses.{" "}
+                  </span>
+                );
+              })}
+              <span className="muted small">
+                Fluoride, nitrate, uranium, iron and arsenic are not in that record; nothing
+                here changes this well's band.
+              </span>
+            </div>
+          ) : openWell.history === null ? (
+            <div className="muted small" style={{ marginBottom: 10 }}>
+              No CGWB station in the 2000–2021 record matches this well by name or within
+              1 km, so there is no earlier chemistry to compare with.
+            </div>
+          ) : null}
+
           {/* Health-significant determinands get their own block, above the
               rest, for the same reason the statement at the top of the screen
               does: order is a claim about importance whether or not it is

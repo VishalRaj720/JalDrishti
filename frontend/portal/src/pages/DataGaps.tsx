@@ -75,6 +75,24 @@ interface HydrochemQA {
   worst: Array<{ well_name: string; district: string | null; cbe_pct: number; qa_class: string }>;
 }
 
+interface ChemHistorySummary {
+  source: { provider: string; title: string; url: string; accessed: string; file: string };
+  records: number; stations: number;
+  years: { first: number; last: number; rows_per_year: Record<string, number> };
+  stations_with_2_or_more_years: number;
+  stations_matched_to_2023_wells: { total: number; by_name: number; by_proximity: number;
+    match_km: number; with_2_or_more_years: number };
+  coverage: Record<string, { n: number; pct: number }>;
+  health_determinands: Record<string, string>;
+  trend_counts: Record<string, { rising: number; falling: number; no_trend: number;
+    insufficient_data: number; not_measured: number }>;
+  gates: { min_samples: number; min_span_years: number; alpha: number };
+  qa: { by_class: { balanced: number; questionable: number; suspect: number; incomplete: number };
+    potassium_assumed_zero: boolean;
+    independence_check: { tested: boolean; verdict?: string; sodium_likely_computed_by_difference?: boolean } };
+  what_this_is: string;
+}
+
 function CoverageGrid({ m }: { m: GapMatrix }) {
   const maxByDim: Record<string, number> = {};
   for (const d of m.dimensions) {
@@ -187,6 +205,12 @@ export default function DataGaps() {
     queryKey: ["hydrochem-qa"],
     queryFn: () => api.get<HydrochemQA>("/water-quality/qa"),
   });
+  // R17: the multi-year CGWB chemistry record (NWDP open data) -- the
+  // temporal replicates the 2023 file lacks, for the general chemistry only.
+  const hist = useQuery({
+    queryKey: ["chemistry-history"],
+    queryFn: () => api.get<ChemHistorySummary>("/water-quality/history"),
+  });
 
   const maxScore = (recs.data?.recommendations ?? []).reduce(
     (mx, r) => Math.max(mx, r.score), 0);
@@ -290,6 +314,53 @@ export default function DataGaps() {
                 {Math.round((qa.data.independence_check.sodium_within_2_mg_l_fraction ?? 0) * 100)}% within 2 mg/L. </>
             )}
             Method: {qa.data.method.references.join("; ")}.
+          </div>
+        </>
+      )}
+
+      {/* ── the temporal record (R17) ── */}
+      {hist.isLoading && <Loading label="Reading the 2000–2021 record…" />}
+      <ErrorNote error={hist.error} />
+      {hist.data && (
+        <>
+          <SectionHead title="Is there any repeat sampling?">
+            The 2023 file has one sample per well. CGWB's multi-year chemistry record
+            for Jharkhand (National Water Data Portal, accessed {hist.data.source.accessed})
+            is read alongside it: {hist.data.records.toLocaleString()} analyses at{" "}
+            {hist.data.stations} stations, {hist.data.years.first}–{hist.data.years.last}.
+          </SectionHead>
+          <Statement
+            eyebrow="Temporal record · CGWB 2000–2021"
+            line={
+              <>
+                <span className="hl ok">{hist.data.stations_matched_to_2023_wells.with_2_or_more_years}</span>{" "}
+                of this platform's wells have an earlier record with two or more sampling
+                years — for the general chemistry only.{" "}
+                <span className="hl gap">None</span> of the health determinands
+                (fluoride, nitrate, uranium, iron, arsenic) is in that record.
+              </>
+            }
+            sub={hist.data.health_determinands.consequence}
+          >
+            <Readout label="Stations matched" value={hist.data.stations_matched_to_2023_wells.total}
+                     sub={`${hist.data.stations_matched_to_2023_wells.by_name} by name · ${hist.data.stations_matched_to_2023_wells.by_proximity} within ${hist.data.stations_matched_to_2023_wells.match_km} km`} />
+            <Readout label="EC trend (rising / falling)"
+                     value={`${hist.data.trend_counts.ec_us_cm.rising} / ${hist.data.trend_counts.ec_us_cm.falling}`}
+                     sub={`${hist.data.trend_counts.ec_us_cm.no_trend} no trend · ${hist.data.trend_counts.ec_us_cm.insufficient_data} too few`} />
+            <Readout label="Chloride trend (rising / falling)"
+                     value={`${hist.data.trend_counts.chloride_mg_l.rising} / ${hist.data.trend_counts.chloride_mg_l.falling}`}
+                     sub={`${hist.data.trend_counts.chloride_mg_l.no_trend} no trend · ${hist.data.trend_counts.chloride_mg_l.insufficient_data} too few`} />
+            <Readout label="Sulphate reported" value={`${hist.data.coverage.sulphate_mg_l.pct}%`}
+                     tone="warn" sub="of analyses" />
+            <Readout label="Charge balance suspect" value={hist.data.qa.by_class.suspect}
+                     tone={hist.data.qa.by_class.suspect ? "warn" : "ok"}
+                     sub={`of ${hist.data.qa.by_class.balanced + hist.data.qa.by_class.questionable + hist.data.qa.by_class.suspect} computable (K assumed 0)`} />
+          </Statement>
+          <div className="muted small" style={{ marginTop: -6, marginBottom: 12 }}>
+            {hist.data.qa.independence_check.verdict} Gates: a station needs at least{" "}
+            {hist.data.gates.min_samples} analyses over {hist.data.gates.min_span_years} years
+            for a trend; fewer is a baseline, never "stable". Read-only: no band or alert
+            uses this record.
           </div>
         </>
       )}

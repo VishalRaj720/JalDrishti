@@ -1071,6 +1071,22 @@ export interface Wqi {
   scale: string; caveat: string;
 }
 
+/** R17. One determinand's multi-year record at a matched CGWB station. */
+export interface ChemTrend {
+  status: "rising" | "falling" | "no_trend" | "insufficient_data" | "not_measured";
+  n: number; span_years?: number; first?: string; last?: string;
+  min?: number; median?: number; max?: number; latest?: number;
+  slope_per_year?: number; mk_p?: number; note?: string;
+  baseline_mean?: number; baseline_sd?: number | null; ucl_mean_plus_2sd?: number | null;
+}
+
+export interface WellHistory {
+  station: string; n: number; years: number[];
+  match: { well_name: string | null; kind: "name" | "proximity" | "none"; distance_km: number };
+  trends: Record<string, ChemTrend>;
+  qa: { n: number; balanced: number; questionable: number; suspect: number; incomplete: number };
+}
+
 export interface WqWell {
   well_id: string; well_name: string;
   latitude: number | null; longitude: number | null;
@@ -1080,6 +1096,9 @@ export interface WqWell {
   wqi: Wqi | null;
   parameters: WqParameter[];
   summary: WqSummary;
+  /** R17: the 2000-2021 record behind this well, or null when no station
+   *  matches. Carries no health determinand; general chemistry only. */
+  history?: WellHistory | null;
 }
 
 export interface WqRollup {

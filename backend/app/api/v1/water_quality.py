@@ -281,6 +281,38 @@ async def hydrochemical_qa(
     return out
 
 
+@router.get("/history")
+async def chemistry_history(
+    detail: bool = Query(False, description="include every station's trends"),
+    _: User = Depends(require_staff),
+) -> dict[str, Any]:
+    """R17. The CGWB multi-year chemistry record (2000-2021, NWDP open data),
+    read from `Datasets/` and matched to the platform's 2023 wells: coverage,
+    the station match table, per-station Theil-Sen/Mann-Kendall trends for the
+    general chemistry led by the ISR excursion indicators, and the record's
+    own charge-balance QA. Read-only; nothing is written and no band or alert
+    reads it. It carries none of the health determinands, and says so."""
+    from app.services import chemistry_history as ch
+    s = dict(ch.summary())
+    if not detail:
+        s.pop("stations_detail", None)
+    return s
+
+
+@router.get("/history/well/{well_name}")
+async def chemistry_history_for_well(
+    well_name: str,
+    _: User = Depends(require_staff),
+) -> dict[str, Any]:
+    from app.services import chemistry_history as ch
+    h = ch.for_well(well_name)
+    if h is None:
+        return {"well_name": well_name, "matched": False,
+                "note": "no station in the 2000-2021 record matches this well by "
+                        "name or within 1 km"}
+    return {"well_name": well_name, "matched": True, **h}
+
+
 @router.get("/well/{well_id}")
 async def one_well(
     well_id: str,
@@ -291,4 +323,10 @@ async def one_well(
     items = await _load(db, "WHERE w.id = :w", {"w": well_id})
     if not items:
         raise HTTPException(404, "No sample recorded for that well.")
-    return {**items[0], "what_this_is": _DISCLAIMER}
+    # R17: the multi-year record behind this well, where a station matches
+    from app.services import chemistry_history as ch
+    try:
+        history = ch.for_well(items[0]["well_name"])
+    except FileNotFoundError:
+        history = None
+    return {**items[0], "history": history, "what_this_is": _DISCLAIMER}
