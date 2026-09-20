@@ -41,6 +41,7 @@ one.
 from __future__ import annotations
 
 import asyncio
+import json
 import smtplib
 import ssl
 from dataclasses import dataclass
@@ -72,6 +73,10 @@ _KIND_LEAD = {
         "A published screening's own modelled timetable has now been passed. No "
         "such mine exists; this is the model's clock running out, not a "
         "detection."),
+    "possible_reach": (
+        "Your block lies inside the UPPER estimate of a published screening's "
+        "uncertainty band, and outside its central estimate. No such mine "
+        "exists; this is the width of the model's uncertainty, not a finding."),
 }
 
 _KIND_LABEL = {
@@ -79,7 +84,71 @@ _KIND_LABEL = {
     "published_screening": "Published screening",
     "aquifer_pathway": "Shared shallow aquifer",
     "aquifer_breach_due": "Screening timetable passed",
+    "possible_reach": "Within a screening's uncertainty band",
 }
+
+_TIER_LABEL = {"notice": "NOTICE", "warning": "WARNING", "alert": "ALERT",
+               "critical": "CRITICAL"}
+
+
+def _explanation_lines(x: dict[str, Any]) -> list[str]:
+    """The seven fields, in plain text, in the order a reader asks them.
+    Tolerates a partial or missing explanation (rows written before R17)."""
+    if not x:
+        return []
+    out = ["", "AT A GLANCE"]
+    if x.get("what_happened"):
+        out.append(f"  What happened:   {x['what_happened']}")
+    d = x.get("driver") or {}
+    if d.get("determinand"):
+        out.append(f"  Driven by:       {d['determinand']} {d.get('value')} "
+                   f"{d.get('unit')} against a limit of {d.get('limit')} "
+                   f"{d.get('unit')} ({d.get('limit_kind')}; "
+                   f"{d.get('times_limit')}x)")
+        extra = [b for b in (d.get("all_breaches") or [])[1:]]
+        for b in extra:
+            out.append(f"                   also {b['determinand']} {b['value']} "
+                       f"{b['unit']} (limit {b['limit']} {b['unit']})")
+    elif d.get("quantity"):
+        out.append(f"  Driven by:       {d['quantity']}"
+                   + (f" ({d['species']})" if d.get("species") else ""))
+    w = x.get("where") or {}
+    if w:
+        out.append(f"  Where:           {w.get('block')}"
+                   + (f", {w['district']}" if w.get("district") else "")
+                   + (f" -- {w['well_name']}" if w.get("well_name") else "")
+                   + (f" ({w['scope']})" if w.get("scope") else ""))
+    t = x.get("tier") or {}
+    if t:
+        out.append(f"  Level:           {_TIER_LABEL.get(t.get('level'), t.get('level'))}"
+                   f" -- {t.get('rule')}")
+    out.append(f"  Basis:           "
+               + ("OBSERVED -- a laboratory measurement"
+                  if x.get("basis") == "observed"
+                  else "MODELLED -- a screening of a hypothetical scenario, "
+                       "not a report of an event"))
+    c = x.get("confidence") or {}
+    if c.get("kind") == "measurement":
+        out.append(f"  Confidence:      {c.get('source')}"
+                   + (f", sampled {str(c['sampled_at'])[:10]}" if c.get("sampled_at") else "")
+                   + ("; a single sample, so a reading rather than a trend"
+                      if c.get("single_sample") else ""))
+    elif c:
+        mig = c.get("migration_m") or {}
+        band = (f"migration P10/P50/P90 = {mig.get('p10')}/{mig.get('p50')}/"
+                f"{mig.get('p90')} m" if mig else "band not recorded")
+        flags = c.get("extrapolation") or []
+        out.append(f"  Confidence:      {band}"
+                   + (f"; outside trained support on {', '.join(flags)}" if flags
+                      else "; inside the model's trained support")
+                   + (f"; excursion probability {c['excursion_probability']}"
+                      if c.get("excursion_probability") is not None else ""))
+    na = x.get("next_action") or []
+    if na:
+        out.append("  What next:")
+        for line in na:
+            out.append(f"    - {line}")
+    return out
 
 
 @dataclass(frozen=True)
@@ -151,9 +220,20 @@ def render_alert_email(row: dict[str, Any]) -> tuple[str, str]:
         f"Area: {where}",
         f"Type: {_KIND_LABEL.get(kind, kind)}",
     ]
+    if row.get("tier"):
+        lines.append(f"Level: {_TIER_LABEL.get(row['tier'], row['tier'])}"
+                     f" ({'measured' if row.get('basis') == 'observed' else 'modelled'})")
     if row.get("sampled_at"):
         lines.append(f"Sample date: {row['sampled_at']:%d %B %Y}")
     lines += ["", row["headline"].upper(), "", row["body"].strip(), ""]
+    x = row.get("explanation")
+    if isinstance(x, str):
+        try:
+            x = json.loads(x)
+        except ValueError:
+            x = None
+    lines += _explanation_lines(x or {})
+    lines.append("")
     lines += [
         "Open the portal for the full record and what to do next:",
         f"  {settings.PORTAL_URL.rstrip('/')}/alerts",
@@ -174,6 +254,7 @@ async def pending_deliveries(db, *, limit: int = 500) -> list[dict[str, Any]]:
     rows = (await db.execute(text("""
         SELECT a.id::text        AS alert_id,
                a.kind, a.headline, a.body, a.severity, a.sampled_at,
+               a.tier, a.basis, a.explanation,
                a.created_at,
                u.id::text        AS user_id,
                u.username, u.email,

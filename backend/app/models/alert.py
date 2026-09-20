@@ -10,7 +10,7 @@ from typing import Optional
 
 from sqlalchemy import (CheckConstraint, DateTime, Float, ForeignKey, Index,
                         String, Text, UniqueConstraint, func, text)
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -74,8 +74,24 @@ class Alert(Base):
 
     headline: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Legacy three-valued severity, derived from `tier` since R17 so older
+    #: readers keep working. `tier` is the authoritative field.
     severity: Mapped[str] = mapped_column(String(16), nullable=False,
                                           server_default="info")
+    #: R17 (migration 0026). `notice | warning | alert | critical` on the
+    #: IS 10500 acceptable/permissible ladder with one project-defined rung
+    #: (see `services/alert_tiers.py`). A modelled alert is never `critical`;
+    #: the CHECK below refuses the row if code ever tries.
+    tier: Mapped[str] = mapped_column(String(16), nullable=False,
+                                      server_default="notice")
+    #: `observed` (a laboratory result) or `modelled` (a screening). Explicit
+    #: rather than inferred from `kind`, and cross-checked against it.
+    basis: Mapped[str] = mapped_column(String(16), nullable=False,
+                                       server_default="modelled")
+    #: The seven fields: what_happened, driver, where, tier, basis,
+    #: confidence, next_action. NULL only on rows written before R17 and not
+    #: yet rebuilt; readers must treat that as "not recorded".
+    explanation: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     well_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     measured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -89,10 +105,19 @@ class Alert(Base):
     __table_args__ = (
         CheckConstraint(
             "kind IN ('measured_exceedance','published_screening',"
-            "'aquifer_pathway','aquifer_breach_due')",
+            "'aquifer_pathway','aquifer_breach_due','possible_reach')",
             name="ck_alert_kind"),
         CheckConstraint("severity IN ('info','warning','high')",
                         name="ck_alert_severity"),
+        CheckConstraint("tier IN ('notice','warning','alert','critical')",
+                        name="ck_alert_tier"),
+        CheckConstraint("basis IN ('observed','modelled')",
+                        name="ck_alert_basis"),
+        # a modelled result is never critical: no mine exists, nothing measured
+        CheckConstraint("NOT (basis = 'modelled' AND tier = 'critical')",
+                        name="ck_modelled_never_critical"),
+        CheckConstraint("(kind = 'measured_exceedance') = (basis = 'observed')",
+                        name="ck_basis_matches_kind"),
         CheckConstraint("kind <> 'published_screening' OR advisory_id IS NOT NULL",
                         name="ck_screening_alert_names_its_advisory"),
         CheckConstraint(
@@ -101,6 +126,7 @@ class Alert(Base):
             name="ck_measured_alert_carries_its_reading"),
         Index("ix_alerts_block", "block_id"),
         Index("ix_alerts_created", "created_at"),
+        Index("ix_alerts_tier", "tier"),
         # THE PARTIAL UNIQUE INDEXES ARE LOAD-BEARING, not an optimisation.
         # `AlertService` inserts with `ON CONFLICT (...) DO NOTHING`, and that
         # clause needs a matching unique index to arbitrate against — without

@@ -52,9 +52,22 @@ function MeasuredScan() {
   const qc = useQueryClient();
   const scan = useMutation({
     mutationFn: () => api.post<{
-      wells_over_limit: number; alerts_created: number; note: string;
+      wells_over_limit: number; alerts_created: number; alerts_upgraded?: number;
+      by_tier?: Record<string, number>; note: string;
       delivery?: DeliveryResult;
     }>("/citizen/alerts/scan-measured"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["delivery-status"] }),
+  });
+  // R17: fill tier / basis / the seven-field explanation on alerts written
+  // before migration 0026. Idempotent; emails nothing (an upgraded row is the
+  // same alert, not a new one). Run once after deploying R17.
+  const rebuild = useMutation({
+    mutationFn: () => api.post<{
+      advisories: Array<{ advisory_id: string; footprint_new: number;
+        possible_reach: string; possible_reach_new: number }>;
+      alerts_still_unexplained: number;
+      measured: { alerts_created: number; alerts_upgraded?: number };
+    }>("/citizen/alerts/rebuild-explanations"),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["delivery-status"] }),
   });
 
@@ -79,9 +92,18 @@ function MeasuredScan() {
           <strong>
             {scan.data.wells_over_limit} well(s) over a limit ·{" "}
             {scan.data.alerts_created} new alert(s)
+            {(scan.data.alerts_upgraded ?? 0) > 0 && ` · ${scan.data.alerts_upgraded} upgraded with the structured record`}
             {scan.data.delivery && ` · ${scan.data.delivery.sent} emailed`}
             {scan.data.delivery && !scan.data.delivery.configured && " · email not configured"}.
           </strong>
+          {scan.data.by_tier && Object.keys(scan.data.by_tier).length > 0 && (
+            <div className="small" style={{ marginTop: 4 }}>
+              By level:{" "}
+              {(["critical", "alert", "warning"] as const)
+                .filter((t) => scan.data!.by_tier![t])
+                .map((t) => `${t} ${scan.data!.by_tier![t]}`).join(" · ")}
+            </div>
+          )}
           <div className="muted small" style={{ marginTop: 4 }}>{scan.data.note}</div>
         </div>
       )}
@@ -89,6 +111,24 @@ function MeasuredScan() {
         Safe to run repeatedly — an alert already raised for a well and sample date
         is not raised twice, so nobody is warned about the same reading again.
       </div>
+      <div className="row wrap" style={{ marginTop: 12, alignItems: "center" }}>
+        <button className="btn" disabled={rebuild.isPending} onClick={() => rebuild.mutate()}>
+          {rebuild.isPending ? "Rebuilding…" : "Fill structured records on older alerts"}
+        </button>
+        <span className="muted small">
+          Adds the level, basis and seven-field explanation to alerts raised before
+          this format existed. Sends no email.
+        </span>
+      </div>
+      <ErrorNote error={rebuild.error} />
+      {rebuild.data && (
+        <div className="banner ok" style={{ marginTop: 8 }}>
+          {rebuild.data.advisories.length} published screening(s) re-checked ·{" "}
+          {rebuild.data.advisories.reduce((n, a) => n + (a.possible_reach_new || 0), 0)} new
+          uncertainty-band alert(s) · {rebuild.data.measured.alerts_upgraded ?? 0} measured
+          alert(s) upgraded · {rebuild.data.alerts_still_unexplained} still without a record.
+        </div>
+      )}
     </div>
   );
 }

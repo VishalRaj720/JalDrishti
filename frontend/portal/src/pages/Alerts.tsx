@@ -17,15 +17,119 @@
  *
  * R16: alerts are ALSO emailed to the address on the account (services/
  * notify.py), and this screen says so -- and says where to turn that off.
+ *
+ * R17: every alert carries a TIER on the IS 10500 acceptable/permissible
+ * ladder (notice / warning / alert / critical) and a structured explanation
+ * answering the seven questions a reader has -- what happened, which
+ * substance, where, how serious, measured or modelled, how sure, what next.
+ * The card renders those fields as a record, not as prose, and a row written
+ * before R17 (no explanation yet) says "not recorded" rather than pretending.
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { api, citizen, type CitizenAlert } from "../api/client";
+import {
+  api, citizen, type AlertExplanation, type AlertTier, type AlertTiersLegend,
+  type CitizenAlert,
+} from "../api/client";
 import { Empty, ErrorNote, Loading } from "../components/bits";
 
 type Filter = "all" | "measured_exceedance" | "published_screening"
-  | "aquifer_pathway";
+  | "aquifer_pathway" | "possible_reach";
+
+/** Tier -> chip tone. `critical` and `alert` are red because they are the
+ *  rungs that call for action; `warning` amber; `notice` neutral. */
+const TIER: Record<AlertTier, { label: string; chip: string; border: string }> = {
+  critical: { label: "Critical", chip: "danger", border: "danger" },
+  alert:    { label: "Alert",    chip: "danger", border: "danger" },
+  warning:  { label: "Warning",  chip: "warn",   border: "warn" },
+  notice:   { label: "Notice",   chip: "neutral", border: "border" },
+};
+
+function fmtBand(b?: { p10?: number; p50?: number; p90?: number } | null, unit = "") {
+  if (!b || b.p50 === undefined) return null;
+  const f = (v?: number) => (v === undefined ? "–" : Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }));
+  return `${f(b.p10)} / ${f(b.p50)} / ${f(b.p90)}${unit ? ` ${unit}` : ""}`;
+}
+
+/** The seven questions, answered from the structured fields. Read
+ *  defensively: shapes differ by basis, and older rows have no explanation. */
+function Explanation({ x, tier }: { x: AlertExplanation | null; tier: AlertTier }) {
+  if (!x) {
+    return (
+      <div className="muted small" style={{ marginTop: 10 }}>
+        Structured explanation not recorded for this alert (written before the
+        record format existed). The full text above is the alert as issued.
+      </div>
+    );
+  }
+  const d = x.driver ?? {};
+  const c = x.confidence ?? {};
+  const observed = x.basis === "observed";
+  const rows: Array<[string, ReactNode]> = [
+    ["What happened", x.what_happened],
+    ["Driven by", d.determinand
+      ? <>
+          <b>{d.determinand}</b> {d.value} {d.unit} against a limit of {d.limit} {d.unit}
+          {d.limit_kind ? ` (${d.limit_kind})` : ""}{d.times_limit ? ` — ${d.times_limit}×` : ""}
+          {(d.all_breaches?.length ?? 0) > 1 && (
+            <div className="muted small">
+              also {d.all_breaches!.slice(1).map((b) =>
+                `${b.determinand} ${b.value} ${b.unit} (limit ${b.limit} ${b.unit})`).join("; ")}
+            </div>
+          )}
+        </>
+      : <>{d.quantity ?? "—"}{d.species ? <span className="muted"> · {d.species}</span> : null}</>],
+    ["Where", <>{x.where?.block}{x.where?.district ? `, ${x.where.district}` : ""}
+      {x.where?.well_name ? <> — {x.where.well_name}</> : null}
+      {x.where?.scope ? <span className="muted small"> ({x.where.scope})</span> : null}</>],
+    ["How serious", <><span className={`chip ${TIER[tier].chip}`}>{TIER[tier].label}</span>{" "}
+      <span className="muted small">{x.tier?.rule}</span></>],
+    ["Basis", observed
+      ? <><b>Observed</b> — a laboratory measurement, not a prediction.</>
+      : <><b>Modelled</b> — a screening of a hypothetical scenario. No ISR uranium
+          mine operates in Jharkhand; nothing has been measured.</>],
+    ["Confidence", observed
+      ? <>{c.source ?? "Laboratory result"}{c.sampled_at ? `, sampled ${String(c.sampled_at).slice(0, 10)}` : ""}
+          {c.single_sample ? " · a single sample, so a reading rather than a trend" : ""}
+          {c.note ? <div className="muted small">{c.note}</div> : null}</>
+      : <>
+          {fmtBand(c.migration_m, "m")
+            ? <>Migration P10 / P50 / P90: <b>{fmtBand(c.migration_m, "m")}</b>
+                {c.band_source ? <span className="muted small"> ({c.band_source} band)</span> : null}</>
+            : <>Band not recorded on this run</>}
+          {c.excursion_probability !== undefined && c.excursion_probability !== null &&
+            <div>Excursion probability at the monitoring ring: <b>{c.excursion_probability}</b></div>}
+          {c.breakthrough_years ? <div>Modelled shallow-aquifer breakthrough: <b>{c.breakthrough_years} yr</b>
+            {c.breakthrough_probability !== undefined && c.breakthrough_probability !== null
+              ? ` (probability ${Math.round(Number(c.breakthrough_probability) * 100)}%)` : ""}</div> : null}
+          <div className={c.in_trained_support === false ? "" : "muted small"}>
+            {c.in_trained_support === false
+              ? <><span className="chip warn">extrapolating</span> outside the trained
+                  support on {c.extrapolation?.join(", ")} — the band's guarantee does not hold there</>
+              : "Inside the model's trained support."}
+          </div>
+          {c.beta_band && <div className="muted small">
+            Matrix-storage ratio β sampled over {c.beta_band[0]}–{c.beta_band[1]} in this band.</div>}
+          {c.note ? <div className="muted small">{c.note}</div> : null}
+        </>],
+    ["What next", (x.next_action?.length ?? 0) > 0
+      ? <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
+          {x.next_action.map((a, i) => <li key={i}>{a}</li>)}
+        </ul>
+      : "—"],
+  ];
+  return (
+    <dl style={{ marginTop: 12 }}>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ display: "grid", gridTemplateColumns: "minmax(110px, 140px) 1fr", gap: 8, padding: "6px 0", borderTop: "1px solid var(--border)" }}>
+          <dt className="muted small" style={{ margin: 0 }}>{k}</dt>
+          <dd style={{ margin: 0 }}>{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 const KIND = {
   measured_exceedance: {
@@ -56,6 +160,14 @@ const KIND = {
     chip: "warn",
     lead: "A published screening's modelled schedule has been reached",
   },
+  // R17. Blocks inside the model's UPPER (P90) estimate that the central
+  // footprint never touches. Worded as the width of the uncertainty band: the
+  // model cannot rule the block out, and that is all it says.
+  possible_reach: {
+    label: "Uncertainty band",
+    chip: "warn",
+    lead: "Inside the upper estimate of a modelled screening, outside its central one",
+  },
 } as const;
 
 /** Never index `KIND` blind: an unknown kind from a newer backend must not
@@ -70,9 +182,11 @@ export default function Alerts() {
 
   const inbox = useQuery({
     queryKey: ["citizen-alerts", filter],
-    queryFn: () => api.get<{ alerts: CitizenAlert[]; unread: number; limit_ppb: number }>(
+    queryFn: () => api.get<{ alerts: CitizenAlert[]; unread: number; limit_ppb: number;
+                             tiers?: AlertTiersLegend }>(
       `/citizen/alerts${filter === "all" ? "" : `?kind=${filter}`}`),
   });
+  const [showLadder, setShowLadder] = useState(false);
 
   const read = useMutation({
     mutationFn: (id: string) => api.post(`/citizen/alerts/${id}/read`),
@@ -121,6 +235,7 @@ export default function Alerts() {
           ["all", "Everything"],
           ["measured_exceedance", "Measured results"],
           ["published_screening", "Assessments"],
+          ["possible_reach", "Uncertainty band"],
           ["aquifer_pathway", "Shared aquifer"],
         ] as Array<[Filter, string]>).map(([v, l]) => (
           <button key={v} className={filter === v ? "active" : ""}
@@ -150,14 +265,20 @@ export default function Alerts() {
 
       {alerts.map((a) => {
         const k = KIND[a.kind as keyof typeof KIND] ?? UNKNOWN;
+        const t = TIER[(a.tier ?? "notice") as AlertTier] ?? TIER.notice;
         const isOpen = open === a.id;
         return (
           <div className="card" key={a.id}
-               style={{ borderLeft: `3px solid var(--${
-                 a.kind === "measured_exceedance" ? "danger" : "warn"})`,
+               style={{ borderLeft: `3px solid var(--${t.border})`,
                  opacity: a.is_read ? 0.82 : 1 }}>
             <div className="row wrap" style={{ marginBottom: 6 }}>
+              <span className={`chip ${t.chip}`} title={a.explanation?.tier?.rule ?? ""}>
+                {t.label}
+              </span>
               <span className={`chip ${k.chip}`}>{k.label}</span>
+              <span className={`chip ${a.basis === "observed" ? "danger" : "neutral"}`}>
+                {a.basis === "observed" ? "Measured" : "Modelled"}
+              </span>
               <span className="muted small">{k.lead}</span>
               <span className="spacer grow" />
               {!a.is_read && <span className="chip info">New</span>}
@@ -187,9 +308,12 @@ export default function Alerts() {
             )}
 
             {isOpen ? (
-              <div className="prose" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
-                {a.body}
-              </div>
+              <>
+                <div className="prose" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
+                  {a.body}
+                </div>
+                <Explanation x={a.explanation} tier={(a.tier ?? "notice") as AlertTier} />
+              </>
             ) : (
               <div className="prose muted" style={{ marginTop: 10 }}>
                 {a.body.split("\n")[0].slice(0, 160)}
@@ -220,7 +344,30 @@ export default function Alerts() {
           groundwater and describe water as it was on the date shown.{" "}
           <strong>Assessments</strong> are computer models of what would happen if a
           uranium in-situ recovery operation were built at a location — no such mine
-          operates in Jharkhand.
+          operates in Jharkhand.{" "}
+          <button className="link-btn" onClick={() => setShowLadder((v) => !v)}>
+            {showLadder ? "Hide" : "How the levels are decided"}
+          </button>
+          {showLadder && inbox.data?.tiers && (
+            <div className="card" style={{ marginTop: 8 }}>
+              <div><b>Levels</b> follow {inbox.data.tiers.standard}: its <i>acceptable</i> limit
+                and its <i>permissible limit in the absence of an alternate source</i>.</div>
+              <dl style={{ margin: "8px 0 0" }}>
+                {inbox.data.tiers.order.map((lvl) => (
+                  <div key={lvl} style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 8, padding: "3px 0" }}>
+                    <dt><span className={`chip ${TIER[lvl].chip}`}>{TIER[lvl].label}</span></dt>
+                    <dd style={{ margin: 0 }}>
+                      <div><span className="muted">measured:</span> {inbox.data!.tiers!.observed[lvl] ?? "—"}</div>
+                      <div><span className="muted">modelled:</span> {inbox.data!.tiers!.modelled[lvl] ?? "—"}</div>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="muted small" style={{ marginTop: 6 }}>
+                Project-defined, not from the standard: {inbox.data.tiers.project_defined.join("; ")}.
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

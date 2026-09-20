@@ -223,10 +223,13 @@ def test_measured_scan_reads_more_than_uranium():
     A scan that finds nothing looks exactly like a scan that found nothing
     wrong, which is why this went unnoticed and why it is pinned at the source.
     """
-    import inspect
-    src = inspect.getsource(AlertService.scan_measured_exceedances)
+    # R17: the scan builds its column list and limits from the IS 10500
+    # registry (`alert_tiers.health_determinands`) instead of literals, so the
+    # guarantee is checked on the registry the SQL is generated from.
+    from app.services.alert_tiers import health_determinands
+    cols = {d.column for d in health_determinands()}
     for col in ("uranium_ppb", "nitrate_mg_l", "fluoride_mg_l"):
-        assert col in src, f"{col} is not scanned"
+        assert col in cols, f"{col} is not scanned"
 
 
 def test_breaches_finds_every_determinand_over_its_limit():

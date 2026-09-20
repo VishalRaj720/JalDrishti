@@ -61,10 +61,11 @@ class UnconfiguredMailer(FakeMailer):
 async def _measured_alert(db, block_id: str, *, well: str = "Well Z") -> str:
     row = (await db.execute(text("""
         INSERT INTO alerts (kind, block_id, headline, body, severity,
+                            tier, basis,
                             well_name, measured_value, measured_unit, sampled_at)
         VALUES ('measured_exceedance', :bid, 'Nitrate above the safe limit in a well near you',
                 'A government monitoring well was tested and found: nitrate 121 mg/L.',
-                'high', :well, 121, 'mg/L', now())
+                'high', 'critical', 'observed', :well, 121, 'mg/L', now())
         RETURNING id::text
     """), {"bid": block_id, "well": well})).first()
     await db.commit()

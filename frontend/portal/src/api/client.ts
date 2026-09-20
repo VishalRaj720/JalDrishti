@@ -441,6 +441,49 @@ export interface Subscription {
   id: string; name: string; district: string | null; created_at: string;
 }
 
+export type AlertTier = "notice" | "warning" | "alert" | "critical";
+
+/** The structured explanation every alert carries since R17 (migration 0026).
+ *  Field shapes differ by `basis`; the UI reads them defensively. */
+export interface AlertExplanation {
+  version: number;
+  basis: "observed" | "modelled";
+  what_happened: string;
+  driver: {
+    determinand?: string; value?: number; unit?: string; limit?: number;
+    limit_kind?: string; times_limit?: number; status?: string; standard?: string;
+    all_breaches?: Array<{ determinand: string; value: number; unit: string;
+      limit: number; limit_kind: string; times_limit: number; status: string }>;
+    species?: string; quantity?: string; overlap_ha?: number | null;
+    footprint_ha?: number | null;
+  };
+  where: { block: string; district: string | null; well_name?: string | null; scope?: string };
+  tier: { level: AlertTier; rule: string; ladder: string };
+  confidence: {
+    kind: "measurement" | "model";
+    source?: string; sampled_at?: string | null; single_sample?: boolean;
+    samples_at_this_well?: number | null; note?: string;
+    premise?: string; engine?: string | null; band_source?: "ml" | "analytical" | null;
+    migration_m?: { p10?: number; p50?: number; p90?: number } | null;
+    area_ha?: { p10?: number; p50?: number; p90?: number } | null;
+    compliance_conc?: { p10?: number; p50?: number; p90?: number } | null;
+    excursion_probability?: number | null; horizon_years?: number | null;
+    extrapolation?: string[]; in_trained_support?: boolean;
+    data_confidence?: Record<string, unknown> | null; beta_band?: number[] | null;
+    breakthrough_years?: number | null; breakthrough_probability?: number | null;
+    reach_km?: number | null;
+  };
+  next_action: string[];
+  what_it_means?: string | null;
+}
+
+/** The ladder, returned by `GET /citizen/alerts` next to the data. */
+export interface AlertTiersLegend {
+  order: AlertTier[]; standard: string;
+  observed: Record<string, string>; modelled: Record<string, string>;
+  project_defined: string[];
+}
+
 /**
  * One alert, about one block.
  *
@@ -457,10 +500,19 @@ export interface CitizenAlert {
    *  breakthrough date has passed. It is still about a mine that does not
    *  exist, and its copy says so throughout. */
   kind: "measured_exceedance" | "published_screening" | "aquifer_pathway"
-      | "aquifer_breach_due";
+      | "aquifer_breach_due" | "possible_reach";
   headline: string;
   body: string;
+  /** Legacy; derived from `tier` since R17. */
   severity: "info" | "warning" | "high";
+  /** R17. The IS 10500 acceptable/permissible ladder plus one project-defined
+   *  rung (`critical`). A modelled alert is never `critical` — the database
+   *  refuses the row. */
+  tier: AlertTier;
+  basis: "observed" | "modelled";
+  /** The seven fields. `null` on rows written before R17 that have not been
+   *  rebuilt — render as "not recorded", never as an empty explanation. */
+  explanation: AlertExplanation | null;
   well_name: string | null;
   measured_value: number | null;
   measured_unit: string | null;

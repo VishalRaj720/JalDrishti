@@ -234,6 +234,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/citizen/alerts/deliver` | ● | · | · | · | · |
 | `GET /api/v1/citizen/alerts/delivery-status` | ● | · | · | · | · |
 | `POST /api/v1/citizen/alerts/read-all` | ● | ● | ● | ● | ● |
+| `POST /api/v1/citizen/alerts/rebuild-explanations` | ● | · | · | · | · |
 | `POST /api/v1/citizen/alerts/scan-breach-due` | ● | · | · | · | · |
 | `POST /api/v1/citizen/alerts/scan-measured` | ● | · | · | · | · |
 | `GET /api/v1/citizen/alerts/unread-count` | ● | ● | ● | ● | ● |
@@ -357,7 +358,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 121/136 · **regulator** 81/136 · **analyst** 83/136 · **field_officer** 70/136 · **citizen** 18/136
+Reachable endpoints per role — **admin** 122/137 · **regulator** 81/137 · **analyst** 83/137 · **field_officer** 70/137 · **citizen** 18/137
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

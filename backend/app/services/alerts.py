@@ -41,6 +41,7 @@ from app.models.alert import Alert, AlertRead, BlockSubscription
 # up into an API module for a rule that belongs to neither. Both now take it
 # from the service that owns the banding.
 from app.services.health_bands import URANIUM_LIMIT_PPB, join_and as _join_and
+from app.services import alert_tiers as tiers
 
 #: `URANIUM_LIMIT_PPB` is re-exported above rather than redeclared as of
 #: 2026-08-26. It was a third literal `30.0` in the codebase, and `citizen.py`
@@ -54,9 +55,69 @@ class AlertService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    # ── shared helpers (R17) ──────────────────────────────────────────
+
+    #: The alert-row upsert. `ON CONFLICT DO NOTHING` made re-runs idempotent;
+    #: R17 needs re-runs to ALSO fill the structured fields on rows written
+    #: before migration 0026 -- without ever duplicating a row or rewriting one
+    #: that already carries an explanation. `xmax = 0` is true only for a fresh
+    #: insert, so the caller can count created vs upgraded separately.
+    _UPSERT_TAIL = """
+                DO UPDATE SET tier = EXCLUDED.tier, basis = EXCLUDED.basis,
+                              severity = EXCLUDED.severity,
+                              explanation = EXCLUDED.explanation
+                WHERE alerts.explanation IS NULL
+                RETURNING id, (xmax = 0) AS inserted
+    """
+
+    @staticmethod
+    def _run_context(run: Any) -> dict[str, Any]:
+        """What a modelled explanation needs from a stored run, tolerant of
+        runs stored before any of these fields existed."""
+        if run is None:
+            return {}
+        hydro = run.hydro or {}
+        if isinstance(hydro, str):
+            hydro = json.loads(hydro)
+        req = run.request or {}
+        return {
+            "engine": getattr(run, "engine", None),
+            "metrics": run.metrics or {},
+            "extrapolation": list(run.extrapolation or []),
+            "data_confidence": (hydro or {}).get("data_confidence"),
+            "beta_band": (hydro or {}).get("beta_band"),
+            "horizon_years": req.get("time_years"),
+            "plume": run.plume or {},
+            "vertical": (hydro or {}).get("vertical") or {},
+        }
+
+    async def _wells_within_wkt(self, wkt: Optional[str]) -> Optional[list[str]]:
+        """Names of monitoring wells inside a lon/lat polygon, or None when
+        there is no polygon to test. An empty list is a finding (nobody is
+        watching the area the model points at); None is "not applicable"."""
+        if not wkt:
+            return None
+        rows = (await self.db.execute(text("""
+            SELECT mw.name FROM monitoring_wells mw
+            WHERE mw.location IS NOT NULL
+              AND ST_Within(mw.location,
+                            ST_MakeValid(ST_SetSRID(ST_GeomFromText(:wkt), 4326)))
+            ORDER BY mw.name LIMIT 25
+        """), {"wkt": wkt})).scalars().all()
+        return [str(n) for n in rows]
+
+    @staticmethod
+    def _ring_wkt(ring: Optional[list[list[float]]]) -> Optional[str]:
+        if not ring or len(ring) < 3:
+            return None
+        pts = [(float(p[0]), float(p[1])) for p in ring]
+        if pts[0] != pts[-1]:
+            pts.append(pts[0])
+        return "POLYGON((" + ", ".join(f"{x} {y}" for x, y in pts) + "))"
+
     # ── generation ───────────────────────────────────────────────────
 
-    async def announce_advisory(self, advisory: Advisory) -> int:
+    async def announce_advisory(self, advisory: Advisory, run: Any = None) -> int:
         """One alert per block the published advisory's footprint actually reaches.
 
         Called when a regulator publishes. The block list was resolved by real
@@ -64,11 +125,29 @@ class AlertService:
         footprint touches — usually one, and only the part of it the model
         actually covers. Alerting the surrounding area would be the
         over-claiming the whole workflow exists to prevent.
+
+        R17: tiered `notice`, or `alert` when the run's own excursion
+        probability at the monitoring ring is >= 0.5 within its horizon; never
+        `critical`. Carries the seven-field explanation with the run's
+        P10/P50/P90 band, extrapolation flags and data-confidence reasons.
+        `run` is optional for callers that have none; the explanation then
+        says the band is not recorded rather than inventing one.
         """
         blocks = advisory.affected_blocks or []
         if not blocks:
             logger.info(f"advisory {advisory.id} reaches no block; no alerts raised")
             return 0
+
+        ctx = self._run_context(run)
+        an = (ctx.get("metrics") or {}).get("analytical") or {}
+        p_ex = an.get("excursion_probability")
+        tier, rule = tiers.modelled_tier("published_screening",
+                                         excursion_probability=p_ex)
+        # wells inside the published footprint -- "what should be monitored next"
+        wells = None
+        if ctx.get("plume"):
+            wells = await self._wells_within_wkt(
+                self._ring_wkt(((ctx["plume"].get("source_zone") or {}).get("polygon"))))
 
         made = 0
         for b in blocks:
@@ -81,25 +160,133 @@ class AlertService:
             if advisory.what_to_do:
                 body += f"\n\nWhat to do: {advisory.what_to_do}"
 
-            # ON CONFLICT DO NOTHING against the partial unique index:
-            # re-publishing or re-running generation must not put the same alert
-            # in front of a citizen twice.
+            explanation = tiers.explain_modelled(
+                kind="published_screening", tier=tier, rule=rule,
+                block=b.get("name"), district=b.get("district"),
+                species=advisory.species, overlap_ha=b.get("overlap_ha"),
+                footprint_ha=advisory.footprint_ha,
+                horizon_years=ctx.get("horizon_years", advisory.time_years),
+                engine=ctx.get("engine"), metrics=ctx.get("metrics"),
+                extrapolation=ctx.get("extrapolation"),
+                data_confidence=ctx.get("data_confidence"),
+                beta_band=ctx.get("beta_band"), wells_in_reach=wells,
+                what_it_means=advisory.what_it_means)
+
             res = await self.db.execute(text("""
-                INSERT INTO alerts (kind, block_id, advisory_id, headline, body, severity)
+                INSERT INTO alerts (kind, block_id, advisory_id, headline, body,
+                                    severity, tier, basis, explanation)
                 VALUES ('published_screening', :block_id, :advisory_id,
-                        :headline, :body, 'info')
+                        :headline, :body, :severity, :tier, 'modelled',
+                        CAST(:explanation AS jsonb))
                 ON CONFLICT (advisory_id, block_id, kind)
                     WHERE advisory_id IS NOT NULL
-                DO NOTHING
-                RETURNING id
-            """), {"block_id": b["id"], "advisory_id": str(advisory.id),
-                   "headline": advisory.headline, "body": body})
-            if res.first():
+            """ + self._UPSERT_TAIL), {
+                "block_id": b["id"], "advisory_id": str(advisory.id),
+                "headline": advisory.headline, "body": body,
+                "severity": tiers.SEVERITY_FOR_TIER[tier], "tier": tier,
+                "explanation": json.dumps(explanation, default=str)})
+            row = res.first()
+            if row and row.inserted:
                 made += 1
 
         await self.db.commit()
-        logger.info(f"advisory {advisory.id}: {made} block alert(s) raised")
+        logger.info(f"advisory {advisory.id}: {made} block alert(s) raised ({tier})")
         return made
+
+    async def announce_possible_reach(self, advisory: Advisory, run: Any) -> dict[str, Any]:
+        """Tell the blocks inside the model's UPPER (P90) migration envelope
+        that the central footprint never touches.
+
+        WHY THIS IS A SEPARATE KIND. The footprint alert says "the central
+        estimate covers N ha of your block". This says "the model is not sure
+        enough to exclude your block": the P90 envelope is the width of the
+        parameter-uncertainty band, and after R17 that band deliberately spans a
+        factor of four on the matrix-storage ratio that decides the extent. A
+        resident inside it deserves to know that the model cannot rule them out
+        -- and deserves the wording that says exactly that and no more.
+
+        Tiered `warning`. Never raised where there is no ML envelope (the run
+        was analytical-only, or the band was below the drawable minimum), and
+        never for a block already told by the footprint alert.
+        """
+        ctx = self._run_context(run)
+        env = (ctx.get("plume") or {}).get("ml_envelope") or {}
+        p90 = env.get("p90") if isinstance(env, dict) else None
+        wkt = self._ring_wkt(p90)
+        if not wkt:
+            skipped = (ctx.get("plume") or {}).get("ml_envelope_skipped") or {}
+            return {"alerts": 0, "reason": "no_p90_envelope",
+                    "note": ("The run stored no P90 envelope"
+                             + (f" ({skipped.get('p90')})" if skipped.get("p90") else "")
+                             + "; nothing to add beyond the footprint.")}
+
+        already = {str(b.get("id")) for b in (advisory.affected_blocks or [])}
+        rows = (await self.db.execute(text("""
+            SELECT b.id::text AS id, b.name, d.name AS district,
+                   ROUND((ST_Area(ST_Transform(ST_Intersection(
+                       b.geometry, ST_MakeValid(ST_SetSRID(ST_GeomFromText(:wkt), 4326))
+                   ), 32645)) / 10000.0)::numeric, 4) AS overlap_ha
+            FROM blocks b
+            LEFT JOIN districts d ON d.id = b.district_id
+            WHERE b.geometry IS NOT NULL
+              AND ST_Intersects(b.geometry,
+                                ST_MakeValid(ST_SetSRID(ST_GeomFromText(:wkt), 4326)))
+        """), {"wkt": wkt})).mappings().all()
+        targets = [r for r in rows if r["id"] not in already]
+        if not targets:
+            return {"alerts": 0, "reason": "p90_within_footprint_blocks",
+                    "note": ("The upper estimate stays inside the blocks the "
+                             "footprint already reached; nobody new to tell.")}
+
+        tier, rule = tiers.modelled_tier("possible_reach")
+        wells = await self._wells_within_wkt(wkt)
+        made = 0
+        for b in targets:
+            body = (
+                f"The model's UPPER estimate (the 90th percentile of its "
+                f"uncertainty band) of how far contamination from a HYPOTHETICAL "
+                f"uranium in-situ recovery operation could travel reaches about "
+                f"{float(b['overlap_ha']):.1f} hectares of {b['name']} block. The "
+                f"central estimate does not reach this block at all.\n\n"
+                f"This is the width of the model's uncertainty, not a finding "
+                f"that anything reaches you. No such mine exists. It is reported "
+                f"because the model cannot rule your block out, and because "
+                f"knowing where a model is uncertain is part of knowing what it "
+                f"says.\n\n{advisory.what_it_means}")
+            if advisory.what_to_do:
+                body += f"\n\nWhat to do: {advisory.what_to_do}"
+            explanation = tiers.explain_modelled(
+                kind="possible_reach", tier=tier, rule=rule,
+                block=b["name"], district=b["district"],
+                species=advisory.species, overlap_ha=float(b["overlap_ha"]),
+                footprint_ha=advisory.footprint_ha,
+                horizon_years=ctx.get("horizon_years", advisory.time_years),
+                engine=ctx.get("engine"), metrics=ctx.get("metrics"),
+                extrapolation=ctx.get("extrapolation"),
+                data_confidence=ctx.get("data_confidence"),
+                beta_band=ctx.get("beta_band"), wells_in_reach=wells,
+                what_it_means=advisory.what_it_means)
+            res = await self.db.execute(text("""
+                INSERT INTO alerts (kind, block_id, advisory_id, headline, body,
+                                    severity, tier, basis, explanation)
+                VALUES ('possible_reach', :block_id, :advisory_id, :headline,
+                        :body, :severity, :tier, 'modelled',
+                        CAST(:explanation AS jsonb))
+                ON CONFLICT (advisory_id, block_id, kind)
+                    WHERE advisory_id IS NOT NULL
+            """ + self._UPSERT_TAIL), {
+                "block_id": b["id"], "advisory_id": str(advisory.id),
+                "headline": (f"Within the uncertainty band of a published "
+                             f"screening — {b['name']}"),
+                "body": body, "severity": tiers.SEVERITY_FOR_TIER[tier],
+                "tier": tier, "explanation": json.dumps(explanation, default=str)})
+            row = res.first()
+            if row and row.inserted:
+                made += 1
+        await self.db.commit()
+        logger.info(f"advisory {advisory.id}: {made} possible-reach alert(s)")
+        return {"alerts": made, "reason": "raised",
+                "blocks": [dict(b) for b in targets]}
 
     async def scan_measured_exceedances(self, *, limit: int = 500) -> dict[str, Any]:
         """Raise an alert for every well whose latest sample breaches a health limit.
@@ -133,49 +320,57 @@ class AlertService:
         2019 and has been clean since should not generate an alert that reads as
         current; the honest statement is about its most recent result.
         """
-        from app.api.v1.public_risk import (FLUORIDE_ACCEPTABLE_MG_L,
-                                            FLUORIDE_PERMISSIBLE_MG_L,
-                                            NITRATE_LIMIT_MG_L,
-                                            URANIUM_LIMIT_PPB)
+        # R17: the health set, its columns and its ACCEPTABLE limits come from
+        # the IS 10500 registry (`services/water_quality.STANDARD`) -- one copy
+        # of every limit. Selecting on the acceptable limit (not the permissible
+        # one, as before) is what makes the `warning` rung reachable: a well
+        # between fluoride 1.0 and 1.5 mg/L is inside the standard's own
+        # tolerated band and is told so, at that tier.
+        hd = tiers.health_determinands()
+        cols = ", ".join(f"ws.{d.column}" for d in hd)
+        where = " OR ".join(f"{d.column} > :lim_{d.key}" for d in hd)
+        params: dict[str, Any] = {f"lim_{d.key}": float(d.acceptable) for d in hd}
+        params["cap"] = limit
 
-        rows = (await self.db.execute(text("""
+        rows = (await self.db.execute(text(f"""
             WITH latest AS (
                 SELECT DISTINCT ON (ws.well_id)
-                       ws.well_id, ws.sampled_at,
-                       ws.uranium_ppb, ws.nitrate_mg_l, ws.fluoride_mg_l,
-                       ws.arsenic_ppb, ws.iron_ppm,
-                       mw.name AS well_name, mw.block_id
+                       ws.well_id, ws.sampled_at, {cols},
+                       mw.name AS well_name, mw.block_id,
+                       (SELECT count(*) FROM water_samples w2
+                         WHERE w2.well_id = ws.well_id) AS n_samples
                 FROM water_samples ws
                 JOIN monitoring_wells mw ON mw.block_id IS NOT NULL
                                         AND mw.id = ws.well_id
                 ORDER BY ws.well_id, ws.sampled_at DESC
             )
-            SELECT * FROM latest
-            WHERE uranium_ppb  >  :u
-               OR nitrate_mg_l >  :no3
-               OR fluoride_mg_l > :f_perm
-               OR arsenic_ppb  >  :as_perm
-               OR iron_ppm     >  :fe
-            ORDER BY sampled_at DESC
+            SELECT l.*, b.name AS block_name, d.name AS district_name
+            FROM latest l
+            JOIN blocks b ON b.id = l.block_id
+            LEFT JOIN districts d ON d.id = b.district_id
+            WHERE {where}
+            ORDER BY l.sampled_at DESC
             LIMIT :cap
-        """), {"u": URANIUM_LIMIT_PPB, "no3": NITRATE_LIMIT_MG_L,
-               "f_perm": FLUORIDE_PERMISSIBLE_MG_L, "as_perm": 50.0,
-               "fe": 0.3, "cap": limit})).mappings().all()
+        """), params)).mappings().all()
 
-        made = 0
+        made = upgraded = 0
+        by_tier: dict[str, int] = {}
         for r in rows:
-            breaches = self._breaches(r)
+            breaches = tiers.breaches_for_sample(r)
             if not breaches:
                 continue
-
-            # Severity from how far over, not from a general sense of concern:
-            # 3x the limit is a different message from 1.1x.
-            worst = max(b["times_limit"] for b in breaches)
-            severity = "high" if worst >= 2.0 else "warning"
+            tier, rule = tiers.observed_tier(breaches)
+            by_tier[tier] = by_tier.get(tier, 0) + 1
 
             names = _join_and([b["label"] for b in breaches])
-            headline = (f"{names.capitalize()} above the safe limit in a well "
-                        f"near you")
+            over_alert = [b for b in breaches
+                          if b["status"] == "above_permissible"]
+            if over_alert:
+                headline = (f"{names.capitalize()} above the safe limit in a well "
+                            f"near you")
+            else:
+                headline = (f"{names.capitalize()} above the acceptable limit in a "
+                            f"well near you")
 
             lines = [
                 f"A government monitoring well"
@@ -184,14 +379,24 @@ class AlertService:
                 "",
             ]
             for b in breaches:
-                lines.append(
-                    f"  - {b['label']}: {b['value']:g} {b['unit']} "
-                    f"(safe limit {b['limit']:g} {b['unit']})")
+                if b["status"] == "above_permissible":
+                    lines.append(
+                        f"  - {b['label']}: {b['value']:g} {b['unit']} "
+                        f"(limit {b['limit']:g} {b['unit']}, "
+                        f"{b['limit_kind']})")
+                else:
+                    lines.append(
+                        f"  - {b['label']}: {b['value']:g} {b['unit']} "
+                        f"(above the acceptable {b['acceptable']:g} {b['unit']}, "
+                        f"within the permissible {b['permissible']:g} {b['unit']} "
+                        f"that is tolerated only where no better source exists)")
             lines += [
                 "",
                 "These are real laboratory results from government groundwater "
                 "sampling. This is a measurement, not a prediction, and it was "
                 "the most recent test at this well.",
+                "",
+                f"Level: {tier.upper()} — {rule}.",
                 "",
             ]
             advice = [b["advice"] for b in breaches if b["advice"]]
@@ -203,78 +408,71 @@ class AlertService:
                 "and the State Pollution Control Board can advise on testing "
                 "and on alternative supply.")
 
+            explanation = tiers.explain_observed(
+                breaches=breaches, tier=tier, rule=rule,
+                block=r["block_name"], district=r["district_name"],
+                well_name=r["well_name"], sampled_at=r["sampled_at"],
+                n_samples_at_well=int(r["n_samples"] or 1))
+
             res = await self.db.execute(text("""
                 INSERT INTO alerts (kind, block_id, headline, body, severity,
+                                    tier, basis, explanation,
                                     well_name, measured_value, measured_unit,
                                     sampled_at)
                 VALUES ('measured_exceedance', :block_id, :headline, :body,
-                        :severity, :well_name, :value, :unit, :sampled_at)
+                        :severity, :tier, 'observed',
+                        CAST(:explanation AS jsonb),
+                        :well_name, :value, :unit, :sampled_at)
                 ON CONFLICT (block_id, well_name, sampled_at)
                 WHERE kind = 'measured_exceedance'
-                DO NOTHING
-                RETURNING id
-            """), {"block_id": str(r["block_id"]), "headline": headline,
-                   "body": "\n".join(lines), "severity": severity,
-                   "well_name": r["well_name"],
-                   # The driving determinand's reading, for the compact card.
-                   "value": breaches[0]["value"], "unit": breaches[0]["unit"],
-                   "sampled_at": r["sampled_at"]})
-            if res.first():
-                made += 1
+            """ + self._UPSERT_TAIL), {
+                "block_id": str(r["block_id"]), "headline": headline,
+                "body": "\n".join(lines),
+                "severity": tiers.SEVERITY_FOR_TIER[tier], "tier": tier,
+                "explanation": json.dumps(explanation, default=str),
+                "well_name": r["well_name"],
+                # The driving determinand's reading, for the compact card.
+                "value": breaches[0]["value"], "unit": breaches[0]["unit"],
+                "sampled_at": r["sampled_at"]})
+            row = res.first()
+            if row:
+                if row.inserted:
+                    made += 1
+                else:
+                    upgraded += 1
 
         await self.db.commit()
         return {
             "wells_over_limit": len(rows),
             "alerts_created": made,
-            "judged_on": {
-                "uranium_ppb": URANIUM_LIMIT_PPB,
-                "nitrate_mg_l": NITRATE_LIMIT_MG_L,
-                "fluoride_mg_l": FLUORIDE_PERMISSIBLE_MG_L,
-                "arsenic_ppb": 50.0, "iron_mg_l": 0.3,
-            },
+            "alerts_upgraded": upgraded,
+            "by_tier": by_tier,
+            "judged_on": {d.column: {"acceptable": d.acceptable,
+                                     "permissible": d.permissible,
+                                     "relaxation": d.relaxation or None,
+                                     "source": d.source} for d in hd},
+            "tiers": tiers.tiers_legend(),
             "note": ("Health-significant determinands only, and only the most "
                      "recent sample per well — a well that exceeded years ago "
                      "and has been clean since must not raise an alert that "
                      "reads as current. Hardness, alkalinity and TDS are not "
                      "alerted on: they exceed at most Jharkhand wells and are "
-                     "aquifer chemistry rather than contamination."),
+                     "aquifer chemistry rather than contamination. "
+                     "`alerts_upgraded` counts rows written before R17 that "
+                     "now carry the structured explanation."),
         }
 
     @staticmethod
     def _breaches(r: Mapping[str, Any]) -> list[dict[str, Any]]:
         """Every health limit this sample is over, worst first.
 
-        Arsenic and iron are included even though the CGWB file carries no
-        values for either — the day a lab result arrives, the alert should fire
-        without anybody remembering to come back and add it here.
+        R17: delegates to `alert_tiers.breaches_for_sample`, which reads the
+        IS 10500 registry -- the limits are no longer repeated here. Arsenic and
+        iron are included even though the CGWB file carries no values for
+        either — the day a lab result arrives, the alert fires without anybody
+        remembering to come back and add it here.
         """
-        from app.api.v1.public_risk import (FLUORIDE_PERMISSIBLE_MG_L,
-                                            NITRATE_LIMIT_MG_L,
-                                            URANIUM_LIMIT_PPB)
-        spec = [
-            ("uranium_ppb", "uranium", "ppb", URANIUM_LIMIT_PPB,
-             "Boiling does not remove uranium."),
-            ("nitrate_mg_l", "nitrate", "mg/L", NITRATE_LIMIT_MG_L,
-             "Nitrate is mainly a risk to infants under six months. Do not use "
-             "this water to make formula feed. Boiling concentrates it rather "
-             "than removing it."),
-            ("fluoride_mg_l", "fluoride", "mg/L", FLUORIDE_PERMISSIBLE_MG_L,
-             "Long-term fluoride exposure causes dental and skeletal fluorosis. "
-             "Boiling does not remove it."),
-            ("arsenic_ppb", "arsenic", "ppb", 50.0,
-             "Arsenic is a long-term poison and boiling does not remove it."),
-            ("iron_ppm", "iron", "mg/L", 0.3, ""),
-        ]
-        out = []
-        for col, label, unit, limit, advice in spec:
-            v = r.get(col)
-            if v is None or float(v) <= limit:
-                continue
-            out.append({"key": col, "label": label, "unit": unit,
-                        "value": float(v), "limit": limit,
-                        "times_limit": float(v) / limit, "advice": advice})
-        out.sort(key=lambda b: -b["times_limit"])
-        return out
+        return tiers.breaches_for_sample(r)
 
     # ── the time-triggered alert ─────────────────────────────────────
 
@@ -468,6 +666,7 @@ class AlertService:
 
         yrs = v.get("years_to_vertical_breakthrough")
         prob = float(v.get("shallow_impact_probability") or 0.0)
+        tier, rule = tiers.modelled_tier("aquifer_breach_due")
         made = 0
         for b in blocks:
             headline = ("A published groundwater screening for your area has "
@@ -496,18 +695,33 @@ class AlertService:
                 f"it — real testing is the only thing that can answer the "
                 f"question this model raises."
             )
+            explanation = tiers.explain_modelled(
+                kind="aquifer_breach_due", tier=tier, rule=rule,
+                block=b["name"], district=b["district"], species=r["species"],
+                overlap_ha=None, footprint_ha=None,
+                horizon_years=(r["request"] or {}).get("time_years")
+                if isinstance(r["request"], dict) else None,
+                engine=None, metrics=None, extrapolation=None,
+                data_confidence=(hydro or {}).get("data_confidence"),
+                beta_band=(hydro or {}).get("beta_band"),
+                years_to_breakthrough=float(yrs), breakthrough_probability=prob,
+                injection_start=r["injection_start_date"],
+                elapsed_years=round(elapsed, 1), reach_km=round(reach_m / 1000.0, 1))
             res = await self.db.execute(text("""
                 INSERT INTO alerts (kind, block_id, advisory_id, headline, body,
-                                    severity)
+                                    severity, tier, basis, explanation)
                 VALUES ('aquifer_breach_due', :block_id, :advisory_id,
-                        :headline, :body, 'warning')
+                        :headline, :body, :severity, :tier, 'modelled',
+                        CAST(:explanation AS jsonb))
                 ON CONFLICT (advisory_id, block_id, kind)
                 WHERE advisory_id IS NOT NULL
-                DO NOTHING
-                RETURNING id
-            """), {"block_id": b["id"], "advisory_id": r["advisory_id"],
-                   "headline": headline, "body": body})
-            if res.first():
+            """ + self._UPSERT_TAIL), {
+                "block_id": b["id"], "advisory_id": r["advisory_id"],
+                "headline": headline, "body": body,
+                "severity": tiers.SEVERITY_FOR_TIER[tier], "tier": tier,
+                "explanation": json.dumps(explanation, default=str)})
+            row = res.first()
+            if row and row.inserted:
                 made += 1
         return made
 
@@ -550,6 +764,7 @@ class AlertService:
         """Alerts for the blocks this user subscribes to, newest first."""
         rows = (await self.db.execute(text("""
             SELECT a.id::text AS id, a.kind, a.headline, a.body, a.severity,
+                   a.tier, a.basis, a.explanation,
                    a.well_name, a.measured_value, a.measured_unit, a.sampled_at,
                    a.created_at, a.advisory_id::text AS advisory_id,
                    b.id::text AS block_id, b.name AS block_name,
@@ -780,6 +995,8 @@ class AlertService:
 
         made = 0
         reach_km = round(reach_m / 1000.0, 1)
+        tier, rule = tiers.modelled_tier("aquifer_pathway")
+        ctx = self._run_context(run)
         for b in targets:
             dist = b["distance_km"]
             name = b["name"]
@@ -802,20 +1019,34 @@ class AlertService:
             if advisory.what_to_do:
                 body += f"\n\nWhat to do: {advisory.what_to_do}"
 
+            explanation = tiers.explain_modelled(
+                kind="aquifer_pathway", tier=tier, rule=rule,
+                block=name, district=b["district"], species=advisory.species,
+                overlap_ha=None, footprint_ha=advisory.footprint_ha,
+                horizon_years=ctx.get("horizon_years", advisory.time_years),
+                engine=ctx.get("engine"), metrics=ctx.get("metrics"),
+                extrapolation=ctx.get("extrapolation"),
+                data_confidence=ctx.get("data_confidence"),
+                beta_band=ctx.get("beta_band"),
+                years_to_breakthrough=float(yrs),
+                breakthrough_probability=v.get("shallow_impact_probability"),
+                reach_km=reach_km, what_it_means=advisory.what_it_means)
             res = await self.db.execute(text("""
                 INSERT INTO alerts (kind, block_id, advisory_id, headline, body,
-                                    severity)
+                                    severity, tier, basis, explanation)
                 VALUES ('aquifer_pathway', :block_id, :advisory_id, :headline,
-                        :body, 'warning')
+                        :body, :severity, :tier, 'modelled',
+                        CAST(:explanation AS jsonb))
                 ON CONFLICT (advisory_id, block_id, kind)
                     WHERE advisory_id IS NOT NULL
-                DO NOTHING
-                RETURNING id
-            """), {"block_id": b["id"], "advisory_id": str(advisory.id),
-                   "headline": (f"Shallow aquifer shared with a screened area "
-                                f"— {name}"),
-                   "body": body})
-            if res.first():
+            """ + self._UPSERT_TAIL), {
+                "block_id": b["id"], "advisory_id": str(advisory.id),
+                "headline": (f"Shallow aquifer shared with a screened area "
+                             f"— {name}"),
+                "body": body, "severity": tiers.SEVERITY_FOR_TIER[tier],
+                "tier": tier, "explanation": json.dumps(explanation, default=str)})
+            row = res.first()
+            if row and row.inserted:
                 made += 1
 
         await self.db.commit()
@@ -875,7 +1106,7 @@ async def raise_for_advisory(advisory_id: uuid.UUID) -> dict[str, Any]:
         )).scalar_one_or_none()
 
         svc = AlertService(db)
-        footprint = await svc.announce_advisory(adv)
+        footprint = await svc.announce_advisory(adv, run)
 
         # `announce_advisory` commits, and COMMIT discards `SET LOCAL` — so the
         # system context set above is gone by now and every RLS-protected table
@@ -890,6 +1121,12 @@ async def raise_for_advisory(advisory_id: uuid.UUID) -> dict[str, Any]:
         await set_rls_context(db, bypass=True)
         aquifer = await svc.announce_aquifer_reach(adv, run)
 
+        # R17: the blocks the P90 envelope reaches but the footprint does not.
+        # `announce_aquifer_reach` commits on the raised path, so the context
+        # is re-set once more -- same hazard, same cure.
+        await set_rls_context(db, bypass=True)
+        possible = await svc.announce_possible_reach(adv, run)
+
     # R16: a row in `alerts` is not a notification. Deliver what was just
     # raised to the people who follow those blocks, and report the outcome
     # alongside the counts so the publish response says whether anyone was
@@ -897,8 +1134,54 @@ async def raise_for_advisory(advisory_id: uuid.UUID) -> dict[str, Any]:
     from app.services.notify import deliver_pending
     delivery = await deliver_pending()
     return {"footprint_alerts": footprint, "aquifer_reach": aquifer,
-            "delivery": delivery}
+            "possible_reach": possible, "delivery": delivery}
+
+
+async def rebuild_explanations() -> dict[str, Any]:
+    """Regenerate every published advisory's alerts so rows written before
+    migration 0026 carry tier, basis and the seven-field explanation.
+
+    Idempotent: every insert path upserts only where `explanation IS NULL`, so
+    nothing is duplicated and nothing already explained is rewritten. Delivery
+    is NOT re-run here -- an upgraded row is the same alert, not a new one.
+    Returns the counts per advisory; the measured scan is the caller's job
+    (`scan_measured_exceedances` upgrades its own rows the same way).
+    """
+    from app.database import AsyncSessionLocal, set_rls_context
+    from app.models.simulation_run import SimulationRun
+
+    out: list[dict[str, Any]] = []
+    async with AsyncSessionLocal() as db:
+        await set_rls_context(db, bypass=True)
+        ids = (await db.execute(
+            select(Advisory.id).where(Advisory.status == "published")
+        )).scalars().all()
+    for aid in ids:
+        async with AsyncSessionLocal() as db:
+            await set_rls_context(db, bypass=True)
+            adv = (await db.execute(select(Advisory).where(Advisory.id == aid))
+                   ).scalar_one_or_none()
+            run = (await db.execute(
+                select(SimulationRun).where(SimulationRun.id == adv.run_id)
+            )).scalar_one_or_none() if adv else None
+            if adv is None:
+                continue
+            svc = AlertService(db)
+            fp = await svc.announce_advisory(adv, run)
+            await set_rls_context(db, bypass=True)
+            aq = await svc.announce_aquifer_reach(adv, run)
+            await set_rls_context(db, bypass=True)
+            pr = await svc.announce_possible_reach(adv, run)
+            out.append({"advisory_id": str(aid), "footprint_new": fp,
+                        "aquifer_reach": aq.get("reason"),
+                        "possible_reach": pr.get("reason"),
+                        "possible_reach_new": pr.get("alerts", 0)})
+    async with AsyncSessionLocal() as db:
+        await set_rls_context(db, bypass=True)
+        remaining = (await db.execute(text(
+            "SELECT count(*) FROM alerts WHERE explanation IS NULL"))).scalar()
+    return {"advisories": out, "alerts_still_unexplained": int(remaining or 0)}
 
 # Re-exported so importers do not need the model module for a type check.
-__all__ = ["AlertService", "raise_for_advisory", "Alert", "AlertRead",
-           "BlockSubscription", "URANIUM_LIMIT_PPB"]
+__all__ = ["AlertService", "raise_for_advisory", "rebuild_explanations",
+           "Alert", "AlertRead", "BlockSubscription", "URANIUM_LIMIT_PPB"]

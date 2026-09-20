@@ -320,7 +320,8 @@ async def list_alerts(
     # 422 to every resident who clicked it, and the "Timetable passed" kind
     # (0023) could not be filtered for at all. Found on the deployed portal.
     kind: Optional[Literal["measured_exceedance", "published_screening",
-                           "aquifer_pathway", "aquifer_breach_due"]] = Query(None),
+                           "aquifer_pathway", "aquifer_breach_due",
+                           "possible_reach"]] = Query(None),
     limit: int = Query(100, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     me: User = Depends(get_current_user),
@@ -330,13 +331,19 @@ async def list_alerts(
     `kind` is exposed as a filter because the two channels answer different
     questions — "is my water safe today" and "what has been modelled for my
     area" — and a reader is entitled to look at one without the other.
+
+    R17: every alert carries `tier`, `basis` and `explanation` (the seven
+    fields); `tiers` is the ladder those were assigned on, returned with the
+    data so the rule travels with the record.
     """
+    from app.services.alert_tiers import tiers_legend
     response.headers["Cache-Control"] = "no-store"
     svc = AlertService(db)
     return {
         "alerts": await svc.inbox(me.id, kind=kind, limit=limit),
         "unread": await svc.unread_count(me.id),
         "limit_ppb": URANIUM_LIMIT_PPB,
+        "tiers": tiers_legend(),
     }
 
 
@@ -393,6 +400,27 @@ async def scan_measured(
     # R16: raising is half the job. Deliver to whoever follows those blocks.
     result["delivery"] = await deliver_pending()
     return result
+
+
+@router.post("/alerts/rebuild-explanations")
+async def rebuild_alert_explanations(
+    _: User = Depends(require_admin),
+):
+    """Fill tier, basis and the seven-field explanation on alerts written
+    before migration 0026. Admin only; idempotent; delivers nothing (an
+    upgraded row is the same alert, not a new one).
+
+    Re-raises every published advisory's alerts through the same upsert the
+    publish path uses, then runs the measured scan, which upgrades its own
+    rows the same way. Run once after deploying R17.
+    """
+    from app.database import AsyncSessionLocal, set_rls_context
+    from app.services.alerts import rebuild_explanations
+    out = await rebuild_explanations()
+    async with AsyncSessionLocal() as adb:
+        await set_rls_context(adb, bypass=True)
+        out["measured"] = await AlertService(adb).scan_measured_exceedances()
+    return out
 
 
 @router.post("/alerts/scan-breach-due")
