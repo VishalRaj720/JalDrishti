@@ -1,0 +1,6580 @@
+{
+ "generated_at": "2026-09-20T12:12:49Z",
+ "method": {
+  "oat_points": 7,
+  "sobol_n_base": 256,
+  "estimators": "Saltelli 2010 (S1), Jansen 1999 (ST); log-transformed outputs where the range exceeds 20x",
+  "engine": "analytical (simulate_plume); no surrogate",
+  "horizon_years": 20.0,
+  "operation_years": 8.0,
+  "restoration_years": 3.0
+ },
+ "groups": {
+  "A": "registered ungrounded constants (P.UNGROUNDED_PARAMETERS) entering the plan-view solve",
+  "B": "resolved hydrogeological inputs with their MC/literature ranges"
+ },
+ "results": [
+  {
+   "site": "jaduguda_deposit",
+   "label": "Jaduguda (deposit)",
+   "species": "uranium_ppb",
+   "regime": "fractured",
+   "ore_zone": "deposit",
+   "u_suppressed": false,
+   "resolved": {
+    "K_m_day": 0.5633232163236447,
+    "gradient_i": 0.00205,
+    "phi_mobile": 0.0075,
+    "n_total": 0.03,
+    "kd_L_kg": 1.0,
+    "beta": 3.0,
+    "source_conc_C0": 15180.0,
+    "background_conc_Cb": 1.0
+   },
+   "beta_basis": "porosity_derived",
+   "inputs": [
+    {
+     "name": "beta (capacity ratio)",
+     "group": "A",
+     "served": 3.0,
+     "lo": 0.3,
+     "hi": 20.0,
+     "log": true,
+     "note": "prior [0.3, 20]; served = porosity-derived"
+    },
+    {
+     "name": "omega (matrix transfer, 1/day)",
+     "group": "A",
+     "served": 0.001,
+     "lo": 0.0001,
+     "hi": 0.01,
+     "log": true,
+     "note": "x/10 .. x10 of the pinned 1e-3"
+    },
+    {
+     "name": "fracture aperture (m)",
+     "group": "A",
+     "served": 0.00025,
+     "lo": 0.0001,
+     "hi": 0.0005,
+     "log": true,
+     "note": "config range 1e-4 .. 5e-4"
+    },
+    {
+     "name": "matrix De (m2/day)",
+     "group": "A",
+     "served": 5e-06,
+     "lo": 1.0000000000000002e-06,
+     "hi": 2.5e-05,
+     "log": true,
+     "note": "x/5 .. x5 (no defensible range in config)"
+    },
+    {
+     "name": "SOURCE_BV_GAIN",
+     "group": "A",
+     "served": 0.4,
+     "lo": 0.1,
+     "hi": 1.0,
+     "log": false,
+     "note": "0.1 .. 1.0 around the served 0.4"
+    },
+    {
+     "name": "SOURCE_BV_REF",
+     "group": "A",
+     "served": 2.0,
+     "lo": 0.5,
+     "hi": 6.0,
+     "log": true,
+     "note": "0.5 .. 6 bulk volumes around the served 2"
+    },
+    {
+     "name": "INCREMENTAL_FLOOR",
+     "group": "A",
+     "served": 0.1,
+     "lo": 0.02,
+     "hi": 0.5,
+     "log": true,
+     "note": "attribution policy 0.02 .. 0.5"
+    },
+    {
+     "name": "K (m/day)",
+     "group": "B",
+     "served": 0.5633232163236447,
+     "lo": 0.1877744054412149,
+     "hi": 1.689969648970934,
+     "log": true,
+     "note": "MC local heterogeneity clip (x/3 .. x3)"
+    },
+    {
+     "name": "hydraulic gradient",
+     "group": "B",
+     "served": 0.00205,
+     "lo": 0.001025,
+     "hi": 0.0041,
+     "log": true,
+     "note": "x0.5 .. x2"
+    },
+    {
+     "name": "mobile porosity",
+     "group": "B",
+     "served": 0.0075,
+     "lo": 0.00375,
+     "hi": 0.015,
+     "log": true,
+     "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)"
+    },
+    {
+     "name": "Kd (L/kg)",
+     "group": "B",
+     "served": 1.0,
+     "lo": 0.3,
+     "hi": 3.0,
+     "log": true,
+     "note": "regime Kd range 0.3-3.0"
+    },
+    {
+     "name": "C0 (source conc)",
+     "group": "B",
+     "served": 15180.0,
+     "lo": 7590.0,
+     "hi": 22770.0,
+     "log": false,
+     "note": "x0.5 .. x1.5"
+    },
+    {
+     "name": "U attenuation k (1/yr)",
+     "group": "B",
+     "served": 0.35,
+     "lo": 0.05,
+     "hi": 0.7,
+     "log": true,
+     "note": "literature range"
+    }
+   ],
+   "oat": {
+    "served_outputs": {
+     "max_migration_distance_m": 6.54382367908545,
+     "affected_area_ha": 9.182446395906682,
+     "compliance_conc": 1.0
+    },
+    "inputs": {
+     "beta (capacity ratio)": {
+      "group": "A",
+      "served": 3.0,
+      "range": [
+       0.3,
+       20.0
+      ],
+      "log": true,
+      "note": "prior [0.3, 20]; served = porosity-derived",
+      "x": [
+       0.3,
+       0.604096117960051,
+       1.21644039911468,
+       2.449489742783178,
+       4.93242414866094,
+       9.932194267794943,
+       20.000000000000007
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        23.1551,
+        15.3528,
+        10.3191,
+        7.2989,
+        5.0337,
+        3.5236,
+        2.5169
+       ],
+       "min": 2.5169,
+       "max": 23.1551,
+       "elasticity": -0.769
+      },
+      "affected_area_ha": {
+       "values": [
+        9.7398,
+        9.5079,
+        9.3289,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.7398,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "omega (matrix transfer, 1/day)": {
+      "group": "A",
+      "served": 0.001,
+      "range": [
+       0.0001,
+       0.01
+      ],
+      "log": true,
+      "note": "x/10 .. x10 of the pinned 1e-3",
+      "x": [
+       0.00010000000000000009,
+       0.0002154434690031884,
+       0.0004641588833612784,
+       0.0010000000000000002,
+       0.0021544346900318843,
+       0.004641588833612781,
+       0.010000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        27.4337,
+        20.3865,
+        10.8225,
+        6.5438,
+        5.7888,
+        5.5371,
+        5.5371
+       ],
+       "min": 5.5371,
+       "max": 27.4337,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.7439,
+        9.512,
+        9.3289,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.7439,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "fracture aperture (m)": {
+      "group": "A",
+      "served": 0.00025,
+      "range": [
+       0.0001,
+       0.0005
+      ],
+      "log": true,
+      "note": "config range 1e-4 .. 5e-4",
+      "x": [
+       0.00010000000000000009,
+       0.0001307660486011831,
+       0.0001709975946676699,
+       0.00022360679774997909,
+       0.00029240177382128653,
+       0.000382362245665865,
+       0.0005000000000000001
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438
+       ],
+       "min": 6.5438,
+       "max": 6.5438,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.1824,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "matrix De (m2/day)": {
+      "group": "A",
+      "served": 5e-06,
+      "range": [
+       1.0000000000000002e-06,
+       2.5e-05
+      ],
+      "log": true,
+      "note": "x/5 .. x5 (no defensible range in config)",
+      "x": [
+       1.0000000000000004e-06,
+       1.7099759466766984e-06,
+       2.9240177382128696e-06,
+       4.999999999999999e-06,
+       8.549879733383486e-06,
+       1.4620088691064335e-05,
+       2.5000000000000018e-05
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438
+       ],
+       "min": 6.5438,
+       "max": 6.5438,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.1824,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_GAIN": {
+      "group": "A",
+      "served": 0.4,
+      "range": [
+       0.1,
+       1.0
+      ],
+      "log": false,
+      "note": "0.1 .. 1.0 around the served 0.4",
+      "x": [
+       0.1,
+       0.25,
+       0.4,
+       0.55,
+       0.7,
+       0.85,
+       1.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438
+       ],
+       "min": 6.5438,
+       "max": 6.5438,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        7.7339,
+        8.4307,
+        9.1824,
+        10.004,
+        10.8612,
+        11.5904,
+        12.637
+       ],
+       "min": 7.7339,
+       "max": 12.637,
+       "elasticity": 0.239
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_REF": {
+      "group": "A",
+      "served": 2.0,
+      "range": [
+       0.5,
+       6.0
+      ],
+      "log": true,
+      "note": "0.5 .. 6 bulk volumes around the served 2",
+      "x": [
+       0.5,
+       0.7565428747114508,
+       1.1447142425533319,
+       1.7320508075688774,
+       2.620741394208897,
+       3.965406456500187,
+       6.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438
+       ],
+       "min": 6.5438,
+       "max": 6.5438,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        13.0429,
+        11.7204,
+        10.5573,
+        9.4882,
+        8.7449,
+        8.2043,
+        8.042
+       ],
+       "min": 8.042,
+       "max": 13.0429,
+       "elasticity": -0.219
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "INCREMENTAL_FLOOR": {
+      "group": "A",
+      "served": 0.1,
+      "range": [
+       0.02,
+       0.5
+      ],
+      "log": true,
+      "note": "attribution policy 0.02 .. 0.5",
+      "x": [
+       0.02,
+       0.03419951893353394,
+       0.058480354764257315,
+       0.09999999999999998,
+       0.17099759466766964,
+       0.29240177382128646,
+       0.49999999999999994
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438
+       ],
+       "min": 6.5438,
+       "max": 6.5438,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.1824,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "K (m/day)": {
+      "group": "B",
+      "served": 0.5633232163236447,
+      "range": [
+       0.1877744054412149,
+       1.689969648970934
+      ],
+      "log": true,
+      "note": "MC local heterogeneity clip (x/3 .. x3)",
+      "x": [
+       0.1877744054412149,
+       0.27081755556232123,
+       0.3905865031414605,
+       0.5633232163236446,
+       0.8124526666869636,
+       1.1717595094243811,
+       1.6899696489709335
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        2.7512,
+        3.4849,
+        4.1285,
+        6.5438,
+        26.5827,
+        39.0533,
+        53.255
+       ],
+       "min": 2.7512,
+       "max": 53.255,
+       "elasticity": 6.945
+      },
+      "affected_area_ha": {
+       "values": [
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.7439,
+        10.2036,
+        10.6674
+       ],
+       "min": 9.1824,
+       "max": 10.6674,
+       "elasticity": 0.158
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "hydraulic gradient": {
+      "group": "B",
+      "served": 0.00205,
+      "range": [
+       0.001025,
+       0.0041
+      ],
+      "log": true,
+      "note": "x0.5 .. x2",
+      "x": [
+       0.001025,
+       0.0012914190761422447,
+       0.001627086078267405,
+       0.00205,
+       0.0025828381522844893,
+       0.0032541721565348073,
+       0.0041
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        3.4849,
+        4.0351,
+        4.5543,
+        6.5438,
+        21.9957,
+        29.6272,
+        37.4756
+       ],
+       "min": 3.4849,
+       "max": 37.4756,
+       "elasticity": 6.945
+      },
+      "affected_area_ha": {
+       "values": [
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.7358,
+        9.9717,
+        10.2036
+       ],
+       "min": 9.1824,
+       "max": 10.2036,
+       "elasticity": 0.158
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "mobile porosity": {
+      "group": "B",
+      "served": 0.0075,
+      "range": [
+       0.00375,
+       0.015
+      ],
+      "log": true,
+      "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)",
+      "x": [
+       0.0037499999999999986,
+       0.004724703937105772,
+       0.005952753944880748,
+       0.007499999999999998,
+       0.009449407874211543,
+       0.011905507889761496,
+       0.014999999999999998
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        9.4533,
+        8.2402,
+        7.4939,
+        6.5438,
+        5.7263,
+        5.1356,
+        4.5854
+       ],
+       "min": 4.5854,
+       "max": 9.4533,
+       "elasticity": -0.749
+      },
+      "affected_area_ha": {
+       "values": [
+        9.3289,
+        9.3289,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.3289,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "Kd (L/kg)": {
+      "group": "B",
+      "served": 1.0,
+      "range": [
+       0.3,
+       3.0
+      ],
+      "log": true,
+      "note": "regime Kd range 0.3-3.0",
+      "x": [
+       0.3,
+       0.4403397802866208,
+       0.6463304070095651,
+       0.9486832980505138,
+       1.3924766500838337,
+       2.0438762071738834,
+       3.0000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        12.0809,
+        9.8157,
+        8.0539,
+        6.7955,
+        5.5371,
+        4.5303,
+        3.7753
+       ],
+       "min": 3.7753,
+       "max": 12.0809,
+       "elasticity": -0.769
+      },
+      "affected_area_ha": {
+       "values": [
+        9.333,
+        9.3289,
+        9.3289,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.333,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "C0 (source conc)": {
+      "group": "B",
+      "served": 15180.0,
+      "range": [
+       7590.0,
+       22770.0
+      ],
+      "log": false,
+      "note": "x0.5 .. x1.5",
+      "x": [
+       7590.0,
+       10120.0,
+       12650.0,
+       15180.0,
+       17710.0,
+       20240.0,
+       22770.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        6.2921,
+        6.2921,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.5438,
+        6.7955
+       ],
+       "min": 6.2921,
+       "max": 6.7955,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.1824,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "U attenuation k (1/yr)": {
+      "group": "B",
+      "served": 0.35,
+      "range": [
+       0.05,
+       0.7
+      ],
+      "log": true,
+      "note": "literature range",
+      "x": [
+       0.05000000000000001,
+       0.07762316445777044,
+       0.12050711320876147,
+       0.18708286933869708,
+       0.29043928667818514,
+       0.450896330296366,
+       0.7
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        6.7955,
+        6.7955,
+        6.7955,
+        6.7955,
+        6.5438,
+        6.2921,
+        5.7888
+       ],
+       "min": 5.7888,
+       "max": 6.7955,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 9.1824,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     }
+    }
+   },
+   "sobol": {
+    "n_base": 256,
+    "evaluations": 3840,
+    "indices": {
+     "max_migration_distance_m": {
+      "log_transformed": true,
+      "variance": 2.070292,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.2132,
+       "omega (matrix transfer, 1/day)": 0.0852,
+       "fracture aperture (m)": -0.0047,
+       "matrix De (m2/day)": 0.0178,
+       "SOURCE_BV_GAIN": -0.0015,
+       "SOURCE_BV_REF": -0.0008,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.4422,
+       "hydraulic gradient": 0.1334,
+       "mobile porosity": 0.0159,
+       "Kd (L/kg)": 0.0546,
+       "C0 (source conc)": 0.0067,
+       "U attenuation k (1/yr)": -0.005
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.2114,
+       "omega (matrix transfer, 1/day)": 0.1009,
+       "fracture aperture (m)": 0.0073,
+       "matrix De (m2/day)": 0.0052,
+       "SOURCE_BV_GAIN": 0.0001,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.4241,
+       "hydraulic gradient": 0.162,
+       "mobile porosity": 0.0363,
+       "Kd (L/kg)": 0.0609,
+       "C0 (source conc)": 0.0005,
+       "U attenuation k (1/yr)": 0.0046
+      }
+     },
+     "affected_area_ha": {
+      "log_transformed": false,
+      "variance": 27.78451,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.0688,
+       "omega (matrix transfer, 1/day)": -0.0046,
+       "fracture aperture (m)": -0.0013,
+       "matrix De (m2/day)": 0.0051,
+       "SOURCE_BV_GAIN": 0.1367,
+       "SOURCE_BV_REF": 0.281,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.028,
+       "hydraulic gradient": 0.0334,
+       "mobile porosity": 0.0123,
+       "Kd (L/kg)": -0.0387,
+       "C0 (source conc)": 0.0009,
+       "U attenuation k (1/yr)": 0.0055
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.1576,
+       "omega (matrix transfer, 1/day)": 0.1472,
+       "fracture aperture (m)": 0.0002,
+       "matrix De (m2/day)": 0.0003,
+       "SOURCE_BV_GAIN": 0.2217,
+       "SOURCE_BV_REF": 0.2741,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.1233,
+       "hydraulic gradient": 0.1492,
+       "mobile porosity": 0.0794,
+       "Kd (L/kg)": 0.0868,
+       "C0 (source conc)": 0.0005,
+       "U attenuation k (1/yr)": 0.003
+      }
+     },
+     "compliance_conc": {
+      "log_transformed": true,
+      "variance": 4.896349,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.1208,
+       "omega (matrix transfer, 1/day)": 0.0244,
+       "fracture aperture (m)": -0.0043,
+       "matrix De (m2/day)": 0.0224,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.1566,
+       "hydraulic gradient": 0.0467,
+       "mobile porosity": -0.024,
+       "Kd (L/kg)": -0.0154,
+       "C0 (source conc)": -0.0097,
+       "U attenuation k (1/yr)": 0.0027
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.4533,
+       "omega (matrix transfer, 1/day)": 0.2107,
+       "fracture aperture (m)": 0.0005,
+       "matrix De (m2/day)": 0.0064,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.528,
+       "hydraulic gradient": 0.3285,
+       "mobile porosity": 0.1129,
+       "Kd (L/kg)": 0.1458,
+       "C0 (source conc)": 0.0031,
+       "U attenuation k (1/yr)": 0.0182
+      }
+     }
+    }
+   },
+   "seconds": 22.2
+  },
+  {
+   "site": "jaduguda_deposit",
+   "label": "Jaduguda (deposit)",
+   "species": "sulfate_mg_l",
+   "regime": "fractured",
+   "ore_zone": "deposit",
+   "u_suppressed": false,
+   "resolved": {
+    "K_m_day": 0.5633232163236447,
+    "gradient_i": 0.00205,
+    "phi_mobile": 0.0075,
+    "n_total": 0.03,
+    "kd_L_kg": 0.05,
+    "beta": 3.0,
+    "source_conc_C0": 1624.5,
+    "background_conc_Cb": 227.0
+   },
+   "beta_basis": "porosity_derived",
+   "inputs": [
+    {
+     "name": "beta (capacity ratio)",
+     "group": "A",
+     "served": 3.0,
+     "lo": 0.3,
+     "hi": 20.0,
+     "log": true,
+     "note": "prior [0.3, 20]; served = porosity-derived"
+    },
+    {
+     "name": "omega (matrix transfer, 1/day)",
+     "group": "A",
+     "served": 0.001,
+     "lo": 0.0001,
+     "hi": 0.01,
+     "log": true,
+     "note": "x/10 .. x10 of the pinned 1e-3"
+    },
+    {
+     "name": "fracture aperture (m)",
+     "group": "A",
+     "served": 0.00025,
+     "lo": 0.0001,
+     "hi": 0.0005,
+     "log": true,
+     "note": "config range 1e-4 .. 5e-4"
+    },
+    {
+     "name": "matrix De (m2/day)",
+     "group": "A",
+     "served": 5e-06,
+     "lo": 1.0000000000000002e-06,
+     "hi": 2.5e-05,
+     "log": true,
+     "note": "x/5 .. x5 (no defensible range in config)"
+    },
+    {
+     "name": "SOURCE_BV_GAIN",
+     "group": "A",
+     "served": 0.4,
+     "lo": 0.1,
+     "hi": 1.0,
+     "log": false,
+     "note": "0.1 .. 1.0 around the served 0.4"
+    },
+    {
+     "name": "SOURCE_BV_REF",
+     "group": "A",
+     "served": 2.0,
+     "lo": 0.5,
+     "hi": 6.0,
+     "log": true,
+     "note": "0.5 .. 6 bulk volumes around the served 2"
+    },
+    {
+     "name": "INCREMENTAL_FLOOR",
+     "group": "A",
+     "served": 0.1,
+     "lo": 0.02,
+     "hi": 0.5,
+     "log": true,
+     "note": "attribution policy 0.02 .. 0.5"
+    },
+    {
+     "name": "K (m/day)",
+     "group": "B",
+     "served": 0.5633232163236447,
+     "lo": 0.1877744054412149,
+     "hi": 1.689969648970934,
+     "log": true,
+     "note": "MC local heterogeneity clip (x/3 .. x3)"
+    },
+    {
+     "name": "hydraulic gradient",
+     "group": "B",
+     "served": 0.00205,
+     "lo": 0.001025,
+     "hi": 0.0041,
+     "log": true,
+     "note": "x0.5 .. x2"
+    },
+    {
+     "name": "mobile porosity",
+     "group": "B",
+     "served": 0.0075,
+     "lo": 0.00375,
+     "hi": 0.015,
+     "log": true,
+     "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)"
+    },
+    {
+     "name": "Kd (L/kg)",
+     "group": "B",
+     "served": 0.05,
+     "lo": 0.001,
+     "hi": 0.3,
+     "log": true,
+     "note": "regime Kd range 0.0-0.3"
+    },
+    {
+     "name": "C0 (source conc)",
+     "group": "B",
+     "served": 1624.5,
+     "lo": 812.25,
+     "hi": 2436.75,
+     "log": false,
+     "note": "x0.5 .. x1.5"
+    }
+   ],
+   "oat": {
+    "served_outputs": {
+     "max_migration_distance_m": 30.705634186477877,
+     "affected_area_ha": 9.955448086302017,
+     "compliance_conc": 227.0
+    },
+    "inputs": {
+     "beta (capacity ratio)": {
+      "group": "A",
+      "served": 3.0,
+      "range": [
+       0.3,
+       20.0
+      ],
+      "log": true,
+      "note": "prior [0.3, 20]; served = porosity-derived",
+      "x": [
+       0.3,
+       0.604096117960051,
+       1.21644039911468,
+       2.449489742783178,
+       4.93242414866094,
+       9.932194267794943,
+       20.000000000000007
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        169.3844,
+        104.9529,
+        61.4113,
+        35.991,
+        21.3933,
+        13.3393,
+        8.5573
+       ],
+       "min": 8.5573,
+       "max": 169.3844,
+       "elasticity": -0.734
+      },
+      "affected_area_ha": {
+       "values": [
+        14.6362,
+        12.4575,
+        10.8708,
+        10.1833,
+        9.5039,
+        9.3289,
+        9.3289
+       ],
+       "min": 9.3289,
+       "max": 14.6362,
+       "elasticity": -0.004
+      },
+      "compliance_conc": {
+       "values": [
+        692.7783,
+        443.2369,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 692.7783,
+       "elasticity": 0.0
+      }
+     },
+     "omega (matrix transfer, 1/day)": {
+      "group": "A",
+      "served": 0.001,
+      "range": [
+       0.0001,
+       0.01
+      ],
+      "log": true,
+      "note": "x/10 .. x10 of the pinned 1e-3",
+      "x": [
+       0.00010000000000000009,
+       0.0002154434690031884,
+       0.0004641588833612784,
+       0.0010000000000000002,
+       0.0021544346900318843,
+       0.004641588833612781,
+       0.010000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        111.7484,
+        70.7236,
+        36.9978,
+        30.7056,
+        29.6989,
+        29.1955,
+        29.1955
+       ],
+       "min": 29.1955,
+       "max": 111.7484,
+       "elasticity": -0.082
+      },
+      "affected_area_ha": {
+       "values": [
+        12.722,
+        11.3224,
+        10.1833,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554
+       ],
+       "min": 9.9554,
+       "max": 12.722,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        538.9382,
+        250.9055,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 538.9382,
+       "elasticity": 0.0
+      }
+     },
+     "fracture aperture (m)": {
+      "group": "A",
+      "served": 0.00025,
+      "range": [
+       0.0001,
+       0.0005
+      ],
+      "log": true,
+      "note": "config range 1e-4 .. 5e-4",
+      "x": [
+       0.00010000000000000009,
+       0.0001307660486011831,
+       0.0001709975946676699,
+       0.00022360679774997909,
+       0.00029240177382128653,
+       0.000382362245665865,
+       0.0005000000000000001
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056
+       ],
+       "min": 30.7056,
+       "max": 30.7056,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554
+       ],
+       "min": 9.9554,
+       "max": 9.9554,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "matrix De (m2/day)": {
+      "group": "A",
+      "served": 5e-06,
+      "range": [
+       1.0000000000000002e-06,
+       2.5e-05
+      ],
+      "log": true,
+      "note": "x/5 .. x5 (no defensible range in config)",
+      "x": [
+       1.0000000000000004e-06,
+       1.7099759466766984e-06,
+       2.9240177382128696e-06,
+       4.999999999999999e-06,
+       8.549879733383486e-06,
+       1.4620088691064335e-05,
+       2.5000000000000018e-05
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056
+       ],
+       "min": 30.7056,
+       "max": 30.7056,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554
+       ],
+       "min": 9.9554,
+       "max": 9.9554,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_GAIN": {
+      "group": "A",
+      "served": 0.4,
+      "range": [
+       0.1,
+       1.0
+      ],
+      "log": false,
+      "note": "0.1 .. 1.0 around the served 0.4",
+      "x": [
+       0.1,
+       0.25,
+       0.4,
+       0.55,
+       0.7,
+       0.85,
+       1.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056
+       ],
+       "min": 30.7056,
+       "max": 30.7056,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        8.5021,
+        9.2333,
+        9.9554,
+        10.5539,
+        11.3165,
+        12.187,
+        13.0635
+       ],
+       "min": 8.5021,
+       "max": 13.0635,
+       "elasticity": 0.225
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_REF": {
+      "group": "A",
+      "served": 2.0,
+      "range": [
+       0.5,
+       6.0
+      ],
+      "log": true,
+      "note": "0.5 .. 6 bulk volumes around the served 2",
+      "x": [
+       0.5,
+       0.7565428747114508,
+       1.1447142425533319,
+       1.7320508075688774,
+       2.620741394208897,
+       3.965406456500187,
+       6.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056
+       ],
+       "min": 30.7056,
+       "max": 30.7056,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        13.4762,
+        12.3178,
+        11.2281,
+        10.2719,
+        9.3535,
+        8.9918,
+        8.637
+       ],
+       "min": 8.637,
+       "max": 13.4762,
+       "elasticity": -0.205
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "INCREMENTAL_FLOOR": {
+      "group": "A",
+      "served": 0.1,
+      "range": [
+       0.02,
+       0.5
+      ],
+      "log": true,
+      "note": "attribution policy 0.02 .. 0.5",
+      "x": [
+       0.02,
+       0.03419951893353394,
+       0.058480354764257315,
+       0.09999999999999998,
+       0.17099759466766964,
+       0.29240177382128646,
+       0.49999999999999994
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        30.7056,
+        29.1955
+       ],
+       "min": 29.1955,
+       "max": 30.7056,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554,
+        9.9554
+       ],
+       "min": 9.9554,
+       "max": 9.9554,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "K (m/day)": {
+      "group": "B",
+      "served": 0.5633232163236447,
+      "range": [
+       0.1877744054412149,
+       1.689969648970934
+      ],
+      "log": true,
+      "note": "MC local heterogeneity clip (x/3 .. x3)",
+      "x": [
+       0.1877744054412149,
+       0.27081755556232123,
+       0.3905865031414605,
+       0.5633232163236446,
+       0.8124526666869636,
+       1.1717595094243811,
+       1.6899696489709335
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        12.1054,
+        15.5903,
+        20.6424,
+        30.7056,
+        101.9665,
+        172.1896,
+        259.4034
+       ],
+       "min": 12.1054,
+       "max": 259.4034,
+       "elasticity": 3.371
+      },
+      "affected_area_ha": {
+       "values": [
+        9.3289,
+        9.4998,
+        9.5039,
+        9.9554,
+        12.2338,
+        14.7928,
+        17.8197
+       ],
+       "min": 9.3289,
+       "max": 17.8197,
+       "elasticity": 0.453
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        414.867,
+        986.8411,
+        976.6675
+       ],
+       "min": 227.0,
+       "max": 986.8411,
+       "elasticity": 0.0
+      }
+     },
+     "hydraulic gradient": {
+      "group": "B",
+      "served": 0.00205,
+      "range": [
+       0.001025,
+       0.0041
+      ],
+      "log": true,
+      "note": "x0.5 .. x2",
+      "x": [
+       0.001025,
+       0.0012914190761422447,
+       0.001627086078267405,
+       0.00205,
+       0.0025828381522844893,
+       0.0032541721565348073,
+       0.0041
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        16.1405,
+        19.0752,
+        22.7713,
+        30.7056,
+        73.4319,
+        119.8356,
+        164.0977
+       ],
+       "min": 16.1405,
+       "max": 164.0977,
+       "elasticity": 3.371
+      },
+      "affected_area_ha": {
+       "values": [
+        9.5039,
+        9.5039,
+        9.7276,
+        9.9554,
+        11.3224,
+        12.9335,
+        14.5568
+       ],
+       "min": 9.5039,
+       "max": 14.5568,
+       "elasticity": 0.453
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        268.1783,
+        573.3617,
+        946.3043
+       ],
+       "min": 227.0,
+       "max": 946.3043,
+       "elasticity": 0.0
+      }
+     },
+     "mobile porosity": {
+      "group": "B",
+      "served": 0.0075,
+      "range": [
+       0.00375,
+       0.015
+      ],
+      "log": true,
+      "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)",
+      "x": [
+       0.0037499999999999986,
+       0.004724703937105772,
+       0.005952753944880748,
+       0.007499999999999998,
+       0.009449407874211543,
+       0.011905507889761496,
+       0.014999999999999998
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        55.4309,
+        45.5002,
+        37.1695,
+        30.7056,
+        25.6624,
+        21.4596,
+        18.1581
+       ],
+       "min": 18.1581,
+       "max": 55.4309,
+       "elasticity": -0.83
+      },
+      "affected_area_ha": {
+       "values": [
+        10.8627,
+        10.4111,
+        10.1833,
+        9.9554,
+        9.7317,
+        9.5039,
+        9.5039
+       ],
+       "min": 9.5039,
+       "max": 10.8627,
+       "elasticity": -0.004
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "Kd (L/kg)": {
+      "group": "B",
+      "served": 0.05,
+      "range": [
+       0.001,
+       0.3
+      ],
+      "log": true,
+      "note": "regime Kd range 0.0-0.3",
+      "x": [
+       0.0010000000000000002,
+       0.0025873402367724454,
+       0.006694329500821693,
+       0.017320508075688777,
+       0.04481404746557164,
+       0.11594918818030371,
+       0.30000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        105.4562,
+        96.3956,
+        79.0293,
+        55.1191,
+        32.9708,
+        18.1214,
+        10.0674
+       ],
+       "min": 10.0674,
+       "max": 105.4562,
+       "elasticity": -0.571
+      },
+      "affected_area_ha": {
+       "values": [
+        12.4616,
+        12.2256,
+        11.5503,
+        10.8627,
+        9.9595,
+        9.5039,
+        9.3289
+       ],
+       "min": 9.3289,
+       "max": 12.4616,
+       "elasticity": -0.004
+      },
+      "compliance_conc": {
+       "values": [
+        447.6974,
+        366.9357,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 447.6974,
+       "elasticity": 0.0
+      }
+     },
+     "C0 (source conc)": {
+      "group": "B",
+      "served": 1624.5,
+      "range": [
+       812.25,
+       2436.75
+      ],
+      "log": false,
+      "note": "x0.5 .. x1.5",
+      "x": [
+       812.25,
+       1083.0,
+       1353.75,
+       1624.5,
+       1895.25,
+       2166.0,
+       2436.75
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        19.1281,
+        25.1686,
+        28.6921,
+        30.7056,
+        32.4674,
+        33.7259,
+        34.4809
+       ],
+       "min": 19.1281,
+       "max": 34.4809,
+       "elasticity": 0.408
+      },
+      "affected_area_ha": {
+       "values": [
+        9.4998,
+        9.7276,
+        9.9554,
+        9.9554,
+        9.9595,
+        9.9595,
+        9.9595
+       ],
+       "min": 9.4998,
+       "max": 9.9595,
+       "elasticity": 0.004
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     }
+    }
+   },
+   "sobol": {
+    "n_base": 256,
+    "evaluations": 3584,
+    "indices": {
+     "max_migration_distance_m": {
+      "log_transformed": true,
+      "variance": 2.366768,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.2172,
+       "omega (matrix transfer, 1/day)": 0.0236,
+       "fracture aperture (m)": -0.0253,
+       "matrix De (m2/day)": -0.0182,
+       "SOURCE_BV_GAIN": -0.0005,
+       "SOURCE_BV_REF": 0.0006,
+       "INCREMENTAL_FLOOR": 0.0001,
+       "K (m/day)": 0.3695,
+       "hydraulic gradient": 0.1012,
+       "mobile porosity": 0.0638,
+       "Kd (L/kg)": 0.133,
+       "C0 (source conc)": -0.0084
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.2428,
+       "omega (matrix transfer, 1/day)": 0.0342,
+       "fracture aperture (m)": 0.0024,
+       "matrix De (m2/day)": 0.0019,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.3857,
+       "hydraulic gradient": 0.1324,
+       "mobile porosity": 0.0515,
+       "Kd (L/kg)": 0.1672,
+       "C0 (source conc)": 0.0054
+      }
+     },
+     "affected_area_ha": {
+      "log_transformed": true,
+      "variance": 0.305936,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.0961,
+       "omega (matrix transfer, 1/day)": -0.0161,
+       "fracture aperture (m)": -0.0164,
+       "matrix De (m2/day)": -0.0054,
+       "SOURCE_BV_GAIN": 0.0563,
+       "SOURCE_BV_REF": 0.0684,
+       "INCREMENTAL_FLOOR": -0.0004,
+       "K (m/day)": 0.2349,
+       "hydraulic gradient": 0.1173,
+       "mobile porosity": 0.0949,
+       "Kd (L/kg)": 0.1192,
+       "C0 (source conc)": -0.0003
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.2133,
+       "omega (matrix transfer, 1/day)": 0.0296,
+       "fracture aperture (m)": 0.0005,
+       "matrix De (m2/day)": 0.0002,
+       "SOURCE_BV_GAIN": 0.0734,
+       "SOURCE_BV_REF": 0.0967,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.4181,
+       "hydraulic gradient": 0.1681,
+       "mobile porosity": 0.0787,
+       "Kd (L/kg)": 0.147,
+       "C0 (source conc)": 0.0017
+      }
+     },
+     "compliance_conc": {
+      "log_transformed": false,
+      "variance": 104063.134542,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": -0.05,
+       "omega (matrix transfer, 1/day)": 0.0568,
+       "fracture aperture (m)": -0.0013,
+       "matrix De (m2/day)": 0.0016,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.3424,
+       "hydraulic gradient": 0.0277,
+       "mobile porosity": 0.0302,
+       "Kd (L/kg)": -0.0147,
+       "C0 (source conc)": 0.0782
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.3191,
+       "omega (matrix transfer, 1/day)": 0.1445,
+       "fracture aperture (m)": 0.0004,
+       "matrix De (m2/day)": 0.0007,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.7136,
+       "hydraulic gradient": 0.3328,
+       "mobile porosity": 0.1232,
+       "Kd (L/kg)": 0.3093,
+       "C0 (source conc)": 0.1658
+      }
+     }
+    }
+   },
+   "seconds": 26.3
+  },
+  {
+   "site": "belt_point",
+   "label": "Singhbhum belt (between deposits)",
+   "species": "uranium_ppb",
+   "regime": "fractured",
+   "ore_zone": "belt",
+   "u_suppressed": false,
+   "resolved": {
+    "K_m_day": 0.3846551587458544,
+    "gradient_i": 0.00241,
+    "phi_mobile": 0.0075,
+    "n_total": 0.03,
+    "kd_L_kg": 1.0,
+    "beta": 3.0,
+    "source_conc_C0": 9740.5,
+    "background_conc_Cb": 1.0
+   },
+   "beta_basis": "porosity_derived",
+   "inputs": [
+    {
+     "name": "beta (capacity ratio)",
+     "group": "A",
+     "served": 3.0,
+     "lo": 0.3,
+     "hi": 20.0,
+     "log": true,
+     "note": "prior [0.3, 20]; served = porosity-derived"
+    },
+    {
+     "name": "omega (matrix transfer, 1/day)",
+     "group": "A",
+     "served": 0.001,
+     "lo": 0.0001,
+     "hi": 0.01,
+     "log": true,
+     "note": "x/10 .. x10 of the pinned 1e-3"
+    },
+    {
+     "name": "fracture aperture (m)",
+     "group": "A",
+     "served": 0.00025,
+     "lo": 0.0001,
+     "hi": 0.0005,
+     "log": true,
+     "note": "config range 1e-4 .. 5e-4"
+    },
+    {
+     "name": "matrix De (m2/day)",
+     "group": "A",
+     "served": 5e-06,
+     "lo": 1.0000000000000002e-06,
+     "hi": 2.5e-05,
+     "log": true,
+     "note": "x/5 .. x5 (no defensible range in config)"
+    },
+    {
+     "name": "SOURCE_BV_GAIN",
+     "group": "A",
+     "served": 0.4,
+     "lo": 0.1,
+     "hi": 1.0,
+     "log": false,
+     "note": "0.1 .. 1.0 around the served 0.4"
+    },
+    {
+     "name": "SOURCE_BV_REF",
+     "group": "A",
+     "served": 2.0,
+     "lo": 0.5,
+     "hi": 6.0,
+     "log": true,
+     "note": "0.5 .. 6 bulk volumes around the served 2"
+    },
+    {
+     "name": "INCREMENTAL_FLOOR",
+     "group": "A",
+     "served": 0.1,
+     "lo": 0.02,
+     "hi": 0.5,
+     "log": true,
+     "note": "attribution policy 0.02 .. 0.5"
+    },
+    {
+     "name": "K (m/day)",
+     "group": "B",
+     "served": 0.3846551587458544,
+     "lo": 0.12821838624861812,
+     "hi": 1.153965476237563,
+     "log": true,
+     "note": "MC local heterogeneity clip (x/3 .. x3)"
+    },
+    {
+     "name": "hydraulic gradient",
+     "group": "B",
+     "served": 0.00241,
+     "lo": 0.001205,
+     "hi": 0.00482,
+     "log": true,
+     "note": "x0.5 .. x2"
+    },
+    {
+     "name": "mobile porosity",
+     "group": "B",
+     "served": 0.0075,
+     "lo": 0.00375,
+     "hi": 0.015,
+     "log": true,
+     "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)"
+    },
+    {
+     "name": "Kd (L/kg)",
+     "group": "B",
+     "served": 1.0,
+     "lo": 0.3,
+     "hi": 3.0,
+     "log": true,
+     "note": "regime Kd range 0.3-3.0"
+    },
+    {
+     "name": "C0 (source conc)",
+     "group": "B",
+     "served": 9740.5,
+     "lo": 4870.25,
+     "hi": 14610.75,
+     "log": false,
+     "note": "x0.5 .. x1.5"
+    },
+    {
+     "name": "U attenuation k (1/yr)",
+     "group": "B",
+     "served": 0.28,
+     "lo": 0.05,
+     "hi": 0.7,
+     "log": true,
+     "note": "literature range"
+    }
+   ],
+   "oat": {
+    "served_outputs": {
+     "max_migration_distance_m": 4.383410948485239,
+     "affected_area_ha": 11.215896022536288,
+     "compliance_conc": 1.0
+    },
+    "inputs": {
+     "beta (capacity ratio)": {
+      "group": "A",
+      "served": 3.0,
+      "range": [
+       0.3,
+       20.0
+      ],
+      "log": true,
+      "note": "prior [0.3, 20]; served = porosity-derived",
+      "x": [
+       0.3,
+       0.604096117960051,
+       1.21644039911468,
+       2.449489742783178,
+       4.93242414866094,
+       9.932194267794943,
+       20.000000000000007
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        16.9074,
+        10.8542,
+        7.3057,
+        5.0096,
+        3.3397,
+        2.2961,
+        1.6699
+       ],
+       "min": 1.6699,
+       "max": 16.9074,
+       "elasticity": -0.465
+      },
+      "affected_area_ha": {
+       "values": [
+        11.3581,
+        11.2208,
+        11.2159,
+        11.2159,
+        11.0982,
+        11.0982,
+        11.0982
+       ],
+       "min": 11.0982,
+       "max": 11.3581,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "omega (matrix transfer, 1/day)": {
+      "group": "A",
+      "served": 0.001,
+      "range": [
+       0.0001,
+       0.01
+      ],
+      "log": true,
+      "note": "x/10 .. x10 of the pinned 1e-3",
+      "x": [
+       0.00010000000000000009,
+       0.0002154434690031884,
+       0.0004641588833612784,
+       0.0010000000000000002,
+       0.0021544346900318843,
+       0.004641588833612781,
+       0.010000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        21.2909,
+        14.1939,
+        5.4271,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834
+       ],
+       "min": 4.3834,
+       "max": 21.2909,
+       "elasticity": -0.465
+      },
+      "affected_area_ha": {
+       "values": [
+        11.5149,
+        11.3532,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159
+       ],
+       "min": 11.2159,
+       "max": 11.5149,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "fracture aperture (m)": {
+      "group": "A",
+      "served": 0.00025,
+      "range": [
+       0.0001,
+       0.0005
+      ],
+      "log": true,
+      "note": "config range 1e-4 .. 5e-4",
+      "x": [
+       0.00010000000000000009,
+       0.0001307660486011831,
+       0.0001709975946676699,
+       0.00022360679774997909,
+       0.00029240177382128653,
+       0.000382362245665865,
+       0.0005000000000000001
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834
+       ],
+       "min": 4.3834,
+       "max": 4.3834,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159
+       ],
+       "min": 11.2159,
+       "max": 11.2159,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "matrix De (m2/day)": {
+      "group": "A",
+      "served": 5e-06,
+      "range": [
+       1.0000000000000002e-06,
+       2.5e-05
+      ],
+      "log": true,
+      "note": "x/5 .. x5 (no defensible range in config)",
+      "x": [
+       1.0000000000000004e-06,
+       1.7099759466766984e-06,
+       2.9240177382128696e-06,
+       4.999999999999999e-06,
+       8.549879733383486e-06,
+       1.4620088691064335e-05,
+       2.5000000000000018e-05
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834
+       ],
+       "min": 4.3834,
+       "max": 4.3834,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159
+       ],
+       "min": 11.2159,
+       "max": 11.2159,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_GAIN": {
+      "group": "A",
+      "served": 0.4,
+      "range": [
+       0.1,
+       1.0
+      ],
+      "log": false,
+      "note": "0.1 .. 1.0 around the served 0.4",
+      "x": [
+       0.1,
+       0.25,
+       0.4,
+       0.55,
+       0.7,
+       0.85,
+       1.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3739,
+        4.5842,
+        4.5528
+       ],
+       "min": 4.3739,
+       "max": 4.5842,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        8.1329,
+        9.5886,
+        11.2159,
+        12.9563,
+        14.8194,
+        16.8227,
+        18.8573
+       ],
+       "min": 8.1329,
+       "max": 18.8573,
+       "elasticity": 0.299
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_REF": {
+      "group": "A",
+      "served": 2.0,
+      "range": [
+       0.5,
+       6.0
+      ],
+      "log": true,
+      "note": "0.5 .. 6 bulk volumes around the served 2",
+      "x": [
+       0.5,
+       0.7565428747114508,
+       1.1447142425533319,
+       1.7320508075688774,
+       2.620741394208897,
+       3.965406456500187,
+       6.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        4.4885,
+        4.4572,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834
+       ],
+       "min": 4.3834,
+       "max": 4.4885,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        13.9242,
+        13.5579,
+        12.9025,
+        11.5442,
+        10.3788,
+        9.3637,
+        8.5108
+       ],
+       "min": 8.5108,
+       "max": 13.9242,
+       "elasticity": -0.191
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "INCREMENTAL_FLOOR": {
+      "group": "A",
+      "served": 0.1,
+      "range": [
+       0.02,
+       0.5
+      ],
+      "log": true,
+      "note": "attribution policy 0.02 .. 0.5",
+      "x": [
+       0.02,
+       0.03419951893353394,
+       0.058480354764257315,
+       0.09999999999999998,
+       0.17099759466766964,
+       0.29240177382128646,
+       0.49999999999999994
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.3834
+       ],
+       "min": 4.3834,
+       "max": 4.3834,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159
+       ],
+       "min": 11.2159,
+       "max": 11.2159,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "K (m/day)": {
+      "group": "B",
+      "served": 0.3846551587458544,
+      "range": [
+       0.12821838624861812,
+       1.153965476237563
+      ],
+      "log": true,
+      "note": "MC local heterogeneity clip (x/3 .. x3)",
+      "x": [
+       0.12821838624861812,
+       0.18492291247257883,
+       0.26670499105357126,
+       0.3846551587458544,
+       0.5547687374177364,
+       0.8001149731607139,
+       1.1539654762375633
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        2.5648,
+        2.9593,
+        3.7485,
+        4.3834,
+        5.4821,
+        6.5375,
+        24.4879
+       ],
+       "min": 2.5648,
+       "max": 24.4879,
+       "elasticity": 0.267
+      },
+      "affected_area_ha": {
+       "values": [
+        11.0982,
+        11.0982,
+        11.0982,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.5149
+       ],
+       "min": 11.0982,
+       "max": 11.5149,
+       "elasticity": 0.004
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "hydraulic gradient": {
+      "group": "B",
+      "served": 0.00241,
+      "range": [
+       0.001205,
+       0.00482
+      ],
+      "log": true,
+      "note": "x0.5 .. x2",
+      "x": [
+       0.0012049999999999995,
+       0.001518204865123321,
+       0.0019128182676216802,
+       0.002409999999999999,
+       0.003036409730246642,
+       0.0038256365352433573,
+       0.004819999999999999
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        3.1566,
+        3.5512,
+        3.9458,
+        4.3834,
+        4.9525,
+        5.6015,
+        6.3405
+       ],
+       "min": 3.1566,
+       "max": 6.3405,
+       "elasticity": 0.267
+      },
+      "affected_area_ha": {
+       "values": [
+        11.0982,
+        11.0982,
+        11.0982,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159
+       ],
+       "min": 11.0982,
+       "max": 11.2159,
+       "elasticity": 0.004
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "mobile porosity": {
+      "group": "B",
+      "served": 0.0075,
+      "range": [
+       0.00375,
+       0.015
+      ],
+      "log": true,
+      "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)",
+      "x": [
+       0.0037499999999999986,
+       0.004724703937105772,
+       0.005952753944880748,
+       0.007499999999999998,
+       0.009449407874211543,
+       0.011905507889761496,
+       0.014999999999999998
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        6.3405,
+        5.6015,
+        4.9525,
+        4.3834,
+        3.9458,
+        3.5512,
+        3.1566
+       ],
+       "min": 3.1566,
+       "max": 6.3405,
+       "elasticity": -0.267
+      },
+      "affected_area_ha": {
+       "values": [
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.0982,
+        11.0982,
+        11.0982
+       ],
+       "min": 11.0982,
+       "max": 11.2159,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "Kd (L/kg)": {
+      "group": "B",
+      "served": 1.0,
+      "range": [
+       0.3,
+       3.0
+      ],
+      "log": true,
+      "note": "regime Kd range 0.3-3.0",
+      "x": [
+       0.3,
+       0.4403397802866208,
+       0.6463304070095651,
+       0.9486832980505138,
+       1.3924766500838337,
+       2.0438762071738834,
+       3.0000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        8.5581,
+        6.8882,
+        5.6358,
+        4.5921,
+        3.7572,
+        3.131,
+        2.5048
+       ],
+       "min": 2.5048,
+       "max": 8.5581,
+       "elasticity": -0.465
+      },
+      "affected_area_ha": {
+       "values": [
+        11.2208,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.0982,
+        11.0982,
+        11.0982
+       ],
+       "min": 11.0982,
+       "max": 11.2208,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "C0 (source conc)": {
+      "group": "B",
+      "served": 9740.5,
+      "range": [
+       4870.25,
+       14610.75
+      ],
+      "log": false,
+      "note": "x0.5 .. x1.5",
+      "x": [
+       4870.25,
+       6493.666666666666,
+       8117.083333333333,
+       9740.5,
+       11363.916666666666,
+       12987.333333333332,
+       14610.75
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        4.1747,
+        4.3834,
+        4.3834,
+        4.3834,
+        4.5921,
+        4.5921,
+        4.5921
+       ],
+       "min": 4.1747,
+       "max": 4.5921,
+       "elasticity": 0.465
+      },
+      "affected_area_ha": {
+       "values": [
+        11.0982,
+        11.0982,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159
+       ],
+       "min": 11.0982,
+       "max": 11.2159,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     },
+     "U attenuation k (1/yr)": {
+      "group": "B",
+      "served": 0.28,
+      "range": [
+       0.05,
+       0.7
+      ],
+      "log": true,
+      "note": "literature range",
+      "x": [
+       0.05000000000000001,
+       0.07762316445777044,
+       0.12050711320876147,
+       0.18708286933869708,
+       0.29043928667818514,
+       0.450896330296366,
+       0.7
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        4.5921,
+        4.5921,
+        4.5921,
+        4.5921,
+        4.3834,
+        4.1747,
+        3.7572
+       ],
+       "min": 3.7572,
+       "max": 4.5921,
+       "elasticity": -0.465
+      },
+      "affected_area_ha": {
+       "values": [
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.2159,
+        11.0982,
+        11.0982
+       ],
+       "min": 11.0982,
+       "max": 11.2159,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ],
+       "min": 1.0,
+       "max": 1.0,
+       "elasticity": 0.0
+      }
+     }
+    }
+   },
+   "sobol": {
+    "n_base": 256,
+    "evaluations": 3840,
+    "indices": {
+     "max_migration_distance_m": {
+      "log_transformed": true,
+      "variance": 1.497299,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.2987,
+       "omega (matrix transfer, 1/day)": 0.1464,
+       "fracture aperture (m)": 0.0027,
+       "matrix De (m2/day)": 0.0551,
+       "SOURCE_BV_GAIN": 0.008,
+       "SOURCE_BV_REF": 0.0056,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.2202,
+       "hydraulic gradient": 0.0983,
+       "mobile porosity": 0.0527,
+       "Kd (L/kg)": 0.0971,
+       "C0 (source conc)": 0.0011,
+       "U attenuation k (1/yr)": 0.0134
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.2935,
+       "omega (matrix transfer, 1/day)": 0.1791,
+       "fracture aperture (m)": 0.0161,
+       "matrix De (m2/day)": 0.0268,
+       "SOURCE_BV_GAIN": 0.0005,
+       "SOURCE_BV_REF": 0.0003,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.2594,
+       "hydraulic gradient": 0.1418,
+       "mobile porosity": 0.0506,
+       "Kd (L/kg)": 0.0881,
+       "C0 (source conc)": 0.0013,
+       "U attenuation k (1/yr)": 0.0079
+      }
+     },
+     "affected_area_ha": {
+      "log_transformed": false,
+      "variance": 27.548275,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.0058,
+       "omega (matrix transfer, 1/day)": -0.0332,
+       "fracture aperture (m)": -0.0001,
+       "matrix De (m2/day)": 0.0037,
+       "SOURCE_BV_GAIN": 0.426,
+       "SOURCE_BV_REF": 0.2907,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": -0.0163,
+       "hydraulic gradient": -0.0168,
+       "mobile porosity": -0.0011,
+       "Kd (L/kg)": -0.0289,
+       "C0 (source conc)": -0.002,
+       "U attenuation k (1/yr)": 0.0023
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.0447,
+       "omega (matrix transfer, 1/day)": 0.0491,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0002,
+       "SOURCE_BV_GAIN": 0.5488,
+       "SOURCE_BV_REF": 0.3734,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.0627,
+       "hydraulic gradient": 0.0682,
+       "mobile porosity": 0.0278,
+       "Kd (L/kg)": 0.0312,
+       "C0 (source conc)": 0.0001,
+       "U attenuation k (1/yr)": 0.0005
+      }
+     },
+     "compliance_conc": {
+      "log_transformed": true,
+      "variance": 1.313078,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": -0.05,
+       "omega (matrix transfer, 1/day)": 0.0535,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.0193,
+       "hydraulic gradient": 0.1056,
+       "mobile porosity": 0.0407,
+       "Kd (L/kg)": -0.0337,
+       "C0 (source conc)": 0.0037,
+       "U attenuation k (1/yr)": 0.0099
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.2718,
+       "omega (matrix transfer, 1/day)": 0.25,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.647,
+       "hydraulic gradient": 0.2434,
+       "mobile porosity": 0.1069,
+       "Kd (L/kg)": 0.2738,
+       "C0 (source conc)": 0.0025,
+       "U attenuation k (1/yr)": 0.0181
+      }
+     }
+    }
+   },
+   "seconds": 20.7
+  },
+  {
+   "site": "belt_point",
+   "label": "Singhbhum belt (between deposits)",
+   "species": "sulfate_mg_l",
+   "regime": "fractured",
+   "ore_zone": "belt",
+   "u_suppressed": false,
+   "resolved": {
+    "K_m_day": 0.3846551587458544,
+    "gradient_i": 0.00241,
+    "phi_mobile": 0.0075,
+    "n_total": 0.03,
+    "kd_L_kg": 0.05,
+    "beta": 3.0,
+    "source_conc_C0": 1624.5,
+    "background_conc_Cb": 227.0
+   },
+   "beta_basis": "porosity_derived",
+   "inputs": [
+    {
+     "name": "beta (capacity ratio)",
+     "group": "A",
+     "served": 3.0,
+     "lo": 0.3,
+     "hi": 20.0,
+     "log": true,
+     "note": "prior [0.3, 20]; served = porosity-derived"
+    },
+    {
+     "name": "omega (matrix transfer, 1/day)",
+     "group": "A",
+     "served": 0.001,
+     "lo": 0.0001,
+     "hi": 0.01,
+     "log": true,
+     "note": "x/10 .. x10 of the pinned 1e-3"
+    },
+    {
+     "name": "fracture aperture (m)",
+     "group": "A",
+     "served": 0.00025,
+     "lo": 0.0001,
+     "hi": 0.0005,
+     "log": true,
+     "note": "config range 1e-4 .. 5e-4"
+    },
+    {
+     "name": "matrix De (m2/day)",
+     "group": "A",
+     "served": 5e-06,
+     "lo": 1.0000000000000002e-06,
+     "hi": 2.5e-05,
+     "log": true,
+     "note": "x/5 .. x5 (no defensible range in config)"
+    },
+    {
+     "name": "SOURCE_BV_GAIN",
+     "group": "A",
+     "served": 0.4,
+     "lo": 0.1,
+     "hi": 1.0,
+     "log": false,
+     "note": "0.1 .. 1.0 around the served 0.4"
+    },
+    {
+     "name": "SOURCE_BV_REF",
+     "group": "A",
+     "served": 2.0,
+     "lo": 0.5,
+     "hi": 6.0,
+     "log": true,
+     "note": "0.5 .. 6 bulk volumes around the served 2"
+    },
+    {
+     "name": "INCREMENTAL_FLOOR",
+     "group": "A",
+     "served": 0.1,
+     "lo": 0.02,
+     "hi": 0.5,
+     "log": true,
+     "note": "attribution policy 0.02 .. 0.5"
+    },
+    {
+     "name": "K (m/day)",
+     "group": "B",
+     "served": 0.3846551587458544,
+     "lo": 0.12821838624861812,
+     "hi": 1.153965476237563,
+     "log": true,
+     "note": "MC local heterogeneity clip (x/3 .. x3)"
+    },
+    {
+     "name": "hydraulic gradient",
+     "group": "B",
+     "served": 0.00241,
+     "lo": 0.001205,
+     "hi": 0.00482,
+     "log": true,
+     "note": "x0.5 .. x2"
+    },
+    {
+     "name": "mobile porosity",
+     "group": "B",
+     "served": 0.0075,
+     "lo": 0.00375,
+     "hi": 0.015,
+     "log": true,
+     "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)"
+    },
+    {
+     "name": "Kd (L/kg)",
+     "group": "B",
+     "served": 0.05,
+     "lo": 0.001,
+     "hi": 0.3,
+     "log": true,
+     "note": "regime Kd range 0.0-0.3"
+    },
+    {
+     "name": "C0 (source conc)",
+     "group": "B",
+     "served": 1624.5,
+     "lo": 812.25,
+     "hi": 2436.75,
+     "log": false,
+     "note": "x0.5 .. x1.5"
+    }
+   ],
+   "oat": {
+    "served_outputs": {
+     "max_migration_distance_m": 22.960724015875062,
+     "affected_area_ha": 11.50511711752302,
+     "compliance_conc": 227.0
+    },
+    "inputs": {
+     "beta (capacity ratio)": {
+      "group": "A",
+      "served": 3.0,
+      "range": [
+       0.3,
+       20.0
+      ],
+      "log": true,
+      "note": "prior [0.3, 20]; served = porosity-derived",
+      "x": [
+       0.3,
+       0.604096117960051,
+       1.21644039911468,
+       2.449489742783178,
+       4.93242414866094,
+       9.932194267794943,
+       20.000000000000007
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        128.1626,
+        78.9014,
+        46.1302,
+        26.9267,
+        16.0725,
+        10.0192,
+        6.4707
+       ],
+       "min": 6.4707,
+       "max": 128.1626,
+       "elasticity": -0.814
+      },
+      "affected_area_ha": {
+       "values": [
+        15.1915,
+        13.5444,
+        12.1767,
+        11.6816,
+        11.3483,
+        11.2159,
+        11.2159
+       ],
+       "min": 11.2159,
+       "max": 15.1915,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        594.3847,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 594.3847,
+       "elasticity": 0.0
+      }
+     },
+     "omega (matrix transfer, 1/day)": {
+      "group": "A",
+      "served": 0.001,
+      "range": [
+       0.0001,
+       0.01
+      ],
+      "log": true,
+      "note": "x/10 .. x10 of the pinned 1e-3",
+      "x": [
+       0.00010000000000000009,
+       0.0002154434690031884,
+       0.0004641588833612784,
+       0.0010000000000000002,
+       0.0021544346900318843,
+       0.004641588833612781,
+       0.010000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        86.8333,
+        47.1739,
+        25.883,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607
+       ],
+       "min": 22.9607,
+       "max": 86.8333,
+       "elasticity": -0.09
+      },
+      "affected_area_ha": {
+       "values": [
+        13.8483,
+        12.1767,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051
+       ],
+       "min": 11.5051,
+       "max": 13.8483,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        295.0199,
+        227.9465,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 295.0199,
+       "elasticity": 0.0
+      }
+     },
+     "fracture aperture (m)": {
+      "group": "A",
+      "served": 0.00025,
+      "range": [
+       0.0001,
+       0.0005
+      ],
+      "log": true,
+      "note": "config range 1e-4 .. 5e-4",
+      "x": [
+       0.00010000000000000009,
+       0.0001307660486011831,
+       0.0001709975946676699,
+       0.00022360679774997909,
+       0.00029240177382128653,
+       0.000382362245665865,
+       0.0005000000000000001
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607
+       ],
+       "min": 22.9607,
+       "max": 22.9607,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051
+       ],
+       "min": 11.5051,
+       "max": 11.5051,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "matrix De (m2/day)": {
+      "group": "A",
+      "served": 5e-06,
+      "range": [
+       1.0000000000000002e-06,
+       2.5e-05
+      ],
+      "log": true,
+      "note": "x/5 .. x5 (no defensible range in config)",
+      "x": [
+       1.0000000000000004e-06,
+       1.7099759466766984e-06,
+       2.9240177382128696e-06,
+       4.999999999999999e-06,
+       8.549879733383486e-06,
+       1.4620088691064335e-05,
+       2.5000000000000018e-05
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607
+       ],
+       "min": 22.9607,
+       "max": 22.9607,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051
+       ],
+       "min": 11.5051,
+       "max": 11.5051,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_GAIN": {
+      "group": "A",
+      "served": 0.4,
+      "range": [
+       0.1,
+       1.0
+      ],
+      "log": false,
+      "note": "0.1 .. 1.0 around the served 0.4",
+      "x": [
+       0.1,
+       0.25,
+       0.4,
+       0.55,
+       0.7,
+       0.85,
+       1.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9629,
+        22.9212,
+        23.0035
+       ],
+       "min": 22.9212,
+       "max": 23.0035,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        8.7149,
+        9.9113,
+        11.5051,
+        13.2197,
+        15.0735,
+        17.0585,
+        19.0889
+       ],
+       "min": 8.7149,
+       "max": 19.0889,
+       "elasticity": 0.394
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_REF": {
+      "group": "A",
+      "served": 2.0,
+      "range": [
+       0.5,
+       6.0
+      ],
+      "log": true,
+      "note": "0.5 .. 6 bulk volumes around the served 2",
+      "x": [
+       0.5,
+       0.7565428747114508,
+       1.1447142425533319,
+       1.7320508075688774,
+       2.620741394208897,
+       3.965406456500187,
+       6.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        23.0838,
+        23.1352,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607
+       ],
+       "min": 22.9607,
+       "max": 23.1352,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        14.17,
+        13.9409,
+        13.1705,
+        11.9614,
+        10.8359,
+        9.9116,
+        9.0422
+       ],
+       "min": 9.0422,
+       "max": 14.17,
+       "elasticity": -0.287
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "INCREMENTAL_FLOOR": {
+      "group": "A",
+      "served": 0.1,
+      "range": [
+       0.02,
+       0.5
+      ],
+      "log": true,
+      "note": "attribution policy 0.02 .. 0.5",
+      "x": [
+       0.02,
+       0.03419951893353394,
+       0.058480354764257315,
+       0.09999999999999998,
+       0.17099759466766964,
+       0.29240177382128646,
+       0.49999999999999994
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        22.9607,
+        21.7083
+       ],
+       "min": 21.7083,
+       "max": 22.9607,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051
+       ],
+       "min": 11.5051,
+       "max": 11.5051,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "K (m/day)": {
+      "group": "B",
+      "served": 0.3846551587458544,
+      "range": [
+       0.12821838624861812,
+       1.153965476237563
+      ],
+      "log": true,
+      "note": "MC local heterogeneity clip (x/3 .. x3)",
+      "x": [
+       0.12821838624861812,
+       0.18492291247257883,
+       0.26670499105357126,
+       0.3846551587458544,
+       0.5547687374177364,
+       0.8001149731607139,
+       1.1539654762375633
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        10.4563,
+        13.4157,
+        17.3614,
+        22.9607,
+        30.9741,
+        42.4938,
+        89.9663
+       ],
+       "min": 10.4563,
+       "max": 89.9663,
+       "elasticity": 0.822
+      },
+      "affected_area_ha": {
+       "values": [
+        11.2159,
+        11.3483,
+        11.3483,
+        11.5051,
+        11.6865,
+        12.1718,
+        13.8189
+       ],
+       "min": 11.2159,
+       "max": 13.8189,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        335.1127
+       ],
+       "min": 227.0,
+       "max": 335.1127,
+       "elasticity": 0.0
+      }
+     },
+     "hydraulic gradient": {
+      "group": "B",
+      "served": 0.00241,
+      "range": [
+       0.001205,
+       0.00482
+      ],
+      "log": true,
+      "note": "x0.5 .. x2",
+      "x": [
+       0.0012049999999999995,
+       0.001518204865123321,
+       0.0019128182676216802,
+       0.002409999999999999,
+       0.003036409730246642,
+       0.0038256365352433573,
+       0.004819999999999999
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        13.8102,
+        16.1777,
+        19.3343,
+        22.9607,
+        27.7338,
+        33.6091,
+        41.2134
+       ],
+       "min": 13.8102,
+       "max": 41.2134,
+       "elasticity": 0.822
+      },
+      "affected_area_ha": {
+       "values": [
+        11.3483,
+        11.3483,
+        11.5002,
+        11.5051,
+        11.6816,
+        11.6865,
+        12.1669
+       ],
+       "min": 11.3483,
+       "max": 12.1669,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "mobile porosity": {
+      "group": "B",
+      "served": 0.0075,
+      "range": [
+       0.00375,
+       0.015
+      ],
+      "log": true,
+      "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)",
+      "x": [
+       0.0037499999999999986,
+       0.004724703937105772,
+       0.005952753944880748,
+       0.007499999999999998,
+       0.009449407874211543,
+       0.011905507889761496,
+       0.014999999999999998
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        41.2134,
+        33.6091,
+        27.7338,
+        22.9607,
+        19.3343,
+        16.1777,
+        13.8102
+       ],
+       "min": 13.8102,
+       "max": 41.2134,
+       "elasticity": -0.822
+      },
+      "affected_area_ha": {
+       "values": [
+        12.1669,
+        11.6865,
+        11.6816,
+        11.5051,
+        11.5002,
+        11.3483,
+        11.3483
+       ],
+       "min": 11.3483,
+       "max": 12.1669,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "Kd (L/kg)": {
+      "group": "B",
+      "served": 0.05,
+      "range": [
+       0.001,
+       0.3
+      ],
+      "log": true,
+      "note": "regime Kd range 0.0-0.3",
+      "x": [
+       0.0010000000000000002,
+       0.0025873402367724454,
+       0.006694329500821693,
+       0.017320508075688777,
+       0.04481404746557164,
+       0.11594918818030371,
+       0.30000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        79.3189,
+        72.4306,
+        59.4891,
+        41.3293,
+        24.6306,
+        13.5677,
+        7.5144
+       ],
+       "min": 7.5144,
+       "max": 79.3189,
+       "elasticity": -0.633
+      },
+      "affected_area_ha": {
+       "values": [
+        13.5444,
+        13.2699,
+        12.7208,
+        12.1718,
+        11.5051,
+        11.3483,
+        11.2159
+       ],
+       "min": 11.2159,
+       "max": 13.5444,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     },
+     "C0 (source conc)": {
+      "group": "B",
+      "served": 1624.5,
+      "range": [
+       812.25,
+       2436.75
+      ],
+      "log": false,
+      "note": "x0.5 .. x1.5",
+      "x": [
+       812.25,
+       1083.0,
+       1353.75,
+       1624.5,
+       1895.25,
+       2166.0,
+       2436.75
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        13.7764,
+        18.5773,
+        21.2909,
+        22.9607,
+        24.2131,
+        25.2568,
+        26.0917
+       ],
+       "min": 13.7764,
+       "max": 26.0917,
+       "elasticity": 0.363
+      },
+      "affected_area_ha": {
+       "values": [
+        11.3483,
+        11.3483,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051,
+        11.5051
+       ],
+       "min": 11.3483,
+       "max": 11.5051,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0,
+        227.0
+       ],
+       "min": 227.0,
+       "max": 227.0,
+       "elasticity": 0.0
+      }
+     }
+    }
+   },
+   "sobol": {
+    "n_base": 256,
+    "evaluations": 3584,
+    "indices": {
+     "max_migration_distance_m": {
+      "log_transformed": true,
+      "variance": 1.849661,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.3059,
+       "omega (matrix transfer, 1/day)": 0.0187,
+       "fracture aperture (m)": -0.0339,
+       "matrix De (m2/day)": -0.0152,
+       "SOURCE_BV_GAIN": -0.0005,
+       "SOURCE_BV_REF": -0.0016,
+       "INCREMENTAL_FLOOR": -0.0005,
+       "K (m/day)": 0.2225,
+       "hydraulic gradient": 0.0644,
+       "mobile porosity": 0.0769,
+       "Kd (L/kg)": 0.2072,
+       "C0 (source conc)": -0.0036
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.3372,
+       "omega (matrix transfer, 1/day)": 0.0436,
+       "fracture aperture (m)": 0.006,
+       "matrix De (m2/day)": 0.0025,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.2491,
+       "hydraulic gradient": 0.1184,
+       "mobile porosity": 0.0707,
+       "Kd (L/kg)": 0.2307,
+       "C0 (source conc)": 0.0116
+      }
+     },
+     "affected_area_ha": {
+      "log_transformed": true,
+      "variance": 0.175733,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.0754,
+       "omega (matrix transfer, 1/day)": -0.0225,
+       "fracture aperture (m)": -0.0142,
+       "matrix De (m2/day)": 0.0029,
+       "SOURCE_BV_GAIN": 0.2859,
+       "SOURCE_BV_REF": 0.1375,
+       "INCREMENTAL_FLOOR": 0.0005,
+       "K (m/day)": 0.0466,
+       "hydraulic gradient": 0.1819,
+       "mobile porosity": 0.1017,
+       "Kd (L/kg)": 0.1861,
+       "C0 (source conc)": -0.0028
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.1672,
+       "omega (matrix transfer, 1/day)": 0.0277,
+       "fracture aperture (m)": 0.0003,
+       "matrix De (m2/day)": 0.0004,
+       "SOURCE_BV_GAIN": 0.2814,
+       "SOURCE_BV_REF": 0.1857,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.2341,
+       "hydraulic gradient": 0.1141,
+       "mobile porosity": 0.0748,
+       "Kd (L/kg)": 0.1278,
+       "C0 (source conc)": 0.0021
+      }
+     },
+     "compliance_conc": {
+      "log_transformed": false,
+      "variance": 60932.479523,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.0513,
+       "omega (matrix transfer, 1/day)": 0.0536,
+       "fracture aperture (m)": -0.003,
+       "matrix De (m2/day)": 0.0029,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.1077,
+       "hydraulic gradient": 0.0539,
+       "mobile porosity": 0.0137,
+       "Kd (L/kg)": 0.0066,
+       "C0 (source conc)": -0.0207
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.3945,
+       "omega (matrix transfer, 1/day)": 0.1264,
+       "fracture aperture (m)": 0.0012,
+       "matrix De (m2/day)": 0.0008,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.504,
+       "hydraulic gradient": 0.2631,
+       "mobile porosity": 0.1753,
+       "Kd (L/kg)": 0.2606,
+       "C0 (source conc)": 0.1077
+      }
+     }
+    }
+   },
+   "seconds": 25.6
+  },
+  {
+   "site": "non_belt_ranchi",
+   "label": "Ranchi plateau (non-belt)",
+   "species": "uranium_ppb",
+   "regime": "fractured",
+   "ore_zone": "none",
+   "u_suppressed": true,
+   "resolved": {
+    "K_m_day": 0.09400000000000001,
+    "gradient_i": 0.00385,
+    "phi_mobile": 0.01,
+    "n_total": 0.03,
+    "kd_L_kg": 1.0,
+    "beta": 1.9999999999999996,
+    "source_conc_C0": 5.0,
+    "background_conc_Cb": 0.65
+   },
+   "beta_basis": "porosity_derived",
+   "inputs": [
+    {
+     "name": "beta (capacity ratio)",
+     "group": "A",
+     "served": 1.9999999999999996,
+     "lo": 0.3,
+     "hi": 20.0,
+     "log": true,
+     "note": "prior [0.3, 20]; served = porosity-derived"
+    },
+    {
+     "name": "omega (matrix transfer, 1/day)",
+     "group": "A",
+     "served": 0.001,
+     "lo": 0.0001,
+     "hi": 0.01,
+     "log": true,
+     "note": "x/10 .. x10 of the pinned 1e-3"
+    },
+    {
+     "name": "fracture aperture (m)",
+     "group": "A",
+     "served": 0.00025,
+     "lo": 0.0001,
+     "hi": 0.0005,
+     "log": true,
+     "note": "config range 1e-4 .. 5e-4"
+    },
+    {
+     "name": "matrix De (m2/day)",
+     "group": "A",
+     "served": 5e-06,
+     "lo": 1.0000000000000002e-06,
+     "hi": 2.5e-05,
+     "log": true,
+     "note": "x/5 .. x5 (no defensible range in config)"
+    },
+    {
+     "name": "SOURCE_BV_GAIN",
+     "group": "A",
+     "served": 0.4,
+     "lo": 0.1,
+     "hi": 1.0,
+     "log": false,
+     "note": "0.1 .. 1.0 around the served 0.4"
+    },
+    {
+     "name": "SOURCE_BV_REF",
+     "group": "A",
+     "served": 2.0,
+     "lo": 0.5,
+     "hi": 6.0,
+     "log": true,
+     "note": "0.5 .. 6 bulk volumes around the served 2"
+    },
+    {
+     "name": "INCREMENTAL_FLOOR",
+     "group": "A",
+     "served": 0.1,
+     "lo": 0.02,
+     "hi": 0.5,
+     "log": true,
+     "note": "attribution policy 0.02 .. 0.5"
+    },
+    {
+     "name": "K (m/day)",
+     "group": "B",
+     "served": 0.09400000000000001,
+     "lo": 0.03133333333333334,
+     "hi": 0.28200000000000003,
+     "log": true,
+     "note": "MC local heterogeneity clip (x/3 .. x3)"
+    },
+    {
+     "name": "hydraulic gradient",
+     "group": "B",
+     "served": 0.00385,
+     "lo": 0.001925,
+     "hi": 0.0077,
+     "log": true,
+     "note": "x0.5 .. x2"
+    },
+    {
+     "name": "mobile porosity",
+     "group": "B",
+     "served": 0.01,
+     "lo": 0.005,
+     "hi": 0.02,
+     "log": true,
+     "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)"
+    },
+    {
+     "name": "Kd (L/kg)",
+     "group": "B",
+     "served": 1.0,
+     "lo": 0.3,
+     "hi": 3.0,
+     "log": true,
+     "note": "regime Kd range 0.3-3.0"
+    },
+    {
+     "name": "C0 (source conc)",
+     "group": "B",
+     "served": 5.0,
+     "lo": 2.5,
+     "hi": 7.5,
+     "log": false,
+     "note": "x0.5 .. x1.5"
+    },
+    {
+     "name": "U attenuation k (1/yr)",
+     "group": "B",
+     "served": 0.12,
+     "lo": 0.05,
+     "hi": 0.7,
+     "log": true,
+     "note": "literature range"
+    }
+   ],
+   "oat": {
+    "served_outputs": {
+     "max_migration_distance_m": 0.0,
+     "affected_area_ha": 0.0,
+     "compliance_conc": 0.65
+    },
+    "inputs": {
+     "beta (capacity ratio)": {
+      "group": "A",
+      "served": 1.9999999999999996,
+      "range": [
+       0.3,
+       20.0
+      ],
+      "log": true,
+      "note": "prior [0.3, 20]; served = porosity-derived",
+      "x": [
+       0.3,
+       0.604096117960051,
+       1.21644039911468,
+       2.449489742783178,
+       4.93242414866094,
+       9.932194267794943,
+       20.000000000000007
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "omega (matrix transfer, 1/day)": {
+      "group": "A",
+      "served": 0.001,
+      "range": [
+       0.0001,
+       0.01
+      ],
+      "log": true,
+      "note": "x/10 .. x10 of the pinned 1e-3",
+      "x": [
+       0.00010000000000000009,
+       0.0002154434690031884,
+       0.0004641588833612784,
+       0.0010000000000000002,
+       0.0021544346900318843,
+       0.004641588833612781,
+       0.010000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "fracture aperture (m)": {
+      "group": "A",
+      "served": 0.00025,
+      "range": [
+       0.0001,
+       0.0005
+      ],
+      "log": true,
+      "note": "config range 1e-4 .. 5e-4",
+      "x": [
+       0.00010000000000000009,
+       0.0001307660486011831,
+       0.0001709975946676699,
+       0.00022360679774997909,
+       0.00029240177382128653,
+       0.000382362245665865,
+       0.0005000000000000001
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "matrix De (m2/day)": {
+      "group": "A",
+      "served": 5e-06,
+      "range": [
+       1.0000000000000002e-06,
+       2.5e-05
+      ],
+      "log": true,
+      "note": "x/5 .. x5 (no defensible range in config)",
+      "x": [
+       1.0000000000000004e-06,
+       1.7099759466766984e-06,
+       2.9240177382128696e-06,
+       4.999999999999999e-06,
+       8.549879733383486e-06,
+       1.4620088691064335e-05,
+       2.5000000000000018e-05
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_GAIN": {
+      "group": "A",
+      "served": 0.4,
+      "range": [
+       0.1,
+       1.0
+      ],
+      "log": false,
+      "note": "0.1 .. 1.0 around the served 0.4",
+      "x": [
+       0.1,
+       0.25,
+       0.4,
+       0.55,
+       0.7,
+       0.85,
+       1.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_REF": {
+      "group": "A",
+      "served": 2.0,
+      "range": [
+       0.5,
+       6.0
+      ],
+      "log": true,
+      "note": "0.5 .. 6 bulk volumes around the served 2",
+      "x": [
+       0.5,
+       0.7565428747114508,
+       1.1447142425533319,
+       1.7320508075688774,
+       2.620741394208897,
+       3.965406456500187,
+       6.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "INCREMENTAL_FLOOR": {
+      "group": "A",
+      "served": 0.1,
+      "range": [
+       0.02,
+       0.5
+      ],
+      "log": true,
+      "note": "attribution policy 0.02 .. 0.5",
+      "x": [
+       0.02,
+       0.03419951893353394,
+       0.058480354764257315,
+       0.09999999999999998,
+       0.17099759466766964,
+       0.29240177382128646,
+       0.49999999999999994
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "K (m/day)": {
+      "group": "B",
+      "served": 0.09400000000000001,
+      "range": [
+       0.03133333333333334,
+       0.28200000000000003
+      ],
+      "log": true,
+      "note": "MC local heterogeneity clip (x/3 .. x3)",
+      "x": [
+       0.031333333333333345,
+       0.04519048653629881,
+       0.06517595978895967,
+       0.09400000000000001,
+       0.13557145960889638,
+       0.195527879366879,
+       0.28200000000000003
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "hydraulic gradient": {
+      "group": "B",
+      "served": 0.00385,
+      "range": [
+       0.001925,
+       0.0077
+      ],
+      "log": true,
+      "note": "x0.5 .. x2",
+      "x": [
+       0.0019250000000000003,
+       0.0024253480210476306,
+       0.0030557470250387854,
+       0.003850000000000001,
+       0.004850696042095261,
+       0.006111494050077572,
+       0.007700000000000002
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "mobile porosity": {
+      "group": "B",
+      "served": 0.01,
+      "range": [
+       0.005,
+       0.02
+      ],
+      "log": true,
+      "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)",
+      "x": [
+       0.005000000000000002,
+       0.006299605249474366,
+       0.007937005259841003,
+       0.010000000000000004,
+       0.012599210498948734,
+       0.015874010519681993,
+       0.02
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "Kd (L/kg)": {
+      "group": "B",
+      "served": 1.0,
+      "range": [
+       0.3,
+       3.0
+      ],
+      "log": true,
+      "note": "regime Kd range 0.3-3.0",
+      "x": [
+       0.3,
+       0.4403397802866208,
+       0.6463304070095651,
+       0.9486832980505138,
+       1.3924766500838337,
+       2.0438762071738834,
+       3.0000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "C0 (source conc)": {
+      "group": "B",
+      "served": 5.0,
+      "range": [
+       2.5,
+       7.5
+      ],
+      "log": false,
+      "note": "x0.5 .. x1.5",
+      "x": [
+       2.5,
+       3.333333333333333,
+       4.166666666666666,
+       5.0,
+       5.833333333333333,
+       6.666666666666666,
+       7.5
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     },
+     "U attenuation k (1/yr)": {
+      "group": "B",
+      "served": 0.12,
+      "range": [
+       0.05,
+       0.7
+      ],
+      "log": true,
+      "note": "literature range",
+      "x": [
+       0.05000000000000001,
+       0.07762316445777044,
+       0.12050711320876147,
+       0.18708286933869708,
+       0.29043928667818514,
+       0.450896330296366,
+       0.7
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "min": 0.0,
+       "max": 0.0,
+       "elasticity": null
+      },
+      "compliance_conc": {
+       "values": [
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65,
+        0.65
+       ],
+       "min": 0.65,
+       "max": 0.65,
+       "elasticity": 0.0
+      }
+     }
+    }
+   },
+   "sobol": {
+    "n_base": 256,
+    "evaluations": 3840,
+    "indices": {
+     "max_migration_distance_m": {
+      "log_transformed": false,
+      "variance": 0.0,
+      "degenerate": true,
+      "S1": {
+       "beta (capacity ratio)": null,
+       "omega (matrix transfer, 1/day)": null,
+       "fracture aperture (m)": null,
+       "matrix De (m2/day)": null,
+       "SOURCE_BV_GAIN": null,
+       "SOURCE_BV_REF": null,
+       "INCREMENTAL_FLOOR": null,
+       "K (m/day)": null,
+       "hydraulic gradient": null,
+       "mobile porosity": null,
+       "Kd (L/kg)": null,
+       "C0 (source conc)": null,
+       "U attenuation k (1/yr)": null
+      },
+      "ST": {
+       "beta (capacity ratio)": null,
+       "omega (matrix transfer, 1/day)": null,
+       "fracture aperture (m)": null,
+       "matrix De (m2/day)": null,
+       "SOURCE_BV_GAIN": null,
+       "SOURCE_BV_REF": null,
+       "INCREMENTAL_FLOOR": null,
+       "K (m/day)": null,
+       "hydraulic gradient": null,
+       "mobile porosity": null,
+       "Kd (L/kg)": null,
+       "C0 (source conc)": null,
+       "U attenuation k (1/yr)": null
+      },
+      "note": "output constant over the whole design -- indices undefined (source term suppressed or output pinned)"
+     },
+     "affected_area_ha": {
+      "log_transformed": false,
+      "variance": 0.0,
+      "degenerate": true,
+      "S1": {
+       "beta (capacity ratio)": null,
+       "omega (matrix transfer, 1/day)": null,
+       "fracture aperture (m)": null,
+       "matrix De (m2/day)": null,
+       "SOURCE_BV_GAIN": null,
+       "SOURCE_BV_REF": null,
+       "INCREMENTAL_FLOOR": null,
+       "K (m/day)": null,
+       "hydraulic gradient": null,
+       "mobile porosity": null,
+       "Kd (L/kg)": null,
+       "C0 (source conc)": null,
+       "U attenuation k (1/yr)": null
+      },
+      "ST": {
+       "beta (capacity ratio)": null,
+       "omega (matrix transfer, 1/day)": null,
+       "fracture aperture (m)": null,
+       "matrix De (m2/day)": null,
+       "SOURCE_BV_GAIN": null,
+       "SOURCE_BV_REF": null,
+       "INCREMENTAL_FLOOR": null,
+       "K (m/day)": null,
+       "hydraulic gradient": null,
+       "mobile porosity": null,
+       "Kd (L/kg)": null,
+       "C0 (source conc)": null,
+       "U attenuation k (1/yr)": null
+      },
+      "note": "output constant over the whole design -- indices undefined (source term suppressed or output pinned)"
+     },
+     "compliance_conc": {
+      "log_transformed": false,
+      "variance": 4.9e-05,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": -0.05,
+       "omega (matrix transfer, 1/day)": -0.05,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": -0.05,
+       "hydraulic gradient": -0.05,
+       "mobile porosity": -0.05,
+       "Kd (L/kg)": -0.05,
+       "C0 (source conc)": 1.0,
+       "U attenuation k (1/yr)": 1.0
+      },
+      "ST": {
+       "beta (capacity ratio)": 1.0167,
+       "omega (matrix transfer, 1/day)": 1.0027,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.9414,
+       "hydraulic gradient": 0.9998,
+       "mobile porosity": 0.9952,
+       "Kd (L/kg)": 0.9993,
+       "C0 (source conc)": 0.3589,
+       "U attenuation k (1/yr)": 0.1716
+      }
+     }
+    }
+   },
+   "seconds": 17.9
+  },
+  {
+   "site": "non_belt_ranchi",
+   "label": "Ranchi plateau (non-belt)",
+   "species": "sulfate_mg_l",
+   "regime": "fractured",
+   "ore_zone": "none",
+   "u_suppressed": false,
+   "resolved": {
+    "K_m_day": 0.09400000000000001,
+    "gradient_i": 0.00385,
+    "phi_mobile": 0.01,
+    "n_total": 0.03,
+    "kd_L_kg": 0.05,
+    "beta": 1.9999999999999996,
+    "source_conc_C0": 1624.5,
+    "background_conc_Cb": 31.0
+   },
+   "beta_basis": "porosity_derived",
+   "inputs": [
+    {
+     "name": "beta (capacity ratio)",
+     "group": "A",
+     "served": 1.9999999999999996,
+     "lo": 0.3,
+     "hi": 20.0,
+     "log": true,
+     "note": "prior [0.3, 20]; served = porosity-derived"
+    },
+    {
+     "name": "omega (matrix transfer, 1/day)",
+     "group": "A",
+     "served": 0.001,
+     "lo": 0.0001,
+     "hi": 0.01,
+     "log": true,
+     "note": "x/10 .. x10 of the pinned 1e-3"
+    },
+    {
+     "name": "fracture aperture (m)",
+     "group": "A",
+     "served": 0.00025,
+     "lo": 0.0001,
+     "hi": 0.0005,
+     "log": true,
+     "note": "config range 1e-4 .. 5e-4"
+    },
+    {
+     "name": "matrix De (m2/day)",
+     "group": "A",
+     "served": 5e-06,
+     "lo": 1.0000000000000002e-06,
+     "hi": 2.5e-05,
+     "log": true,
+     "note": "x/5 .. x5 (no defensible range in config)"
+    },
+    {
+     "name": "SOURCE_BV_GAIN",
+     "group": "A",
+     "served": 0.4,
+     "lo": 0.1,
+     "hi": 1.0,
+     "log": false,
+     "note": "0.1 .. 1.0 around the served 0.4"
+    },
+    {
+     "name": "SOURCE_BV_REF",
+     "group": "A",
+     "served": 2.0,
+     "lo": 0.5,
+     "hi": 6.0,
+     "log": true,
+     "note": "0.5 .. 6 bulk volumes around the served 2"
+    },
+    {
+     "name": "INCREMENTAL_FLOOR",
+     "group": "A",
+     "served": 0.1,
+     "lo": 0.02,
+     "hi": 0.5,
+     "log": true,
+     "note": "attribution policy 0.02 .. 0.5"
+    },
+    {
+     "name": "K (m/day)",
+     "group": "B",
+     "served": 0.09400000000000001,
+     "lo": 0.03133333333333334,
+     "hi": 0.28200000000000003,
+     "log": true,
+     "note": "MC local heterogeneity clip (x/3 .. x3)"
+    },
+    {
+     "name": "hydraulic gradient",
+     "group": "B",
+     "served": 0.00385,
+     "lo": 0.001925,
+     "hi": 0.0077,
+     "log": true,
+     "note": "x0.5 .. x2"
+    },
+    {
+     "name": "mobile porosity",
+     "group": "B",
+     "served": 0.01,
+     "lo": 0.005,
+     "hi": 0.02,
+     "log": true,
+     "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)"
+    },
+    {
+     "name": "Kd (L/kg)",
+     "group": "B",
+     "served": 0.05,
+     "lo": 0.001,
+     "hi": 0.3,
+     "log": true,
+     "note": "regime Kd range 0.0-0.3"
+    },
+    {
+     "name": "C0 (source conc)",
+     "group": "B",
+     "served": 1624.5,
+     "lo": 812.25,
+     "hi": 2436.75,
+     "log": false,
+     "note": "x0.5 .. x1.5"
+    }
+   ],
+   "oat": {
+    "served_outputs": {
+     "max_migration_distance_m": 5.706897879828009,
+     "affected_area_ha": 12.2207401281297,
+     "compliance_conc": 31.0
+    },
+    "inputs": {
+     "beta (capacity ratio)": {
+      "group": "A",
+      "served": 1.9999999999999996,
+      "range": [
+       0.3,
+       20.0
+      ],
+      "log": true,
+      "note": "prior [0.3, 20]; served = porosity-derived",
+      "x": [
+       0.3,
+       0.604096117960051,
+       1.21644039911468,
+       2.449489742783178,
+       4.93242414866094,
+       9.932194267794943,
+       20.000000000000007
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        24.4581,
+        14.6749,
+        8.3565,
+        4.8916,
+        2.8534,
+        1.8344,
+        1.2229
+       ],
+       "min": 1.2229,
+       "max": 24.4581,
+       "elasticity": -0.714
+      },
+      "affected_area_ha": {
+       "values": [
+        12.6348,
+        12.3428,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.1146
+       ],
+       "min": 12.1146,
+       "max": 12.6348,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "omega (matrix transfer, 1/day)": {
+      "group": "A",
+      "served": 0.001,
+      "range": [
+       0.0001,
+       0.01
+      ],
+      "log": true,
+      "note": "x/10 .. x10 of the pinned 1e-3",
+      "x": [
+       0.00010000000000000009,
+       0.0002154434690031884,
+       0.0004641588833612784,
+       0.0010000000000000002,
+       0.0021544346900318843,
+       0.004641588833612781,
+       0.010000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        33.4261,
+        11.0062,
+        6.3184,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069
+       ],
+       "min": 5.7069,
+       "max": 33.4261,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        12.8206,
+        12.3428,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207
+       ],
+       "min": 12.2207,
+       "max": 12.8206,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0059,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0059,
+       "elasticity": 0.0
+      }
+     },
+     "fracture aperture (m)": {
+      "group": "A",
+      "served": 0.00025,
+      "range": [
+       0.0001,
+       0.0005
+      ],
+      "log": true,
+      "note": "config range 1e-4 .. 5e-4",
+      "x": [
+       0.00010000000000000009,
+       0.0001307660486011831,
+       0.0001709975946676699,
+       0.00022360679774997909,
+       0.00029240177382128653,
+       0.000382362245665865,
+       0.0005000000000000001
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069
+       ],
+       "min": 5.7069,
+       "max": 5.7069,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207
+       ],
+       "min": 12.2207,
+       "max": 12.2207,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "matrix De (m2/day)": {
+      "group": "A",
+      "served": 5e-06,
+      "range": [
+       1.0000000000000002e-06,
+       2.5e-05
+      ],
+      "log": true,
+      "note": "x/5 .. x5 (no defensible range in config)",
+      "x": [
+       1.0000000000000004e-06,
+       1.7099759466766984e-06,
+       2.9240177382128696e-06,
+       4.999999999999999e-06,
+       8.549879733383486e-06,
+       1.4620088691064335e-05,
+       2.5000000000000018e-05
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069
+       ],
+       "min": 5.7069,
+       "max": 5.7069,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207
+       ],
+       "min": 12.2207,
+       "max": 12.2207,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_GAIN": {
+      "group": "A",
+      "served": 0.4,
+      "range": [
+       0.1,
+       1.0
+      ],
+      "log": false,
+      "note": "0.1 .. 1.0 around the served 0.4",
+      "x": [
+       0.1,
+       0.25,
+       0.4,
+       0.55,
+       0.7,
+       0.85,
+       1.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        5.6632,
+        5.7155,
+        5.7069,
+        5.6397,
+        5.7455,
+        5.5791,
+        5.6137
+       ],
+       "min": 5.5791,
+       "max": 5.7455,
+       "elasticity": 0.172
+      },
+      "affected_area_ha": {
+       "values": [
+        8.3373,
+        10.0712,
+        12.2207,
+        14.4919,
+        16.9492,
+        19.4603,
+        22.2441
+       ],
+       "min": 8.3373,
+       "max": 22.2441,
+       "elasticity": 0.473
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "SOURCE_BV_REF": {
+      "group": "A",
+      "served": 2.0,
+      "range": [
+       0.5,
+       6.0
+      ],
+      "log": true,
+      "note": "0.5 .. 6 bulk volumes around the served 2",
+      "x": [
+       0.5,
+       0.7565428747114508,
+       1.1447142425533319,
+       1.7320508075688774,
+       2.620741394208897,
+       3.965406456500187,
+       6.0
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        5.7766,
+        5.767,
+        5.7132,
+        5.7784,
+        5.7553,
+        5.7072,
+        5.6859
+       ],
+       "min": 5.6859,
+       "max": 5.7784,
+       "elasticity": -0.092
+      },
+      "affected_area_ha": {
+       "values": [
+        13.9814,
+        13.8033,
+        13.4472,
+        12.6539,
+        11.3876,
+        10.0297,
+        9.1824
+       ],
+       "min": 9.1824,
+       "max": 13.9814,
+       "elasticity": -0.253
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "INCREMENTAL_FLOOR": {
+      "group": "A",
+      "served": 0.1,
+      "range": [
+       0.02,
+       0.5
+      ],
+      "log": true,
+      "note": "attribution policy 0.02 .. 0.5",
+      "x": [
+       0.02,
+       0.03419951893353394,
+       0.058480354764257315,
+       0.09999999999999998,
+       0.17099759466766964,
+       0.29240177382128646,
+       0.49999999999999994
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069,
+        5.7069
+       ],
+       "min": 5.7069,
+       "max": 5.7069,
+       "elasticity": 0.0
+      },
+      "affected_area_ha": {
+       "values": [
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207
+       ],
+       "min": 12.2207,
+       "max": 12.2207,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "K (m/day)": {
+      "group": "B",
+      "served": 0.09400000000000001,
+      "range": [
+       0.03133333333333334,
+       0.28200000000000003
+      ],
+      "log": true,
+      "note": "MC local heterogeneity clip (x/3 .. x3)",
+      "x": [
+       0.031333333333333345,
+       0.04519048653629881,
+       0.06517595978895967,
+       0.09400000000000001,
+       0.13557145960889638,
+       0.195527879366879,
+       0.28200000000000003
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        2.4458,
+        3.2611,
+        4.2802,
+        5.7069,
+        7.9489,
+        11.0062,
+        15.8978
+       ],
+       "min": 2.4458,
+       "max": 15.8978,
+       "elasticity": 0.714
+      },
+      "affected_area_ha": {
+       "values": [
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.3428,
+        12.3428
+       ],
+       "min": 12.2207,
+       "max": 12.3428,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "hydraulic gradient": {
+      "group": "B",
+      "served": 0.00385,
+      "range": [
+       0.001925,
+       0.0077
+      ],
+      "log": true,
+      "note": "x0.5 .. x2",
+      "x": [
+       0.0019250000000000003,
+       0.0024253480210476306,
+       0.0030557470250387854,
+       0.003850000000000001,
+       0.004850696042095261,
+       0.006111494050077572,
+       0.007700000000000002
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        3.2611,
+        3.8725,
+        4.6878,
+        5.7069,
+        6.9298,
+        8.5603,
+        10.5985
+       ],
+       "min": 3.2611,
+       "max": 10.5985,
+       "elasticity": 0.714
+      },
+      "affected_area_ha": {
+       "values": [
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.3428
+       ],
+       "min": 12.2207,
+       "max": 12.3428,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "mobile porosity": {
+      "group": "B",
+      "served": 0.01,
+      "range": [
+       0.005,
+       0.02
+      ],
+      "log": true,
+      "note": "x/2 .. x2 (beta held at its served value, so this is the velocity effect only)",
+      "x": [
+       0.005000000000000002,
+       0.006299605249474366,
+       0.007937005259841003,
+       0.010000000000000004,
+       0.012599210498948734,
+       0.015874010519681993,
+       0.02
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        10.5985,
+        8.5603,
+        6.9298,
+        5.7069,
+        4.6878,
+        3.8725,
+        3.2611
+       ],
+       "min": 3.2611,
+       "max": 10.5985,
+       "elasticity": -0.714
+      },
+      "affected_area_ha": {
+       "values": [
+        12.3428,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207
+       ],
+       "min": 12.2207,
+       "max": 12.3428,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "Kd (L/kg)": {
+      "group": "B",
+      "served": 0.05,
+      "range": [
+       0.001,
+       0.3
+      ],
+      "log": true,
+      "note": "regime Kd range 0.0-0.3",
+      "x": [
+       0.0010000000000000002,
+       0.0025873402367724454,
+       0.006694329500821693,
+       0.017320508075688777,
+       0.04481404746557164,
+       0.11594918818030371,
+       0.30000000000000004
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        19.7703,
+        18.1398,
+        14.8787,
+        10.3947,
+        6.1145,
+        3.2611,
+        1.8344
+       ],
+       "min": 1.8344,
+       "max": 19.7703,
+       "elasticity": -0.714
+      },
+      "affected_area_ha": {
+       "values": [
+        12.4809,
+        12.4809,
+        12.3428,
+        12.3428,
+        12.2207,
+        12.2207,
+        12.2207
+       ],
+       "min": 12.2207,
+       "max": 12.4809,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     },
+     "C0 (source conc)": {
+      "group": "B",
+      "served": 1624.5,
+      "range": [
+       812.25,
+       2436.75
+      ],
+      "log": false,
+      "note": "x0.5 .. x1.5",
+      "x": [
+       812.25,
+       1083.0,
+       1353.75,
+       1624.5,
+       1895.25,
+       2166.0,
+       2436.75
+      ],
+      "max_migration_distance_m": {
+       "values": [
+        0.0,
+        0.0,
+        2.6496,
+        5.7069,
+        7.5413,
+        8.968,
+        9.9871
+       ],
+       "min": 0.0,
+       "max": 9.9871,
+       "elasticity": 2.557
+      },
+      "affected_area_ha": {
+       "values": [
+        0.0,
+        0.0,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.2207,
+        12.3428
+       ],
+       "min": 0.0,
+       "max": 12.3428,
+       "elasticity": 0.0
+      },
+      "compliance_conc": {
+       "values": [
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0,
+        31.0
+       ],
+       "min": 31.0,
+       "max": 31.0,
+       "elasticity": 0.0
+      }
+     }
+    }
+   },
+   "sobol": {
+    "n_base": 256,
+    "evaluations": 3584,
+    "indices": {
+     "max_migration_distance_m": {
+      "log_transformed": false,
+      "variance": 1186.481523,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.0727,
+       "omega (matrix transfer, 1/day)": 0.0216,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0001,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.0705,
+       "hydraulic gradient": 0.0539,
+       "mobile porosity": 0.0051,
+       "Kd (L/kg)": 0.0841,
+       "C0 (source conc)": 0.1421
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.2825,
+       "omega (matrix transfer, 1/day)": 0.1034,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.2221,
+       "hydraulic gradient": 0.2308,
+       "mobile porosity": 0.1853,
+       "Kd (L/kg)": 0.2395,
+       "C0 (source conc)": 0.2809
+      }
+     },
+     "affected_area_ha": {
+      "log_transformed": false,
+      "variance": 62.899005,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": 0.0063,
+       "omega (matrix transfer, 1/day)": 0.0044,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.1658,
+       "SOURCE_BV_REF": 0.1066,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": -0.0129,
+       "hydraulic gradient": 0.0227,
+       "mobile porosity": -0.0171,
+       "Kd (L/kg)": 0.0059,
+       "C0 (source conc)": 0.6678
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.006,
+       "omega (matrix transfer, 1/day)": 0.0026,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.2502,
+       "SOURCE_BV_REF": 0.1008,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.0042,
+       "hydraulic gradient": 0.0072,
+       "mobile porosity": 0.0047,
+       "Kd (L/kg)": 0.0051,
+       "C0 (source conc)": 0.778
+      }
+     },
+     "compliance_conc": {
+      "log_transformed": true,
+      "variance": 0.385479,
+      "degenerate": false,
+      "S1": {
+       "beta (capacity ratio)": -0.05,
+       "omega (matrix transfer, 1/day)": -0.0184,
+       "fracture aperture (m)": -0.0,
+       "matrix De (m2/day)": 0.0002,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": -0.05,
+       "hydraulic gradient": 0.0188,
+       "mobile porosity": 0.0686,
+       "Kd (L/kg)": 0.2853,
+       "C0 (source conc)": 0.0362
+      },
+      "ST": {
+       "beta (capacity ratio)": 0.4912,
+       "omega (matrix transfer, 1/day)": 0.2418,
+       "fracture aperture (m)": 0.0,
+       "matrix De (m2/day)": 0.0,
+       "SOURCE_BV_GAIN": 0.0,
+       "SOURCE_BV_REF": 0.0,
+       "INCREMENTAL_FLOOR": 0.0,
+       "K (m/day)": 0.5755,
+       "hydraulic gradient": 0.3978,
+       "mobile porosity": 0.229,
+       "Kd (L/kg)": 0.4045,
+       "C0 (source conc)": 0.0217
+      }
+     }
+    }
+   },
+   "seconds": 22.9
+  }
+ ],
+ "summary": [
+  {
+   "site": "jaduguda_deposit",
+   "species": "uranium_ppb",
+   "output": "max_migration_distance_m",
+   "top": [
+    {
+     "input": "K (m/day)",
+     "ST": 0.4241,
+     "group": "B"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.2114,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.162,
+     "group": "B"
+    },
+    {
+     "input": "omega (matrix transfer, 1/day)",
+     "ST": 0.1009,
+     "group": "A"
+    }
+   ],
+   "share_group_A": 0.321
+  },
+  {
+   "site": "jaduguda_deposit",
+   "species": "uranium_ppb",
+   "output": "affected_area_ha",
+   "top": [
+    {
+     "input": "SOURCE_BV_REF",
+     "ST": 0.2741,
+     "group": "A"
+    },
+    {
+     "input": "SOURCE_BV_GAIN",
+     "ST": 0.2217,
+     "group": "A"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.1576,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.1492,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.644
+  },
+  {
+   "site": "jaduguda_deposit",
+   "species": "uranium_ppb",
+   "output": "compliance_conc",
+   "top": [
+    {
+     "input": "K (m/day)",
+     "ST": 0.528,
+     "group": "B"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.4533,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.3285,
+     "group": "B"
+    },
+    {
+     "input": "omega (matrix transfer, 1/day)",
+     "ST": 0.2107,
+     "group": "A"
+    }
+   ],
+   "share_group_A": 0.371
+  },
+  {
+   "site": "jaduguda_deposit",
+   "species": "sulfate_mg_l",
+   "output": "max_migration_distance_m",
+   "top": [
+    {
+     "input": "K (m/day)",
+     "ST": 0.3857,
+     "group": "B"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.2428,
+     "group": "A"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.1672,
+     "group": "B"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.1324,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.275
+  },
+  {
+   "site": "jaduguda_deposit",
+   "species": "sulfate_mg_l",
+   "output": "affected_area_ha",
+   "top": [
+    {
+     "input": "K (m/day)",
+     "ST": 0.4181,
+     "group": "B"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.2133,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.1681,
+     "group": "B"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.147,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.337
+  },
+  {
+   "site": "jaduguda_deposit",
+   "species": "sulfate_mg_l",
+   "output": "compliance_conc",
+   "top": [
+    {
+     "input": "K (m/day)",
+     "ST": 0.7136,
+     "group": "B"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.3328,
+     "group": "B"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.3191,
+     "group": "A"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.3093,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.22
+  },
+  {
+   "site": "belt_point",
+   "species": "uranium_ppb",
+   "output": "max_migration_distance_m",
+   "top": [
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.2935,
+     "group": "A"
+    },
+    {
+     "input": "K (m/day)",
+     "ST": 0.2594,
+     "group": "B"
+    },
+    {
+     "input": "omega (matrix transfer, 1/day)",
+     "ST": 0.1791,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.1418,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.485
+  },
+  {
+   "site": "belt_point",
+   "species": "uranium_ppb",
+   "output": "affected_area_ha",
+   "top": [
+    {
+     "input": "SOURCE_BV_GAIN",
+     "ST": 0.5488,
+     "group": "A"
+    },
+    {
+     "input": "SOURCE_BV_REF",
+     "ST": 0.3734,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.0682,
+     "group": "B"
+    },
+    {
+     "input": "K (m/day)",
+     "ST": 0.0627,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.842
+  },
+  {
+   "site": "belt_point",
+   "species": "uranium_ppb",
+   "output": "compliance_conc",
+   "top": [
+    {
+     "input": "K (m/day)",
+     "ST": 0.647,
+     "group": "B"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.2738,
+     "group": "B"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.2718,
+     "group": "A"
+    },
+    {
+     "input": "omega (matrix transfer, 1/day)",
+     "ST": 0.25,
+     "group": "A"
+    }
+   ],
+   "share_group_A": 0.288
+  },
+  {
+   "site": "belt_point",
+   "species": "sulfate_mg_l",
+   "output": "max_migration_distance_m",
+   "top": [
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.3372,
+     "group": "A"
+    },
+    {
+     "input": "K (m/day)",
+     "ST": 0.2491,
+     "group": "B"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.2307,
+     "group": "B"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.1184,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.364
+  },
+  {
+   "site": "belt_point",
+   "species": "sulfate_mg_l",
+   "output": "affected_area_ha",
+   "top": [
+    {
+     "input": "SOURCE_BV_GAIN",
+     "ST": 0.2814,
+     "group": "A"
+    },
+    {
+     "input": "K (m/day)",
+     "ST": 0.2341,
+     "group": "B"
+    },
+    {
+     "input": "SOURCE_BV_REF",
+     "ST": 0.1857,
+     "group": "A"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.1672,
+     "group": "A"
+    }
+   ],
+   "share_group_A": 0.545
+  },
+  {
+   "site": "belt_point",
+   "species": "sulfate_mg_l",
+   "output": "compliance_conc",
+   "top": [
+    {
+     "input": "K (m/day)",
+     "ST": 0.504,
+     "group": "B"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.3945,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.2631,
+     "group": "B"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.2606,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.285
+  },
+  {
+   "site": "non_belt_ranchi",
+   "species": "uranium_ppb",
+   "output": "max_migration_distance_m",
+   "degenerate": true,
+   "note": "output constant over the whole design -- indices undefined (source term suppressed or output pinned)",
+   "top": [],
+   "share_group_A": null
+  },
+  {
+   "site": "non_belt_ranchi",
+   "species": "uranium_ppb",
+   "output": "affected_area_ha",
+   "degenerate": true,
+   "note": "output constant over the whole design -- indices undefined (source term suppressed or output pinned)",
+   "top": [],
+   "share_group_A": null
+  },
+  {
+   "site": "non_belt_ranchi",
+   "species": "uranium_ppb",
+   "output": "compliance_conc",
+   "top": [
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 1.0167,
+     "group": "A"
+    },
+    {
+     "input": "omega (matrix transfer, 1/day)",
+     "ST": 1.0027,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.9998,
+     "group": "B"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.9993,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.311
+  },
+  {
+   "site": "non_belt_ranchi",
+   "species": "sulfate_mg_l",
+   "output": "max_migration_distance_m",
+   "top": [
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.2825,
+     "group": "A"
+    },
+    {
+     "input": "C0 (source conc)",
+     "ST": 0.2809,
+     "group": "B"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.2395,
+     "group": "B"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.2308,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.25
+  },
+  {
+   "site": "non_belt_ranchi",
+   "species": "sulfate_mg_l",
+   "output": "affected_area_ha",
+   "top": [
+    {
+     "input": "C0 (source conc)",
+     "ST": 0.778,
+     "group": "B"
+    },
+    {
+     "input": "SOURCE_BV_GAIN",
+     "ST": 0.2502,
+     "group": "A"
+    },
+    {
+     "input": "SOURCE_BV_REF",
+     "ST": 0.1008,
+     "group": "A"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.0072,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.31
+  },
+  {
+   "site": "non_belt_ranchi",
+   "species": "sulfate_mg_l",
+   "output": "compliance_conc",
+   "top": [
+    {
+     "input": "K (m/day)",
+     "ST": 0.5755,
+     "group": "B"
+    },
+    {
+     "input": "beta (capacity ratio)",
+     "ST": 0.4912,
+     "group": "A"
+    },
+    {
+     "input": "Kd (L/kg)",
+     "ST": 0.4045,
+     "group": "B"
+    },
+    {
+     "input": "hydraulic gradient",
+     "ST": 0.3978,
+     "group": "B"
+    }
+   ],
+   "share_group_A": 0.31
+  }
+ ],
+ "figures": [
+  "sensitivity_jaduguda_deposit_uranium.png",
+  "sensitivity_jaduguda_deposit_sulfate.png",
+  "sensitivity_belt_point_uranium.png",
+  "sensitivity_belt_point_sulfate.png",
+  "sensitivity_non_belt_ranchi_uranium.png",
+  "sensitivity_non_belt_ranchi_sulfate.png"
+ ]
+}

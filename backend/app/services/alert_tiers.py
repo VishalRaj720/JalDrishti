@@ -187,7 +187,8 @@ def _iso(d: Any) -> Optional[str]:
 def explain_observed(*, breaches: list[dict[str, Any]], tier: str, rule: str,
                      block: str, district: Optional[str], well_name: Optional[str],
                      sampled_at: Any, source: str = "CGWB laboratory analysis",
-                     n_samples_at_well: Optional[int] = None) -> dict[str, Any]:
+                     n_samples_at_well: Optional[int] = None,
+                     qa: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
     """The seven fields for a measured exceedance."""
     lead = breaches[0]
     names = ", ".join(b["label"] for b in breaches)
@@ -234,6 +235,12 @@ def explain_observed(*, breaches: list[dict[str, Any]], tier: str, rule: str,
             "source": source, "sampled_at": when,
             "samples_at_this_well": n_samples_at_well,
             "single_sample": (n_samples_at_well or 1) <= 1,
+            # R17: the analysis's own internal consistency -- a flag, never a
+            # reason to drop the reading (services/hydrochem_qa.py)
+            "charge_balance": ({"qa_class": qa.get("qa_class"),
+                                "cbe_pct": qa.get("cbe_pct"),
+                                "ec_class": qa.get("ec_class")}
+                               if qa else None),
             "note": ("A laboratory result compared with a published limit. It "
                      "says nothing about exposure, treatment at the point of "
                      "use, or what anybody drinks; and with one sample there is "

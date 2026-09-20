@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import require_authenticated, require_staff
 from app.models.user import User
+from app.services import hydrochem_qa as hq
 from app.services import water_quality as wq
 
 router = APIRouter(prefix="/water-quality", tags=["Water quality"])
@@ -78,6 +79,9 @@ async def _load(db: AsyncSession, where: str = "", params: Optional[dict] = None
             "district_id": row["district_id"], "district": row["district_name"],
             "sampled_at": row["sampled_at"],
             "wqi": wq.wqi(row),
+            # R17: the analysis's own internal consistency (charge balance and
+            # ion-sum/EC), carried as a flag -- never used to drop a sample.
+            "qa": hq.assess(row),
             **assessed,
         })
     return out
@@ -255,6 +259,26 @@ async def blocks(
     out.sort(key=lambda b: (-b["above_permissible"], -b["any_exceedance"],
                             b["name"]))
     return {"blocks": out, "what_this_is": _DISCLAIMER}
+
+
+@router.get("/qa")
+async def hydrochemical_qa(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_staff),
+) -> dict[str, Any]:
+    """R17. Charge-balance and ion-sum/EC consistency of every analysis in the
+    measured record: counts by class, the error distribution, the worst
+    analyses named, and the independence check that says whether the balance
+    is a real check on this file at all (on the CGWB 2023 file it is not --
+    sodium reproduces the balance-implied value, so it was computed by
+    difference). Flags only; nothing is excluded."""
+    out = await hq.summary(db)
+    out["what_this_is"] = (
+        "Internal consistency of each laboratory analysis, judged by the "
+        "conventional charge-balance rule (Hem 1985; Freeze & Cherry 1979). A "
+        "flag means the analysis deserves a re-run, not that a reported value "
+        "is wrong; no sample is excluded from any band or alert because of it.")
+    return out
 
 
 @router.get("/well/{well_id}")

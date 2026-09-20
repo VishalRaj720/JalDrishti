@@ -61,6 +61,20 @@ const NUM: React.CSSProperties = {
  * The count stays printed in every cell. A heat map whose values live only in a
  * tooltip is a picture of data rather than data, and this table is cited.
  */
+interface HydrochemQA {
+  samples: number;
+  by_class: { balanced: number; questionable: number; suspect: number; incomplete: number };
+  ec_by_class: { consistent: number; inconsistent: number; incomplete: number };
+  cbe_distribution: { n: number; p05: number | null; p25: number | null; median: number | null;
+    p75: number | null; p95: number | null; mean_abs: number | null; sign_bias: number | null };
+  thresholds: { cbe_accept_pct: number; cbe_flag_pct: number; ec_ratio_band: [number, number] };
+  independence_check?: { tested: boolean; n?: number;
+    sodium_vs_balance_median_abs_mg_l?: number; sodium_within_2_mg_l_fraction?: number;
+    sodium_likely_computed_by_difference?: boolean; verdict?: string };
+  method: { references: string[]; policy: string };
+  worst: Array<{ well_name: string; district: string | null; cbe_pct: number; qa_class: string }>;
+}
+
 function CoverageGrid({ m }: { m: GapMatrix }) {
   const maxByDim: Record<string, number> = {};
   for (const d of m.dimensions) {
@@ -166,6 +180,14 @@ export default function DataGaps() {
     queryFn: () => api.get<Recommendations>("/data-gaps/recommendations?limit=20"),
   });
 
+  // R17: is each laboratory analysis internally consistent? Charge balance
+  // and ion-sum/EC, computed over the whole measured record -- and the
+  // independence check that says whether the balance is a real test here.
+  const qa = useQuery({
+    queryKey: ["hydrochem-qa"],
+    queryFn: () => api.get<HydrochemQA>("/water-quality/qa"),
+  });
+
   const maxScore = (recs.data?.recommendations ?? []).reduce(
     (mx, r) => Math.max(mx, r.score), 0);
 
@@ -216,6 +238,61 @@ export default function DataGaps() {
         ]}
         caption="The hatched share is the part of the state this platform cannot speak for."
       />
+
+      {/* ── the analyses themselves (R17) ──
+          Every major ion is measured, which is exactly what the conventional
+          charge-balance check needs. What it found is more useful than a count
+          of failures: the file balances by construction. */}
+      {qa.isLoading && <Loading label="Checking the analyses…" />}
+      <ErrorNote error={qa.error} />
+      {qa.data && (
+        <>
+          <SectionHead title="Are the analyses internally consistent?">
+            Charge balance (cations against anions, meq/L) and ion sum against
+            conductivity for every one of the {qa.data.samples} analyses. Flags travel
+            with the sample; nothing is excluded from a band or an alert because of them.
+          </SectionHead>
+          <Statement
+            eyebrow="Hydrochemical QA · charge balance"
+            line={qa.data.independence_check?.sodium_likely_computed_by_difference ? (
+              <>
+                <span className="hl warn">{qa.data.by_class.balanced}</span> of{" "}
+                {qa.data.samples} analyses balance within ±{qa.data.thresholds.cbe_accept_pct}% —
+                but sodium reproduces the balance-implied value, so the balance is a
+                consistency of construction, not an independent check.
+              </>
+            ) : (
+              <>
+                <span className="hl ok">{qa.data.by_class.balanced}</span> of{" "}
+                {qa.data.samples} analyses balance within ±{qa.data.thresholds.cbe_accept_pct}%;{" "}
+                <span className="hl warn">{qa.data.by_class.questionable}</span> questionable,{" "}
+                <span className="hl gap">{qa.data.by_class.suspect}</span> suspect.
+              </>
+            )}
+            sub={qa.data.independence_check?.verdict ?? qa.data.method.policy}
+          >
+            <Readout label="Balanced (≤5%)" value={qa.data.by_class.balanced} tone="ok" />
+            <Readout label="Questionable (5–10%)" value={qa.data.by_class.questionable}
+                     tone={qa.data.by_class.questionable ? "warn" : "ok"} />
+            <Readout label="Suspect (>10%)" value={qa.data.by_class.suspect}
+                     tone={qa.data.by_class.suspect ? "gap" : "ok"} />
+            <Readout label="Incomplete" value={qa.data.by_class.incomplete} tone="gap"
+                     sub="a major ion not reported" />
+            <Readout label="Ion sum vs EC inconsistent" value={qa.data.ec_by_class.inconsistent}
+                     tone={qa.data.ec_by_class.inconsistent ? "warn" : "ok"}
+                     sub={`band ${qa.data.thresholds.ec_ratio_band[0]}–${qa.data.thresholds.ec_ratio_band[1]}`} />
+            <Readout label="Mean |CBE|" value={`${qa.data.cbe_distribution.mean_abs ?? "–"}%`}
+                     sub={`p05 ${qa.data.cbe_distribution.p05 ?? "–"}% · p95 ${qa.data.cbe_distribution.p95 ?? "–"}%`} />
+          </Statement>
+          <div className="muted small" style={{ marginTop: -6, marginBottom: 12 }}>
+            {qa.data.independence_check?.tested && (
+              <>Sodium vs balance-implied sodium: median |Δ| {qa.data.independence_check.sodium_vs_balance_median_abs_mg_l} mg/L,{" "}
+                {Math.round((qa.data.independence_check.sodium_within_2_mg_l_fraction ?? 0) * 100)}% within 2 mg/L. </>
+            )}
+            Method: {qa.data.method.references.join("; ")}.
+          </div>
+        </>
+      )}
 
       {/* ── the deficiency matrix ──
           Counts alone are a statistic. Each column carries what it denies and

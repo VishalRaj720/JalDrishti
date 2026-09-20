@@ -326,8 +326,13 @@ class AlertService:
         # one, as before) is what makes the `warning` rung reachable: a well
         # between fluoride 1.0 and 1.5 mg/L is inside the standard's own
         # tolerated band and is told so, at that tier.
+        from app.services import hydrochem_qa as hq
         hd = tiers.health_determinands()
-        cols = ", ".join(f"ws.{d.column}" for d in hd)
+        # the health columns plus every major ion, so the sample's charge
+        # balance can travel with the alert as a confidence flag (R17)
+        ion_cols = sorted(set(hq.CATIONS) | set(hq.ANIONS) | {"ec_us_cm"})
+        cols = ", ".join(f"ws.{c}" for c in
+                         dict.fromkeys([d.column for d in hd] + ion_cols))
         where = " OR ".join(f"{d.column} > :lim_{d.key}" for d in hd)
         params: dict[str, Any] = {f"lim_{d.key}": float(d.acceptable) for d in hd}
         params["cap"] = limit
@@ -412,7 +417,8 @@ class AlertService:
                 breaches=breaches, tier=tier, rule=rule,
                 block=r["block_name"], district=r["district_name"],
                 well_name=r["well_name"], sampled_at=r["sampled_at"],
-                n_samples_at_well=int(r["n_samples"] or 1))
+                n_samples_at_well=int(r["n_samples"] or 1),
+                qa=hq.assess(r))
 
             res = await self.db.execute(text("""
                 INSERT INTO alerts (kind, block_id, headline, body, severity,
