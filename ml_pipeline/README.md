@@ -127,7 +127,20 @@ python -m ml_pipeline.validation.field_coverage --write-metrics
 # Keep the documented metrics equal to the deployed ones (they drifted three
 # times when hand-copied). tests/test_docs_in_sync.py fails if this is stale.
 python -m ml_pipeline.tools.sync_docs
+
+# R17 — global sensitivity of the plume outputs to the registered ungrounded
+# constants and the resolved hydrogeology, at three reference sites (Sobol +
+# OAT; ~3 min). Writes ml/artifacts/sensitivity.json + figures; never served.
+python -m ml_pipeline.validation.sensitivity --n 256
 ```
+
+**v4 artifacts (R17, 2026-09-20).** The served dual-porosity capacity ratio β is
+derived from each run's own porosities (`P.beta_from_porosities`), the training
+prior is log-uniform on [0.3, 20] and the Monte-Carlo band spans a factor of 4;
+`model_card.json` records the training-CSV SHA-256, the bake meta, the trainer
+commit and the regeneration commands, and `metrics.json` carries three baselines
+(mean, ridge, depth-1 stump) on the same GroupKFold folds. `LIMITATIONS.md` §1d has
+the before/after table.
 
 ### Phase 3 guardrails (v2 — enforced + honestly verified)
 - **No leakage, two skill numbers:** `GroupKFold(5)` on `scenario_id` (interpolation

@@ -395,7 +395,8 @@ often cap storage below what the seeded geodata needs — check before committin
 
 ## 8. Pre-deployment checklist
 
-- [ ] `alembic upgrade head` applied with `MIGRATION_DATABASE_URL` (head = `0023_breach_due_alert`)
+- [ ] `alembic upgrade head` applied with `MIGRATION_DATABASE_URL` (head = `0026_alert_tiers_explanation`)
+- [ ] After R17: `POST /api/v1/citizen/alerts/rebuild-explanations` once, as the admin, so alerts raised before migration `0026` carry tier, basis and the structured record (idempotent; sends no email). Stored runs made before R17 have no timeline frames and read as "not recorded"; re-run a site to obtain frames
 - [ ] `python -m scripts.create_app_role` run; `DATABASE_URL` points at `jaldrishti_app`
 - [ ] Startup log reads **`Row-level security active: 19 policies … (no bypass)`** — not `INERT`
 - [ ] `JWT_SECRET` and `JWT_REFRESH_SECRET` rotated to fresh random values

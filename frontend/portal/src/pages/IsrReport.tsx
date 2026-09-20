@@ -348,14 +348,24 @@ export default function IsrReport() {
                   <p>
                     <b>What decides the extent.</b> In fractured rock this engine retards
                     the plume by how much contaminant the rock matrix between fractures
-                    stores (the capacity ratio β, served here as{" "}
-                    {fmt((detail.data?.hydro as any)?.dual_porosity_beta, 0)}; effective
+                    stores (the capacity ratio β, here{" "}
+                    {fmt((detail.data?.hydro as any)?.dual_porosity_beta, 1)}
+                    {(detail.data?.hydro as any)?.beta_basis === "porosity_derived"
+                      ? ", derived from this site's own total and mobile porosities"
+                      : (detail.data?.hydro as any)?.beta_basis === "user_override"
+                        ? ", a user override" : ""}; effective
                     retardation {fmt((detail.data?.hydro as any)?.retardation_effective, 0)}×).
-                    No Jharkhand measurement constrains β, and the uncertainty band does
-                    not span it: with weaker matrix storage the same operation reaches
-                    tens to hundreds of metres. Read the figures above as the immobile
-                    end of a range this tool cannot yet bound — see{" "}
-                    <code>docs/LIMITATIONS.md</code> §1d.
+                    No Jharkhand measurement constrains β. The uncertainty band samples it
+                    over{" "}
+                    {(detail.data?.hydro as any)?.beta_band
+                      ? <>{fmt((detail.data?.hydro as any)?.beta_band[0], 2)}–{fmt((detail.data?.hydro as any)?.beta_band[1], 1)}</>
+                      : "a factor of four either side"}
+                    {" "}— four times more or four times less matrix storage than the
+                    porosities imply — so the P10–P90 band is where the extent's
+                    structural uncertainty is expressed; the central figure is not the
+                    immobile end of the range, as it was before the September 2026
+                    retrain. Hydraulic conductivity and β carry most of the extent's
+                    variance (<code>docs/LIMITATIONS.md</code> §1d, §1e).
                   </p>
                 )}
                 <p>

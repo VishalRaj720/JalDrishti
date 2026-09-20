@@ -192,7 +192,7 @@ Still locally, still pointed at Neon:
 
 ```bash
 cd backend
-alembic upgrade head          # head is 0024_drop_vestigial_sim
+alembic upgrade head          # head is 0026_alert_tiers_explanation
 python -m scripts.init_db     # enum types
 python -m scripts.seed        # districts, blocks, wells, 397 samples, ISR points
 ```

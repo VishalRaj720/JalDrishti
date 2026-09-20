@@ -350,6 +350,9 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `PUT /api/v1/users/{user_id}` | ● | · | · | · | · |
 | `GET /api/v1/water-quality/blocks` | ● | ● | ● | ● | · |
 | `GET /api/v1/water-quality/districts` | ● | ● | ● | ● | · |
+| `GET /api/v1/water-quality/history` | ● | ● | ● | ● | · |
+| `GET /api/v1/water-quality/history/well/{well_name}` | ● | ● | ● | ● | · |
+| `GET /api/v1/water-quality/qa` | ● | ● | ● | ● | · |
 | `GET /api/v1/water-quality/standard` | ● | ● | ● | ● | ● |
 | `GET /api/v1/water-quality/well/{well_id}` | ● | ● | ● | ● | · |
 | `GET /api/v1/water-quality/wells` | ● | ● | ● | ● | · |
@@ -360,7 +363,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 123/139 · **regulator** 82/139 · **analyst** 84/139 · **field_officer** 71/139 · **citizen** 18/139
+Reachable endpoints per role — **admin** 126/142 · **regulator** 85/142 · **analyst** 87/142 · **field_officer** 74/142 · **citizen** 18/142
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

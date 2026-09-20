@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-20T12:12:49Z",
+ "generated_at": "2026-09-20T12:36:48Z",
  "method": {
   "oat_points": 7,
   "sobol_n_base": 256,
@@ -1064,7 +1064,7 @@
      }
     }
    },
-   "seconds": 22.2
+   "seconds": 22.3
   },
   {
    "site": "jaduguda_deposit",
@@ -3092,7 +3092,7 @@
      }
     }
    },
-   "seconds": 20.7
+   "seconds": 21.0
   },
   {
    "site": "belt_point",
@@ -4068,7 +4068,7 @@
      }
     }
    },
-   "seconds": 25.6
+   "seconds": 26.3
   },
   {
    "site": "non_belt_ranchi",
@@ -5088,41 +5088,42 @@
      "compliance_conc": {
       "log_transformed": false,
       "variance": 4.9e-05,
-      "degenerate": false,
+      "degenerate": true,
       "S1": {
-       "beta (capacity ratio)": -0.05,
-       "omega (matrix transfer, 1/day)": -0.05,
-       "fracture aperture (m)": 0.0,
-       "matrix De (m2/day)": 0.0,
-       "SOURCE_BV_GAIN": 0.0,
-       "SOURCE_BV_REF": 0.0,
-       "INCREMENTAL_FLOOR": 0.0,
-       "K (m/day)": -0.05,
-       "hydraulic gradient": -0.05,
-       "mobile porosity": -0.05,
-       "Kd (L/kg)": -0.05,
-       "C0 (source conc)": 1.0,
-       "U attenuation k (1/yr)": 1.0
+       "beta (capacity ratio)": null,
+       "omega (matrix transfer, 1/day)": null,
+       "fracture aperture (m)": null,
+       "matrix De (m2/day)": null,
+       "SOURCE_BV_GAIN": null,
+       "SOURCE_BV_REF": null,
+       "INCREMENTAL_FLOOR": null,
+       "K (m/day)": null,
+       "hydraulic gradient": null,
+       "mobile porosity": null,
+       "Kd (L/kg)": null,
+       "C0 (source conc)": null,
+       "U attenuation k (1/yr)": null
       },
       "ST": {
-       "beta (capacity ratio)": 1.0167,
-       "omega (matrix transfer, 1/day)": 1.0027,
-       "fracture aperture (m)": 0.0,
-       "matrix De (m2/day)": 0.0,
-       "SOURCE_BV_GAIN": 0.0,
-       "SOURCE_BV_REF": 0.0,
-       "INCREMENTAL_FLOOR": 0.0,
-       "K (m/day)": 0.9414,
-       "hydraulic gradient": 0.9998,
-       "mobile porosity": 0.9952,
-       "Kd (L/kg)": 0.9993,
-       "C0 (source conc)": 0.3589,
-       "U attenuation k (1/yr)": 0.1716
-      }
+       "beta (capacity ratio)": null,
+       "omega (matrix transfer, 1/day)": null,
+       "fracture aperture (m)": null,
+       "matrix De (m2/day)": null,
+       "SOURCE_BV_GAIN": null,
+       "SOURCE_BV_REF": null,
+       "INCREMENTAL_FLOOR": null,
+       "K (m/day)": null,
+       "hydraulic gradient": null,
+       "mobile porosity": null,
+       "Kd (L/kg)": null,
+       "C0 (source conc)": null,
+       "U attenuation k (1/yr)": null
+      },
+      "note": "output stays within 3 of its floor 0.65 over the whole design (below the engine's attribution floor) -- indices undefined"
      }
     }
    },
-   "seconds": 17.9
+   "seconds": 18.1
   },
   {
    "site": "non_belt_ranchi",
@@ -6098,7 +6099,7 @@
      }
     }
    },
-   "seconds": 22.9
+   "seconds": 23.1
   }
  ],
  "summary": [
@@ -6460,29 +6461,10 @@
    "site": "non_belt_ranchi",
    "species": "uranium_ppb",
    "output": "compliance_conc",
-   "top": [
-    {
-     "input": "beta (capacity ratio)",
-     "ST": 1.0167,
-     "group": "A"
-    },
-    {
-     "input": "omega (matrix transfer, 1/day)",
-     "ST": 1.0027,
-     "group": "A"
-    },
-    {
-     "input": "hydraulic gradient",
-     "ST": 0.9998,
-     "group": "B"
-    },
-    {
-     "input": "Kd (L/kg)",
-     "ST": 0.9993,
-     "group": "B"
-    }
-   ],
-   "share_group_A": 0.311
+   "degenerate": true,
+   "note": "output stays within 3 of its floor 0.65 over the whole design (below the engine's attribution floor) -- indices undefined",
+   "top": [],
+   "share_group_A": null
   },
   {
    "site": "non_belt_ranchi",

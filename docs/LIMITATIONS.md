@@ -306,10 +306,28 @@ it at the source level instead, and says so.
 
 ## 3. Data gaps that shape what the product may claim
 
-- **CGWB chemistry has no temporal replicates.** 397 wells, **one sample each, one year,
-  zero repeats.** This is what blocks NUREG-1569's preferred statistical UCL rules.
-  Substituting regional *spatial* spread was tested and **rejected**: sd(TDS) = 286.5
-  gives a UCL of 1,965 mg/L, near the BIS limit itself.
+- **The 2023 CGWB chemistry file has no temporal replicates.** 397 wells, **one sample
+  each, one year, zero repeats.** Substituting regional *spatial* spread was tested and
+  **rejected**: sd(TDS) = 286.5 gives a UCL of 1,965 mg/L, near the BIS limit itself.
+  **Partly closed for the general chemistry (R17):** the CGWB 2000–2021 record
+  (National Water Data Portal, `Datasets/cgwb_gwq_chemical_jharkhand_2000_2021.csv`)
+  gives 244 of the platform's wells two or more sampling years for EC, chloride,
+  sulphate (46 % of analyses), bicarbonate, hardness and the major cations —
+  enough for a per-station baseline mean and sd, and a Theil-Sen trend where a
+  station clears ≥ 4 analyses over ≥ 3 years (`services/chemistry_history.py`,
+  `GET /water-quality/history`). **It carries no fluoride, nitrate, iron, arsenic
+  or manganese and two uranium values**, so trend forecasting for any health
+  determinand the platform bands or alerts on remains undemonstrated, and the record
+  is read-only: no band and no alert uses it.
+- **The 2023 file balances by construction.** 393 of 393 computable analyses have a
+  charge-balance error within ±3.2 %, and sodium reproduces the balance-implied value
+  to within rounding (65 % within 2 mg/L) — consistent with sodium computed by
+  difference and hardness from Ca/Mg. The charge balance is therefore **not an
+  independent check** on that file, and its zero suspect analyses are not evidence of
+  laboratory quality (`services/hydrochem_qa.py`, `GET /water-quality/qa`). The
+  2000–2021 record does *not* balance by construction (127 of 753 computable analyses
+  suspect) and the check is real there. Nothing is excluded on a QA flag; the flag
+  travels with the sample.
 - **C₀ rests on n = 9 measurements at 7 Texas mines** and scales the concentration field
   linearly. Reported alongside the answer rather than buried.
 - **Sampled ≠ analysed for uranium.** Three districts (East Singhbum 28/28, Saraikela
@@ -740,6 +758,42 @@ named `Isr1`, `Try1` and `try2` sat on the public map.
 
 ---
 
+## 4h. R17 (2026-09-20) — the pre-report pass
+
+Five items from `docs/PRE_REPORT_AUDIT_AND_PLAN.md`, implemented and verified;
+`docs/PROJECT_FREEZE.md` is the factual record for the report. Findings worth a
+line here rather than in a changelog:
+
+* **The β retrain** (§1d, closed) moved the Jaduguda uranium extent from ~11 m to
+  ~21 m and the sulfate extent from ~32 m to ~73 m at 20 yr; the P90 band now
+  reaches ~100 m (U) and ~470 m (SO₄). The published footprint still intersects
+  blocks on the central contour, so alert counts did not change; the P90 envelope
+  raises a separate `possible_reach` alert at *warning*.
+* **Alert tiers use IS 10500's own two limits.** *Warning* = above acceptable within
+  permissible; *alert* = above permissible or above acceptable where the standard
+  allows no relaxation; *critical* = ≥ 2× the alert limit or ≥ 2 health determinands
+  over their limit at one well — the one **project-defined** rung, labelled as such
+  in the rule text stored on every row. A modelled result can never be critical
+  (`ck_modelled_never_critical`). Selecting on the acceptable limit made the warning
+  rung reachable: **21 wells** between fluoride 1.0 and 1.5 mg/L that the old scan
+  (permissible only) never raised. On the local record: 3 critical, 29 alert,
+  21 warning measured alerts.
+* **The fourth instance of the RLS-after-COMMIT class** (§1c): an upsert needs an
+  UPDATE policy, and `alerts` had none. Refused on the first rebuild against a real
+  database, invisible to the suite. Migration `0026` adds `alerts_update`.
+* **Timeline frames** are separate engine evaluations at up to ~15 horizons, stored
+  on the run; a run stored before R17 reads as *not recorded*. The ML band is
+  evaluated per frame but not drawn at intermediate horizons on the console, because
+  the band ellipses belong to the run's own horizon.
+* **Sensitivity** (§1e): K first, β second, then gradient and Kd; the fracture
+  aperture, De and ω contribute ≈ 0 to the plan-view outputs at 20 yr; the leach-disc
+  growth constants govern the footprint area. Uranium at a non-ore pin is constant
+  over the whole design (source suppressed) and is reported as degenerate, not as an
+  index.
+* **The charge balance finding** (§3): the 2023 file balances by construction.
+
+---
+
 ## 4a. The aquifer-reach alert, and what bounds it
 
 Publishing now raises a second kind of alert — `aquifer_pathway` — for blocks
@@ -835,7 +889,16 @@ presentation:
 - **The level trends are not a forecast.** Theil-Sen describes what the
   measurements did between 2013 and 2021. Nothing is extrapolated forward, and a
   station with fewer than 8 readings or under 3 years of record gets no trend at
-  all rather than an uncertain one.
+  all rather than an uncertain one. **The same holds for the 2000–2021 chemistry
+  trends (R17)**: general chemistry only, no health determinand, nothing
+  forecast, and a station under 4 analyses or 3 years is a baseline, not a trend.
+- **A timeline is not a prediction of when.** Frames are separate engine
+  evaluations at fixed horizons; "first exceedance at the 8-year frame" means the
+  crossing lies between the 5- and 8-year evaluations of a hypothetical scenario,
+  not that anything will happen in year 8.
+- **An alert tier is not a health determination.** *Critical* is a project-defined
+  multiple of a published limit at one well on one sample; it says nothing about
+  exposure.
 - **The IS 10500 assessment is not a health determination.** It compares a
   laboratory value with a published limit. It says nothing about exposure,
   duration, treatment at the point of use, or what anybody actually drinks.

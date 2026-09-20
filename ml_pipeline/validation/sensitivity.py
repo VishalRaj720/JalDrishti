@@ -246,9 +246,17 @@ def _elasticity(d, base_inputs, defs, served, k, eps=0.05) -> float | None:
                        / (math.log(1 + eps) - math.log(1 - eps))), 3)
 
 
-def sobol(base_inputs: dict, defs: list[dict[str, Any]], n: int, seed: int = 7
-          ) -> dict[str, Any]:
-    """Saltelli design; Jansen estimators for S1 and ST."""
+def sobol(base_inputs: dict, defs: list[dict[str, Any]], n: int, seed: int = 7,
+          pins: dict[str, float] | None = None) -> dict[str, Any]:
+    """Saltelli design; Jansen estimators for S1 and ST.
+
+    `pins` names outputs pinned at a floor, as (floor, tolerance): when the
+    output never rises more than `tolerance` above the floor over the whole
+    design, the variance is a wiggle on a constant and the indices are
+    reported as undefined rather than as noise. For the ring concentration the
+    floor is the background and the tolerance is the engine's own attribution
+    floor, INCREMENTAL_FLOOR x threshold -- variation the engine itself does
+    not count as an exceedance."""
     D = len(defs)
     U = _sobol_matrix(n, 2 * D, seed)
     A, B = U[:, :D], U[:, D:]
@@ -280,8 +288,15 @@ def sobol(base_inputs: dict, defs: list[dict[str, Any]], n: int, seed: int = 7
         # DEGENERATE: the output does not vary over the design (e.g. uranium
         # at a non-ore pin, where the source term is clamped to background).
         # A Sobol index of a constant is 0/0; report that, never a number.
+        # a relative spread under 0.1 % of the median is a constant output for
+        # every purpose here (the engine's grid resolution is coarser than that)
         spread = float(np.max(y_all) - np.min(y_all))
-        degenerate = (var <= 1e-12) or (spread <= 1e-9 * max(abs(float(np.max(y_all))), 1e-12))
+        scale = max(abs(float(np.median(y_all))), 1e-12)
+        degenerate = (var <= 1e-12) or (spread / scale < 1e-3)
+        pin = (pins or {}).get(k)
+        pinned = (pin is not None
+                  and float(np.max(y_all)) - float(pin[0]) <= float(pin[1]))
+        degenerate = degenerate or pinned
         rec = {"log_transformed": bool(use_log), "variance": round(float(var), 6),
                "degenerate": bool(degenerate), "S1": {}, "ST": {}}
         for i, d in enumerate(defs):
@@ -295,7 +310,10 @@ def sobol(base_inputs: dict, defs: list[dict[str, Any]], n: int, seed: int = 7
             rec["S1"][d["name"]] = round(max(min(s1, 1.0), -0.05), 4)
             rec["ST"][d["name"]] = round(max(min(st, 1.5), 0.0), 4)
         if degenerate:
-            rec["note"] = ("output constant over the whole design -- indices undefined "
+            rec["note"] = (f"output stays within {pin[1]:g} of its floor {pin[0]:g} over "
+                           f"the whole design (below the engine's attribution floor) -- "
+                           f"indices undefined" if pinned else
+                           "output constant over the whole design -- indices undefined "
                            "(source term suppressed or output pinned)")
         out["indices"][k] = rec
     return out
@@ -314,7 +332,9 @@ def run_site(site_key: str, species: str, n: int) -> dict[str, Any]:
     served = {d["name"]: d["served"] for d in defs}
     t0 = time.time()
     o = oat(inputs, defs, served)
-    s = sobol(inputs, defs, n)
+    thr = P.EXCURSION_THRESHOLDS[species]
+    s = sobol(inputs, defs, n, pins={"compliance_conc": (
+        float(inputs["background_conc_Cb"]), float(P.INCREMENTAL_FLOOR) * thr)})
     return {
         "site": site_key, "label": site["label"], "species": species,
         "regime": inputs["regime"], "ore_zone": (hydro.get("ore_zone") or {}).get("zone"),

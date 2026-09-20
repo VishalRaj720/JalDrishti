@@ -26,13 +26,33 @@ decision-support prototype.
 
 | Part | What it is | State |
 |---|---|---|
-| `ml_pipeline/` | The physics + ML engine. Domenico/Ogata-Banks transport, Tang matrix diffusion, dual-porosity retardation; XGBoost P10/P50/P90 heads with Mondrian split-conformal calibration | **338 tests.** Transport kernel benchmarked against an exact solution; bands validated on the serving distribution |
-| `backend/` | FastAPI + PostgreSQL/PostGIS. JWT + 5-role RBAC with Postgres row-level security, provenance spine, immutable audit log, field-observation review, dataset sync, IS 10500 water-quality assessment, groundwater level trends | **402 tests.** Runs the real engine; every stored run pins model card, artifact bundle and git SHA |
+| `ml_pipeline/` | The physics + ML engine. Domenico/Ogata-Banks transport, Tang matrix diffusion, dual-porosity retardation; XGBoost P10/P50/P90 heads with Mondrian split-conformal calibration | **368 tests.** Transport kernel benchmarked against an exact solution; bands validated on the serving distribution |
+| `backend/` | FastAPI + PostgreSQL/PostGIS. JWT + 5-role RBAC with Postgres row-level security, provenance spine, immutable audit log, field-observation review, dataset sync, IS 10500 water-quality assessment, groundwater level trends | **518 tests.** Runs the real engine; every stored run pins model card, artifact bundle and git SHA |
 | `frontend/portal/` | The portal SPA — Vite + React 18 + TypeScript + Leaflet | Typechecks and builds clean |
 
 **The engine is the authority.** The ML surrogate was trained on that engine's own output,
 so it cannot be more accurate than it — it contributes calibrated uncertainty bands.
 Every number in the UI says which engine produced it.
+
+**R17 (2026-09-20), the pre-report pass** — recorded in
+[`docs/PROJECT_FREEZE.md`](docs/PROJECT_FREEZE.md), the factual source for the
+technical report:
+
+- the dual-porosity capacity ratio **β is derived from each run's own porosities**
+  (3.0 at Jaduguda; the v3 engine served a literature mean of 10) with a log-uniform
+  [0.3, 20] training prior and a factor-4 Monte-Carlo band; v4 artifacts, every gate
+  passing, baselines and provenance in the model card;
+- **alerts carry a tier** (notice / warning / alert / critical) on IS 10500's own two
+  limits, a basis (observed / modelled) and a seven-field explanation; a modelled
+  result can never be critical (database CHECK); a `possible_reach` kind tells blocks
+  inside the P90 envelope;
+- **timeline frames** on every stored run — the engine evaluated at each horizon,
+  nothing interpolated — with a scrub/play control and the first-exceedance year;
+- **hydrochemical QA** (charge balance, ion-sum/EC) on every analysis, and the finding
+  that the 2023 file balances by construction; a **global sensitivity analysis**
+  (`ml_pipeline/validation/sensitivity.py`) over the ungrounded constants;
+- the **CGWB 2000–2021 chemistry record** (NWDP open data) read alongside the 2023
+  file, for the general chemistry only — it carries none of the health determinands.
 
 ## Documentation
 
@@ -43,6 +63,9 @@ because `tools/sync_docs.py`, `validation/end_to_end_audit.py` and
 | Read this | For |
 |---|---|
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | **What this system does not know.** Open findings, permanent blockers, claims not to make |
+| [`docs/PROJECT_FREEZE.md`](docs/PROJECT_FREEZE.md) | **The frozen state (R17, 2026-09-20)** — verification record, final models, assumptions, limitations and the Project Completion Matrix; the factual source for the technical report |
+| [`docs/PRE_REPORT_AUDIT_AND_PLAN.md`](docs/PRE_REPORT_AUDIT_AND_PLAN.md) | The audit that preceded the freeze: what was weak, what was built, what was rejected and why |
+| [`docs/TECHNICAL_REPORT_STRUCTURE.md`](docs/TECHNICAL_REPORT_STRUCTURE.md) | The report's contract: sections, evidence map, allowed and forbidden claims |
 | [`docs/PRODUCT_DESIGN.md`](docs/PRODUCT_DESIGN.md) | How the three components become one product |
 | [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | **The eight-minute walkthrough** for a review panel — one storyline, every screen in order |
 | [`docs/DEPLOY_WALKTHROUGH.md`](docs/DEPLOY_WALKTHROUGH.md) | **Start here to deploy.** The click-by-click: which site, what to type, what to check |
@@ -198,7 +221,10 @@ and **not in production** unless `DOCS_ENABLED=true`.
 `/water-quality/*` assesses every measured determinand against **IS 10500:2012**,
 and `/groundwater/*` reports Theil-Sen level trends over the 2013-2021 CGWB
 station record. Both read data the platform was already collecting; neither
-involves the model, and neither predicts anything.
+involves the model, and neither predicts anything. `/water-quality/qa` is the
+charge-balance and ion-sum/EC check on every analysis (R17), and
+`/water-quality/history` the CGWB 2000–2021 chemistry record matched to the 2023
+wells — read-only, general chemistry only.
 
 **The citizen surface bands on health, not on uranium (R14).** `/public/risk/*`
 judges a block on every measured health-significant determinand — uranium,
@@ -309,7 +335,7 @@ JalDrishti/
 ├── frontend/
 │   ├── portal/           The portal SPA — Vite + React + TS + Leaflet (22 screens)
 │   └── ml_pipeline/      Vanilla JS + Leaflet UI for the engine's own dashboard
-├── Datasets/             Jharkhand geology, water quality/levels, rivers, DEM, NAQUIM refs
+├── Datasets/             Jharkhand geology, water quality/levels (2023 + CGWB 2000–2021), rivers, DEM, NAQUIM refs
 ├── fetch_data/           Download/ETL scripts for those datasets
 ├── utilities/            One-off GeoJSON/CSV/PDF prep helpers
 ├── docs/                 All tracked documentation (local/ is untracked)
@@ -325,3 +351,6 @@ JalDrishti/
 - **"No data" is a monitoring gap, never a clean result.**
 - **A retrain must be followed by `sync_docs`.** Never fix a stale metrics block by
   editing the prose number.
+- **Migration head is `0026_alert_tiers_explanation`.** After deploying R17, run
+  `alembic upgrade head`, then `POST /citizen/alerts/rebuild-explanations` once (admin)
+  so alerts raised before R17 carry their tier, basis and structured record.
