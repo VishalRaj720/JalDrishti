@@ -642,6 +642,48 @@ async def public_advisories(response: Response,
     return {"count": len(out), "advisories": out}
 
 
+@router.get("/advisories/{advisory_id}/timeline")
+async def public_advisory_timeline(advisory_id: uuid.UUID, response: Response,
+                                   db: AsyncSession = Depends(get_db)):
+    """R17. The stored timeline frames behind a PUBLISHED screening, in the
+    public subset (`timeline.public_view`): the screening-limit contour and
+    source zone per frame -- geometry the published footprint already reveals
+    -- the metrics, the phases and the first-exceedance years. No model
+    internals, no ISR coordinate.
+
+    The run is RLS-protected and an anonymous session reads nothing from it,
+    so the frames are fetched under the system context in their own session,
+    exactly as `citizen._published_run_detail` does and with the same bound:
+    only an advisory whose `status` is already `published`.
+    """
+    from app.database import AsyncSessionLocal, set_rls_context
+    from app.services import timeline as _tl
+    response.headers["Cache-Control"] = "public, max-age=300"
+    pub = (await db.execute(text("""
+        SELECT id::text AS id, run_id::text AS run_id, species
+        FROM advisories WHERE id = :aid AND status = 'published'
+    """), {"aid": str(advisory_id)})).mappings().first()
+    if pub is None:
+        raise HTTPException(404, "no published screening with that id")
+    async with AsyncSessionLocal() as adb:
+        await set_rls_context(adb, bypass=True)
+        row = (await adb.execute(text("""
+            SELECT plume -> 'frames' AS timeline FROM simulation_runs
+            WHERE id = :rid
+        """), {"rid": pub["run_id"]})).mappings().first()
+    tl = row["timeline"] if row else None
+    if isinstance(tl, str):
+        import json as _json
+        tl = _json.loads(tl)
+    if not tl:
+        return {"recorded": False, "advisory_id": pub["id"],
+                "reason": ("The run behind this screening was stored before "
+                           "timeline frames were recorded. Its published result "
+                           "is unaffected; absence of frames is not a finding "
+                           "of no change over time.")}
+    return {"advisory_id": pub["id"], **_tl.public_view(tl)}
+
+
 @router.get("/{district_id}")
 async def district_detail(district_id: uuid.UUID, response: Response,
                           db: AsyncSession = Depends(get_db)):

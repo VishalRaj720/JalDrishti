@@ -317,6 +317,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `GET /api/v1/monitoring-wells` | ● | ● | ● | ● | · |
 | `POST /api/v1/monitoring-wells` | ● | · | ● | · | · |
 | `GET /api/v1/public/risk/advisories` | ○ | ○ | ○ | ○ | ○ |
+| `GET /api/v1/public/risk/advisories/{advisory_id}/timeline` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/at` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/blocks/at` | ○ | ○ | ○ | ○ | ○ |
 | `GET /api/v1/public/risk/blocks/search` | ○ | ○ | ○ | ○ | ○ |
@@ -336,6 +337,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 | `POST /api/v1/simulations/reap` | ● | · | · | · | · |
 | `GET /api/v1/simulations/runs` | ● | ● | ● | ● | · |
 | `GET /api/v1/simulations/runs/{run_id}` | ● | ● | ● | ● | · |
+| `GET /api/v1/simulations/runs/{run_id}/timeline` | ● | ● | ● | ● | · |
 | `POST /api/v1/simulations/{isr_id}` | ● | ● | ● | · | · |
 | `POST /api/v1/simulations/{isr_id}/lifecycle` | ● | ● | ● | · | · |
 | `POST /api/v1/simulations/{isr_id}/preview` | ● | ● | ● | · | · |
@@ -358,7 +360,7 @@ Generated — do not edit by hand. Regenerate with `python -m scripts.authz_matr
 
 **● = permitted · `·` = 403 · ○ = no authentication required**
 
-Reachable endpoints per role — **admin** 122/137 · **regulator** 81/137 · **analyst** 83/137 · **field_officer** 70/137 · **citizen** 18/137
+Reachable endpoints per role — **admin** 123/139 · **regulator** 82/139 · **analyst** 84/139 · **field_officer** 71/139 · **citizen** 18/139
 
 <!-- END GENERATED AUTHZ MATRIX -->
 

@@ -441,6 +441,40 @@ export interface Subscription {
   id: string; name: string; district: string | null; created_at: string;
 }
 
+/** One evaluated horizon of a stored run (R17). Every field is the engine's
+ *  own result at `year`; nothing is interpolated between frames. */
+export interface TimelineFrame {
+  year: number;
+  phase: string;
+  calendar_date?: string | null;
+  contours?: number[][][];
+  source_zone?: number[][] | null;
+  source_conc?: number | null;
+  area_ha?: number | null;
+  migration_m?: number | null;
+  compliance_conc?: number | null;
+  excursion_probability?: number | null;
+  excursion_declared?: boolean;
+  ml_migration_band?: { p10: number; p50: number; p90: number } | null;
+  extrapolating?: boolean;
+  extrapolation?: string[];
+  error?: string;
+}
+
+export interface RecordedTimeline {
+  recorded: true; run_id?: string; advisory_id?: string;
+  species: string; threshold: number | null; monitor_ring_m: number | null;
+  horizon_years: number; operation_years: number; restoration_years: number;
+  years: number[]; frames: TimelineFrame[];
+  frame_errors?: number;
+  first_exceedance_year: number | null; first_excursion_year: number | null;
+  note?: string; premise?: string;
+}
+
+export type RunTimeline =
+  | { recorded: false; reason: string; run_id?: string; advisory_id?: string }
+  | RecordedTimeline;
+
 export type AlertTier = "notice" | "warning" | "alert" | "critical";
 
 /** The structured explanation every alert carries since R17 (migration 0026).

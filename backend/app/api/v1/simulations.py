@@ -403,6 +403,26 @@ async def get_run(
     return out
 
 
+@router.get("/runs/{run_id}/timeline")
+async def get_run_timeline(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_staff),
+):
+    """R17. The stored timeline frames of a run, or an explicit "not recorded"
+    for a run stored before frames existed. Never a 404 for the latter: the
+    absence is a fact about the record, not a missing resource."""
+    from app.services import timeline as _tl
+    try:
+        run = await SimulationRunService(db).get(run_id)
+    except AppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    tl = (run.plume or {}).get("frames") if isinstance(run.plume, dict) else None
+    if not tl:
+        return _tl.not_recorded(run)
+    return {"recorded": True, "run_id": str(run.id), "species": run.species, **tl}
+
+
 @router.get("/runs", response_model=list[RunResponse])
 async def list_runs(
     isr_id: uuid.UUID = Query(...),

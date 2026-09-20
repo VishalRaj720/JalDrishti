@@ -48,6 +48,8 @@ import {
 import RegisterForm from "../console/RegisterForm";
 import SiteEditForm from "../console/SiteEditForm";
 import RunResult from "../console/RunResult";
+import TimelineControl, { useRunTimeline } from "../console/TimelineControl";
+import type { TimelineFrame } from "../api/client";
 import SweepChart, { type Sweep } from "../console/SweepChart";
 import ProposeAdvisory from "../console/ProposeAdvisory";
 import PublishFromPreview from "../console/PublishFromPreview";
@@ -594,6 +596,33 @@ export default function Console() {
   const previewPlume = useMemo(
     () => (preview ? storedRunToPlume(preview) : null), [preview]);
 
+  // R17: timeline frames of the stored run. While a frame other than the
+  // run's own horizon is selected, the map draws THAT frame's screening-limit
+  // contour and source zone through the same renderer, with no ML envelope:
+  // the band ellipses belong to the run's horizon, and drawing them at year 3
+  // would show something the model did not evaluate there.
+  const timeline = useRunTimeline({
+    runId: mode === "site" && showStored && activeRun?.status === "completed" ? activeRun.id : null,
+  });
+  const [frame, setFrame] = useState<TimelineFrame | null>(null);
+  const onFrame = useCallback((f: TimelineFrame | null) => setFrame(f), []);
+  useEffect(() => { setFrame(null); }, [activeRun?.id, showStored, mode]);
+  const framePlume = useMemo(() => {
+    if (!frame || !storedPlume) return null;
+    return {
+      ...storedPlume,
+      ml_envelope: null,
+      plume: {
+        ...storedPlume.plume,
+        contours: [{ level: storedPlume.threshold, is_bis: true, polygons: frame.contours ?? [] }],
+        source_zone: storedPlume.plume?.source_zone
+          ? { ...storedPlume.plume.source_zone, polygon: frame.source_zone ?? null,
+              conc: frame.source_conc, above_threshold: (frame.area_ha ?? 0) > 0 }
+          : null,
+      },
+    };
+  }, [frame, storedPlume]);
+
   useEffect(() => {
     const g = plumeGroup.current;
     if (!g) return;
@@ -601,10 +630,10 @@ export default function Console() {
     // and a stored run. They must never look different from each other, because
     // a visual difference would read as a physics difference.
     const r = mode === "pin" ? live
-      : mode === "site" ? (showStored ? storedPlume : previewPlume)
+      : mode === "site" ? (showStored ? (framePlume ?? storedPlume) : previewPlume)
       : null;
     if (!r) { g.clearLayers(); lastFitted.current = null; return; }
-    drawPlume(g, r, showBands);
+    drawPlume(g, r, framePlume ? false : showBands);
 
     // Bring the result into view the FIRST time each result is drawn. A
     // typical footprint is a few hectares — a few hundred metres across — and
@@ -620,7 +649,7 @@ export default function Console() {
       g.eachLayer((l: any) => { if (typeof l.getBounds === "function") b.extend(l.getBounds()); });
       if (b.isValid()) m.fitBounds(b.pad(0.5), { maxZoom: 15 });
     }
-  }, [mode, live, storedPlume, previewPlume, showStored, showBands]);
+  }, [mode, live, storedPlume, previewPlume, framePlume, showStored, showBands]);
 
   // The direction the plume travels, drawn on the map. The engine has always
   // returned `azimuth_deg`; the portal showed it as a number for an
@@ -1223,6 +1252,9 @@ This also destroys ${n} stored run(s) `
           {activeRun?.status === "completed" && storedPlume && (
             <>
               <RunResult r={storedPlume} extrapolation={activeRun.extrapolation ?? []} />
+              <div className="card-title" style={{ marginTop: 12 }}>Over time</div>
+              {timeline.isLoading && <Loading label="Loading frames…" />}
+              <TimelineControl tl={timeline.data} onFrame={onFrame} />
               <div className="sec">Provenance — how to re-derive this number</div>
               <dl className="kv">
                 <dt>Run id</dt><dd className="mono">{activeRun.id.slice(0, 18)}…</dd>

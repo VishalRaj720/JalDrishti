@@ -36,6 +36,7 @@ import {
 import { canRunSim, useAuth } from "../auth";
 import { ErrorNote, Loading, TableScroll } from "../components/bits";
 import LifecycleChart, { LifecycleNarrative } from "../console/LifecycleChart";
+import { TimelineStrip, useRunTimeline } from "../console/TimelineControl";
 import SweepChart, { type Sweep } from "../console/SweepChart";
 import ReportMap from "../console/ReportMap";
 import RunResult from "../console/RunResult";
@@ -74,6 +75,10 @@ export default function IsrReport() {
     queryKey: ["runs", siteId], enabled: !!siteId,
     queryFn: () => api.get<SimRun[]>(`/simulations/runs?isr_id=${siteId}&limit=10`),
   });
+  // R17: the most recent completed run's evaluated frames -- the figure that
+  // shows the plume change over time from numbers the engine produced.
+  const latestRun = (runs.data ?? []).find((r) => r.status === "completed") ?? null;
+  const timeline = useRunTimeline({ runId: latestRun?.id ?? null });
 
   // One species per request, merged as they arrive (see `fetchLifecycle` for
   // why: the deployed host needs ~4 s per evaluation and the gateway closes at
@@ -532,6 +537,59 @@ export default function IsrReport() {
               <>
                 <LifecycleChart data={lifecycleShown} />
                 {lifecycle.data && <LifecycleNarrative data={lifecycle.data} />}
+              </>
+            )}
+          </section>
+        )}
+
+        {/* ── the stored run over time (R17) ── */}
+        {latestRun && (
+          <section className="card avoid-break">
+            <div className="card-title">
+              The stored run over time — {SPECIES_NAME[latestRun.species] ?? latestRun.species}
+            </div>
+            {timeline.isLoading && <Loading label="Loading frames…" />}
+            <ErrorNote error={timeline.error} />
+            {timeline.data && !timeline.data.recorded && (
+              <div className="muted small"><b>Timeline not recorded.</b> {timeline.data.reason}</div>
+            )}
+            {timeline.data?.recorded && (
+              <>
+                <TimelineStrip tl={timeline.data} />
+                <TableScroll>
+                  <table className="grid">
+                    <thead>
+                      <tr><th>Year</th><th>Phase</th><th>Footprint (ha)</th><th>Migration (m)</th>
+                          <th>At the ring</th><th>Excursion panel</th></tr>
+                    </thead>
+                    <tbody>
+                      {timeline.data.frames.filter((f) => !f.error).map((f) => {
+                        const thr = timeline.data!.recorded ? timeline.data!.threshold : null;
+                        const over = thr !== null && Number(f.compliance_conc ?? 0) > thr;
+                        return (
+                          <tr key={f.year}>
+                            <td className="mono">{f.year}</td>
+                            <td>{f.phase}</td>
+                            <td>{f.area_ha?.toFixed?.(2) ?? "–"}</td>
+                            <td>{f.migration_m?.toFixed?.(1) ?? "–"}</td>
+                            <td style={{ color: over ? "var(--danger)" : undefined }}>
+                              {f.compliance_conc?.toFixed?.(3) ?? "–"}
+                              {over ? " ▲" : ""}
+                            </td>
+                            <td>{f.excursion_declared ? "declared" : "–"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </TableScroll>
+                <div className="muted small" style={{ marginTop: 6 }}>
+                  Each row is a separate engine evaluation at that year; nothing is interpolated.
+                  {timeline.data.first_exceedance_year !== null
+                    ? <> The ring first exceeds the screening limit at the <b>{timeline.data.first_exceedance_year} yr</b> frame
+                        — the true crossing lies between it and the previous frame.</>
+                    : <> No frame puts the ring above the screening limit within the run's horizon.</>}
+                </div>
               </>
             )}
           </section>

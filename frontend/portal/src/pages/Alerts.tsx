@@ -302,7 +302,18 @@ export default function Alerts() {
                     {a.measured_value.toFixed(1)}
                   </span>
                   <span className="rv-u"> {a.measured_unit}</span>
-                  <span className="rv-u"> (limit {inbox.data?.limit_ppb ?? 30})</span>
+                  {/* R17: the limit of the DRIVING determinand from the record.
+                      This used to print the uranium limit (30) under every
+                      reading, nitrate and fluoride included. Falls back to the
+                      uranium limit only when the row has no record and is a
+                      uranium reading. */}
+                  {(() => {
+                    const d = a.explanation?.driver;
+                    const lim = d?.limit ?? (a.measured_unit === "ppb" ? inbox.data?.limit_ppb : undefined);
+                    return lim !== undefined && lim !== null
+                      ? <span className="rv-u"> (limit {lim}{d?.limit_kind ? `, ${d.limit_kind}` : ""})</span>
+                      : null;
+                  })()}
                 </span>
               </div>
             )}

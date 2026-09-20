@@ -242,6 +242,27 @@ class SimulationRunService:
             if vertical and isinstance(run.hydro, dict):
                 run.hydro = {**run.hydro, "vertical": vertical}
             run.plume = _plume_geometry(result)
+
+            # R17: timeline frames -- the engine evaluated at a fixed set of
+            # horizons up to the run's own, each a real evaluation, stored with
+            # the run so the console and the report can show the plume change
+            # over time. A timeline failure must not fail the run: the
+            # single-horizon result stands and the reader is told the frames
+            # are not recorded.
+            try:
+                from app.services import timeline as _tl
+                tl = await _tl.compute_timeline(
+                    site, run.request or {}, predict=mlp.predict,
+                    payload_from_site=mlp.payload_from_site)
+                # stored under `frames`: `plume.timeline` is the engine's
+                # calendar dict for the single horizon and must stay intact
+                run.plume = {**(run.plume or {}), "frames": tl}
+                _tl.log_summary(run.id, tl)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"run {run_id}: timeline not recorded: "
+                               f"{type(exc).__name__}: {exc}")
+                if isinstance(run.plume, dict):
+                    run.plume = {**run.plume, "frames": None}
             run.model_card_sha = prov["model_card_sha"]
             run.artifacts_sha = prov["artifacts_sha"]
             run.code_version = prov["code_version"]

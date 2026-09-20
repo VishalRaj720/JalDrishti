@@ -96,8 +96,25 @@ def upgrade() -> None:
     """)
     op.create_index("ix_alerts_tier", "alerts", ["tier"])
 
+    # THE UPSERT NEEDS AN UPDATE POLICY. Migration 0018 gave `alerts` a SELECT
+    # policy and a system-only INSERT policy and nothing else -- an UPDATE
+    # under forced RLS is therefore refused outright. The R17 upsert
+    # (`ON CONFLICT ... DO UPDATE ... WHERE alerts.explanation IS NULL`) hit
+    # exactly that on the first rebuild against a real database: "new row
+    # violates row-level security policy (USING expression)". The test suite
+    # could not catch it -- its database is built from ORM metadata and has no
+    # policies (LIMITATIONS.md 1c) -- so this is the fourth instance of that
+    # class of bug, and the policy below is the cure. System context only, the
+    # same gate the INSERT policy uses: no endpoint lets a user edit an alert.
+    op.execute("""
+        CREATE POLICY alerts_update ON alerts FOR UPDATE
+        USING (coalesce(current_setting('app.bypass_rls', true), 'off') = 'on')
+        WITH CHECK (coalesce(current_setting('app.bypass_rls', true), 'off') = 'on')
+    """)
+
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS alerts_update ON alerts")
     op.drop_index("ix_alerts_tier", table_name="alerts")
     op.execute("ALTER TABLE alerts DROP CONSTRAINT IF EXISTS ck_basis_matches_kind")
     op.execute("ALTER TABLE alerts DROP CONSTRAINT IF EXISTS ck_modelled_never_critical")
