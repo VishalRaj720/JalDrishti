@@ -12,10 +12,16 @@ not yet been delivered by email, sends one message per pair, and records the
 attempt in `alert_deliveries`. It is safe to call as often as you like:
 
   * the unique index on (alert_id, user_id, channel) makes a re-run send
-    nothing twice, even after a crash between send and record;
+    nothing twice ONCE SENT, even after a crash between send and record;
   * a failed send is recorded as `failed` with the SMTP error, so it is
     visible on the operator's panel and retried on the next run rather than
-    forgotten;
+    forgotten -- literally: `pending_deliveries` treats a `failed` row the
+    same as no row, and the insert is an UPSERT that overwrites it, so a
+    transient relay outage or a credentials fix does not orphan every alert
+    that happened to be raised during the bad window (2026-09-21: found live,
+    a wrong SMTP credential left three deliveries permanently `failed` with
+    zero retries because the insert used to be `ON CONFLICT ... DO NOTHING`
+    against a row that already existed);
   * with no SMTP host configured it sends nothing, records nothing, and
     returns the size of the backlog -- a number the Administration screen
     shows, so "delivery is not set up" is a visible state and not a silent one.
@@ -250,7 +256,14 @@ def render_alert_email(row: dict[str, Any]) -> tuple[str, str]:
 
 
 async def pending_deliveries(db, *, limit: int = 500) -> list[dict[str, Any]]:
-    """Every (alert, subscriber) pair not yet delivered by email."""
+    """Every (alert, subscriber) pair not yet SUCCESSFULLY delivered by email.
+
+    "Not yet delivered" includes a pair that was already tried and failed --
+    the unique row on (alert_id, user_id, channel) means there is at most one
+    delivery record per pair, and a `failed` one must be as eligible for
+    another attempt as no row at all, or a `failed` is a dead end forever
+    (found live, 2026-09-21: a bad SMTP credential window permanently
+    orphaned three deliveries this way -- see deliver_pending's UPSERT)."""
     rows = (await db.execute(text("""
         SELECT a.id::text        AS alert_id,
                a.kind, a.headline, a.body, a.severity, a.sampled_at,
@@ -267,7 +280,7 @@ async def pending_deliveries(db, *, limit: int = 500) -> list[dict[str, Any]]:
         LEFT JOIN districts d ON d.id = b.district_id
         LEFT JOIN alert_deliveries ad
                ON ad.alert_id = a.id AND ad.user_id = u.id AND ad.channel = 'email'
-        WHERE ad.id IS NULL
+        WHERE (ad.id IS NULL OR ad.status = 'failed')
           AND u.alert_email_opt_in
           AND u.email IS NOT NULL AND u.email <> ''
           -- Withdrawn advisories are taken back everywhere, the slow channel
@@ -322,11 +335,21 @@ async def deliver_pending(*, limit: int = 200, mailer: Optional[Mailer] = None) 
                     status, detail = "failed", f"{type(exc).__name__}: {exc}"[:2000]
                     logger.error(f"alert delivery to {addr} failed: {detail}")
 
+            # UPSERT, not INSERT ... DO NOTHING: the only row `pending_deliveries`
+            # can have handed us is either absent or `failed` (see its docstring),
+            # so a conflict here is always a RETRY and must overwrite the old
+            # failed attempt, not silently discard this one's outcome. The extra
+            # `WHERE` is a belt-and-suspenders repeat of that same invariant --
+            # it must never overwrite an already-`sent` row, even if some future
+            # caller feeds this function a pair pending_deliveries would not have.
             await db.execute(text("""
                 INSERT INTO alert_deliveries (alert_id, user_id, channel, address,
                                               status, detail)
                 VALUES (:aid, :uid, 'email', :addr, :status, :detail)
-                ON CONFLICT (alert_id, user_id, channel) DO NOTHING
+                ON CONFLICT (alert_id, user_id, channel) DO UPDATE
+                SET address = EXCLUDED.address, status = EXCLUDED.status,
+                    detail = EXCLUDED.detail
+                WHERE alert_deliveries.status = 'failed'
             """), {"aid": row["alert_id"], "uid": row["user_id"], "addr": addr,
                    "status": status, "detail": detail})
             # Commit per message so a record of a sent email survives the

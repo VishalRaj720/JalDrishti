@@ -185,6 +185,46 @@ async def test_a_failed_send_is_recorded_not_lost(db_session, a_block):
 
 
 @pytest.mark.asyncio
+async def test_a_failed_send_is_retried_not_orphaned(db_session, a_block):
+    """Found live (2026-09-21): a bad SMTP credential window left deliveries
+    permanently `failed` -- pending_deliveries excluded any pair that already
+    had a row at all, and the insert was `ON CONFLICT ... DO NOTHING`, so a
+    fixed credential could never re-send them. A `failed` row must be picked
+    up again, and a later success must overwrite it, not be discarded."""
+    uid, _ = await _user(db_session, f"r{uuid.uuid4().hex[:5]}", UserRole.citizen)
+    email = (await db_session.execute(text("SELECT email FROM users WHERE id = :u"),
+                                      {"u": str(uid)})).scalar()
+    await AlertService(db_session).subscribe(uid, uuid.UUID(a_block["id"]))
+    alert_id = await _measured_alert(db_session, a_block["id"])
+
+    # first attempt: the relay is down for this address
+    broken = FakeMailer(fail_for=email)
+    out1 = await notify.deliver_pending(mailer=broken)
+    assert out1["failed"] == 1 and out1["sent"] == 0
+
+    # relay fixed (e.g. the credential was corrected) -- retry must pick the
+    # pair back up rather than reporting 0 pending forever. `out["pending"]`
+    # is reported net of this run's own sends (see deliver_pending's last
+    # line), so the proof that it was picked up at all is `sent == 1`, not
+    # the (already-zeroed) pending count.
+    working = FakeMailer()
+    out2 = await notify.deliver_pending(mailer=working)
+    assert out2["sent"] == 1 and out2["failed"] == 0, out2
+    assert working.sent and working.sent[0][0] == email
+
+    row = (await db_session.execute(text(
+        "SELECT status, detail FROM alert_deliveries WHERE alert_id = :a"),
+        {"a": alert_id})).first()
+    assert row[0] == "sent" and row[1] is None, (
+        "the retry's success must overwrite the old failed row, not sit beside it")
+
+    # and it is genuinely idempotent again now that it succeeded
+    out3 = await notify.deliver_pending(mailer=working)
+    assert out3["pending"] == 0 and out3["sent"] == 0
+    assert len(working.sent) == 1
+
+
+@pytest.mark.asyncio
 async def test_demo_addresses_never_reach_a_relay(db_session, a_block):
     """`citizen@jaldrishti.local` is published in the README on purpose. A
     reserved-domain address is skipped and recorded as such, so a fresh
