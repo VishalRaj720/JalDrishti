@@ -686,6 +686,10 @@ export interface LifecyclePoint {
   migration_m: number | null;
   compliance_conc: number | null;
   excursion_declared: boolean | null;
+  /** The NUREG indicators (chloride / TDS / sulfate) over their control limit.
+   *  The excursion is declared on THESE, never on the species charted, so a
+   *  uranium point can read "background at the ring" and "excursion" at once. */
+  excursion_indicators?: string[];
   shallow_impact_probability: number | null;
   extrapolating: boolean;
   error: string | null;
@@ -695,10 +699,15 @@ export interface LifecycleSeries {
   species: string;
   unit: string;
   threshold: number | null;
-  /** The engine's own words when it refuses a source term (a non-ore zone for
-   *  uranium). Present per species so the chart can say why one line sits at
-   *  zero while the others do not. */
+  /** The engine's own words when it refuses a source term OUTRIGHT (a
+   *  non-ore zone for uranium/radium — the curve sits at trace level).
+   *  Present per species so the chart can say why one line sits at zero
+   *  while the others do not. */
   suppressed: string | null;
+  /** The engine's words when it scaled a source term DOWN without zeroing
+   *  it (a hypothetical low-confidence ore zone). The curve is real and
+   *  non-trivial here — this is a confidence caveat, not an absence. */
+  notice: string | null;
   points: LifecyclePoint[];
 }
 

@@ -70,6 +70,12 @@ class LifecyclePoint(BaseModel):
     migration_m: Optional[float] = None
     compliance_conc: Optional[float] = None
     excursion_declared: Optional[bool] = None
+    #: Which NUREG indicators (chloride / TDS / sulfate) were over their upper
+    #: control limit. The excursion is declared on these conservative
+    #: indicators regardless of the species charted (NUREG-1569 rejects
+    #: uranium as an indicator because it is retarded), so a uranium series can
+    #: honestly show "background at the ring" and "excursion" on one point.
+    excursion_indicators: list[str] = []
     shallow_impact_probability: Optional[float] = None
     extrapolating: bool = False
     error: Optional[str] = None
@@ -79,10 +85,18 @@ class LifecycleSeries(BaseModel):
     species: str
     unit: str
     threshold: Optional[float] = None
-    #: The engine's own words when it refuses a source term (a non-ore zone for
-    #: uranium). Carried per species so the chart can say why one line is flat
-    #: at zero while the others are not.
+    #: The engine's own words when it refuses a source term OUTRIGHT (a
+    #: non-ore "none" zone for uranium/radium; `hydro.u_suppressed` is True).
+    #: Carried per species so the chart can say why one line is flat at zero
+    #: while the others are not.
     suppressed: Optional[str] = None
+    #: The engine's words when it scaled a source term DOWN without zeroing it
+    #: (a "belt" pin: hypothetical low-confidence ore, C0 reduced but very
+    #: much non-zero). Distinct from `suppressed` on purpose — until R17
+    #: patch, both cases shared one field and the frontend captioned a belt
+    #: run's real, five-figure ppb curve "No source term for this contaminant
+    #: here", which is false. See LIMITATIONS.md.
+    notice: Optional[str] = None
     points: list[LifecyclePoint]
 
 
@@ -144,6 +158,7 @@ async def lifecycle(
             continue
         pts: list[LifecyclePoint] = []
         suppressed: Optional[str] = None
+        notice: Optional[str] = None
         threshold: Optional[float] = None
 
         for y in ordered:
@@ -162,8 +177,17 @@ async def lifecycle(
             vert = r.get("vertical") or {}
             if threshold is None:
                 threshold = r.get("threshold")
-            if r.get("notice") and suppressed is None:
-                suppressed = r["notice"]
+            # `r["notice"]` is shared by the engine for two DIFFERENT claims —
+            # a "none" zone (no ore, C0 forced to trace) and a "belt" zone
+            # (ore assumed, C0 reduced but real) — and only the first means
+            # "no source term". `hydro.u_suppressed` is the engine's own
+            # boolean for exactly that first case; trust it, not the prose.
+            if r.get("notice"):
+                if (r.get("hydro") or {}).get("u_suppressed"):
+                    if suppressed is None:
+                        suppressed = r["notice"]
+                elif notice is None:
+                    notice = r["notice"]
 
             pts.append(LifecyclePoint(
                 year=y,
@@ -177,13 +201,17 @@ async def lifecycle(
                 compliance_conc=an.get("compliance_conc"),
                 excursion_declared=bool(
                     (r.get("isr_excursion") or {}).get("excursion_declared")),
+                excursion_indicators=[
+                    i["species"] for i in
+                    ((r.get("isr_excursion") or {}).get("indicators") or [])
+                    if isinstance(i, dict) and i.get("over_ucl")],
                 shallow_impact_probability=vert.get("shallow_impact_probability"),
                 extrapolating=bool(r.get("extrapolation")),
             ))
 
         series.append(LifecycleSeries(
             species=sp, unit=SPECIES_UNIT[sp], threshold=threshold,
-            suppressed=suppressed, points=pts))
+            suppressed=suppressed, notice=notice, points=pts))
 
     await audit.record(
         action="simulation.lifecycle", entity_type="isr-points",

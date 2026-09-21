@@ -258,10 +258,26 @@ class SweepPoint(BaseModel):
     migration_m: Optional[float] = None
     compliance_conc: Optional[float] = None
     excursion_declared: Optional[bool] = None
+    #: Which NUREG indicators (chloride / TDS / sulfate) were over their upper
+    #: control limit -- the excursion is declared on THESE, never on the
+    #: species being charted. Empty when none.
+    excursion_indicators: list[str] = []
     source_zone_above_threshold: Optional[bool] = None
     residual_fraction: Optional[float] = None
     extrapolating: bool = False
     error: Optional[str] = None
+
+
+def _excursion_indicators(r: dict) -> list[str]:
+    """The indicator species over their UCL in the NUREG panel of one engine
+    result. The panel is computed on the CONSERVATIVE indicators (chloride,
+    TDS, sulfate) regardless of which species the chart is showing -- NUREG-1569
+    rejects uranium as an indicator because it is retarded -- so a uranium
+    chart can honestly read "1 ppb at the ring" and "excursion" on the same
+    point. Naming the indicators is what makes that pairing legible."""
+    panel = r.get("isr_excursion") or {}
+    return [i["species"] for i in (panel.get("indicators") or [])
+            if isinstance(i, dict) and i.get("over_ucl")]
 
 
 class SweepResponse(BaseModel):
@@ -332,6 +348,7 @@ async def sweep_simulation(
             migration_m=an.get("migration_m"),
             compliance_conc=an.get("compliance_conc"),
             excursion_declared=bool((r.get("isr_excursion") or {}).get("excursion_declared")),
+            excursion_indicators=_excursion_indicators(r),
             source_zone_above_threshold=sz.get("above_threshold"),
             residual_fraction=(r.get("restoration") or {}).get("residual_endpoint_fraction"),
             extrapolating=bool(r.get("extrapolation")),

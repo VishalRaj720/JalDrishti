@@ -23,6 +23,7 @@ import { useMemo, useState } from "react";
 import type { Lifecycle, LifecycleSeries } from "../api/client";
 import { SPECIES_NAME } from "../map/plume";
 import { fmt } from "./mapLayers";
+import { indicatorList } from "./SweepChart";
 
 type MetricKey = "source_conc" | "area_ha" | "migration_m" | "compliance_conc"
                | "shallow_impact_probability";
@@ -120,6 +121,15 @@ export default function LifecycleChart({ data }: { data: Lifecycle }) {
       {series.suppressed && (
         <div className="banner warn" style={{ marginBottom: 8 }}>
           <strong>No source term for this contaminant here.</strong> {series.suppressed}
+        </div>
+      )}
+      {/* Distinct from `suppressed` on purpose: a "belt" pin still has a real,
+          non-trivial source term (the curve below shows it) — the engine only
+          scaled it down for a lower-confidence ore assumption. Captioning that
+          "no source term" would contradict the numbers on screen. */}
+      {series.notice && !series.suppressed && (
+        <div className="banner" style={{ marginBottom: 8 }}>
+          <strong>Source term reduced, not eliminated.</strong> {series.notice}
         </div>
       )}
 
@@ -220,7 +230,10 @@ export default function LifecycleChart({ data }: { data: Lifecycle }) {
           const value = metric === "shallow_impact_probability"
             ? `${((hovered[metric] as number) * 100).toFixed(0)}%`
             : `${fmt(hovered[metric], 2)} ${meta.unit(series)}`;
-          const label = `Year ${fmt(hovered.year, 1)} · ${hovered.phase.replace(/_/g, "-")}`;
+          const label = `Year ${fmt(hovered.year, 1)} · ${hovered.phase.replace(/_/g, "-")}`
+            + (hovered.excursion_declared
+                ? ` · excursion on ${indicatorList(hovered.excursion_indicators) || "indicators"}`
+                : "");
           const w = Math.max(value.length, label.length) * 4.6 + 14;
           const flip = cx + w + 14 > W;
           const bx = flip ? cx - w - 10 : cx + 10;
@@ -251,7 +264,7 @@ export default function LifecycleChart({ data }: { data: Lifecycle }) {
         <span className="row" style={{ gap: 5 }}>
           <svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="3.4"
             fill="var(--accent)" stroke="var(--danger)" strokeWidth="2.2" /></svg>
-          red ring = excursion declared
+          red ring = excursion declared on the NUREG indicators (Cl, TDS, SO₄) — not on this species
         </span>
         <span>{pinned != null ? "tap the point again to release" : "tap or hover a point"}</span>
       </div>

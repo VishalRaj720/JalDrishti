@@ -15,12 +15,24 @@
 import { useMemo, useState } from "react";
 import { fmt } from "./mapLayers";
 
+/** Short labels for the NUREG indicator species, for the excursion chip. */
+export const INDICATOR_SHORT: Record<string, string> = {
+  chloride_mg_l: "Cl", tds_mg_l: "TDS", sulfate_mg_l: "SO₄",
+};
+export const indicatorList = (xs?: string[]) =>
+  (xs ?? []).map((s) => INDICATOR_SHORT[s] ?? s).join(", ");
+
 export interface SweepPoint {
   value: number;
   area_ha: number | null;
   migration_m: number | null;
   compliance_conc: number | null;
   excursion_declared: boolean | null;
+  /** The NUREG indicators over their control limit -- the excursion is on
+   *  these conservative reagents (chloride / TDS / sulfate), not on the
+   *  species charted, which is why a uranium point can read background at the
+   *  ring and still carry the chip. */
+  excursion_indicators?: string[];
   source_zone_above_threshold: boolean | null;
   residual_fraction: number | null;
   extrapolating: boolean;
@@ -184,7 +196,11 @@ export default function SweepChart({
             <span className="rv-v">{fmt(activePoint[metric], 2)}</span>
             <span className="rv-u"> {unit}</span>
             {activePoint.excursion_declared && (
-              <span className="chip danger" style={{ marginLeft: 6 }}>excursion</span>
+              <span className="chip danger" style={{ marginLeft: 6 }}
+                    title="Declared on the conservative NUREG indicators at the monitoring ring, not on the species charted">
+                excursion{activePoint.excursion_indicators?.length
+                  ? ` on ${indicatorList(activePoint.excursion_indicators)}` : ""}
+              </span>
             )}
           </span>
         </div>
@@ -193,7 +209,11 @@ export default function SweepChart({
       <div className="muted small" style={{ marginTop: 8, lineHeight: "var(--lh-base)" }}>
         <b>Hollow points</b> are outside the model's trained range — the analytical
         engine still serves there, but the ML band's conformal guarantee is void.
-        <b> Red-ringed points</b> declare a NUREG-1569-inspired excursion.
+        <b> Red-ringed points</b> declare a NUREG-1569-inspired excursion — judged
+        on the conservative indicators (chloride, TDS, sulfate) at the monitoring
+        ring, <em>not</em> on the species charted: NUREG rejects uranium as an
+        indicator because it is retarded, so a uranium curve can sit at background
+        at the ring while the reagents have already arrived.
       </div>
 
       <div className={`banner ${sweep.crossing_value !== null ? "ok" : "warn"}`}

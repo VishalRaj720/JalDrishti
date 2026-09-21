@@ -792,6 +792,28 @@ line here rather than in a changelog:
   index.
 * **The charge balance finding** (§3): the 2023 file balances by construction.
 
+### 4h-i. Post-freeze fix (2026-09-21) — the lifecycle chart said "no source term" over a 14,000 ppb curve
+
+Found by the owner on the deployed Jaduguda report. The registered site is
+0.35 km outside the deposit polygon, so the ore mask classes it **belt**: ore
+assumed at low confidence, uranium C0 scaled ×0.30 (14,294 ppb, not zero;
+`u_suppressed` false). The engine reports that reduction through the same
+`notice` field it uses for a **none** zone, where C0 is forced to trace and
+`u_suppressed` is true. `lifecycle.py` copied whichever notice arrived into
+`series.suppressed`, and the chart prefixed it "No source term for this
+contaminant here." Both cases now travel in separate fields, split on
+`hydro.u_suppressed`, and the chart words each honestly. The frame and sweep
+services were checked and do not share the defect.
+
+Recorded alongside it, because it reads as a contradiction and is not one: a
+uranium sweep point can show *1 ppb at the ring* and *excursion* on the same
+dot. The NUREG-1569 2-of-3 test is judged on chloride, TDS and sulfate at the
+ring (`EXCURSION_ONLY_SPECIES` + the two ML species), and NUREG rejects uranium
+as an indicator because it is retarded (R_eff ≈ 270 here; the uranium front is
+26 m from the wellfield at 20 yr, the ring is at 100 m). Every sweep and
+lifecycle point now carries `excursion_indicators`, and the chips name them.
+Physics unchanged; response schemas gained two additive fields.
+
 ---
 
 ## 4a. The aquifer-reach alert, and what bounds it
