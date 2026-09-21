@@ -262,3 +262,135 @@ def test_hold_decay_continuous_at_rest_zero():
     a_eps = label(op_years=20.0, t_years=50.0, rest_years=0.05,
                   k_atten=0.2)["affected_area_ha"]
     assert abs(a_eps - a0) / max(a0, 1e-9) < 0.05, (a0, a_eps)
+
+
+# --------------------------------------------------------------------------- #
+# Source-zone background floor (2026-09-21, LIMITATIONS.md 4h-ii)
+# --------------------------------------------------------------------------- #
+# Found on the deployed Jaduguda TDS lifecycle chart: an unrestored trace at
+# 50 yr, and a routine 5 yr restoration sweep held indefinitely, both read the
+# leach-zone "source strength" BELOW the aquifer's own natural background TDS
+# -- physically backwards, since the water doing the flushing/restoring IS the
+# regional background water and cannot dilute the source past it. These pin
+# the fix generically (synthetic feature rows, no site/coordinates involved)
+# so it is provably a property of the PHYSICS FUNCTION, not of one location:
+# any Jharkhand site whose species has a background comparable to its C0 gets
+# the same protection, because the floor is keyed on `background`, a plain
+# argument, not on where the site is.
+HIGH_BG = 1800.0   # comparable to Jaduguda's real TDS background, 1,778.6 mg/L
+
+
+def test_restored_source_is_floored_at_background_when_opted_in():
+    """A routine 5 yr (reference) restoration sweep must not read cleaner
+    than the water restoring it, once the caller opts in.
+
+    `feat` carries the transport geometry (velocity, dispersivity, beta...);
+    params_from_features never reads source_conc_C0 / background_conc_Cb off
+    it -- both are passed as explicit species_C0 / background kwargs below --
+    so the fixture's own hardcoded 15,000 / 2.0 (uranium-scale) values are
+    irrelevant here and left as-is."""
+    f = feat_row(t_years=15.0, rest_years=5.0, residual=0.337)  # TDS's Texas ratio
+    p_off = params_from_features(f, species_C0=3656.0, t_days=15 * 365.0,
+                                 operation_days=8 * 365.0,
+                                 restoration_days=5 * 365.0,
+                                 residual_fraction=0.337, background=HIGH_BG,
+                                 floor_source_at_background=False)
+    p_on = params_from_features(f, species_C0=3656.0, t_days=15 * 365.0,
+                                operation_days=8 * 365.0,
+                                restoration_days=5 * 365.0,
+                                residual_fraction=0.337, background=HIGH_BG,
+                                floor_source_at_background=True)
+    # the bug, reproduced: unfloored, the restored reading undercuts background
+    assert p_off.C_res < HIGH_BG, p_off.C_res
+    assert p_off.disc_conc < HIGH_BG, p_off.disc_conc
+    # the fix: floored, it cannot
+    assert p_on.C_res == pytest.approx(HIGH_BG, rel=1e-9)
+    assert p_on.disc_conc == pytest.approx(HIGH_BG, rel=1e-9)
+
+
+def test_unrestored_passive_flush_is_also_floored_at_background():
+    """The SAME f_src<1 branch handles the passive 30-yr-half-life flush with
+    zero restoration -- confirm long-horizon unrestored traces get the same
+    protection, not just active restoration sweeps."""
+    f = feat_row(t_years=50.0, rest_years=0.0, residual=1.0)  # no sweep planned
+    p_off = params_from_features(f, species_C0=3656.0, t_days=50 * 365.0,
+                                 operation_days=8 * 365.0, restoration_days=0.0,
+                                 residual_fraction=1.0, background=HIGH_BG,
+                                 floor_source_at_background=False)
+    p_on = params_from_features(f, species_C0=3656.0, t_days=50 * 365.0,
+                                operation_days=8 * 365.0, restoration_days=0.0,
+                                residual_fraction=1.0, background=HIGH_BG,
+                                floor_source_at_background=True)
+    assert p_off.disc_conc < HIGH_BG, p_off.disc_conc
+    assert p_on.disc_conc >= HIGH_BG - 1e-6, p_on.disc_conc
+
+
+def test_floor_defaults_off_so_generate_py_labels_are_unaffected():
+    """generate.py's label_row() never passes the flag -- confirm the default
+    reproduces the pre-fix (buggy) number exactly, i.e. training labels do not
+    silently move under this patch."""
+    f = feat_row(t_years=15.0, rest_years=5.0, residual=0.337)
+    p_default = params_from_features(f, species_C0=3656.0, t_days=15 * 365.0,
+                                     operation_days=8 * 365.0,
+                                     restoration_days=5 * 365.0,
+                                     residual_fraction=0.337, background=HIGH_BG)
+    assert p_default.C_res < HIGH_BG   # unfloored unless explicitly requested
+    assert p_default.C_res == pytest.approx(0.337 * 3656.0, rel=1e-6)
+
+
+def test_low_background_species_unaffected_by_the_floor():
+    """Uranium at this same site (background ~1 ppb, negligible next to a
+    multi-thousand-ppb C0) never gets near its own floor -- the fix changes
+    nothing for the species/sites that were never broken."""
+    f = feat_row(t_years=15.0, rest_years=5.0, residual=0.066)
+    p_on = params_from_features(f, species_C0=15000.0, t_days=15 * 365.0,
+                                operation_days=8 * 365.0,
+                                restoration_days=5 * 365.0,
+                                residual_fraction=0.066, background=2.0,
+                                floor_source_at_background=True)
+    assert p_on.C_res == pytest.approx(0.066 * 15000.0, rel=1e-6)
+
+
+def test_live_serve_path_floors_statewide_not_just_at_jaduguda():
+    """End-to-end through resolve_inputs -> predict_analytical (the exact
+    function `ml/predict.py` serves every request with) at SEVEN real
+    Jharkhand pins spanning five districts -- the invariant `restored source
+    >= this site's own background` must hold everywhere, because the floor is
+    keyed on each site's resolved `background_conc_Cb`, not on Jaduguda's.
+    Jaduguda itself is included and is the one that changed: its TDS 5 yr
+    restoration reading used to read 1,232 mg/L against a 1,779 mg/L
+    background (LIMITATIONS.md 4h-ii); it must now read exactly the
+    background."""
+    from ml_pipeline.dashboard.resolve import resolve_inputs
+    from ml_pipeline.ml.predict import predict_analytical
+
+    PINS = [
+        ("Jaduguda (East Singhbhum)", 86.36, 22.65),
+        ("Seraikela-Kharsawan", 85.93, 22.70),
+        ("West Singhbhum, Chaibasa", 85.80, 22.55),
+        ("Bokaro", 86.15, 23.78),
+        ("Dhanbad", 86.43, 23.80),
+        ("Hazaribagh", 85.36, 23.99),
+        ("Ranchi", 85.33, 23.36),
+    ]
+    jaduguda_src = None
+    for name, lon, lat in PINS:
+        inputs, hydro = resolve_inputs(dict(
+            lon=lon, lat=lat, species="tds_mg_l", time_years=15.0,
+            operation_years=8.0, restoration_years=5.0))
+        out = predict_analytical(**inputs)
+        cb = inputs["background_conc_Cb"]
+        src = out["_field"].metrics["source_zone_conc"]
+        assert src >= cb - 1e-6, (name, src, cb)
+        # the restoration diagnostic must agree with the served field --
+        # QA F-3 was exactly this class of defect (a diagnostic silently
+        # disagreeing with what the field actually shows)
+        assert out["restoration"]["source_conc_after_restoration"] == \
+            pytest.approx(src, abs=0.15), (name, out["restoration"], src)
+        if "Jaduguda" in name:
+            jaduguda_src = (src, cb)
+    # and it actually bit at Jaduguda specifically -- confirms this asserted
+    # something, not just that every site was already fine
+    assert jaduguda_src is not None
+    assert jaduguda_src[0] == pytest.approx(jaduguda_src[1], rel=1e-6)
+    assert jaduguda_src[1] > 1500.0, jaduguda_src   # the high-background site

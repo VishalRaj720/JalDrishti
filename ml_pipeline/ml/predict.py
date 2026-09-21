@@ -188,7 +188,13 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0,
                          t_days=t_days, operation_days=op_days,
                          restoration_days=rest_years * 365.0,
                          residual_fraction=residual, grid_n=200,
-                         compliance_x=ring_x)
+                         compliance_x=ring_x,
+                         # LIVE serve path -- floor the post-closure source
+                         # reading at this site's own background (2026-09-21,
+                         # LIMITATIONS.md 4h-ii). generate.py's label_row()
+                         # calls simulate_plume too but never passes this, so
+                         # the surrogate's training labels are unaffected.
+                         floor_source_at_background=True)
     m = res.metrics
 
     # excursion probability via the same parameter-uncertainty MC as Phase 2
@@ -241,7 +247,17 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0,
             "residual_realized_fraction": round(float(f_now), 4),     # after ELAPSED sweep
             # the fraction the transport engine is actually running with
             "served_source_fraction": round(float(f_served), 4),
-            "source_conc_after_restoration": round(f_served * inputs["source_conc_C0"], 1),
+            # Floored the same way the served field is (2026-09-21,
+            # LIMITATIONS.md 4h-ii) -- this diagnostic is computed
+            # independently of params_from_features/C_res, so leaving it
+            # unfloored would silently reproduce the exact "diagnostic
+            # contradicts the field" defect QA F-3 already fixed once (the
+            # comment above): a restored TDS run would show source_zone.conc
+            # floored at background while this number, right next to it,
+            # still read below it.
+            "source_conc_after_restoration": round(
+                max(f_served * inputs["source_conc_C0"],
+                    inputs["background_conc_Cb"]), 1),
             "rebound_floor_active": bool(P.RESTORATION_REBOUND_FLOOR
                                          and f_served > f_now * 0.999
                                          and t_days > op_days),

@@ -814,6 +814,62 @@ as an indicator because it is retarded (R_eff ≈ 270 here; the uranium front is
 lifecycle point now carries `excursion_indicators`, and the chips name them.
 Physics unchanged; response schemas gained two additive fields.
 
+### 4h-ii. Post-freeze fix (2026-09-21) — a restored or long-idle source zone could read cleaner than the aquifer around it
+
+Found while checking the sulfate/TDS lifecycle traces the owner asked about
+next. Two mechanisms weaken the served source-zone reading after injection
+stops — the restoration-sweep credit, and a passive 30-yr-half-life flush that
+applies even with **no** restoration planned — and neither had a floor: both
+multiply the *absolute* source concentration by a fraction that can fall
+arbitrarily close to zero. For a species whose natural background is a large
+fraction of its lixiviant C0, that decays the source zone past the water that
+is supposedly doing the flushing, which is backwards — passive flushing is
+regional groundwater, already at background, so the best it can do is return
+the source zone to background, never below it.
+
+At the registered Jaduguda site this was not an edge case: TDS's background
+there is 1,779 mg/L (against a 3,656 mg/L source), and TDS's own Texas-derived
+restoration ratio (0.337, from real paired pre/post ISR data) already lands
+below it — a **routine 5-year restoration sweep held the "source strength"
+line at 1,232 mg/L indefinitely**, and an unrestored trace crossed the same
+line by ~39 years into the 50-year horizon slider (1,385 mg/L at year 50).
+Sulfate's own ratio (0.138) landed within 1% of its background — not yet
+wrong there, but not far off. Uranium and radium were never at risk: their
+natural backgrounds (~1 ppb, ~23 mBq/L) are negligible next to their C0.
+
+**Fix**: `params_from_features`/`simulate_plume`
+([transport.py](../ml_pipeline/physics/transport.py)) gained an explicit
+`floor_source_at_background` argument (default `False`, so nothing changes
+unless a caller opts in) that floors the post-closure source reading —
+`C_res`, which the disc display and the restoration deficit-wave both derive
+from — at that site's own resolved `background_conc_Cb`. It is a plain
+function argument, not a per-site override, so it applies to any Jharkhand
+coordinate through the same served path, keyed on whatever background that
+coordinate resolves to. The three live-serve callers
+(`ml/predict.py:predict_analytical`, `dashboard/server.py`'s contour build,
+`dashboard/isr_excursion.py`'s ring check) and the R17 sensitivity tool
+(`validation/sensitivity.py`, "one analytical engine evaluation" by its own
+docstring) now pass `True`. A second, independently-computed diagnostic
+(`restoration.source_conc_after_restoration` in `predict.py`) was found to
+read the pre-fix number and would have silently disagreed with the now-fixed
+field — exactly the "diagnostic contradicts the field" defect class QA F-3
+already fixed once — and was floored the same way.
+
+**Deliberately not mirrored in `ml_pipeline/synthetic/generate.py`.** That
+module's copy of this same block builds the ML surrogate's (P10/P50/P90)
+TRAINING labels for `affected_area_ha` / `max_migration_distance_m` /
+`compliance_conc`, and flooring it would move those labels for the same
+narrow set of scenarios (high-background species, restored or long-idle
+runs) — correctly, but that requires a re-bake and retrain to avoid
+reintroducing the train/serve divergence this project has hit three times
+before, which is out of scope for a patch. **Residual gap**: the surrogate's
+trained bands for TDS (and, in the long tail, sulfate) at high-background
+sites therefore still reflect the pre-floor physics until a deliberate
+re-bake; the live analytical numbers — which is what every chart in the
+portal currently reads — do not. `ml_pipeline/tests/test_attenuation.py`
+covers the floor generically (no site involved) and end-to-end at seven real
+Jharkhand pins across five districts, including the consistency check above.
+
 ---
 
 ## 4a. The aquifer-reach alert, and what bounds it

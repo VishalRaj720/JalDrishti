@@ -67,7 +67,9 @@ def _ring_concentration(payload: dict, species: str, ring_m: float) -> dict:
         t_days=inputs["time_years"] * 365.0,
         operation_days=inputs["operation_years"] * 365.0,
         restoration_days=rest_days,
-        residual_fraction=feat.get("_residual_endpoint", 1.0))
+        residual_fraction=feat.get("_residual_endpoint", 1.0),
+        background=float(inputs["background_conc_Cb"]),
+        floor_source_at_background=True)
     plume = concentration_point(float(ring_m), 0.0, params)
     baseline = float(inputs["background_conc_Cb"])
     return {

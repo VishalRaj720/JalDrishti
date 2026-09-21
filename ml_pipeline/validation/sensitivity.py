@@ -183,7 +183,11 @@ def _evaluate(base_inputs: dict, defs: list[dict[str, Any]],
             operation_days=inputs["operation_years"] * 365.0,
             restoration_days=float(inputs.get("restoration_years") or 0.0) * 365.0,
             residual_fraction=feat.get("_residual_endpoint", feat["residual_fraction"]),
-            grid_n=160, compliance_x=ring_x)
+            grid_n=160, compliance_x=ring_x,
+            # this is "one analytical engine evaluation" -- match the LIVE
+            # served answer (predict_analytical), not generate.py's frozen
+            # training labels. See LIMITATIONS.md 4h-ii.
+            floor_source_at_background=True)
     m = res.metrics
     return {k: float(m[k]) for k in OUTPUTS}
 

@@ -587,7 +587,9 @@ def api_predict(req: PredictRequest):
             t_days=inputs["time_years"] * 365.0,
             operation_days=inputs["operation_years"] * 365.0,
             restoration_days=float(inputs.get("restoration_years", 0.0) or 0.0) * 365.0,
-            residual_fraction=_feat.get("_residual_endpoint", 1.0))
+            residual_fraction=_feat.get("_residual_endpoint", 1.0),
+            background=inputs["background_conc_Cb"],
+            floor_source_at_background=True)
         _cp = concentration_field(field.X, field.Y, _prm, include_disc=False)
         # same up-gradient display mask solve_plume applies (the Domenico
         # upstream half-plane is a solution artifact, not a plume)

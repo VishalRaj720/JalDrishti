@@ -1035,10 +1035,22 @@ def plume_metrics(C_plume: np.ndarray, X: np.ndarray, Y: np.ndarray, *,
 # --------------------------------------------------------------------------- #
 def params_from_features(feat: dict, *, species_C0: float, t_days: float,
                          operation_days: float, restoration_days: float = 0.0,
-                         residual_fraction: float = 1.0) -> TransportParams:
+                         residual_fraction: float = 1.0,
+                         background: float = 0.0,
+                         floor_source_at_background: bool = False) -> TransportParams:
     """Build TransportParams from a build_feature_row dict. Uses the EFFECTIVE
     containment `_eta_eff` (design eta degraded by pump-downtime episodes) when
-    present, else the design eta."""
+    present, else the design eta.
+
+    `floor_source_at_background`, EXPLICIT opt-in, default False: floors the
+    post-closure source-zone reading at `background` (see C_res below). Not a
+    default-on because this same function is `generate.py`'s ground truth for
+    the ML surrogate's TRAINING LABELS as well as the live served answer
+    (`ml/predict.py:predict_analytical`) -- an implicit toggle (e.g. keying off
+    whether `background` was passed) would silently change one and not the
+    other depending on caller habits. Every LIVE call passes True; generate.py
+    never does, so the trained surrogate keeps training on the pre-floor
+    labels until it is deliberately re-baked. See the note at C_res."""
     regime = feat.get("_regime", "porous")
     beta = feat.get("dual_porosity_beta", 0.0)
     eta = feat.get("_eta_eff", feat["containment_eta"])
@@ -1084,7 +1096,30 @@ def params_from_features(feat: dict, *, species_C0: float, t_days: float,
                                      operation_days, restoration_days)
     Xc_clean, C_res = None, 0.0
     if f_src < 1.0:
-        C_res = f_src * species_C0
+        # FLOOR AT BACKGROUND (2026-09-21). Both terms inside f_src -- the
+        # restoration credit and the passive post-closure flush -- model the
+        # source zone being re-equilibrated by REGIONAL groundwater, i.e.
+        # water that is already at `background`. A pure C0 x f_src decay has
+        # no floor, so for a species whose natural background is a large
+        # fraction of its lixiviant C0 (TDS and, to a lesser extent, sulfate,
+        # at high-salinity fractured sites -- Jaduguda's own TDS background is
+        # 1,779 mg/L against a 3,656 mg/L source) it can decay the source zone
+        # to a reading BELOW the water that is supposedly doing the flushing --
+        # physically backwards; the best the flush can do is return the source
+        # zone to background, never past it. Found on the deployed Jaduguda
+        # lifecycle chart: an unrestored TDS trace read 1,385 mg/L at 50 yr
+        # against a 1,779 mg/L background, and a routine 5 yr restoration sweep
+        # held it at 1,232 mg/L indefinitely. See LIMITATIONS.md 4h-ii.
+        #
+        # Gated on the explicit flag (not on `background` alone) so
+        # generate.py's identical block -- which builds the ML surrogate's
+        # TRAINING LABELS from the same physics -- keeps training on the
+        # pre-floor numbers until it is deliberately re-baked and retrained
+        # (WP-1-scale effort, out of scope for this patch). Applying the floor
+        # to only one of the two would itself BE the train/serve divergence
+        # this project has hit three times before. See LIMITATIONS.md 4h-ii.
+        C_res = (max(f_src * species_C0, background) if floor_source_at_background
+                 else f_src * species_C0)
         # DEFICIT WAVE LAUNCHED AT THE START OF THE SWEEP (2026-08-05).
         # It used to be held for the sweep's whole duration (restoration_days
         # passed here), so a LONGER sweep delayed the clean water further and
@@ -1201,7 +1236,8 @@ def solve_plume(params: TransportParams, *, threshold: float, background: float,
 def simulate_plume(feat: dict, *, species_C0: float, background: float,
                    threshold: float, t_days: float, operation_days: float,
                    restoration_days: float = 0.0, residual_fraction: float = 1.0,
-                   grid_n: int = 220, compliance_x: float | None = None) -> PlumeResult:
+                   grid_n: int = 220, compliance_x: float | None = None,
+                   floor_source_at_background: bool = False) -> PlumeResult:
     """From a Phase-1 feature row -> plume field + metrics.
 
     `feat` must contain the carry-throughs from build_feature_row:
@@ -1212,11 +1248,19 @@ def simulate_plume(feat: dict, *, species_C0: float, background: float,
     compliance_x: solver-frame x of the monitoring ring (= COMPLIANCE_BUFFER_M
     from the wellfield edge). Evaluated at the TRUE front even when the grid is
     censored, so excursion logic stays correct off-scale.
+
+    `floor_source_at_background`: see params_from_features. `background` is
+    ALWAYS required here (solve_plume needs it regardless), so it cannot
+    double as the floor's on/off switch -- generate.py's label_row() passes a
+    real `background` too, for the unrelated threshold/compliance math, and
+    must NOT pick up the floor as a side effect.
     """
     params = params_from_features(feat, species_C0=species_C0, t_days=t_days,
                                   operation_days=operation_days,
                                   restoration_days=restoration_days,
-                                  residual_fraction=residual_fraction)
+                                  residual_fraction=residual_fraction,
+                                  background=background,
+                                  floor_source_at_background=floor_source_at_background)
     return solve_plume(params, threshold=threshold, background=background,
                        grid_n=grid_n, compliance_x=compliance_x)
 
