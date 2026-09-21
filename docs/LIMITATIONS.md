@@ -855,20 +855,42 @@ read the pre-fix number and would have silently disagreed with the now-fixed
 field — exactly the "diagnostic contradicts the field" defect class QA F-3
 already fixed once — and was floored the same way.
 
-**Deliberately not mirrored in `ml_pipeline/synthetic/generate.py`.** That
+**Initially not mirrored in `ml_pipeline/synthetic/generate.py`** — that
 module's copy of this same block builds the ML surrogate's (P10/P50/P90)
 TRAINING labels for `affected_area_ha` / `max_migration_distance_m` /
-`compliance_conc`, and flooring it would move those labels for the same
-narrow set of scenarios (high-background species, restored or long-idle
-runs) — correctly, but that requires a re-bake and retrain to avoid
-reintroducing the train/serve divergence this project has hit three times
-before, which is out of scope for a patch. **Residual gap**: the surrogate's
-trained bands for TDS (and, in the long tail, sulfate) at high-background
-sites therefore still reflect the pre-floor physics until a deliberate
-re-bake; the live analytical numbers — which is what every chart in the
-portal currently reads — do not. `ml_pipeline/tests/test_attenuation.py`
+`compliance_conc`, and flooring it moves those labels for the same narrow set
+of scenarios (high-background species, restored or long-idle runs), which
+needs a re-bake and retrain to avoid reintroducing the train/serve divergence
+this project has hit three times before. `ml_pipeline/tests/test_attenuation.py`
 covers the floor generically (no site involved) and end-to-end at seven real
-Jharkhand pins across five districts, including the consistency check above.
+Jharkhand pins across five districts, including a diagnostic-consistency
+check, before the retrain below.
+
+**Closed same day — model card v5** (`python -m ml_pipeline.synthetic.generate
+--scenarios 900 --mc 48` → `ml.train` → `ml.shap_analysis` → the 120-scenario
+field-mix=1.0 batch → `field_coverage` → `tools.sync_docs` →
+`validation.sensitivity --n 256` → `validation.end_to_end_audit`, full chain,
+same day). `_draw_params` (the per-MC-draw path `mc_band_labels` and
+`excursion_probability` both use) and `label_row`'s central-reference
+`simulate_plume` call both now floor at the scenario's own `Cb`, unconditionally
+— generate.py has no live-serve/training split to preserve, so there is no
+opt-in flag there, only in `transport.py`'s shared function. 18,000 training
+rows / 900 scenarios rebaked; retrained surrogate moved only within noise of
+v4 (e.g. `max_migration_distance_m` pooled R²(P50) 0.444 → 0.504, per-species
+R²(log) changes all under 0.01) — expected, since the fix touches a narrow
+scenario slice. Field-resampled coverage: **PASS on all 3 targets**
+(0.885 / 0.875 / 0.881 scenario coverage, gate 0.80). End-to-end audit:
+**43/44**, the one failure the same pre-existing, already-disclosed radium
+R²(log) gate (`max_migration_distance_m` 0.500, `compliance_conc` 0.235 — both
+still reported honestly, not moved). `ml_pipeline` suite (373) green against
+the new artifacts; `backend` suite (522) re-run green too (it calls the
+engine in-process, so it exercises the retrained model, not a mock) —
+including `test_ml_artifacts_are_unchanged`, the guard that specifically
+fails on any undeclared model change; its baseline hash file
+(`backend/tests/ml_artifact_hashes.json`) was regenerated as part of this
+commit, deliberately, for exactly the reason its own failure message names.
+No remaining gap: the live analytical path and the trained surrogate now
+agree on the corrected physics everywhere.
 
 ---
 

@@ -400,7 +400,16 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     f_src = source_strength_fraction(residual_fraction, t_days, op_days, rest_days)
     Xc_clean, C_res = None, 0.0
     if f_src < 1.0:
-        C_res = f_src * scn["C0"][species]
+        # BACKGROUND FLOOR (v5, 2026-09-21, LIMITATIONS.md 4h-ii). Mirrors
+        # params_from_features(..., floor_source_at_background=True), now
+        # unconditional here: this MC draw's source zone is being
+        # re-equilibrated by regional groundwater already at this scenario's
+        # own background, so it cannot read cleaner than that water. Without
+        # this floor a high-background/low-margin species (TDS, at the tail
+        # sulfate) trained on labels where the restored or long-idle source
+        # read BELOW its own background -- unfixable at serve time alone
+        # since these are the TRAINING targets, hence the re-bake.
+        C_res = max(f_src * scn["C0"][species], scn["Cb"][species])
         Xc_clean = front_position(v_base, 1.0, t_days, op_days, 0.0, beta_k,
                                   omega=omega_k)
 
@@ -530,13 +539,16 @@ def label_row(scn: dict, t_years: float, species: str,
         u_attenuation_k_per_yr=(scn.get("atten_k", 0.0)
                                 if species == "uranium_ppb" else 0.0),
     )
-    # deterministic central run (reference + served analytical path)
+    # deterministic central run (reference + served analytical path). v5:
+    # floored at background, matching the live serve path and _draw_params
+    # above -- LIMITATIONS.md 4h-ii.
     res = simulate_plume(feat, species_C0=scn["C0"][species],
                          background=scn["Cb"][species], threshold=threshold,
                          t_days=t_days, operation_days=op_days,
                          restoration_days=rest_days,
                          residual_fraction=scn["residual"][species],
-                         grid_n=160, compliance_x=P.COMPLIANCE_BUFFER_M)
+                         grid_n=160, compliance_x=P.COMPLIANCE_BUFFER_M,
+                         floor_source_at_background=True)
     m = res.metrics
     bands = mc_band_labels(scn, species, t_days, op_days, draws)
 
@@ -608,8 +620,13 @@ def generate(n_scenarios: int = 900, times_years=DEFAULT_TIMES_YEARS,
 
     meta = {
         # v4 = R17 beta prior (log-uniform [0.3, 20], porosity-derived serving,
-        # factor-4 MC band). Every label depends on it, so the version moves.
-        "version": 4, "n_scenarios": n_scenarios, "n_rows": len(df), "n_mc": n_mc,
+        # factor-4 MC band).
+        # v5 = post-freeze fix (2026-09-21, LIMITATIONS.md 4h-ii): the
+        # restored/passively-flushed source-zone reading is floored at each
+        # scenario's own background (was unfloored, so a high-background
+        # species like TDS could train on labels reading below its own
+        # background). Every label depends on it, so the version moves.
+        "version": 5, "n_scenarios": n_scenarios, "n_rows": len(df), "n_mc": n_mc,
         "seed": int(seed), "mc_seed": int(seed + 1),
         "generator": "ml_pipeline.synthetic.generate",
         "git_sha": _git_sha(),

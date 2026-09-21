@@ -1,9 +1,12 @@
-"""R17 -- the v4 artifacts carry baselines, provenance and a sensitivity record.
+"""R17 -- the v4/v5 artifacts carry baselines, provenance and a sensitivity
+record.
 
   * metrics.json: every band target reports the three reference models on
     the same folds, and the surrogate beats all of them in log space;
-  * model_card.json: version 4, the beta prior, and a reproducibility block
-    whose training-CSV SHA-256 matches the file on disk when it is present;
+  * model_card.json: version 5 (post-freeze background-floor retrain,
+    LIMITATIONS.md 4h-ii; v4 was the beta retrain), the beta prior, and a
+    reproducibility block whose training-CSV SHA-256 matches the file on
+    disk when it is present;
   * the sensitivity script produces the documented schema on a tiny design
     and restores every config constant it patched;
   * the audit's radium gate is still reported as failing -- it must not have
@@ -41,15 +44,15 @@ def test_baselines_are_reported_and_beaten():
         assert bl["surrogate_p50"]["r2_log"] == pytest.approx(b["r2_log"])
 
 
-def test_model_card_is_v4_with_the_beta_prior_and_provenance():
+def test_model_card_is_v5_with_the_beta_prior_and_provenance():
     c = _card()
-    assert c["version"] == 4
+    assert c["version"] == 5
     r = c["reproducibility"]
     assert r["beta_prior"] == list(P.DUAL_POROSITY["beta_prior"])
     assert r["beta_mc_factor"] == P.DUAL_POROSITY["beta_mc_factor"]
     assert r["training_rows"] == 18000 and r["training_scenarios"] == 900
     assert len(r["training_csv_sha256"]) == 64
-    assert r["bake_meta"] is None or r["bake_meta"]["version"] == 4
+    assert r["bake_meta"] is None or r["bake_meta"]["version"] == 5
     assert r["regenerate"][0].startswith("python -m ml_pipeline.synthetic.generate")
     csv = OUT / r["training_csv"]
     if csv.exists():

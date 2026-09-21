@@ -1,20 +1,20 @@
 {
-  "version": 4,
+  "version": 5,
   "e1_geometry": true,
   "reproducibility": {
     "training_csv": "synthetic_training.csv",
-    "training_csv_sha256": "3a50ba19669ba5efdfec6bced1a8a440b6d98efaea07cba5213e1b53fd824fd5",
+    "training_csv_sha256": "8ac61f2db8540c046748765ac00be59bf4112a8d5cef1dc3ffeeae088a6d22b4",
     "training_rows": 18000,
     "training_scenarios": 900,
     "bake_meta": {
-      "version": 4,
+      "version": 5,
       "n_scenarios": 900,
       "n_rows": 18000,
       "n_mc": 48,
       "seed": 42,
       "mc_seed": 43,
       "generator": "ml_pipeline.synthetic.generate",
-      "git_sha": "7af0326573acedfeab06dac89693988ad9b58e8e",
+      "git_sha": "8d2499d0df481ed2f2d74da984c4114815a1ef32",
       "beta_prior": [
         0.3,
         20.0
@@ -92,7 +92,7 @@
       "mean_pex_by_species": {
         "radium_226_mbq_l": 0.003,
         "sulfate_mg_l": 0.297,
-        "tds_mg_l": 0.401,
+        "tds_mg_l": 0.402,
         "uranium_ppb": 0.152
       },
       "restoration_share": 0.5,
@@ -105,8 +105,8 @@
         "radium_226_mbq_l": 1000.0
       }
     },
-    "trainer_git_sha": "7af0326573acedfeab06dac89693988ad9b58e8e",
-    "trained_at": "2026-09-20T06:58:58Z",
+    "trainer_git_sha": "8d2499d0df481ed2f2d74da984c4114815a1ef32",
+    "trained_at": "2026-09-21T07:41:38Z",
     "xgb_params": {
       "n_estimators": 450,
       "max_depth": 5,
@@ -194,34 +194,34 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|radium_226_mbq_l": 0.56335,
-      "fractured|sulfate_mg_l": 1.03194,
-      "fractured|tds_mg_l": 1.36362,
-      "fractured|uranium_ppb": 0.23079,
-      "porous|radium_226_mbq_l": 0.47443,
-      "porous|sulfate_mg_l": 1.10146,
-      "porous|tds_mg_l": 1.37911,
-      "porous|uranium_ppb": 0.30871
+      "fractured|radium_226_mbq_l": 0.57403,
+      "fractured|sulfate_mg_l": 1.01705,
+      "fractured|tds_mg_l": 1.46606,
+      "fractured|uranium_ppb": 0.23754,
+      "porous|radium_226_mbq_l": 0.5786,
+      "porous|sulfate_mg_l": 1.10573,
+      "porous|tds_mg_l": 1.29442,
+      "porous|uranium_ppb": 0.29035
     },
     "max_migration_distance_m": {
-      "fractured|radium_226_mbq_l": 0.23198,
-      "fractured|sulfate_mg_l": 1.17433,
-      "fractured|tds_mg_l": 1.53004,
-      "fractured|uranium_ppb": 0.85182,
-      "porous|radium_226_mbq_l": 0.52853,
-      "porous|sulfate_mg_l": 1.79868,
-      "porous|tds_mg_l": 1.95826,
-      "porous|uranium_ppb": 1.06925
+      "fractured|radium_226_mbq_l": 0.23263,
+      "fractured|sulfate_mg_l": 1.1173,
+      "fractured|tds_mg_l": 1.74105,
+      "fractured|uranium_ppb": 0.86174,
+      "porous|radium_226_mbq_l": 0.51784,
+      "porous|sulfate_mg_l": 1.86818,
+      "porous|tds_mg_l": 2.10978,
+      "porous|uranium_ppb": 0.99124
     },
     "compliance_conc": {
-      "fractured|radium_226_mbq_l": 0.06941,
-      "fractured|sulfate_mg_l": 1.22594,
-      "fractured|tds_mg_l": 0.65134,
-      "fractured|uranium_ppb": 1.82774,
-      "porous|radium_226_mbq_l": 0.04853,
-      "porous|sulfate_mg_l": 1.27147,
-      "porous|tds_mg_l": 0.62086,
-      "porous|uranium_ppb": 2.01064
+      "fractured|radium_226_mbq_l": 0.07564,
+      "fractured|sulfate_mg_l": 1.27418,
+      "fractured|tds_mg_l": 0.6949,
+      "fractured|uranium_ppb": 1.9276,
+      "porous|radium_226_mbq_l": 0.0426,
+      "porous|sulfate_mg_l": 1.29902,
+      "porous|tds_mg_l": 0.66096,
+      "porous|uranium_ppb": 2.04922
     }
   },
   "monotone_maps": {

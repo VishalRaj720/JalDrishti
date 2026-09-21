@@ -402,7 +402,11 @@ def train_all():
         # v4 = R17 beta retrain: porosity-derived served beta, log-uniform
         # [0.3, 20] training prior, factor-4 MC band (LIMITATIONS.md 1d).
         # v3 was the E1 disc/anisotropy retrain.
-        "version": 4,
+        # v5 = post-freeze fix (2026-09-21, LIMITATIONS.md 4h-ii): the
+        # restored/passively-flushed source-zone reading is floored at each
+        # scenario's own background, so a high-background species (TDS) no
+        # longer trains on labels reading below its own background.
+        "version": 5,
         "e1_geometry": True,
         "reproducibility": reproducibility,
         "features": MODEL_FEATURES,

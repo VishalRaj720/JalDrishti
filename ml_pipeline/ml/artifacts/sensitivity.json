@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-20T12:36:48Z",
+ "generated_at": "2026-09-21T07:56:17Z",
  "method": {
   "oat_points": 7,
   "sobol_n_base": 256,
@@ -1064,7 +1064,7 @@
      }
     }
    },
-   "seconds": 22.3
+   "seconds": 23.7
   },
   {
    "site": "jaduguda_deposit",
@@ -2040,7 +2040,7 @@
      }
     }
    },
-   "seconds": 26.3
+   "seconds": 27.6
   },
   {
    "site": "belt_point",
@@ -3092,7 +3092,7 @@
      }
     }
    },
-   "seconds": 21.0
+   "seconds": 22.4
   },
   {
    "site": "belt_point",
@@ -4068,7 +4068,7 @@
      }
     }
    },
-   "seconds": 26.3
+   "seconds": 26.1
   },
   {
    "site": "non_belt_ranchi",
@@ -5123,7 +5123,7 @@
      }
     }
    },
-   "seconds": 18.1
+   "seconds": 18.4
   },
   {
    "site": "non_belt_ranchi",
@@ -6099,7 +6099,7 @@
      }
     }
    },
-   "seconds": 23.1
+   "seconds": 22.3
   }
  ],
  "summary": [
