@@ -117,9 +117,11 @@ RADIUM_SOURCE_MBQ_L = {"min": 40.0, "gm": 371.3, "max": 1706.0, "gsd": 2.6}
 # -- which is why the max is used rather than scaling up by a uranium-like
 # ISR factor.
 RADIUM_SOURCE_STATISTIC = "max"
-# Regional background: uranium-mine-area groundwater Ra-226 ~ 23 mBq/L, with
-# potable wells spanning <3.5-208 mBq/L (BARC, J. Environ. Radioactivity 99
-# (2008) 1245; Jaduguda ground-water ingestion-dose study).
+# Regional background: uranium-mine-area groundwater Ra-226 ~ 23 mBq/L
+# (BARC: Tripathi et al., Appl. Radiat. Isot. 66(11) (2008) 1666-1670,
+# doi:10.1016/j.apradiso.2007.12.019), with potable wells spanning
+# <3.5-208 mBq/L (Tripathi et al., Radiat. Prot. Dosim. 148(2) (2012) 211-218,
+# doi:10.1093/rpd/ncr014; Jaduguda ground-water ingestion-dose study).
 RADIUM_BACKGROUND_MBQ_L = 23.0
 
 # Kd (L/kg). Source: EPA 402-R-04-002C Vol III, archived at
@@ -1091,8 +1093,8 @@ HORIZON_SLIDER_MAX_YEARS = 50.0
 # time at the retarded contaminant velocity). This gives the plume a FINITE
 # steady-state extent x* = (v_c/k) * ln(C0/thr) instead of unbounded growth.
 #
-# Rate grounding (Wyoming ISR cross-hole field test, Johnson et al. 2019,
-# ES&T 10.1021/acs.est.9b01572): ~50% of injected U(VI) reduced to U(IV) in
+# Rate grounding (Wyoming ISR cross-hole field test, Reimus et al. 2019,
+# ES&T 53(13) 7483-7493, 10.1021/acs.est.9b01572): ~50% of injected U(VI) reduced to U(IV) in
 # ~1 yr where reducing capacity was INTACT -> k_max ~ 0.7/yr. Two honesty
 # caveats bound the range DOWN: (1) that test conflates nothing with sorption
 # (we already model retardation separately -- calibrating to the 39%-recovered-

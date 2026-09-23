@@ -61,7 +61,7 @@ I thank my faculty mentor for guidance throughout the fellowship, and in particu
 
 I thank the TEXMiN–BIT Sindri Mining CPS Centre of Excellence and B.I.T. Sindri for the fellowship and for the review panel in August 2026.
 
-This project rests entirely on open data published by others: the Central Ground Water Board (CGWB) and the National Water Informatics Centre (National Water Data Portal), for the 2023 groundwater-chemistry yearbook table, the 2013–2021 water-level record, the 2000–2021 chemistry record and the district NAQUIM reports; the Geological Survey of India and NRSC Bhuvan for the lineament map; the International Atomic Energy Agency for the UDEPO deposit database; the U.S. Geological Survey for the two Texas ISR data releases; the European Space Agency / Copernicus programme for the GLO-30 digital elevation model; and Lehner & Grill for HydroRIVERS. The published Jaduguda studies by the Bhabha Atomic Research Centre and the Indian School of Mines provided the only local measurements of mine-water uranium and radium.
+This project rests entirely on open data published by others: the Central Ground Water Board (CGWB) and the National Water Informatics Centre (National Water Data Portal), for the 2023 groundwater-quality table of the *Annual Ground Water Quality Report 2024*, the 2013–2021 water-level record (via India-WRIS and the India Data Portal), the 2000–2021 chemistry record, the NAQUIM aquifer-mapping reports and the East Singhbhum groundwater information booklet; the Geological Survey of India and the National Remote Sensing Centre (ISRO), whose 1:50,000 lineament layer is served on Bhuvan; the International Atomic Energy Agency for the UDEPO deposit database; the U.S. Geological Survey for the two Texas ISR data releases; the European Space Agency / Copernicus programme for the GLO-30 digital elevation model, distributed by OpenTopography; and Lehner & Grill for HydroRIVERS. The published Jaduguda studies by the Bhabha Atomic Research Centre and the Indian School of Mines provided the only local measurements of mine-water uranium and radium.
 
 The software stands on FastAPI, SQLAlchemy, PostgreSQL/PostGIS, XGBoost, scikit-learn, NumPy/SciPy, pandas/GeoPandas, React, Vite, Leaflet and TanStack Query, and is hosted on Neon, Render and Cloudflare Workers.
 
@@ -93,7 +93,6 @@ The principal limitation is structural: no field validation of any modelled plum
 - **Version labels.** The surrogate artifacts are versioned by model card: v3 (11 Aug 2026), v4 (20 Sep 2026, the β retrain), v5 (21 Sep 2026, the background-floor retrain — the version reported here). "R10–R17" denote the numbered review-and-remediation passes of August–September 2026, as used throughout the repository's documentation.
 - **What is not claimed.** The words *real-time*, *validated against reality*, *accurate* and *predicts contamination* are avoided deliberately; §5 and §7 explain why each would overstate the work.
 
-
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 ```
@@ -102,7 +101,7 @@ The principal limitation is structural: no field validation of any modelled plum
 
 ## 1.1 Background
 
-Jharkhand is a hard-rock state. Outside the Damodar valley coalfields and the alluvial fringes, groundwater is stored and transmitted in a thin weathered mantle and in the fractured crystalline rock beneath it — Precambrian gneisses, schists, granites and quartzites of the Chotanagpur plateau and the Singhbhum craton. The Central Ground Water Board's aquifer-mapping (NAQUIM) reports for the state's districts describe a three-layer column: a weathered zone typically 13–30 m deep, a productive fractured zone that dies out somewhere between about 90 and 260 m depending on the district, and massive rock below [37]–[39]. Drinking water is drawn from the first of these layers by hand pumps and dug wells; irrigation and small-town supply reach into the second. The water table in this column swings by several metres between the pre-monsoon and post-monsoon campaigns — the statewide campaign medians in the CGWB record used here are 7.20 m below ground in May and 3.22 m in August [40].
+Jharkhand is a hard-rock state. Outside the Damodar valley coalfields and the alluvial fringes, groundwater is stored and transmitted in a thin weathered mantle and in the fractured crystalline rock beneath it — Precambrian gneisses, schists, granites and quartzites of the Chotanagpur plateau and the Singhbhum craton. The Central Ground Water Board's aquifer-mapping (NAQUIM) reports for the state's districts describe a three-layer column: a weathered zone typically 13–30 m deep, a productive fractured zone that dies out somewhere between about 90 and 260 m depending on the district, and massive rock below [37], [38]. Drinking water is drawn from the first of these layers by hand pumps and dug wells; irrigation and small-town supply reach into the second. The water table in this column swings by several metres between the pre-monsoon and post-monsoon campaigns — the statewide campaign medians in the CGWB record used here are 7.20 m below ground in May and 3.22 m in August [40].
 
 The Singhbhum Shear Zone of East Singhbhum district hosts India's oldest uranium mines — Jaduguda, Bhatin, Narwapahar, Turamdih, Banduhurang, Mohuldih and Bagjata — all of them conventional underground or open-pit operations run by the Uranium Corporation of India Ltd. The ore is uraninite in quartz–chlorite–biotite schists with abundant sulphides (chalcopyrite, pyrite, pyrrhotite); it is simultaneously a copper belt. None of these mines is an ISR operation, and this distinction is the premise of everything that follows.
 
@@ -120,7 +119,7 @@ The last clause is not a hedge; it is the second of the project's three objectiv
 
 ## 1.3 Motivation
 
-The proposal's motivation (proposal §7–§8) was that conventional groundwater monitoring in mining regions "depends on manual sampling, lab analysis, and threshold-based decision-making, which tend to be reactive rather than predictive". That description was confirmed, rather than merely assumed, by the measured record obtained for Jharkhand: the CGWB groundwater-chemistry yearbook table for 2023 holds 397 wells across 24 districts with **one sample per well, in one year, with no repeats**, and no well depth recorded [40]; the only genuinely temporal data available for the state are quarterly water-level readings (9,583 readings at 398 stations, 2013–2021) [41]. A predictive system in the proposal's sense — one that forecasts a degradation trend from a chemistry time series — was not buildable on that record, and this report says so in §5 and §7.
+The proposal's motivation (proposal §7–§8) was that conventional groundwater monitoring in mining regions "depends on manual sampling, lab analysis, and threshold-based decision-making, which tend to be reactive rather than predictive". That description was confirmed, rather than merely assumed, by the measured record obtained for Jharkhand: CGWB's 2023 groundwater-quality table for the state holds 397 wells across 24 districts with **one sample per well, in one year, with no repeats**, and no well depth recorded [39]; the only genuinely temporal data available for the state are quarterly water-level readings (9,583 readings at 398 stations, 2013–2021) [40]. A predictive system in the proposal's sense — one that forecasts a degradation trend from a chemistry time series — was not buildable on that record, and this report says so in §5 and §7.
 
 What *is* buildable, and what the project delivers, is a **screening tool that says what to look for and where**: a transport model grounded in real Jharkhand hydrogeology that turns a hypothetical source into a footprint, a monitoring-ring concentration, an excursion probability and a shallow-aquifer breakthrough time; an assessment of the existing measured record against the Indian drinking-water standard that turns 397 laboratory analyses into block-level bands and tiered alerts delivered to the residents concerned; and a ranking of every block by how poorly it is observed, so that the next sampling round goes where the record is blind rather than where the model is already confident.
 
@@ -130,7 +129,7 @@ Four gaps, each substantiated in §2 or found during the project:
 
 1. **No ISR-specific screening tool exists for Indian hard-rock hydrogeology.** The ISR screening literature and every commercial ISR operation on Earth concern unconsolidated or weakly consolidated sandstone aquifers [12], [15]–[17]. Transferring that experience to a fractured metamorphic shear zone requires a stated model of fractured-rock transport — dual porosity, matrix diffusion, fracture-fabric anisotropy — and a statement of which of its parameters are measured locally (§4.4–§4.5, §5.1).
 2. **The Indian groundwater-ML literature depends on data that does not exist here.** The random-forest, SVM, gradient-boosting and neural-network studies of groundwater quality in India that the proposal cited as method (§2.2) use multi-station, multi-year records. The Jharkhand record has one sample per well. The gap is not in the algorithms; it is in what they would be trained on.
-3. **Monitoring data is collected and not read.** The record contains twenty determinands at 99–100 % coverage; until this project's R13 pass (August 2026) only one of them, uranium, drove any logic in the system — and uranium exceeds its limit at zero wells while nitrate and fluoride exceed at 22 and 32. This was a finding about the project's own earlier design, and it generalises: a threshold that never fires is indistinguishable from a threshold that has nothing to fire on (§4.8, §6.1).
+3. **Monitoring data is collected and not read.** The 2023 record carries seventeen determinands, fourteen of them analysed at 99–100 % of wells (uranium at 86 %, iron and arsenic at none); until this project's R13 pass (August 2026) only one of them, uranium, drove any logic in the system — and uranium exceeds its limit at zero wells while nitrate and fluoride exceed at 22 and 32. This was a finding about the project's own earlier design, and it generalises: a threshold that never fires is indistinguishable from a threshold that has nothing to fire on (§4.8, §6.1).
 4. **Alerts that reach nobody.** A notification that exists only as a database row, visible to a resident who has signed in, opened a bell and previously followed the right block, is not a notification. Closing the threshold → alert → delivery → acknowledgement loop on a manual record turned out to require four separate fixes, three of them to controls that were present, configured and inert (§4.8, §6.8).
 
 ## 1.5 Objectives and deliverables
@@ -191,7 +190,7 @@ The report reconstructs what was done rather than an idealised version, and the 
 | May 2026 | ML approach 1c | Unified pipeline with **uranium as the regression target** (previously dropped): 342 Jharkhand real + 131 Texas real + 3,000 synthetic rows; five models (U, TDS, SO₄, pH regressors; safe/marginal/unsafe classifier); real-only U R²(log) 0.69; backend slimmed (Celery/Redis/Flower removed); two-command database setup. | MPR May 2026; commit `0693b20` |
 | Jun 2026 | **The turning point** | Audit of approach 1: in its training data distance-from-mine was random and time never entered the label; the real validation rows had neither. **Rebuild** as a 2-D analytical transport engine (Domenico + Tang + dual porosity + containment + three-phase timeline) with a physics-labelled 13,500-row training set and a monotone-constrained, conformally calibrated XGBoost surrogate; grounding in real Jharkhand fields (flow field, lineaments, NAQUIM, UDEPO, shear-zone transmissivity, rivers); interactive dashboard; ~1,100-case QA sweep at nine pins, four defects fixed. | MPR Jun 2026; commits `6a85293`–`5ad73ff`; `docs/local/comparison.md` |
 | Jul 2026 | Reviews and backend rebuild | Fidelity fixes (depth-decay K, attenuation by ore zone, seam blending, **radium-226** as a fourth species → 18,000 rows); **three independent review rounds** (findings #1–#9, V-1–V-8, D-1–D-7) each closed or refuted with evidence; exact-solution benchmark; full Ogata–Banks term restored; migration R² 0.719 → 0.896 across four retrains; backend rebuilt on the real engine (P0–P4): the placeholder simulation engine deleted, a signup privilege-escalation hole closed, **five roles + Postgres row-level security**, field-observation workflow, transposed geometry fixed; React/TypeScript portal. | MPR Jul 2026; PR #6 |
-| Aug 2026 | Product and deployment (R10–R15) | Console, publication workflow, resident surface, PDF report, comparison, dataset manager, monitoring-network plan; **IS 10500 assessment** of the 19 unread determinands; Theil–Sen/Mann–Kendall level trends; three **inert security controls** found and wired; deployment audit NO-GO on five conditions, all closed; deployed on Neon + Render + Cloudflare; the **β plume-extent finding** recorded as open; final presentation to the TEXMiN–BIT Sindri panel. | MPR Aug 2026; PRs #7–#9 |
+| Aug 2026 | Product and deployment (R10–R15) | Console, publication workflow, resident surface, PDF report, comparison, dataset manager, monitoring-network plan; **IS 10500 assessment** of the determinands no logic had read; Theil–Sen/Mann–Kendall level trends; three **inert security controls** found and wired; deployment audit NO-GO on five conditions, all closed; deployed on Neon + Render + Cloudflare; the **β plume-extent finding** recorded as open; final presentation to the TEXMiN–BIT Sindri panel. | MPR Aug 2026; PRs #7–#9 |
 | Sep 2026 | R16, R17 and freeze | R16: the alert loop closed (home block at registration, SMTP delivery, scheduler, front page). R17: pre-report audit; **β derived from porosities and the v4 retrain**; alert tiers with a seven-field record; timeline frames; hydrochemical QA; global sensitivity analysis; the CGWB 2000–2021 record; documentation sync and **project freeze**. Post-freeze fixes: two chart mis-statements, a background floor on the source term with the **v5 retrain**, and an alert-delivery retry defect found while configuring email on the deployed system. | commits `77b721b`–`476a4a9`; `docs/PROJECT_FREEZE.md` |
 
 Three features of this chronology matter for reading the rest of the report. First, the first git commit is dated 26 December 2025, so the November work is documented only in the first MPR. Second, the machine-learning work of March–May 2026 (three successive tabular pipelines) was superseded, not refined: its data files were kept, its models and synthetic generators were deleted from the repository in July (`6a85293`), and §7.2 explains why the reported R² of 0.69 did not validate what it appeared to validate. Third, from July onward the project's method of working was audit-driven: every review pass produced a written finding list, every finding was either fixed with a pinned test or refuted with evidence, and the record of retracted findings was kept because the retraction is itself information (`docs/local/audit-record/README.md`).
@@ -199,7 +198,6 @@ Three features of this chronology matter for reading the rest of the report. Fir
 ## 1.9 Structure of this report
 
 §2 reviews the literature by comparison and ends each subsection with what the reviewed work does not provide for this problem. §3 states the study context, every dataset with its provenance and row count, the data-quality findings, and — in §3.6 — the hypothetical scenario precisely. §4 is the methodology, ordered physics-first: architecture, preprocessing, features, the hydrogeological framework, the plume engine, the surrogate, vulnerability, alerts, uncertainty and data gaps, the CPS architecture, and the software. §5 tabulates assumptions and limitations. §6 reports results with the [M]/[S]/[V] tags. §7 discusses the research questions. §8 is the Project Completion Matrix. §9 concludes; §10 lists future work. The appendices carry the descriptive statistics, the full model metrics, the API and schema summaries, the scenario and assumption registers, sample records, the Source-to-Claim Register, deployment details and the sensitivity tables.
-
 
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
@@ -211,7 +209,7 @@ The review is organised by the seven bodies of work the project had to draw on, 
 
 ## 2.1 Groundwater quality assessment: indices versus limits
 
-Two traditions assess groundwater quality. The **index tradition** collapses many determinands into one number: the water quality index (WQI) of Brown et al. [56] and its descendants weight each parameter by a relative weight, most often the inverse of its permissible limit, and sum the weighted sub-indices. The construction is convenient and is widely used for Indian groundwater [57], but it has a property that misleads: because the weight is 1/limit, the determinand with the smallest limit dominates the score regardless of whether it is the determinand of concern. The project found this on a real well before it found it in the formula — Dasokhap (Hazaribagh) scores "unsuitable for drinking" on a fluoride reading of 1.43 mg/L that is *below* its own permissible limit of 1.5 mg/L, because fluoride carries 96 % of the score (`docs/LIMITATIONS.md` §4d). The **limit tradition** compares each determinand with a published standard and reports the class. In India the standard is IS 10500:2012 [25], which defines for each determinand an *acceptable* limit and a *permissible limit in the absence of an alternate source*, with "no relaxation" for nitrate, uranium (via the 2015/2021 amendments) and some others; the WHO guideline value of 30 µg/L for uranium [26] is the provisional health-based value the Indian standard aligns with. CGWB's own assessment practice is limit-based, district by district, in its groundwater year books [39].
+Two traditions assess groundwater quality. The **index tradition** collapses many determinands into one number: the water quality index (WQI) of Brown et al. [56] and its descendants weight each parameter by a relative weight, most often the inverse of its permissible limit, and sum the weighted sub-indices. The construction is convenient and is widely used for Indian groundwater [57], but it has a property that misleads: because the weight is 1/limit, the determinand with the smallest limit dominates the score regardless of whether it is the determinand of concern. The project found this on a real well before it found it in the formula — Dasokhap (Hazaribagh) scores "unsuitable for drinking" on a fluoride reading of 1.43 mg/L that is *below* its own permissible limit of 1.5 mg/L, because fluoride carries 96 % of the score (`docs/LIMITATIONS.md` §4d). The **limit tradition** compares each determinand with a published standard and reports the class. In India the standard is IS 10500:2012 [25], which defines for each determinand an *acceptable* limit and a *permissible limit in the absence of an alternate source*, with "no relaxation" for nitrate, uranium (via the 2015/2021 amendments) and some others; the WHO guideline value of 30 µg/L for uranium [26] is the provisional health-based value the Indian standard aligns with. CGWB's own assessment practice is limit-based, district by district, in its annual groundwater-quality reports [39].
 
 The project reports the limit-based assessment first and the composite index second, with the dominant term shown beside every score (§4.7). *What neither tradition provides is a rule for what to say about a well that was never analysed for a determinand — the index treats a missing value as zero and the limit comparison treats it as absent — and the project had to define "not tested" as a class of its own.*
 
@@ -263,7 +261,6 @@ Read together, §2.1–§2.7 locate the gap JalDrishti addresses. The ISR contam
 
 The gap, then, is a *screening-grade, honestly-bounded* system for hard-rock India: a transport engine with every foreign parameter registered as such, a surrogate whose accuracy is defined as fidelity to the engine, an assessment of the measured record that distinguishes "clean" from "not tested", an alert loop that actually delivers, and a monitoring recommendation that ranks by observation. That is what §3–§6 describe and §8 audits against the proposal.
 
-
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 ```
@@ -282,7 +279,7 @@ A second premise: **no field validation is possible.** No ISR plume has ever bee
 
 **Terrain and aquifers.** Jharkhand (79,714 km²) is dominated by Precambrian crystalline rock — the Chotanagpur Gneissic Complex in the north and centre, the Singhbhum craton and its shear zone in the south-east — with Gondwana sandstones in the Damodar and other coal basins, Rajmahal basalts in the east, laterite caps and alluvium along the major rivers. The CGWB aquifer polygons used here classify the state into 12 lithologies, of which eight (schist, gneiss, granite, quartzite, charnockite, Basement Gneissic Complex, basalt, intrusive) are treated as *fractured* aquifers and four (limestone, sandstone, laterite, alluvium) as *porous* (`config/parameters.py`, `LITHOLOGY_REGIME`). The Basement Gneissic Complex alone covers 48,047 km², more than half the state — which is why "alert every block on the same aquifer" was rejected as a notification rule (§4.8).
 
-**The vertical column.** The NAQUIM reports for 21 districts, the CGWB district profile for East Singhbhum and regional estimates for the remaining three give a three-layer column per district (`Datasets/naquim_reference/naquim_vertical.csv`): the base of the weathered shallow aquifer (Layer 1) at 13–22 m; productive fractures from about 8–30 m down to a *fracture-death depth* that ranges from 90 m (Khunti) and 100 m (Godda) through 121 m (Ranchi) and 181 m (Dhanbad) to 258 m (East Singhbhum); and the deeper aquifer recorded as confined in the three Singhbhum districts and semi-confined elsewhere. Ore in the Singhbhum deposits lies at 60–250 m (Banduhurang open-pit at the shallow end, Jaduguda's deeper levels at the other) — i.e. inside or at the base of the productive fractured zone, and 100–200 m below the drinking-water aquifer. That separation is what the vertical screening of §4.5 evaluates.
+**The vertical column.** Twenty-two CGWB NAQUIM reports were downloaded [37]; one of them, the combined report for the three Singhbhum-belt districts, was an unreadable PDF. The twenty-one readable reports ground nineteen districts (two of them, Bokaro and Ranchi, only through block-level and part-district reports, at lower confidence); the 2013 CGWB groundwater information booklet grounds East Singhbhum [38]; Saraikela-Kharsawan is bracketed by its East and West Singhbhum neighbours; and Hazaribagh, Palamu and Ramgarh, which have no district-level report in the set, carry regional estimates from adjacent districts. Together they give a three-layer column for each of the 24 districts (`Datasets/naquim_reference/naquim_vertical.csv`): the base of the weathered shallow aquifer (Layer 1) at 13–22 m; productive fractures from about 8–30 m down to a *fracture-death depth* that ranges from 90 m (Khunti) and 100 m (Godda) through 121 m (Ranchi) and 181 m (Dhanbad) to 258 m (East Singhbhum); and the deeper aquifer recorded as confined in the three Singhbhum districts and semi-confined elsewhere. Ore in the Singhbhum deposits lies at 60–250 m (Banduhurang open-pit at the shallow end, Jaduguda's deeper levels at the other) — i.e. inside or at the base of the productive fractured zone, and 100–200 m below the drinking-water aquifer. That separation is what the vertical screening of §4.5 evaluates.
 
 **Regional flow.** The plateau is a divergence: the Subarnarekha drains the south-east past the uranium belt, the Damodar the north-east, the North Koel and Son the north-west. The project's flow field (§4.2) is built from 398 CGWB level stations on a 5 km grid; its hydraulic gradient has a statewide median of 0.0030 (10th–90th percentile 0.0012–0.0076), and at the Jaduguda reference pin resolves to 0.00205 (`ml_pipeline/data_prep/artifacts/flow_field_meta.json`; §6.4).
 
@@ -296,21 +293,21 @@ Table 3.1 lists every dataset the delivered system reads, with provider, extent,
 
 | # | Dataset | Provider / citation | Rows / extent | Used for | Repository path |
 |---|---|---|---|---|---|
-| 1 | Groundwater chemistry, 2023 | CGWB [39] | 397 wells, 24 districts, 20 determinands; **one sample per well**; U analysed at 342; Fe, As 0 % | IS 10500 assessment, citizen band, measured alerts, engine background concentrations, hydrochemical QA, monitoring-gap ranking | `Datasets/waterQuality_jharkhand.csv` |
+| 1 | Groundwater chemistry, 2023 | CGWB, *Annual Ground Water Quality Report 2024* [39] | 397 wells, 24 districts, 17 determinands (the database adds TDS derived from EC); **one sample per well**; U analysed at 342; Fe, As 0 % | IS 10500 assessment, citizen band, measured alerts, engine background concentrations, hydrochemical QA, monitoring-gap ranking | `Datasets/waterQuality_jharkhand.csv` |
 | 2 | Groundwater chemistry, 2000–2021 | CGWB via National Water Data Portal, NWIC [41] | 1,632 analyses, 366 stations, 2000–2021; pH/EC 100 %, HCO₃/Cl/Ca/Mg/Na 92 %, hardness 81 %, SO₄ 46 %; **no F, NO₃, Fe, As, Mn**; 2 uranium values | per-station baseline mean/sd and Theil–Sen trend of the general chemistry; read-only | `Datasets/cgwb_gwq_chemical_jharkhand_2000_2021.csv` (+ physical file: temperature, turbidity) |
-| 3 | Groundwater levels, 2013–2021 | CGWB / India-WRIS [40] | 9,583 readings, 398 stations, all months (campaign-bucketed) | flow field (head = DEM − depth), seasonal amplitude, level trends | `Datasets/cgwb_waterlevel_jharkhand.csv` |
+| 3 | Groundwater levels, 2013–2021 | CGWB / India-WRIS, via India Data Portal [40] | 9,583 readings, 398 stations, all months (campaign-bucketed) | flow field (head = DEM − depth), seasonal amplitude, level trends | `Datasets/cgwb_waterlevel_jharkhand.csv` |
 | 4 | Aquifer polygons | CGWB / NAQUIM-derived | 24 polygons statewide: lithology, K, specific yield, thickness, transmissivity | regime, K, porosities (with literature fill where a field is "-") | `Datasets/Aquifers_Jharkhand.geojson` |
 | 5 | District and sub-district boundaries | Government of India | 24 districts; 264 blocks used for ranking (275 sub-districts loaded) | block resolution, alert targeting, public map | `Datasets/*Boundary_JH.geojson` |
-| 6 | Lineaments | GSI / NRSC Bhuvan [42] | 1,889 features; 1,826 structural segments used (799 joint/fracture, 39 dyke, 15 shear zone, 9 fault, 8 fold axis) | strike field → transverse anisotropy and display azimuth | `Datasets/jharkhand_lineaments.geojson` |
+| 6 | Lineaments | GSI–NRSC 1:50,000 lineament layer, Bhuvan WMS [42] | 1,889 features (a partial, grid-sampled harvest of the layer); 1,826 structural segments used (799 joint/fracture, 39 dyke, 15 shear zone, 9 fault, 8 fold axis) | strike field → transverse anisotropy and display azimuth | `Datasets/jharkhand_lineaments.geojson` |
 | 7 | Perennial rivers | HydroRIVERS v1.0, Lehner & Grill [45], clipped | 4,577 reaches with discharge | receptor distance; plume–river crossing test | `Datasets/jharkhand_rivers.geojson` |
 | 8 | NAQUIM vertical table | CGWB NAQUIM district reports [37] + E-Singhbhum profile [38]; 3 regional estimates | 24 rows: Layer-1 base, fracture range, confined flag, confidence | vertical screening; per-district depth-decay length | `Datasets/naquim_reference/naquim_vertical.csv` |
 | 9 | Uranium deposits | UCIL deposit outlines (project-digitised) + IAEA UDEPO grades [43] | 7 deposit polygons + a belt envelope; 9 UDEPO Indian deposits | ore-zone gating of the uranium source term; grade scaling; per-deposit ore depth | `Datasets/Jharkhand Ore/`, `Datasets/udepo_uranium_deposits.xlsx` |
 | 10 | Texas ISR groundwater quality | USGS data release [15] (Dataset 1) | `TX_ISR_Final.xlsx`: Baseline 86, End-of-Mining 9, Final Post-restoration 86 rows after parsing | source signature (C₀ envelope), paired restoration residuals, porosity | `Datasets/Real_dataset/Dataset_1/` |
 | 11 | Texas ISR operations | USGS data release [16] (Dataset 2) | `Restoration.csv` (13 production areas), `TexasISROperations.csv`, `AquiferExemptions.csv`, `MinePermits.csv`, `DisposalVolumes.csv`, `AreaInformation.csv`, `CitationsSources.csv` | restoration reference duration (median 5.0 yr), operating ranges | `Datasets/Real_dataset/Dataset 2/` |
-| 12 | Digital elevation model | Copernicus GLO-30 [44] | statewide, 30 m (703 MB, not in git) | flow-field bake only (station head, DEM fallback) | regenerable via `fetch_data/` |
+| 12 | Digital elevation model | Copernicus GLO-30 via OpenTopography [44] | statewide, 1 arc-second (≈ 30 m); 703 MB, not in git | flow-field bake only (station head, DEM fallback) | `Datasets/jharkhand_glo30_dem.tif`, regenerable with the local, git-ignored `fetch_data/fetchDEM.py` |
 | 13 | Synthetic training set | this project (v5 bake) | 900 scenarios × 5 horizons × 4 species = 18,000 rows; 48 MC draws each; SHA-256 `8ac61f2d…` in the model card | surrogate training; regenerable by seed 42 | `ml_pipeline/outputs/` (not in git) |
 
-Three datasets that were loaded into the database in early 2026 but do not feed the delivered system are noted for completeness: the monitoring-station table of December 2025 (superseded by the level record), the synthetic water-sample rows of March 2026 (flagged `synthetic = TRUE`, later dropped with the `DataGen_ModelMVP` pipeline), and the `Datasets/phase1_sources/` archive of PDFs (EPA and IAEA Kd compendia, the Sethy and Giri papers, the NAQUIM depth evidence) which are literature, not data.
+Three datasets that were loaded into the database in early 2026 but do not feed the delivered system are noted for completeness: the monitoring-station table of December 2025 (superseded by the level record), the synthetic water-sample rows of March 2026 (flagged `synthetic = TRUE`, later dropped with the `DataGen_ModelMVP` pipeline), and the `Datasets/phase1_sources/` archive (the EPA, IAEA and SKB K_d compendia, an IAEA alkaline-leach report and the Sethy et al. full text), which is literature, not data.
 
 ## 3.4 Dataset characteristics
 
@@ -395,7 +392,6 @@ Every modelled result in §6 is conditional on the operating scenario in Table 3
 | Excursion control limit ⚑ | baseline × 1.20, bracketed | — | NUREG-1569 "simple percentage" rule [12] |
 | Thresholds | U 30 ppb; SO₄ 400 mg/L; TDS 2,000 mg/L; Ra 1,000 mBq/L (WHO); Cl, NO₃, F, hardness per IS 10500 | — | [25], [26] |
 
-
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 ```
@@ -475,7 +471,7 @@ Figure 4.2 — Deployed topology (single-origin, Option A of docs/DEPLOYMENT.md)
 
 ![Figure 4.4 — The fracture-strike field from 1,826 GSI lineament segments: mean strike and circular variance per 5 km cell. Source: `ml_pipeline/data_prep/artifacts/strike_field.png`.](figures/fig_strike_field.png)
 
-**NAQUIM → layer table.** 410 evidence snippets were extracted from the 21 district PDFs into `naquim_depth_evidence.md`, and the layer table of §3.2 was built from them by hand with a per-row confidence and page citation.
+**NAQUIM → layer table.** An automated keyword scan of the 22 NAQUIM PDFs (7 July 2026) extracted 410 evidence snippets, from the 18 that yielded matches, into `naquim_depth_evidence.md`, and the layer table of §3.2 was built from them by hand with a per-row confidence and page citation.
 
 **Texas → source signature and residuals.** The three sheets of `TX_ISR_Final.xlsx` are parsed with their header rows located and their unit rows, footnotes and repeated headers rejected by rule (a pinned row-count assertion guards against the parser drifting — review2 V-4); detection-limit strings (`<.001`) and uncertainty notation (`1044±5`) are handled; one pH data-entry error (795) was corrected. Per-mine End-of-Mining means give the C₀ envelope; the paired per-mine ratio of Final-Post-restoration to End-of-Mining medians gives the restoration residual per species (§3.4). The 13 restoration durations in `Restoration.csv` give the 5.0-year reference sweep.
 
@@ -622,7 +618,6 @@ is the excursion probability — incremental, so that a naturally poor baseline 
 
 **Timeline frames (R17).** For every stored run the engine is re-evaluated at up to ~15 horizons (the base set within the horizon, the horizon itself, and the two phase boundaries), and each frame stores the screening-limit contour, area, migration, ring concentration, phase and the first-exceedance year at the ring. Nothing is interpolated: "first exceedance at the 8-year frame" means the crossing lies between the 5- and 8-year evaluations. The ML band is evaluated per frame but drawn only at the run's own horizon, because the band ellipses belong to that horizon.
 
-
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 ```
@@ -754,7 +749,6 @@ The honest description is *CPS-ready decision support over a manual monitoring n
 
 **Two engineering findings recorded as method.** First, *after any COMMIT the RLS context is gone*: `SET LOCAL` dies at commit by design, so code that commits and keeps writing is anonymous from then on, and RLS-protected tables return nothing rather than erroring. This caused three silent failures (an alert system that never delivered, a run endpoint that never worked, the alert upsert) and a fourth form (an `ON CONFLICT DO UPDATE` needs an UPDATE policy). The rule adopted: write the value in the original INSERT; check `pg_policies` for UPDATE before any upsert on an RLS table. Second, *configuration that enforces nothing*: a rate limit read into settings and listed in the deployment checklist applied to nothing for months because the middleware that consults it was never installed; the alert insert, the exceedance scan and the docker-compose database role were the same shape. The only detection was to *measure* — count 429s, count rows — and each control now has a test that measures it.
 
-
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 ```
@@ -788,6 +782,7 @@ Each row states an assumption, where it enters the system, the consequence if it
 | 55 wells in the three Singhbhum districts un-analysed for uranium | the uranium belt itself | the belt is untested for the one contaminant the tool screens for | `Not tested` band; ranking factor with weight 30 |
 | Spatial density ~1 well per 200 km² | background at a pin | the nearest well may be tens of km away | `data_confidence.nearest_well_km` |
 | NAQUIM at district scale; three districts on regional estimates | vertical screening, K(z) | a per-district λ and layer base applied to every pin in the district | confidence column in the layer table |
+| The lineament layer is a partial copy: 1,889 features recovered by WMS point queries on a 60 × 60 grid, not a full export [42] | strike field, transverse anisotropy | orientation statistics are robust to the undersampling; fracture count and intensity are not, and are deliberately not used | `ml_pipeline/data_prep/strike_field.py` (method note); reference [42] |
 | CGWB values characterise the shallow aquifer, applied at ore depth through a modelled K(z) | every fractured run | the deep K is a law, not a measurement | `extrapolation` reports `hydro:K_m_day` below trained support |
 | The 2023 charge balance is a consistency of construction (Na by difference) | QA | zero suspect analyses is not evidence of laboratory quality | `independence_check` reported with the QA summary |
 | The 2000–2021 record carries no health determinand | D1 "forecast trends" | trend forecasting for any banded or alerted determinand remains undemonstrated | §7; no band or alert uses the record |
@@ -834,7 +829,6 @@ Each row states an assumption, where it enters the system, the consequence if it
 | Other commodities (coal, rare earth, heavy metals) | *designed for* through the species registry (`SPECIES` / `ML_SPECIES` / `EXCURSION_ONLY_SPECIES`; chloride was added without a retrain as the proof) — **not demonstrated** |
 | Any modelled result | a conditional statement about a hypothetical operation, never a forecast of real contamination |
 | "Validated" | benchmarked against exact solutions and internally gated — never validated against a real plume, because none exists to validate against |
-
 
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
@@ -1126,7 +1120,6 @@ The pattern: hydraulic conductivity first, then β, then the gradient and Kd for
 
 The deployed API runs whichever commit was last deployed; `docs/PROJECT_FREEZE.md` §8 lists the steps that bring the deployment to the report commit (migrate to `0026`, deploy the v5 artifacts, rebuild alert explanations once, re-run one simulation per published site so the advisory has frames).
 
-
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 ```
@@ -1231,165 +1224,163 @@ Only what follows from a limitation named in §5 or a result in §6.
 9. **Other commodities through the species registry** — coal-mine acid drainage (sulphate, iron, manganese) is the nearest, because its indicators are already in the excursion panel — with the explicit caveat that nothing outside uranium ISR has been demonstrated.
 10. **Remove the demo field observation** from the ore dataset (§3.5 item 7) and re-verify the deployed database, before any further use of the deployed system.
 
-
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 ```
 
 # References
 
-IEEE numeric. Entries marked ✓ were opened (DOI, publisher page or catalogue record) on 21 September 2026 during the writing of this report; entries marked ○ are canonical works cited from the project's own configuration and documentation and were not re-opened on that date — they should be checked once more before submission. Dataset entries give provider, title, version or year, URL and access date.
+IEEE numeric. Every entry was checked on 21 or 23 September 2026 against one of: its DOI record (Crossref), the publisher's or issuing body's page, a library or standards-catalogue record, or — for the five local reference documents (the three EPA K_d volumes, the East Singhbhum booklet and the NRSC lineament manual) — the PDF held in `Datasets/`. Dataset entries were checked against the files, the download scripts in `fetch_data/` and the provider's portal where it could be reached; the one detail that could not be confirmed is stated in its entry ([39]). Dataset entries give provider, title, version or year, URL and access date. The download scripts named under `fetch_data/` are kept in the project's local checkout and are not tracked in git.
 
 **Transport theory and hydrogeology**
 
-[1] ○ R. A. Freeze and J. A. Cherry, *Groundwater*. Englewood Cliffs, NJ: Prentice-Hall, 1979.
+[1] R. A. Freeze and J. A. Cherry, *Groundwater*. Englewood Cliffs, NJ: Prentice-Hall, 1979.
 
-[2] ○ P. A. Domenico, "An analytical model for multidimensional transport of a decaying contaminant species," *Journal of Hydrology*, vol. 91, no. 1–2, pp. 49–58, 1987.
+[2] P. A. Domenico, "An analytical model for multidimensional transport of a decaying contaminant species," *Journal of Hydrology*, vol. 91, no. 1–2, pp. 49–58, 1987, doi: 10.1016/0022-1694(87)90127-2.
 
-[3] ○ P. A. Domenico and G. A. Robbins, "A new method of contaminant plume analysis," *Ground Water*, vol. 23, no. 4, pp. 476–485, 1985.
+[3] P. A. Domenico and G. A. Robbins, "A new method of contaminant plume analysis," *Ground Water*, vol. 23, no. 4, pp. 476–485, 1985, doi: 10.1111/j.1745-6584.1985.tb01497.x.
 
-[4] ○ A. Ogata and R. B. Banks, "A solution of the differential equation of longitudinal dispersion in porous media," U.S. Geological Survey Professional Paper 411-A, 1961.
+[4] A. Ogata and R. B. Banks, "A solution of the differential equation of longitudinal dispersion in porous media," U.S. Geological Survey Professional Paper 411-A, 1961. https://pubs.usgs.gov/pp/0411a/report.pdf
 
-[5] ○ D. H. Tang, E. O. Frind, and E. A. Sudicky, "Contaminant transport in fractured porous media: Analytical solution for a single fracture," *Water Resources Research*, vol. 17, no. 3, pp. 555–564, 1981.
+[5] D. H. Tang, E. O. Frind, and E. A. Sudicky, "Contaminant transport in fractured porous media: Analytical solution for a single fracture," *Water Resources Research*, vol. 17, no. 3, pp. 555–564, 1981, doi: 10.1029/WR017i003p00555.
 
-[6] ○ I. Neretnieks, "Diffusion in the rock matrix: An important factor in radionuclide retardation?," *Journal of Geophysical Research*, vol. 85, no. B8, pp. 4379–4397, 1980.
+[6] I. Neretnieks, "Diffusion in the rock matrix: An important factor in radionuclide retardation?," *Journal of Geophysical Research*, vol. 85, no. B8, pp. 4379–4397, 1980, doi: 10.1029/JB085iB08p04379.
 
-[7] ○ M. N. Goltz and P. V. Roberts, "Three-dimensional solutions for solute transport in an infinite medium with mobile and immobile zones," *Water Resources Research*, vol. 22, no. 7, pp. 1139–1148, 1986.
+[7] M. N. Goltz and P. V. Roberts, "Three-dimensional solutions for solute transport in an infinite medium with mobile and immobile zones," *Water Resources Research*, vol. 22, no. 7, pp. 1139–1148, 1986, doi: 10.1029/WR022i007p01139.
 
-[8] ○ L. W. Gelhar, C. Welty, and K. R. Rehfeldt, "A critical review of data on field-scale dispersion in aquifers," *Water Resources Research*, vol. 28, no. 7, pp. 1955–1974, 1992.
+[8] L. W. Gelhar, C. Welty, and K. R. Rehfeldt, "A critical review of data on field-scale dispersion in aquifers," *Water Resources Research*, vol. 28, no. 7, pp. 1955–1974, 1992, doi: 10.1029/92WR00607.
 
-[9] ○ M. Xu and Y. Eckstein, "Use of weighted least-squares method in evaluation of the relationship between dispersivity and field scale," *Ground Water*, vol. 33, no. 6, pp. 905–908, 1995.
+[9] M. Xu and Y. Eckstein, "Use of weighted least-squares method in evaluation of the relationship between dispersivity and field scale," *Ground Water*, vol. 33, no. 6, pp. 905–908, 1995, doi: 10.1111/j.1745-6584.1995.tb00035.x.
 
-[10] ○ M. R. West, B. H. Kueper, and M. J. Ungs, "On the use and error of approximation in the Domenico (1987) solution," *Ground Water*, vol. 45, no. 2, pp. 126–135, 2007.
+[10] M. R. West, B. H. Kueper, and M. J. Ungs, "On the use and error of approximation in the Domenico (1987) solution," *Ground Water*, vol. 45, no. 2, pp. 126–135, 2007, doi: 10.1111/j.1745-6584.2006.00280.x.
 
-[11] ○ C. E. Manning and S. E. Ingebritsen, "Permeability of the continental crust: Implications of geothermal data and metamorphic systems," *Reviews of Geophysics*, vol. 37, no. 1, pp. 127–150, 1999.
+[11] C. E. Manning and S. E. Ingebritsen, "Permeability of the continental crust: Implications of geothermal data and metamorphic systems," *Reviews of Geophysics*, vol. 37, no. 1, pp. 127–150, 1999, doi: 10.1029/1998RG900002.
 
 **ISR regulation, records and field studies**
 
-[12] ✓ U.S. Nuclear Regulatory Commission, *Standard Review Plan for In Situ Leach Uranium Extraction License Applications*, NUREG-1569, Final Report, June 2003. https://www.nrc.gov/reading-rm/doc-collections/nuregs/staff/sr1569/
+[12] U.S. Nuclear Regulatory Commission, *Standard Review Plan for In Situ Leach Uranium Extraction License Applications*, NUREG-1569, Final Report, June 2003. https://www.nrc.gov/reading-rm/doc-collections/nuregs/staff/sr1569/
 
-[13] ✓ P. C. Mackin, D. Daruwalla, J. Winterle, M. Smith, and D. A. Pickett, *A Baseline Risk-Informed, Performance-Based Approach for In Situ Leach Uranium Extraction Licensees*, NUREG/CR-6733, U.S. Nuclear Regulatory Commission, Sept. 2001.
+[13] P. C. Mackin, D. Daruwalla, J. Winterle, M. Smith, and D. A. Pickett, *A Baseline Risk-Informed, Performance-Based Approach for In Situ Leach Uranium Extraction Licensees*, NUREG/CR-6733, U.S. Nuclear Regulatory Commission, Sept. 2001.
 
-[14] ✓ J. A. Davis and G. P. Curtis, *Consideration of Geochemical Issues in Groundwater Restoration at Uranium In-Situ Leach Mining Facilities*, NUREG/CR-6870, U.S. Nuclear Regulatory Commission, Jan. 2007.
+[14] J. A. Davis and G. P. Curtis, *Consideration of Geochemical Issues in Groundwater Restoration at Uranium In-Situ Leach Mining Facilities*, NUREG/CR-6870, U.S. Nuclear Regulatory Commission, Jan. 2007.
 
-[15] ✓ S. M. Hall and T. B. Hennesy, "Historic groundwater quality of in situ recovery (ISR) uranium mines, Texas," U.S. Geological Survey data release, https://doi.org/10.5066/F74T6GC4 (ScienceBase item 5d1ce55ce4b0941bde64cd53). Accessed April 2026; re-checked 21 Sept. 2026.
+[15] S. M. Hall and T. B. Hennesy, "Historic groundwater quality of in situ recovery (ISR) uranium mines, Texas," U.S. Geological Survey data release, https://doi.org/10.5066/F74T6GC4 (ScienceBase item 5d1ce55ce4b0941bde64cd53). Accessed April 2026; re-checked 21 Sept. 2026.
 
-[16] ✓ U.S. Geological Survey, "Data compiled on historical water use, spatial land disturbance, aquifer disturbance and uranium produced by in situ recovery of uranium from sandstone-hosted uranium deposits in the South Texas Coastal Plain, USA," data release, 2022, https://doi.org/10.5066/P9U7QKC1. Accessed April 2026 (`Datasets/Real_dataset/Dataset 2/Product_10.5066P9U7QKC1_METADATA.xml`).
+[16] U.S. Geological Survey, "Data compiled on historical water use, spatial land disturbance, aquifer disturbance and uranium produced by in situ recovery of uranium from sandstone-hosted uranium deposits in the South Texas Coastal Plain, USA," data release, 2022, https://doi.org/10.5066/P9U7QKC1. Accessed April 2026 (`Datasets/Real_dataset/Dataset 2/Product_10.5066P9U7QKC1_METADATA.xml`).
 
-[17] ✓ S. M. Hall, *Groundwater Restoration at Uranium In-Situ Recovery Mines, South Texas Coastal Plain*, U.S. Geological Survey Open-File Report 2009-1143, 2009. https://pubs.usgs.gov/of/2009/1143/
+[17] S. M. Hall, *Groundwater Restoration at Uranium In-Situ Recovery Mines, South Texas Coastal Plain*, U.S. Geological Survey Open-File Report 2009-1143, 2009. https://pubs.usgs.gov/of/2009/1143/
 
-[18] ✓ P. W. Reimus, M. A. Dangelmayr, J. T. Clay, and K. R. Chamberlain, "Uranium natural attenuation downgradient of an in situ recovery mine inferred from a cross-hole field test," *Environmental Science & Technology*, vol. 53, no. 13, pp. 7483–7493, 2019, doi: 10.1021/acs.est.9b01572. *(Note: the project's configuration comment attributes this study to "Johnson et al. 2019"; the DOI resolves to Reimus et al., cited here correctly.)*
+[18] P. W. Reimus, M. A. Dangelmayr, J. T. Clay, and K. R. Chamberlain, "Uranium natural attenuation downgradient of an in situ recovery mine inferred from a cross-hole field test," *Environmental Science & Technology*, vol. 53, no. 13, pp. 7483–7493, 2019, doi: 10.1021/acs.est.9b01572.
 
-[19] ✓ T. J. Gallegos, K. M. Campbell, R. A. Zielinski, P. W. Reimus, J. T. Clay, N. Janot, J. R. Bargar, and W. M. Benzel, "Persistent U(IV) and U(VI) following in-situ recovery (ISR) mining of a sandstone uranium deposit, Wyoming, USA," *Applied Geochemistry*, vol. 63, pp. 222–234, 2015 (ScienceDirect S0883292715300342).
+[19] T. J. Gallegos, K. M. Campbell, R. A. Zielinski, P. W. Reimus, J. T. Clay, N. Janot, J. R. Bargar, and W. M. Benzel, "Persistent U(IV) and U(VI) following in-situ recovery (ISR) mining of a sandstone uranium deposit, Wyoming, USA," *Applied Geochemistry*, vol. 63, pp. 222–234, 2015 (ScienceDirect S0883292715300342).
 
-[20] ✓ U.S. Environmental Protection Agency, *Aquifer Restoration after Uranium Recovery*, EPA/600/F-17/342, 2017.
+[20] U.S. Environmental Protection Agency, *Aquifer Restoration after Uranium Recovery*, EPA/600/F-17/342, 2017.
 
-[21] ○ C. J. Newell, H. S. Rifai, J. T. Wilson, J. A. Connor, J. A. Aziz, and M. P. Suarez, *Calculation and Use of First-Order Rate Constants for Monitored Natural Attenuation Studies*, EPA/540/S-02/500, U.S. EPA, 2002.
+[21] C. J. Newell, H. S. Rifai, J. T. Wilson, J. A. Connor, J. A. Aziz, and M. P. Suarez, *Calculation and Use of First-Order Rate Constants for Monitored Natural Attenuation Studies*, Ground Water Issue, EPA/540/S-02/500, U.S. EPA National Risk Management Research Laboratory, Nov. 2002.
 
 **Jaduguda and Jharkhand studies**
 
-[22] ✓ N. K. Sethy et al., "Dissolved uranium, ²²⁶Ra in the mine water effluent: A case study in Jaduguda," *Radiation Protection and Environment*, vol. 36, no. 1, pp. 32–37, 2013, doi: 10.4103/0972-0464.121824.
+[22] N. K. Sethy et al., "Dissolved uranium, ²²⁶Ra in the mine water effluent: A case study in Jaduguda," *Radiation Protection and Environment*, vol. 36, no. 1, pp. 32–37, 2013, doi: 10.4103/0972-0464.121824.
 
-[23] ✓ S. Giri, M. K. Mahato, G. Singh, and V. N. Jha, "Risk assessment due to intake of heavy metals through the ingestion of groundwater around two proposed uranium mining areas in Jharkhand, India," *Environmental Monitoring and Assessment*, vol. 184, pp. 1351–1358, 2012, doi: 10.1007/s10661-011-2045-3.
+[23] S. Giri, M. K. Mahato, G. Singh, and V. N. Jha, "Risk assessment due to intake of heavy metals through the ingestion of groundwater around two proposed uranium mining areas in Jharkhand, India," *Environmental Monitoring and Assessment*, vol. 184, pp. 1351–1358, 2012, doi: 10.1007/s10661-011-2045-3.
 
-[24] ✓ R. M. Tripathi, S. K. Sahoo, V. N. Jha, A. H. Khan, and V. D. Puranik, "Assessment of environmental radioactivity at uranium mining, processing and tailings management facility at Jaduguda, India," *Applied Radiation and Isotopes*, vol. 66, no. 11, pp. 1666–1670, 2008. *(Note: cited in the project's configuration as "BARC, J. Environ. Radioactivity 99"; the groundwater ²²⁶Ra range 3.5–208 mBq/L is from this Applied Radiation and Isotopes paper.)*
+[24] R. M. Tripathi, S. K. Sahoo, V. N. Jha, A. H. Khan, and V. D. Puranik, "Assessment of environmental radioactivity at uranium mining, processing and tailings management facility at Jaduguda, India," *Applied Radiation and Isotopes*, vol. 66, no. 11, pp. 1666–1670, 2008, doi: 10.1016/j.apradiso.2007.12.019.
 
 **Standards**
 
-[25] ○ Bureau of Indian Standards, *IS 10500:2012 — Drinking Water — Specification (Second Revision)*, New Delhi, 2012, with amendments.
+[25] Bureau of Indian Standards, *IS 10500:2012 — Drinking Water — Specification (Second Revision)*, New Delhi, 2012, with amendments.
 
-[26] ○ World Health Organization, *Guidelines for Drinking-water Quality*, 4th ed. incorporating the 1st addendum, Geneva, 2017.
+[26] World Health Organization, *Guidelines for Drinking-water Quality*, 4th ed. incorporating the 1st addendum. Geneva: WHO, 2017, ISBN 978-92-4-154995-0.
 
 **Machine learning and statistics**
 
-[27] ○ Y. Romano, E. Patterson, and E. J. Candès, "Conformalized quantile regression," in *Advances in Neural Information Processing Systems 32 (NeurIPS 2019)*, 2019.
+[27] Y. Romano, E. Patterson, and E. J. Candès, "Conformalized quantile regression," in *Advances in Neural Information Processing Systems 32 (NeurIPS 2019)*, 2019.
 
-[28] ○ V. Vovk, A. Gammerman, and G. Shafer, *Algorithmic Learning in a Random World*. New York: Springer, 2005.
+[28] V. Vovk, A. Gammerman, and G. Shafer, *Algorithmic Learning in a Random World*. New York: Springer, 2005.
 
-[29] ○ T. Chen and C. Guestrin, "XGBoost: A scalable tree boosting system," in *Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining*, 2016, pp. 785–794.
+[29] T. Chen and C. Guestrin, "XGBoost: A scalable tree boosting system," in *Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining*, 2016, pp. 785–794, doi: 10.1145/2939672.2939785.
 
-[30] ○ S. M. Lundberg and S.-I. Lee, "A unified approach to interpreting model predictions," in *Advances in Neural Information Processing Systems 30 (NeurIPS 2017)*, 2017.
+[30] S. M. Lundberg and S.-I. Lee, "A unified approach to interpreting model predictions," in *Advances in Neural Information Processing Systems 30 (NeurIPS 2017)*, 2017.
 
-[31] ○ H. Theil, "A rank-invariant method of linear and polynomial regression analysis," *Proc. Koninklijke Nederlandse Akademie van Wetenschappen*, vol. 53, pp. 386–392, 521–525, 1397–1412, 1950.
+[31] H. Theil, "A rank-invariant method of linear and polynomial regression analysis, I, II, III," *Proc. Koninklijke Nederlandse Akademie van Wetenschappen, Series A*, vol. 53, pp. 386–392, 521–525, 1397–1412, 1950.
 
-[32] ○ P. K. Sen, "Estimates of the regression coefficient based on Kendall's tau," *Journal of the American Statistical Association*, vol. 63, no. 324, pp. 1379–1389, 1968.
+[32] P. K. Sen, "Estimates of the regression coefficient based on Kendall's tau," *Journal of the American Statistical Association*, vol. 63, no. 324, pp. 1379–1389, 1968, doi: 10.1080/01621459.1968.10480934.
 
-[33] ○ H. B. Mann, "Nonparametric tests against trend," *Econometrica*, vol. 13, no. 3, pp. 245–259, 1945.
+[33] H. B. Mann, "Nonparametric tests against trend," *Econometrica*, vol. 13, no. 3, pp. 245–259, 1945, doi: 10.2307/1907187.
 
-[34] ○ M. G. Kendall, *Rank Correlation Methods*, 4th ed. London: Charles Griffin, 1975.
+[34] M. G. Kendall, *Rank Correlation Methods*, 4th ed. London: Charles Griffin, 1975.
 
-[35] ○ J. D. Hem, *Study and Interpretation of the Chemical Characteristics of Natural Water*, 3rd ed., U.S. Geological Survey Water-Supply Paper 2254, 1985.
+[35] J. D. Hem, *Study and Interpretation of the Chemical Characteristics of Natural Water*, 3rd ed., U.S. Geological Survey Water-Supply Paper 2254, 1985. https://pubs.usgs.gov/wsp/wsp2254/
 
-[36] ○ American Public Health Association, *Standard Methods for the Examination of Water and Wastewater*, 23rd ed., Method 1030 E (checking correctness of analyses), 2017.
+[36] American Public Health Association, American Water Works Association, and Water Environment Federation, *Standard Methods for the Examination of Water and Wastewater*, 23rd ed. Washington, DC: APHA, 2017, Section 1030 E, "Checking analyses' correctness."
 
 **Datasets**
 
-[37] ○ Central Ground Water Board, *National Aquifer Mapping and Management Programme (NAQUIM) — district reports for Jharkhand* (21 districts; page citations per row in `Datasets/naquim_reference/naquim_vertical.csv` and the extraction tracker). Accessed July 2026.
+[37] Central Ground Water Board, *Aquifer Maps and Ground Water Management Plan* reports (NAQUIM), Jharkhand, State Unit Office Ranchi; Ministry of Water Resources, River Development & Ganga Rejuvenation (2016) and Ministry of Jal Shakti (2018–2022). Twenty-two reports were downloaded from cgwb.gov.in in July 2026: two Phase-I reports of 2016 (parts of Bokaro, Ramgarh and Dhanbad; parts of Ranchi, Khunti and Lohardaga); Godda, Dumka, Jamtara and Pakur (2018–19); Sahebganj (2017–18 programme, dated 2019); Chatra, Deoghar, Dhanbad, Garhwa, Giridih, Gumla, Khunti, Koderma, Latehar, Lohardaga, Simdega and West Singhbhum, and two block-level reports of 2022 (Chandrapura and Nawadih blocks, Bokaro district; Khelri, Lapung, Silli, Rahe, Tamar and Sonahatu blocks, Ranchi district); and a combined East Singhbhum / Saraikela-Kharsawan / West Singhbhum (parts) report whose downloaded PDF was unreadable. File list and page citations per row: `Datasets/naquim_reference/NAQUIM_extraction_tracker.md` and `naquim_vertical.csv`.
 
-[38] ○ Central Ground Water Board, *District Ground Water Profile — East Singhbhum, Jharkhand* (`Datasets/naquim_reference/cgwb_east_singhbhum_profile.pdf`). Accessed July 2026.
+[38] Central Ground Water Board, *Ground Water Information Booklet: East Singhbhum District, Jharkhand State*, prepared by S. Toppo, State Unit Office Ranchi, Mid-Eastern Region Patna, Sept. 2013. Retrieved from http://cgwb.gov.in/old_website/District_Profile/Jharkhand/East%20Singhbhum.pdf on 7 July 2026 (`Datasets/naquim_reference/cgwb_east_singhbhum_profile.pdf`).
 
-[39] ○ Central Ground Water Board, groundwater quality data for Jharkhand, 2023 (tabular extract "table 36"; 397 wells, 24 districts, 20 determinands), as held in `Datasets/waterQuality_jharkhand.csv`. The originating year-book title is to be confirmed before submission.
+[39] Central Ground Water Board, *Annual Ground Water Quality Report 2024*, Ministry of Jal Shakti, released 31 Dec. 2024 (2023 sampling); Jharkhand state table, downloaded from cgwb.gov.in and held as `Datasets/waterQuality_jharkhand.csv` (added 17 April 2026; column `source_table` = "waterQuality_table36"): 397 locations, 24 districts, 17 determinands, every row dated 2023. The attribution to this report rests on content — the sampling year, uranium reported in ppb, and the 2023 national sampling round the report is based on; the table number could not be re-checked against the report itself, because cgwb.gov.in refused automated access on 23 Sept. 2026.
 
-[40] ○ Central Ground Water Board / India-WRIS, groundwater level monitoring data, Jharkhand, 2013–2021 (9,583 readings, 398 stations), as held in `Datasets/cgwb_waterlevel_jharkhand.csv`. https://indiawris.gov.in ; https://cgwb.gov.in/GW-data-access.html. Accessed January–February 2026.
+[40] Central Ground Water Board, Ministry of Jal Shakti, "CGWB – Changes in Depth to Water Level" (station-level quarterly depth to water, from India-WRIS, https://indiawris.gov.in/wris/#/groundWater), as redistributed with codebook by the India Data Portal (dataset `cgwb-changes-in-depth-to-water-level`; portal retrieval date 4 May 2024). Jharkhand rows, 2013–2021 (9,583 readings, 398 stations), filtered by `fetch_data/filter_jharkhand.py` into `Datasets/cgwb_waterlevel_jharkhand.csv`. Accessed January–February 2026.
 
-[41] ○ Central Ground Water Board via National Water Informatics Centre, "Ground Water Quality Chemical Parameters CGWB Jharkhand (1961–2025) Manual" and "…Physical Parameters…", National Water Data Portal (CKAN), packages `ground-water-quality-manual-chemical-parameters-cgwb-f-gfg` and `ground-water-quality-manual-physical-parameters-cgwb`. Downloaded 20 Sept. 2026 (`services/chemistry_history.py` carries the resource URLs).
+[41] Central Ground Water Board via National Water Informatics Centre, "Ground Water Quality Chemical Parameters CGWB Jharkhand (1961 - 2025) Manual" and "Ground Water Quality Physical Parameters CGWB Jharkhand (1961 - 2025) Manual," National Water Data Portal, packages `ground-water-quality-manual-chemical-parameters-cgwb-f-gfg` and `ground-water-quality-manual-physical-parameters-cgwb`, https://nwdp.nwic.gov.in. Downloaded 20 Sept. 2026 (`backend/app/services/chemistry_history.py` carries the resource URL).
 
-[42] ○ Geological Survey of India / NRSC Bhuvan, lineament map of Jharkhand (1,889 features), and *GSI lineament mapping manual* (`Datasets/naquim_reference/gsi_lineament_mapping_manual.pdf`). Accessed July 2026.
+[42] Geological Survey of India and National Remote Sensing Centre (ISRO), National Geomorphology and Lineament Mapping on 1:50,000 scale — Jharkhand lineament layer `lineament:JH_LN50K_0506`, served by the Bhuvan GeoServer WMS, https://bhuvan-vec2.nrsc.gov.in/bhuvan/wms. Method: National Remote Sensing Centre, *Manual for Geomorphology and Lineament Mapping (Web Version)*, Technical Report NRSC-RSAA-ERG-G&GD-SEP'12-TR-445, Sept. 2012 (`Datasets/naquim_reference/gsi_lineament_mapping_manual.pdf`). Harvested 7 July 2026 by WMS GetFeatureInfo queries on a 60 × 60 point grid over Jharkhand (`fetch_data/bhuvan_lineaments.py`), because GSI's Bhukosh portal was unreachable and WFS export is disabled on Bhuvan; the 1,889 features are those recovered near grid nodes — a partial copy of the layer, not the complete layer.
 
-[43] ○ International Atomic Energy Agency, *World Distribution of Uranium Deposits (UDEPO)* database, India extract (`Datasets/udepo_uranium_deposits.xlsx`). https://www.iaea.org/resources/databases/udepo. Accessed July 2026.
+[43] International Atomic Energy Agency, *World Distribution of Uranium Deposits (UDEPO)*, INFCIS online database, India export ("UDepo Data List", filter Country = India), `Datasets/udepo_uranium_deposits.xlsx`. Accessed July 2026. The database was renamed UThDEPO in 2026 and is served at https://infcis.iaea.org/UTHDEPO.
 
-[44] ○ European Space Agency / Copernicus, *Copernicus DEM — GLO-30* (30 m), Jharkhand extract. Accessed July 2026.
+[44] European Space Agency, *Copernicus Global Digital Elevation Model* (GLO-30), distributed by OpenTopography, doi: 10.5069/G9028PQB. Jharkhand extract (83.2–88.1° E, 21.8–25.5° N, 1 arc-second) downloaded in tiles through the OpenTopography global-DEM API (`demtype=COP30`) and mosaicked (`fetch_data/fetchDEM.py`, `fetch_data/mosaic_dem.py`), 6–7 July 2026.
 
-[45] ○ B. Lehner and G. Grill, "Global river hydrography and network routing: baseline data and new approaches to study the world's large river systems," *Hydrological Processes*, vol. 27, no. 15, pp. 2171–2186, 2013 (HydroRIVERS v1.0).
+[45] B. Lehner and G. Grill, "Global river hydrography and network routing: baseline data and new approaches to study the world's large river systems," *Hydrological Processes*, vol. 27, no. 15, pp. 2171–2186, 2013, doi: 10.1002/hyp.9740 (HydroRIVERS v1.0).
 
-[46] ○ U.S. Environmental Protection Agency, *Understanding Variation in Partition Coefficient, Kd, Values*, Vols. I–II, EPA 402-R-99-004A/B, 1999.
+[46] U.S. Environmental Protection Agency, *Understanding Variation in Partition Coefficient, K_d, Values*, Vol. I: *The K_d Model, Methods of Measurement, and Application of Chemical Reaction Codes*, EPA 402-R-99-004A, and Vol. II: *Review of Geochemistry and Available K_d Values for Cadmium, Cesium, Chromium, Lead, Plutonium, Radon, Strontium, Thorium, Tritium (³H), and Uranium*, EPA 402-R-99-004B, Aug. 1999.
 
-[47] ○ U.S. Environmental Protection Agency, *Understanding Variation in Partition Coefficient, Kd, Values*, Vol. III, EPA 402-R-04-002C, 2004 (Table 5.28, radium).
+[47] U.S. Environmental Protection Agency, *Understanding Variation in Partition Coefficient, K_d, Values*, Vol. III: *Review of Geochemistry and Available K_d Values for Americium, Arsenic, Curium, Iodine, Neptunium, Radium, and Technetium*, EPA 402-R-04-002C, July 2004 (Table 5.28: radium K_d values listed by Thibault et al. [48]).
 
-[48] ○ D. H. Thibault, M. I. Sheppard, and P. A. Smith, *A Critical Compilation and Review of Default Soil Solid/Liquid Partition Coefficients, Kd, for Use in Environmental Assessments*, AECL-10125, Atomic Energy of Canada Ltd., 1990.
+[48] D. H. Thibault, M. I. Sheppard, and P. A. Smith, *A Critical Compilation and Review of Default Soil Solid/Liquid Partition Coefficients, K_d, for Use in Environmental Assessments*, AECL-10125, Atomic Energy of Canada Ltd., Pinawa, 1990.
 
-[49] ○ M. I. Sheppard and D. H. Thibault, "Default solid/liquid partition coefficients, Kds, for four major soil types: A compendium," *Health Physics*, vol. 59, no. 4, pp. 471–482, 1990.
+[49] M. I. Sheppard and D. H. Thibault, "Default soil solid/liquid partition coefficients, K_ds, for four major soil types: A compendium," *Health Physics*, vol. 59, no. 4, pp. 471–482, 1990.
 
 **Sensitivity analysis**
 
-[50] ○ A. Saltelli, P. Annoni, I. Azzini, F. Campolongo, M. Ratto, and S. Tarantola, "Variance based sensitivity analysis of model output. Design and estimator for the total sensitivity index," *Computer Physics Communications*, vol. 181, no. 2, pp. 259–270, 2010.
+[50] A. Saltelli, P. Annoni, I. Azzini, F. Campolongo, M. Ratto, and S. Tarantola, "Variance based sensitivity analysis of model output. Design and estimator for the total sensitivity index," *Computer Physics Communications*, vol. 181, no. 2, pp. 259–270, 2010, doi: 10.1016/j.cpc.2009.09.018.
 
-[51] ○ M. J. W. Jansen, "Analysis of variance designs for model output," *Computer Physics Communications*, vol. 117, no. 1–2, pp. 35–43, 1999.
+[51] M. J. W. Jansen, "Analysis of variance designs for model output," *Computer Physics Communications*, vol. 117, no. 1–2, pp. 35–43, 1999, doi: 10.1016/S0010-4655(98)00154-4.
 
-[52] ○ I. M. Sobol', "Sensitivity estimates for nonlinear mathematical models," *Mathematical Modelling and Computational Experiments*, vol. 1, no. 4, pp. 407–414, 1993.
+[52] I. M. Sobol', "Sensitivity estimates for nonlinear mathematical models," *Mathematical Modelling and Computational Experiments*, vol. 1, no. 4, pp. 407–414, 1993.
 
 **Vulnerability indices and water-quality indices**
 
-[53] ○ L. Aller, T. Bennett, J. H. Lehr, R. J. Petty, and G. Hackett, *DRASTIC: A Standardized System for Evaluating Ground Water Pollution Potential Using Hydrogeologic Settings*, EPA/600/2-87/035, U.S. EPA, 1987.
+[53] L. Aller, T. Bennett, J. H. Lehr, R. J. Petty, and G. Hackett, *DRASTIC: A Standardized System for Evaluating Ground Water Pollution Potential Using Hydrogeologic Settings*, EPA/600/2-87/035, U.S. EPA Robert S. Kerr Environmental Research Laboratory, Ada, OK, 1987.
 
-[54] ○ S. S. D. Foster, "Fundamental concepts in aquifer vulnerability, pollution risk and protection strategy," in *Vulnerability of Soil and Groundwater to Pollutants*, TNO Committee on Hydrological Research, Proceedings and Information No. 38, pp. 69–86, 1987.
+[54] S. S. D. Foster, "Fundamental concepts in aquifer vulnerability, pollution risk and protection strategy," in W. van Duijvenbooden and H. G. van Waegeningh, Eds., *Vulnerability of Soil and Groundwater to Pollutants*, TNO Committee on Hydrological Research, Proceedings and Information No. 38, The Hague, 1987, pp. 69–86.
 
-[55] ○ M. Civita, *Le carte della vulnerabilità degli acquiferi all'inquinamento: teoria e pratica*. Bologna: Pitagora, 1994.
+[55] M. Civita, *Le carte della vulnerabilità degli acquiferi all'inquinamento: teoria e pratica*. Bologna: Pitagora, 1994.
 
-[56] ○ R. M. Brown, N. I. McClelland, R. A. Deininger, and R. G. Tozer, "A water quality index — do we dare?," *Water & Sewage Works*, vol. 117, no. 10, pp. 339–343, 1970.
+[56] R. M. Brown, N. I. McClelland, R. A. Deininger, and R. G. Tozer, "A water quality index — do we dare?," *Water & Sewage Works*, vol. 117, no. 10, pp. 339–343, 1970.
 
-[57] ○ C. R. Ramakrishnaiah, C. Sadashivaiah, and G. Ranganna, "Assessment of water quality index for the groundwater in Tumkur Taluk, Karnataka State, India," *E-Journal of Chemistry*, vol. 6, no. 2, pp. 523–530, 2009.
+[57] C. R. Ramakrishnaiah, C. Sadashivaiah, and G. Ranganna, "Assessment of water quality index for the groundwater in Tumkur Taluk, Karnataka State, India," *E-Journal of Chemistry*, vol. 6, no. 2, pp. 523–530, 2009, doi: 10.1155/2009/757424.
 
 **Groundwater machine learning**
 
-[58] ○ S. Sahoo and M. K. Jha, "Groundwater-level prediction using multiple linear regression and artificial neural network techniques: a comparative assessment," *Hydrogeology Journal*, vol. 21, pp. 1865–1887, 2013.
+[58] S. Sahoo and M. K. Jha, "Groundwater-level prediction using multiple linear regression and artificial neural network techniques: a comparative assessment," *Hydrogeology Journal*, vol. 21, no. 8, pp. 1865–1887, 2013, doi: 10.1007/s10040-013-1029-5.
 
-[59] ○ T. Rajaee, H. Ebrahimi, and V. Nourani, "A review of the artificial intelligence methods in groundwater level modeling," *Journal of Hydrology*, vol. 572, pp. 336–351, 2019.
+[59] T. Rajaee, H. Ebrahimi, and V. Nourani, "A review of the artificial intelligence methods in groundwater level modeling," *Journal of Hydrology*, vol. 572, pp. 336–351, 2019, doi: 10.1016/j.jhydrol.2018.12.037.
 
 **Screening tools, standards of practice, global data**
 
-[60] ○ C. J. Newell, R. K. McLeod, and J. R. Gonzales, *BIOSCREEN: Natural Attenuation Decision Support System — User's Manual, Version 1.3*, EPA/600/R-96/087, U.S. EPA, 1996.
+[60] C. J. Newell, R. K. McLeod, and J. R. Gonzales, *BIOSCREEN: Natural Attenuation Decision Support System — User's Manual, Version 1.3*, EPA/600/R-96/087, U.S. EPA, Aug. 1996.
 
-[61] ○ ASTM International, *ASTM D6312 — Standard Guide for Developing Appropriate Statistical Approaches for Groundwater Detection Monitoring Programs*.
+[61] ASTM International, *ASTM D6312-98 — Standard Guide for Developing Appropriate Statistical Approaches for Ground-Water Detection Monitoring Programs*. West Conshohocken, PA: ASTM, 1998. (Revised as D6312-17, "… at Waste Disposal Facilities"; that revision was withdrawn in 2026. The edition cited is the one current when NUREG-1569 [12] was issued.)
 
-[62] ○ J. Huscroft, T. Gleeson, J. Hartmann, and J. Börker, "Compiling and mapping global permeability of the unconsolidated and consolidated Earth: GLobal HYdrogeology MaPS 2.0 (GLHYMPS 2.0)," *Geophysical Research Letters*, vol. 45, no. 4, pp. 1897–1904, 2018.
+[62] J. Huscroft, T. Gleeson, J. Hartmann, and J. Börker, "Compiling and mapping global permeability of the unconsolidated and consolidated Earth: GLobal HYdrogeology MaPS 2.0 (GLHYMPS 2.0)," *Geophysical Research Letters*, vol. 45, no. 4, pp. 1897–1904, 2018, doi: 10.1002/2017GL075860.
 
 **Project documents (not peer-reviewed; cited by path)**
 
 - V. Raj, *Monthly Progress Reports*, November 2025 – August 2026 (ten reports), TEXMiN–BIT Sindri UG Fellowship 2025–26.
 - V. Raj, *Proposal: Smart Water Monitoring: Machine Learning and CPS for Safe & Sustainable Mining*, UG Call for Proposal Fellowship Program 2025, TEXMiN–BIT Sindri Mining CPS CoE (`docs/local/My_Proposal.pdf`).
 - JalDrishti repository documentation at commit `476a4a9`: `docs/LIMITATIONS.md`, `docs/PROJECT_FREEZE.md`, `docs/PRE_REPORT_AUDIT_AND_PLAN.md`, `docs/TECHNICAL_REPORT_STRUCTURE.md`, `docs/PRODUCT_DESIGN.md`, `docs/DEPLOYMENT.md`, `docs/roles.md`, `ml_pipeline/ARCHITECTURE.md`, `ml_pipeline/JHARKHAND_FIDELITY_MATRIX.md`, `ml_pipeline/E1_geometry_design.md`; and the untracked review record `docs/local/audit-record/` (QA sweep 13 July 2026; `review.md` 4 Aug; `review2.md` 5 Aug; `DOMENICO_ERROR_ENVELOPE.md` 5 Aug; `review3.md` 10 Aug; `ML_PIPELINE_READINESS.md` 10 Aug; `R10_AUDIT.md` 19 Aug; `DEPLOYMENT_AUDIT_2026-08-20.md`).
-
 
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
@@ -1493,7 +1484,7 @@ Authorization tallies and the full matrix: `docs/roles.md` §5.
 
 ## Appendix D — Database schema and row-level security
 
-**Tables (ORM models at the report commit):** `orgs`, `users` (with `home_block_id`, `alert_email_opt_in`), `districts`, `blocks`, `aquifers`, `monitoring_wells`, `monitoring_stations`, `water_samples` (20 determinands, `record_source`), `data_sources`, `dataset_versions`, `isr_points` (operating parameters, `injection_start_date`, owner org), `scenarios`, `simulation_runs` (request, plume geometry with contours, frames and vertical block; pinned model-card SHA, artifact SHA, code version), `simulations` (legacy, empty), `advisories` (status, headline, what it means, affected blocks, decided_by, published_at), `alerts` (kind, block, severity, tier, basis, explanation JSONB, well fields, advisory link), `alert_deliveries`, `block_subscriptions`, `field_observations`, `audit_log`.
+**Tables (ORM models at the report commit):** `orgs`, `users` (with `home_block_id`, `alert_email_opt_in`), `districts`, `blocks`, `aquifers`, `monitoring_wells`, `monitoring_stations`, `water_samples` (20 determinand columns — the 2023 CGWB file fills 17 of them, plus TDS derived from EC — and `record_source`), `data_sources`, `dataset_versions`, `isr_points` (operating parameters, `injection_start_date`, owner org), `scenarios`, `simulation_runs` (request, plume geometry with contours, frames and vertical block; pinned model-card SHA, artifact SHA, code version), `simulations` (legacy, empty), `advisories` (status, headline, what it means, affected blocks, decided_by, published_at), `alerts` (kind, block, severity, tier, basis, explanation JSONB, well fields, advisory link), `alert_deliveries`, `block_subscriptions`, `field_observations`, `audit_log`.
 
 **Migrations:** `0001_initial` … `0026_alert_tiers_and_explanation` (26). Notable: `0004` month-3 schema; `0007` orgs/provenance/audit; `0008` viewer → citizen; `0009` ISR owner org and RLS; `0011` fix swapped district axes; `0012` simulation runs; `0016` plume geometry; `0017` advisories; `0018` citizen alerts; `0019`/`0022` regulator retired and restored with the single-admin index; `0021` aquifer-pathway alerts; `0023` breach-due; `0025` home block and delivery ledger; `0026` tiers, basis, explanation, `ck_modelled_never_critical`, `ck_basis_matches_kind`, `possible_reach`, `alerts_update` policy.
 
@@ -1566,7 +1557,7 @@ Included in this report: the public map (Fig. 6.1), the console result panel (Fi
 
 ## Appendix H — Source-to-Claim Register
 
-Every quantitative claim in the body, its section, and its source at commit `476a4a9` (or the dataset / citation). Reference entries opened on the report date are marked ✓ in the reference list.
+Every quantitative claim in the body, its section, and its source at commit `476a4a9` (or the dataset / citation). Every reference entry was checked against its source record on 21 or 23 September 2026; the head of the reference list says how.
 
 | # | Claim | § | Source |
 |---|---|---|---|
@@ -1617,11 +1608,11 @@ Every quantitative claim in the body, its section, and its source at commit `476
 | 45 | June 2026 first surrogate metrics (area R² 0.869, cov 82.4 % …) | 1.8 | MPR Jun 2026 |
 | 46 | Proposal objectives, deliverables, inputs, methodology diagram | 1.5, 8 | `docs/local/My_Proposal.pdf` pp. 1–5 |
 | 47 | Mentor discrepancy (proposal vs MPRs) | title page | proposal p. 1; all ten MPRs §2 |
-| 48 | Reference attribution corrections ("Johnson et al. 2019" → Reimus et al.; "J. Environ. Radioact. 99" → Appl. Radiat. Isot. 66) | references | DOI 10.1021/acs.est.9b01572 and publisher records opened 21 Sep 2026 |
+| 48 | Citation corrections in `config/parameters.py` comments, made 23 Sep 2026: "Johnson et al. 2019" → Reimus et al. 2019 [18]; "BARC, J. Environ. Radioactivity 99 (2008) 1245" → Tripathi et al. 2008 [24] for the 23 mBq/L regional ²²⁶Ra value, and Tripathi et al. 2012 (*Radiat. Prot. Dosim.* 148(2), 211–218, doi:10.1093/rpd/ncr014) for the <3.5–208 mBq/L potable-well range, which this report does not use. No computed value changed. | references; §3.6 (Table 3.3) | Crossref records for 10.1021/acs.est.9b01572 and 10.1016/j.apradiso.2007.12.019; publisher abstract of 10.1093/rpd/ncr014 |
 | 49 | NUREG-1569 ring 75–180 m, ≥ 3 indicators, 2-of-N, uranium rejected as an indicator | 1.1, 4.5 | NUREG-1569 §5.7.8.3 pp. 137–139 (as quoted in `config/parameters.py`) |
 | 50 | Basement Gneissic Complex 48,047 km²; shallow flow ~1.5 m/yr; 27 m / 255 m in 20 yr | 3.2, 6.8 | `docs/LIMITATIONS.md` §4a |
 
-**Reference verification status:** entries 12–20, 22–24 opened on 21 September 2026 (✓); the remaining canonical works and dataset entries (○) were cited from the project's configuration and documentation and should be opened once more before submission, in particular [39] (the exact CGWB year-book title) and [37]/[38] (NAQUIM report titles per district).
+**Reference verification status:** all 62 entries were checked on 21 and 23 September 2026 — journal articles against their Crossref DOI records; books, reports and standards against publisher, issuing-body or catalogue records; the three EPA K_d volumes, the East Singhbhum booklet and the NRSC lineament manual against the PDFs in `Datasets/`; and the datasets against their files, their download scripts and, where it could be reached, the provider's portal. The check changed the dataset entries materially: [37] names the 22 NAQUIM reports actually held (the draft said "21 districts"), [39] identifies the 2023 chemistry as the Jharkhand table of CGWB's *Annual Ground Water Quality Report 2024*, [40] records the India Data Portal as the redistributor of the India-WRIS level record, [42] records that the lineament file is a partial grid-sampled harvest, and [44] records OpenTopography as the DEM distributor. One detail remains open: the table number of the 2023 chemistry within the CGWB report [39], because cgwb.gov.in refused automated access on 23 September 2026.
 
 ## Appendix I — Deployment details
 

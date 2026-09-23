@@ -98,7 +98,7 @@ Authorization tallies and the full matrix: `docs/roles.md` §5.
 
 ## Appendix D — Database schema and row-level security
 
-**Tables (ORM models at the report commit):** `orgs`, `users` (with `home_block_id`, `alert_email_opt_in`), `districts`, `blocks`, `aquifers`, `monitoring_wells`, `monitoring_stations`, `water_samples` (20 determinands, `record_source`), `data_sources`, `dataset_versions`, `isr_points` (operating parameters, `injection_start_date`, owner org), `scenarios`, `simulation_runs` (request, plume geometry with contours, frames and vertical block; pinned model-card SHA, artifact SHA, code version), `simulations` (legacy, empty), `advisories` (status, headline, what it means, affected blocks, decided_by, published_at), `alerts` (kind, block, severity, tier, basis, explanation JSONB, well fields, advisory link), `alert_deliveries`, `block_subscriptions`, `field_observations`, `audit_log`.
+**Tables (ORM models at the report commit):** `orgs`, `users` (with `home_block_id`, `alert_email_opt_in`), `districts`, `blocks`, `aquifers`, `monitoring_wells`, `monitoring_stations`, `water_samples` (20 determinand columns — the 2023 CGWB file fills 17 of them, plus TDS derived from EC — and `record_source`), `data_sources`, `dataset_versions`, `isr_points` (operating parameters, `injection_start_date`, owner org), `scenarios`, `simulation_runs` (request, plume geometry with contours, frames and vertical block; pinned model-card SHA, artifact SHA, code version), `simulations` (legacy, empty), `advisories` (status, headline, what it means, affected blocks, decided_by, published_at), `alerts` (kind, block, severity, tier, basis, explanation JSONB, well fields, advisory link), `alert_deliveries`, `block_subscriptions`, `field_observations`, `audit_log`.
 
 **Migrations:** `0001_initial` … `0026_alert_tiers_and_explanation` (26). Notable: `0004` month-3 schema; `0007` orgs/provenance/audit; `0008` viewer → citizen; `0009` ISR owner org and RLS; `0011` fix swapped district axes; `0012` simulation runs; `0016` plume geometry; `0017` advisories; `0018` citizen alerts; `0019`/`0022` regulator retired and restored with the single-admin index; `0021` aquifer-pathway alerts; `0023` breach-due; `0025` home block and delivery ledger; `0026` tiers, basis, explanation, `ck_modelled_never_critical`, `ck_basis_matches_kind`, `possible_reach`, `alerts_update` policy.
 
@@ -171,7 +171,7 @@ Included in this report: the public map (Fig. 6.1), the console result panel (Fi
 
 ## Appendix H — Source-to-Claim Register
 
-Every quantitative claim in the body, its section, and its source at commit `476a4a9` (or the dataset / citation). Reference entries opened on the report date are marked ✓ in the reference list.
+Every quantitative claim in the body, its section, and its source at commit `476a4a9` (or the dataset / citation). Every reference entry was checked against its source record on 21 or 23 September 2026; the head of the reference list says how.
 
 | # | Claim | § | Source |
 |---|---|---|---|
@@ -222,11 +222,11 @@ Every quantitative claim in the body, its section, and its source at commit `476
 | 45 | June 2026 first surrogate metrics (area R² 0.869, cov 82.4 % …) | 1.8 | MPR Jun 2026 |
 | 46 | Proposal objectives, deliverables, inputs, methodology diagram | 1.5, 8 | `docs/local/My_Proposal.pdf` pp. 1–5 |
 | 47 | Mentor discrepancy (proposal vs MPRs) | title page | proposal p. 1; all ten MPRs §2 |
-| 48 | Reference attribution corrections ("Johnson et al. 2019" → Reimus et al.; "J. Environ. Radioact. 99" → Appl. Radiat. Isot. 66) | references | DOI 10.1021/acs.est.9b01572 and publisher records opened 21 Sep 2026 |
+| 48 | Citation corrections in `config/parameters.py` comments, made 23 Sep 2026: "Johnson et al. 2019" → Reimus et al. 2019 [18]; "BARC, J. Environ. Radioactivity 99 (2008) 1245" → Tripathi et al. 2008 [24] for the 23 mBq/L regional ²²⁶Ra value, and Tripathi et al. 2012 (*Radiat. Prot. Dosim.* 148(2), 211–218, doi:10.1093/rpd/ncr014) for the <3.5–208 mBq/L potable-well range, which this report does not use. No computed value changed. | references; §3.6 (Table 3.3) | Crossref records for 10.1021/acs.est.9b01572 and 10.1016/j.apradiso.2007.12.019; publisher abstract of 10.1093/rpd/ncr014 |
 | 49 | NUREG-1569 ring 75–180 m, ≥ 3 indicators, 2-of-N, uranium rejected as an indicator | 1.1, 4.5 | NUREG-1569 §5.7.8.3 pp. 137–139 (as quoted in `config/parameters.py`) |
 | 50 | Basement Gneissic Complex 48,047 km²; shallow flow ~1.5 m/yr; 27 m / 255 m in 20 yr | 3.2, 6.8 | `docs/LIMITATIONS.md` §4a |
 
-**Reference verification status:** entries 12–20, 22–24 opened on 21 September 2026 (✓); the remaining canonical works and dataset entries (○) were cited from the project's configuration and documentation and should be opened once more before submission, in particular [39] (the exact CGWB year-book title) and [37]/[38] (NAQUIM report titles per district).
+**Reference verification status:** all 62 entries were checked on 21 and 23 September 2026 — journal articles against their Crossref DOI records; books, reports and standards against publisher, issuing-body or catalogue records; the three EPA K_d volumes, the East Singhbhum booklet and the NRSC lineament manual against the PDFs in `Datasets/`; and the datasets against their files, their download scripts and, where it could be reached, the provider's portal. The check changed the dataset entries materially: [37] names the 22 NAQUIM reports actually held (the draft said "21 districts"), [39] identifies the 2023 chemistry as the Jharkhand table of CGWB's *Annual Ground Water Quality Report 2024*, [40] records the India Data Portal as the redistributor of the India-WRIS level record, [42] records that the lineament file is a partial grid-sampled harvest, and [44] records OpenTopography as the DEM distributor. One detail remains open: the table number of the 2023 chemistry within the CGWB report [39], because cgwb.gov.in refused automated access on 23 September 2026.
 
 ## Appendix I — Deployment details
 

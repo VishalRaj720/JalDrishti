@@ -395,9 +395,11 @@ which avoids the hazard rather than working around it.
 
 ### The measured record was being collected and not read
 
-`water_samples` carries **twenty determinands at 99-100 % coverage** — pH, EC,
-TDS, hardness, nitrate, fluoride, chloride, sulphate, Ca, Mg, Na, K, PO4, HCO3,
-CO3 — and **only `uranium_ppb` drove any logic**: 47 code references against 4
+`water_samples` has twenty determinand columns, and **fifteen of them are
+filled at 99-100 % coverage** — pH, EC, TDS (derived from EC), hardness,
+nitrate, fluoride, chloride, sulphate, Ca, Mg, Na, K, PO4, HCO3, CO3 (uranium
+is at 86 %; iron, arsenic, turbidity and DO are empty in the seeded CGWB
+record) — and **only `uranium_ppb` drove any logic**: 47 code references against 4
 each (pure model and schema plumbing) for every other parameter.
 
 That mattered more than it sounds, because **uranium exceeds its limit at zero of

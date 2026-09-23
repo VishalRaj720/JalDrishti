@@ -75,7 +75,7 @@ Figure 4.2 — Deployed topology (single-origin, Option A of docs/DEPLOYMENT.md)
 
 ![Figure 4.4 — The fracture-strike field from 1,826 GSI lineament segments: mean strike and circular variance per 5 km cell. Source: `ml_pipeline/data_prep/artifacts/strike_field.png`.](figures/fig_strike_field.png)
 
-**NAQUIM → layer table.** 410 evidence snippets were extracted from the 21 district PDFs into `naquim_depth_evidence.md`, and the layer table of §3.2 was built from them by hand with a per-row confidence and page citation.
+**NAQUIM → layer table.** An automated keyword scan of the 22 NAQUIM PDFs (7 July 2026) extracted 410 evidence snippets, from the 18 that yielded matches, into `naquim_depth_evidence.md`, and the layer table of §3.2 was built from them by hand with a per-row confidence and page citation.
 
 **Texas → source signature and residuals.** The three sheets of `TX_ISR_Final.xlsx` are parsed with their header rows located and their unit rows, footnotes and repeated headers rejected by rule (a pinned row-count assertion guards against the parser drifting — review2 V-4); detection-limit strings (`<.001`) and uncertainty notation (`1044±5`) are handled; one pH data-entry error (795) was corrected. Per-mine End-of-Mining means give the C₀ envelope; the paired per-mine ratio of Final-Post-restoration to End-of-Mining medians gives the restoration residual per species (§3.4). The 13 restoration durations in `Restoration.csv` give the 5.0-year reference sweep.
 
