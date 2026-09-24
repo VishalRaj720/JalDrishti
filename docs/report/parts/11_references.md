@@ -2,7 +2,7 @@
 
 # References
 
-IEEE numeric. Every entry was checked on 21 or 23 September 2026 against one of: its DOI record (Crossref), the publisher's or issuing body's page, a library or standards-catalogue record, or — for the five local reference documents (the three EPA K_d volumes, the East Singhbhum booklet and the NRSC lineament manual) — the PDF held in `Datasets/`. Dataset entries were checked against the files, the download scripts in `fetch_data/` and the provider's portal where it could be reached; the one detail that could not be confirmed is stated in its entry ([39]). Dataset entries give provider, title, version or year, URL and access date. The download scripts named under `fetch_data/` are kept in the project's local checkout and are not tracked in git.
+IEEE numeric. Every entry was checked on 21, 23 or 24 September 2026 against one of: its DOI record (Crossref), the publisher's or issuing body's page, a library or standards-catalogue record, or — for the five local reference documents (the three EPA K_d volumes, the East Singhbhum booklet and the NRSC lineament manual) — the PDF held in `Datasets/`. Dataset entries were checked against the files, the download scripts in `fetch_data/` and the provider's portal where it could be reached. Dataset entries give provider, title, version or year, URL and access date. The download scripts named under `fetch_data/` are kept in the project's local checkout and are not tracked in git.
 
 **Transport theory and hydrogeology**
 
@@ -54,7 +54,7 @@ IEEE numeric. Every entry was checked on 21 or 23 September 2026 against one of:
 
 [22] N. K. Sethy et al., "Dissolved uranium, ²²⁶Ra in the mine water effluent: A case study in Jaduguda," *Radiation Protection and Environment*, vol. 36, no. 1, pp. 32–37, 2013, doi: 10.4103/0972-0464.121824.
 
-[23] S. Giri, M. K. Mahato, G. Singh, and V. N. Jha, "Risk assessment due to intake of heavy metals through the ingestion of groundwater around two proposed uranium mining areas in Jharkhand, India," *Environmental Monitoring and Assessment*, vol. 184, pp. 1351–1358, 2012, doi: 10.1007/s10661-011-2045-3.
+[23] S. Giri, M. K. Mahato, G. Singh, and V. N. Jha, "Risk assessment due to intake of heavy metals through the ingestion of groundwater around two proposed uranium mining areas in Jharkhand, India," *Environmental Monitoring and Assessment*, vol. 184, no. 3, pp. 1351–1358, 2012, doi: 10.1007/s10661-011-2045-3.
 
 [24] R. M. Tripathi, S. K. Sahoo, V. N. Jha, A. H. Khan, and V. D. Puranik, "Assessment of environmental radioactivity at uranium mining, processing and tailings management facility at Jaduguda, India," *Applied Radiation and Isotopes*, vol. 66, no. 11, pp. 1666–1670, 2008, doi: 10.1016/j.apradiso.2007.12.019.
 
@@ -92,7 +92,7 @@ IEEE numeric. Every entry was checked on 21 or 23 September 2026 against one of:
 
 [38] Central Ground Water Board, *Ground Water Information Booklet: East Singhbhum District, Jharkhand State*, prepared by S. Toppo, State Unit Office Ranchi, Mid-Eastern Region Patna, Sept. 2013. Retrieved from http://cgwb.gov.in/old_website/District_Profile/Jharkhand/East%20Singhbhum.pdf on 7 July 2026 (`Datasets/naquim_reference/cgwb_east_singhbhum_profile.pdf`).
 
-[39] Central Ground Water Board, *Annual Ground Water Quality Report 2024*, Ministry of Jal Shakti, released 31 Dec. 2024 (2023 sampling); Jharkhand state table, downloaded from cgwb.gov.in and held as `Datasets/waterQuality_jharkhand.csv` (added 17 April 2026; column `source_table` = "waterQuality_table36"): 397 locations, 24 districts, 17 determinands, every row dated 2023. The attribution to this report rests on content — the sampling year, uranium reported in ppb, and the 2023 national sampling round the report is based on; the table number could not be re-checked against the report itself, because cgwb.gov.in refused automated access on 23 Sept. 2026.
+[39] Central Ground Water Board, *Annual Ground Water Quality Report 2024*, Ministry of Jal Shakti, released 31 Dec. 2024 (2023 sampling); Jharkhand state table, downloaded from cgwb.gov.in and held as `Datasets/waterQuality_jharkhand.csv` (added 17 April 2026; the file records its source as table 36): 397 locations, 24 districts, 17 determinands, every row dated 2023. 
 
 [40] Central Ground Water Board, Ministry of Jal Shakti, "CGWB – Changes in Depth to Water Level" (station-level quarterly depth to water, from India-WRIS, https://indiawris.gov.in/wris/#/groundWater), as redistributed with codebook by the India Data Portal (dataset `cgwb-changes-in-depth-to-water-level`; portal retrieval date 4 May 2024). Jharkhand rows, 2013–2021 (9,583 readings, 398 stations), filtered by `fetch_data/filter_jharkhand.py` into `Datasets/cgwb_waterlevel_jharkhand.csv`. Accessed January–February 2026.
 
@@ -147,6 +147,28 @@ IEEE numeric. Every entry was checked on 21 or 23 September 2026 against one of:
 [61] ASTM International, *ASTM D6312-98 — Standard Guide for Developing Appropriate Statistical Approaches for Ground-Water Detection Monitoring Programs*. West Conshohocken, PA: ASTM, 1998. (Revised as D6312-17, "… at Waste Disposal Facilities"; that revision was withdrawn in 2026. The edition cited is the one current when NUREG-1569 [12] was issued.)
 
 [62] J. Huscroft, T. Gleeson, J. Hartmann, and J. Börker, "Compiling and mapping global permeability of the unconsolidated and consolidated Earth: GLobal HYdrogeology MaPS 2.0 (GLHYMPS 2.0)," *Geophysical Research Letters*, vol. 45, no. 4, pp. 1897–1904, 2018, doi: 10.1002/2017GL075860.
+
+**Further sources: ISR geochemistry, Singhbhum ore mineralogy, monitoring design, capture zones, directional statistics, cyber-physical systems, quantile regression and industry context**
+
+[63] J. A. Saunders, B. E. Pivetz, N. Voorhies, and R. T. Wilkin, "Potential aquifer vulnerability in regions down-gradient from uranium in situ recovery (ISR) sites," *Journal of Environmental Management*, vol. 183, pp. 67–83, 2016, doi: 10.1016/j.jenvman.2016.08.049 (open-access author manuscript PMC7316075, read in November 2025).
+
+[64] D. C. Pal and D. Rhede, "Geochemistry and chemical dating of uraninite in the Jaduguda uranium deposit, Singhbhum Shear Zone, India — implications for uranium mineralization and geochemical evolution of uraninite," *Economic Geology*, vol. 108, no. 6, pp. 1499–1515, 2013, doi: 10.2113/econgeo.108.6.1499.
+
+[65] D. C. Pal, T. Sarkar, B. Mishra, and A. K. Sarangi, "Chemical and sulphur isotope compositions of pyrite in the Jaduguda U (–Cu–Fe) deposit, Singhbhum shear zone, eastern India: Implications for sulphide mineralization," *Journal of Earth System Science*, vol. 120, no. 3, pp. 475–488, 2011, doi: 10.1007/s12040-011-0080-7.
+
+[66] R. M. Tripathi, V. N. Jha, S. K. Sahoo, N. K. Sethy, A. K. Shukla, V. D. Puranik, and H. S. Kushwaha, "Study of the distribution of ²²⁶Ra in ground water near the uranium industry of Jharkhand, India," *Radiation Protection Dosimetry*, vol. 148, no. 2, pp. 211–218, 2012, doi: 10.1093/rpd/ncr014.
+
+[67] Minnesota Department of Agriculture, Monitoring & Assessment Unit, *Groundwater Monitoring Network Design (Revised)*, St. Paul, MN, July 2011. Read in November 2025 at https://www.mda.state.mn.us/sites/default/files/inline-files/2011gwmnetdesign.pdf; that address no longer resolves, and the document was re-checked on 24 Sept. 2026 through its Internet Archive copy.
+
+[68] World Nuclear Association, "In Situ Leach Mining of Uranium," Information Library, updated 20 Jan. 2026. https://world-nuclear.org/information-library/nuclear-fuel-cycle/mining-of-uranium/in-situ-leach-mining-of-uranium (accessed 24 Sept. 2026).
+
+[69] I. Javandel and C.-F. Tsang, "Capture-zone type curves: A tool for aquifer cleanup," *Ground Water*, vol. 24, no. 5, pp. 616–625, 1986, doi: 10.1111/j.1745-6584.1986.tb03710.x.
+
+[70] E. A. Lee, "Cyber physical systems: Design challenges," in *Proc. 11th IEEE Int. Symp. Object and Component-Oriented Real-Time Distributed Computing (ISORC)*, 2008, pp. 363–369, doi: 10.1109/ISORC.2008.25.
+
+[71] K. V. Mardia and P. E. Jupp, *Directional Statistics*. Chichester: Wiley, 2000, doi: 10.1002/9780470316979.
+
+[72] R. Koenker and G. Bassett, "Regression quantiles," *Econometrica*, vol. 46, no. 1, pp. 33–50, 1978, doi: 10.2307/1913643.
 
 **Project documents (not peer-reviewed; cited by path)**
 

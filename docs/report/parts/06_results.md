@@ -18,7 +18,7 @@
 
 **Chemistry trends, 2000–2021.** 244 of the platform's wells have two or more sampling years in the NWDP record; 175 clear the trend threshold for electrical conductivity, of which **13 are rising and 6 falling**, the rest without a significant trend. No health determinand can be trended, because none is in the file.
 
-![Figure 6.1 [M] — The public map: districts coloured by the worst measured health determinand (uranium, nitrate or fluoride) against IS 10500:2012; 14 of 24 districts are High concern, driven by nitrate and fluoride, and grey (`Not tested`) is never green. Screenshot from the deployed portal, August 2026.](figures/fig_public_map.png)
+![Figure 6.1 [M] — The public map: districts coloured by the worst measured health determinand (uranium, nitrate or fluoride) against IS 10500:2012 [25], from the 2023 CGWB record [39]; 14 of 24 districts are High concern, driven by nitrate and fluoride, and grey (`Not tested`) is never green. Screenshot from the deployed portal, August 2026. Basemap © OpenStreetMap contributors, available under the Open Database Licence; rendered with Leaflet.](figures/fig_public_map.png)
 
 ## 6.2 Machine-learning model performance [V]
 

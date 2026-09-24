@@ -20,26 +20,23 @@ numbersections: false
 | **Student** | Vishal Raj, Roll No. 24030480134 |
 | **Programme** | B.Tech, Information Technology (2024–2028) |
 | **Department / Institute** | Department of Information Technology, B.I.T. Sindri, Dhanbad, Jharkhand |
-| **Faculty mentor named in the proposal** | Prof. Sachin Kumar Agrawal, Assistant Professor, Department of Information Technology, B.I.T. Sindri |
-| **Mentor of record in the ten monthly progress reports** | Asst. Prof. Mukesh Chandra, Department of Production & Industrial Engineering, B.I.T. Sindri |
+| **Faculty mentor** | Asst. Prof. Mukesh Chandra, Department of Production & Industrial Engineering, B.I.T. Sindri |
 | **Programme** | TEXMiN–BIT Sindri Mining CPS CoE, UG Call for Proposal Fellowship 2025 |
 | **Academic year** | 2025–26 |
 | **Fellowship period** | 1 November 2025 – August 2026 (10 months), with a post-fellowship freeze-and-report phase in September 2026 |
 | **Repository** | github.com/VishalRaj720/JalDrishti (173 commits to `main` at the report commit) |
 | **Deployed system** | Portal: jaldrishti.letsmailvishal111.workers.dev · API: jaldrishti-api.onrender.com |
-| **Report commit** | `main` at `476a4a9` (v5 model artifacts), 21 September 2026 |
-
-> **Note on the mentor line.** The proposal (page 1) names Prof. Sachin Kumar Agrawal as faculty mentor; all ten monthly progress reports and the consolidated report of 25 June 2026 name Asst. Prof. Mukesh Chandra. Both are recorded here because the documentary record carries both. **[To be confirmed by the student before submission.]**
+| **Report commit** | numbers regenerated at `main` `476a4a9` (v5 model artifacts), 21 September 2026; references, the ore-dataset correction and the final text, 24 September 2026 |
 
 \newpage
 
 # Declaration
 
-I, Vishal Raj, admission number 24030480134, enrolled in the B.Tech (Information Technology) programme at B.I.T. Sindri, Dhanbad, declare that the work described in this report, entitled *Smart Water Monitoring: Machine Learning and CPS for Safe & Sustainable Mining* (system name *JalDrishti*), was carried out by me under the guidance of my faculty mentor during the TEXMiN–BIT Sindri UG Fellowship 2025–26.
+I, Vishal Raj, admission number 24030480134, enrolled in the B.Tech (Information Technology) programme at B.I.T. Sindri, Dhanbad, declare that the work described in this report, entitled *Smart Water Monitoring: Machine Learning and CPS for Safe & Sustainable Mining* (system name *JalDrishti*), was carried out by me under the guidance of my faculty mentor, Asst. Prof. Mukesh Chandra, during the TEXMiN–BIT Sindri UG Fellowship 2025–26.
 
 All sources of data, published methods and prior work used in this project are acknowledged in the text and in the reference list. Numerical results reported here were regenerated from the repository at the commit named on the title page, and every quantitative claim is traceable to a file, a test, a dataset row count or a citation in the Source-to-Claim Register (Appendix H).
 
-AI-assisted software tooling (Claude, Anthropic) was used throughout the project for software development, code review, documentation and drafting, under my direction and review; the design decisions, the datasets chosen, the scientific assumptions adopted and the interpretation of results are my responsibility. This is stated plainly because it is true and because the project's own working rule was that anything weaker than it looks must be written down rather than left for a reader to discover.
+**Use of generative AI.** A generative AI assistant (Claude, Anthropic) was used throughout the project for software development, code review and technical documentation, and to draft the text of this report from the project record — the ten monthly progress reports, the repository, its documentation and its commit history. I reviewed, corrected and approved the text, and I take responsibility for all of it: the design decisions, the choice of datasets, the scientific assumptions adopted and the interpretation of the results are mine to answer for. No AI tool is an author of this report. This statement is made in accordance with the academic-integrity requirements of the fellowship and the institute; where they prescribe a particular form of disclosure, that form applies.
 
 The proposal carried a TEXMiN CoE declaration on intellectual property and confidentiality (proposal page 6). Where the final report requires that institutional wording, it is to be attached in the institutional form; this declaration does not replace it.
 
@@ -51,11 +48,11 @@ Signature: ______________________  Date: ______________
 
 # Acknowledgement
 
-I thank my faculty mentor for guidance throughout the fellowship, and in particular for the advice in April 2026 to look for internationally published ISR operating records when no Indian ISR data could exist — the decision from which the final methodology descends.
+I thank my faculty mentor, Asst. Prof. Mukesh Chandra, for guidance throughout the fellowship, and in particular for the advice in April 2026 to look for internationally published ISR operating records when no Indian ISR data could exist — the decision from which the final methodology descends.
 
 I thank the TEXMiN–BIT Sindri Mining CPS Centre of Excellence and B.I.T. Sindri for the fellowship and for the review panel in August 2026.
 
-This project rests entirely on open data published by others: the Central Ground Water Board (CGWB) and the National Water Informatics Centre (National Water Data Portal), for the 2023 groundwater-quality table of the *Annual Ground Water Quality Report 2024*, the 2013–2021 water-level record (via India-WRIS and the India Data Portal), the 2000–2021 chemistry record, the NAQUIM aquifer-mapping reports and the East Singhbhum groundwater information booklet; the Geological Survey of India and the National Remote Sensing Centre (ISRO), whose 1:50,000 lineament layer is served on Bhuvan; the International Atomic Energy Agency for the UDEPO deposit database; the U.S. Geological Survey for the two Texas ISR data releases; the European Space Agency / Copernicus programme for the GLO-30 digital elevation model, distributed by OpenTopography; and Lehner & Grill for HydroRIVERS. The published Jaduguda studies by the Bhabha Atomic Research Centre and the Indian School of Mines provided the only local measurements of mine-water uranium and radium.
+This project rests entirely on open data published by others: the Central Ground Water Board (CGWB) and the National Water Informatics Centre (National Water Data Portal), for the 2023 groundwater-quality table of the *Annual Ground Water Quality Report 2024*, the 2013–2021 water-level record (via India-WRIS and the India Data Portal), the 2000–2021 chemistry record, the NAQUIM aquifer-mapping reports and the East Singhbhum groundwater information booklet; the Geological Survey of India and the National Remote Sensing Centre (ISRO), whose 1:50,000 lineament layer is served on Bhuvan; the International Atomic Energy Agency for the UDEPO deposit database; the U.S. Geological Survey for the two Texas ISR data releases; the European Space Agency / Copernicus programme for the GLO-30 digital elevation model, distributed by OpenTopography; and Lehner & Grill for HydroRIVERS. The published Jaduguda studies of the Bhabha Atomic Research Centre provided the only local measurements of mine-water uranium and groundwater radium used here, and the Indian School of Mines study of groundwater around Bagjata and Banduhurang the only local heavy-metal measurements.
 
 The software stands on FastAPI, SQLAlchemy, PostgreSQL/PostGIS, XGBoost, scikit-learn, NumPy/SciPy, pandas/GeoPandas, React, Vite, Leaflet and TanStack Query, and is hosted on Neon, Render and Cloudflare Workers.
 

@@ -71,7 +71,6 @@ Status vocabulary (from the freeze record): **FIV** fully implemented and valida
 | **D6 — CPS contribution** | sensors, streams, closed loop | data → detection → prediction → vulnerability → tiered alert → explanation → action, closed on the manual record; physical layer manual | delivery and tier tests | **CO** for sensing / **FP** for the decision loop | `main.py` scheduler, ingest, alert loop | "CPS-ready decision support", never a live loop |
 | Proposed inputs (proposal §7) | pH, T, EC, TDS, turbidity, SO₄, NO₃, Cl, hardness, Fe, Mn, As, levels, distance, rainfall | all read where they exist; Fe/Mn/As never measured; T and turbidity only in the 2000–2021 physical file; rainfall via the measured seasonal swing, not IMD | — | partial by data | §3.4 | three named inputs absent from the record |
 | Proposed methods (proposal §11) | RF/SVM/GB/ANN, CV, sensitivity analysis, data-gap analysis, case study | gradient boosting (quantile) with conformal calibration; RF/ridge/logistic in the superseded pipelines; grouped CV; Sobol sensitivity; case study with timeline | — | met with a stated substitution | §4.6, §6.9, §6.5 | SVM/ANN not used — nothing to learn that trees had not on 18,000 synthetic rows |
-| Data hygiene (found in this report) | — | a demo field observation (`jharia`) remains in the tracked ore dataset and resolves a deposit-tier source near Dhanbad | — | **open** | §3.5 item 7 | remove through the dataset manager; re-check the deployed database |
 
 # 9. Conclusion
 
@@ -98,4 +97,3 @@ Only what follows from a limitation named in §5 or a result in §6.
 7. **Sensor integration with a real ingest contract**, if a telemetry station is ever installed in the belt; the data layer accepts it, and the CPS diagram's physical layer moves from "manual" to "sensed" only then.
 8. **SMS delivery** for residents without email, and a paid hosting tier so the scheduler does not sleep.
 9. **Other commodities through the species registry** — coal-mine acid drainage (sulphate, iron, manganese) is the nearest, because its indicators are already in the excursion panel — with the explicit caveat that nothing outside uranium ISR has been demonstrated.
-10. **Remove the demo field observation** from the ore dataset (§3.5 item 7) and re-verify the deployed database, before any further use of the deployed system.

@@ -33,7 +33,6 @@ Each row states an assumption, where it enters the system, the consequence if it
 | CGWB values characterise the shallow aquifer, applied at ore depth through a modelled K(z) | every fractured run | the deep K is a law, not a measurement | `extrapolation` reports `hydro:K_m_day` below trained support |
 | The 2023 charge balance is a consistency of construction (Na by difference) | QA | zero suspect analyses is not evidence of laboratory quality | `independence_check` reported with the QA summary |
 | The 2000–2021 record carries no health determinand | D1 "forecast trends" | trend forecasting for any banded or alerted determinand remains undemonstrated | §7; no band or alert uses the record |
-| A demo field observation (`jharia`) sits in the tracked ore dataset | uranium source term near Dhanbad | a deposit-tier hypothetical source where no deposit exists | found during this report; §3.5 item 7; to be removed via the dataset manager |
 
 ## 5.3 Modelling (surrogate) limitations
 
