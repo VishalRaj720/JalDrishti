@@ -1,6 +1,7 @@
 """Module 2 -- 3-tier ore masking + ML-bypass for non-ore uranium."""
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from ml_pipeline.data_prep.ore_loader import ore_zone_at
@@ -147,7 +148,55 @@ def test_radium_has_a_source_footprint_but_does_not_migrate():
     assert far["metrics"]["analytical"]["area_ha"] == 0.0
 
 
-def test_a_field_added_deposit_does_not_enlarge_the_regional_belt():
+@pytest.fixture
+def field_sighting_csv(tmp_path, monkeypatch):
+    """The real deposit CSV plus one synthetic field-added sighting near Jharia.
+
+    These two tests used to read the live file and skip when it held no
+    field-added row. They ran only because a demo observation had been synced
+    into it during R11 testing; when that record was removed (2026-09-24) both
+    guards went quiet without failing. They now bring their own sighting, at the
+    same spot and in the same shape `dataset_sync` writes (a 400 m circle,
+    `record_source=added`), so they always run.
+    """
+    import csv
+    import math
+
+    from ml_pipeline.data_prep import ore_loader
+
+    lon, lat, r_m = 86.28, 23.39, 400.0
+    dlat = r_m / 111_320.0
+    dlon = r_m / (111_320.0 * math.cos(math.radians(lat)))
+    ring = ", ".join(
+        f"{lon + dlon * math.cos(2 * math.pi * i / 24):.6f} "
+        f"{lat + dlat * math.sin(2 * math.pi * i / 24):.6f}" for i in range(25))
+
+    with ore_loader.ORE_CSV.open(encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        header, rows = reader.fieldnames, list(reader)
+    rows.append({**{h: "" for h in header},
+                 "name": "Synthetic field sighting", "state": "Jharkhand",
+                 "center_lat": str(lat), "center_lon": str(lon),
+                 "status": "Field-observed", "geometry_wkt": f"POLYGON(({ring}))",
+                 "notes": "test fixture", "record_source": "added",
+                 "record_ref": "test-fixture"})
+    path = tmp_path / "jharkhand_uranium_deposits.csv"
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=header)
+        w.writeheader()
+        w.writerows(rows)
+
+    caches = (ore_loader._ore, ore_loader.added_deposit_names, ore_loader.ore_geojson)
+    for f in caches:
+        f.cache_clear()
+    monkeypatch.setattr(ore_loader, "ORE_CSV", path)
+    yield path
+    monkeypatch.undo()
+    for f in caches:
+        f.cache_clear()
+
+
+def test_a_field_added_deposit_does_not_enlarge_the_regional_belt(field_sighting_csv):
     """R11. The bug this pins was reported from a real screenshot.
 
     `raw_deposits` feeds the convex hull the belt is unioned with. That was safe
@@ -167,9 +216,9 @@ def test_a_field_added_deposit_does_not_enlarge_the_regional_belt():
     from shapely.ops import unary_union
 
     from ml_pipeline.config import parameters as P
-    from ml_pipeline.data_prep.ore_loader import ORE_CSV, _ore
+    from ml_pipeline.data_prep.ore_loader import _ore
 
-    with ORE_CSV.open(encoding="utf-8-sig") as fh:
+    with field_sighting_csv.open(encoding="utf-8-sig") as fh:
         rows = list(csv.DictReader(fh))
 
     originals, added = [], []
@@ -180,9 +229,7 @@ def test_a_field_added_deposit_does_not_enlarge_the_regional_belt():
         (added if (r.get("record_source") or "original").strip() == "added"
          else originals).append(g)
 
-    if not added:
-        import pytest
-        pytest.skip("no field-added deposits in the current CSV")
+    assert added, "fixture assumption: the synthetic sighting is an added row"
 
     # The hull must be the one over ORIGINAL deposits — adding the field rows
     # must not move it at all.
@@ -200,7 +247,7 @@ def test_a_field_added_deposit_does_not_enlarge_the_regional_belt():
         "one field sighting has redrawn the regional geology")
 
 
-def test_a_field_added_deposit_still_gets_its_own_local_zone():
+def test_a_field_added_deposit_still_gets_its_own_local_zone(field_sighting_csv):
     """Excluding it from the hull must not make it inert.
 
     It is a real ore zone locally — that is the whole point of submitting it —
@@ -210,11 +257,10 @@ def test_a_field_added_deposit_still_gets_its_own_local_zone():
     from ml_pipeline.data_prep.ore_loader import _ore, added_deposit_names, ore_zone_at
 
     names = added_deposit_names()
-    if not names:
-        import pytest
-        pytest.skip("no field-added deposits in the current CSV")
+    assert names == {"Synthetic field sighting"}
 
     deposits, _ = _ore()
+    checked = 0
     for name, poly, _p in deposits:
         if name in names:
             c = poly.centroid
@@ -222,4 +268,5 @@ def test_a_field_added_deposit_still_gets_its_own_local_zone():
             assert zone in ("deposit", "belt"), (
                 f"added deposit {name!r} resolves to {zone!r} at its own centre — "
                 f"the submission has no effect at all")
-            break
+            checked += 1
+    assert checked == 1
