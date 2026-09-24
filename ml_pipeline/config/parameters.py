@@ -1590,10 +1590,40 @@ VERTICAL = {
     # sub-vertical joint sets raise vertical conductivity; weathered/porous is more
     # layered (Kv << Kh). This is the physically-correct channel for "fractured is
     # riskier vertically".
-    # !! SCENARIO ASSUMPTION -- screening values, no Singhbhum measurement.
-    #    The DIRECTION (fractured > porous) is standard hard-rock hydrogeology;
-    #    the magnitudes are chosen. Registered in UNGROUNDED_PARAMETERS.
-    "Kv_Kh_by_regime": {"fractured": 0.03, "porous": 0.008},
+    #
+    # FRACTURED VALUE NOW MEASURED, NOT CHOSEN (2026-09-25). The only published
+    # vertical-anisotropy measurements for Indian hard rock are five pumping-test
+    # interpretations in the weathered-fissured layer of the Maheshwaram granite
+    # (Indo-French Centre for Groundwater Research, NGRI-BRGM, ~30 km S of
+    # Hyderabad): Maréchal, Wyns, Lachassagne & Subrahmanyam (2004), J. Geol.
+    # Soc. India 63(5), Tables 2-3 -- Kz/Kr = 0.606, 0.125, 0.034 (Neuman method,
+    # observation wells) and 1/18.7, 1/5.5 (Gringarten method, pumping wells);
+    # summarised by the same group as "the horizontal permeability is 2 to 30
+    # times higher than the vertical" (Maréchal et al. 2003, C. R. Geoscience
+    # 335:451-460). Served central = their GEOMETRIC MEAN, 0.12 (K is
+    # log-normal); the band is the measured minimum and maximum. The value it
+    # replaces, 0.03, was a screening choice that sat below four of the five
+    # measurements -- it made the upward pathway ~4x slower than any Indian
+    # hard-rock test supports.
+    # WHAT IT STILL IS NOT: a Singhbhum measurement. Two documented reasons it
+    # may UNDERSTATE vertical conductivity in the ore belt: (1) the measured
+    # anisotropy comes from sub-horizontal weathering fissures in GRANITE;
+    # in folded metasediments such as the SSZ schists those fissures are
+    # "randomly dipping ... (no preferential orientation)" (Lachassagne,
+    # Dewandel & Wyns 2021, Hydrogeol. J., doi:10.1007/s10040-021-02339-7, SFL
+    # description), i.e. less anisotropic; (2) Maréchal et al. (2004) note that
+    # tectonic fissures take over "beyond 70-90 m", and no anisotropy
+    # measurement exists for that zone anywhere in Jharkhand. Hence the band is
+    # REPORTED on every run (`anisotropy_band` in the vertical block), never
+    # hidden behind the central.
+    # POROUS value unchanged: no Indian measurement exists for the sedimentary
+    # (alluvium / Gondwana sandstone / laterite) aquifers it applies to.
+    "Kv_Kh_by_regime": {"fractured": 0.12, "porous": 0.008},
+    "Kv_Kh_band_by_regime": {"fractured": (0.034, 0.61), "porous": None},
+    "Kv_Kh_citation": ("Maréchal, Wyns, Lachassagne & Subrahmanyam (2004) J. Geol. "
+                       "Soc. India 63(5) Tables 2-3 (Maheshwaram granite, five "
+                       "pumping-test interpretations); Maréchal et al. (2003) "
+                       "C. R. Geoscience 335:451-460"),
     # !! SCENARIO ASSUMPTION -- net upward head gradient (injection driven).
     #    Now BRACKETED by the measured monsoon swing (fix 3.7 / VERTICAL_SEASONAL
     #    reports a two-end-member band around it), but the baseline itself has no
@@ -1621,6 +1651,62 @@ VERTICAL = {
     "ore_thickness_default_m": 20.0,
     "ore_depth_range_m": (50.0, 600.0),
     "ore_thickness_range_m": (2.0, 100.0),
+}
+
+# ---------------------------------------------------------------------------
+# 8a. THE VERTICAL PATH GETS THE SAME PHYSICS AS THE HORIZONTAL ONE (2026-09-25)
+#
+# WHAT WAS WRONG. The upward-leakage pathway moved a WATER PARCEL, not a solute:
+# breakthrough = separation / (Kv*i/phi). So at Jaduguda (20-yr run) uranium and
+# TDS both reached the shallow aquifer in 17.4 yr, and changing the matrix
+# storage ratio beta from 3 to 0 did not move that number -- while the same
+# run's HORIZONTAL front retarded uranium ~270x through exactly that beta. The
+# product therefore paired its most optimistic horizontal answer with its most
+# pessimistic vertical one, for the same rock, in the same response.
+#
+# Two corrections, each reusing a law the engine already applies elsewhere:
+#
+#  matrix_retention  Layer 2 is fractured bedrock (that is why phi_confining is
+#                    fixed at the fractured value). A solute crossing it is
+#                    stored in the matrix between the fractures exactly as it is
+#                    horizontally: same Goltz & Roberts (1986) retarded clock,
+#                    same sorbing capacity ratio beta_eff = beta * R_m, same
+#                    species Kd, beta derived from THIS layer's porosities
+#                    (beta_from_porosities(n_total, phi_confining)) -- the R17
+#                    rule that beta and the mobile porosity the transport runs
+#                    on may not disagree about the same rock.
+#                    NOT applied: first-order uranium redox trapping. The upper
+#                    part of the path crosses the oxidised weathering profile,
+#                    where the reducing capacity that rate represents is not
+#                    established, so applying it would be anti-conservative.
+#                    (Immaterial within the horizon: uranium's retarded arrival
+#                    is centuries.)
+#  depth_resolved_K  The path runs from the ore TOP up to the shallow-aquifer
+#                    base, through rock whose K rises toward the surface (the
+#                    NAQUIM-calibrated K(z) law, section 5d). Flow in series
+#                    through that column is governed by the HARMONIC mean of
+#                    K(z) (Freeze & Cherry 1979, layered systems), not by K at
+#                    ore depth -- the least conductive point on the path, which
+#                    is what was used. Evaluated with the same
+#                    `depth_decay_factor` and fracture base the ore-depth K uses.
+#
+# Both default ON. Setting either False restores the pre-2026-09-25 behaviour
+# exactly (tests pin that), so the change is reversible and auditable.
+# Neither touches a trained feature or label: the vertical screening is served
+# analytically only, so no re-bake / retrain is involved.
+# ---------------------------------------------------------------------------
+VERTICAL_PATH = {
+    "matrix_retention": True,
+    "depth_resolved_K": True,
+    # lixiviant constituents whose vertical arrival is reported beside the run's
+    # own species -- the same panel NUREG-1569 asks licensees to monitor, for the
+    # same reason: they are not attenuated, so they arrive first.
+    "indicator_species": ISR_EXCURSION_INDICATORS,
+    "citation_retention": ("Goltz & Roberts (1986) Water Resour. Res. 22(7):1139 "
+                           "-- the mobile/immobile clock the horizontal front uses"),
+    "citation_series_K": ("Freeze & Cherry (1979) Groundwater, layered-formation "
+                          "equivalent conductivity (harmonic mean for flow "
+                          "across layers)"),
 }
 
 # ---------------------------------------------------------------------------
@@ -1819,9 +1905,18 @@ UNGROUNDED_PARAMETERS = {
                       "one would relabel an assumption as data"),
     },
     "VERTICAL.Kv_Kh_by_regime": {
-        "value": None, "kind": "scenario_assumption",
-        "leverage": "advective upward leakage rate in the shallow-impact screen",
-        "grounding": "GSI Bhukosh structural analysis or local packer data",
+        # 2026-09-25: the FRACTURED value is now the geometric mean of five
+        # Indian hard-rock pumping tests (Maheshwaram granite, Maréchal et al.
+        # 2004) and its measured range is reported on every run. It stays on
+        # this register because the measurements are from a granite fissured
+        # layer <35 m deep, not from Singhbhum schist at ore depth.
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": ("advective upward leakage rate in the shallow-impact screen; "
+                     "breakthrough time scales as 1/(Kv/Kh). The measured "
+                     "0.034-0.61 range spans 18x in time"),
+        "grounding": ("a packer or pumping test with an observation well in the "
+                      "Singhbhum Shear Zone below 70 m (none published); the "
+                      "porous value has no Indian measurement at all"),
     },
     "VERTICAL.upward_gradient": {
         "value": None, "kind": "scenario_assumption",

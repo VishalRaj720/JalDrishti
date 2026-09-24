@@ -814,7 +814,43 @@ export interface VerticalScreening {
     separation_m: number | null;
     static_deep_head?: Record<string, any>;
   } | null;
+  /** 2026-09-25: the screened species, so the panel can tell whether the first
+   *  arrival is something else. Absent on runs stored before then. */
+  species?: string;
+  /** When the pore water carrying the solute would arrive — what the headline
+   *  used to be for every species, before matrix retention was applied. */
+  water_arrival_years?: number | null;
+  /** How strongly the confining rock's matrix holds this species back. */
+  layer2_retardation?: number | null;
+  /** The headline re-evaluated at the ends of the measured Kv/Kh range. */
+  anisotropy_band?: {
+    Kv_Kh_low: number; Kv_Kh_high: number; Kv_Kh_served: number;
+    years_to_breakthrough_range: [number | null, number | null];
+    basis: string;
+  } | null;
+  first_arrival?: {
+    species: string; years: number;
+    shallow_impact_probability: number | null; risk_band: string | null;
+    basis: string;
+  } | null;
+  first_detectable?: { species: string; years: number; basis: string } | null;
+  indicators?: VerticalIndicator[];
+  confining_path?: Record<string, any> | null;
   [k: string]: any;
+}
+
+/** One lixiviant indicator's climb through the same confining rock. */
+export interface VerticalIndicator {
+  species: string;
+  years_to_breakthrough?: number | null;
+  water_arrival_years?: number | null;
+  layer2_retardation?: number | null;
+  health_limit?: number | null;
+  source_exceeds_limit?: boolean | null;
+  shallow_impact_probability?: number | null;
+  risk_band?: string | null;
+  note?: string;
+  status?: string;
 }
 
 export interface ModelBundle {

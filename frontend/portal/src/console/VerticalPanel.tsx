@@ -21,7 +21,19 @@
  * is where this analysis has always been visible.
  */
 import type { VerticalScreening } from "../api/client";
+import { SPECIES_NAME } from "../map/plume";
 import { fmt } from "./mapLayers";
+
+/** Chloride is an excursion indicator only, so the map's species table (which
+ *  lists what can be drawn) does not name it. */
+const nameOf = (sp: string | undefined | null) =>
+  !sp ? "this substance" : (SPECIES_NAME[sp] ?? (sp === "chloride_mg_l" ? "Chloride" : sp));
+
+/** A [fast, slow] breakthrough range as prose; either end may be "never". */
+const rangeText = ([fast, slow]: [number | null, number | null]) =>
+  fast == null && slow == null ? "no breakthrough at either end"
+    : `${fast == null ? "not expected" : `${fmt(fast, 1)} yr`} to ${
+      slow == null ? "not expected" : `${fmt(slow, 1)} yr`}`;
 
 const BAND_TONE: Record<string, string> = {
   high: "danger", moderate: "warn", low: "ok", none: "neutral",
@@ -96,11 +108,41 @@ export function VerticalSchematic({
         </span>}
         <div className="muted small" style={{ marginTop: 4 }}>
           {years != null
-            ? <>If it does, the model expects breakthrough after about{" "}
-                <b>{fmt(years, 1)} years</b>.</>
+            ? <>If it does, the model expects {nameOf(v.species).toLowerCase()} to
+                arrive after about <b>{fmt(years, 1)} years</b>.</>
             : <>The model does not expect breakthrough within the screened horizon.</>}
         </div>
+        {/* Retention stated, not implied (2026-09-25). Before this, the headline
+            WAS the water time for every species, so uranium "arrived" as fast
+            as the salts. A reader should see both numbers and why they differ. */}
+        {v.water_arrival_years != null && (v.layer2_retardation ?? 1) > 1.05 && (
+          <div className="muted small" style={{ marginTop: 4 }}>
+            The groundwater carrying it would cross in about{" "}
+            {fmt(v.water_arrival_years, 1)} years; the rock between the fractures
+            holds {nameOf(v.species).toLowerCase()} back about{" "}
+            {fmt(v.layer2_retardation, 0)}×.
+          </div>
+        )}
       </div>
+
+      {/* The first arrival, when it is not the species on screen. For a uranium
+          screening this is the whole point: the injected salts get there in
+          years, uranium in centuries, and showing only the second would read
+          as "nothing happens for 400 years". */}
+      {v.first_arrival && v.species && v.first_arrival.species !== v.species && (
+        <div className="banner warn" style={{ marginBottom: 10 }}>
+          <strong>
+            Arrives first: {nameOf(v.first_arrival.species)} from the injected
+            solution, after about {fmt(v.first_arrival.years, 1)} years
+          </strong>
+          <div className="muted small" style={{ marginTop: 4 }}>
+            It is not held back by the rock the way{" "}
+            {nameOf(v.species).toLowerCase()} is, and its source concentration is
+            above its drinking-water limit. This is why licensed operations
+            monitor salts, not uranium, to detect a leak (US NRC NUREG-1569).
+          </div>
+        </div>
+      )}
 
       {/* ── the depth schematic ── */}
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img"
@@ -245,6 +287,55 @@ export function VerticalNumbers({ v }: { v: VerticalScreening | null | undefined
             </table>
           </div>
         </div>
+      )}
+
+      {/* Kv/Kh is the input the time scales on most directly, and its only
+          Indian measurements span 18x. The range is shown on every run rather
+          than hidden behind the central value. */}
+      {v.anisotropy_band?.years_to_breakthrough_range && (
+        <div className="muted small" style={{ marginTop: 10, lineHeight: "var(--lh-base)" }}>
+          <b>Across the measured rock anisotropy</b> (vertical ÷ horizontal
+          permeability {fmt(v.anisotropy_band.Kv_Kh_low, 3)}–
+          {fmt(v.anisotropy_band.Kv_Kh_high, 2)}, pumping tests in Indian hard
+          rock): {rangeText(v.anisotropy_band.years_to_breakthrough_range)}.
+          No such test exists for this belt at ore depth.
+        </div>
+      )}
+
+      {(v.indicators?.length ?? 0) > 0 && (
+        <>
+          <div className="muted small" style={{ margin: "12px 0 4px" }}>
+            The same climb for what the injected solution carries:
+          </div>
+          <div className="table-scroll">
+            <table className="grid">
+              <thead>
+                <tr><th>Substance</th><th>Arrives</th><th>Held back</th>
+                  <th>Source above its limit</th></tr>
+              </thead>
+              <tbody>
+                {v.indicators!.map((ind) => (
+                  <tr key={ind.species}>
+                    <td>{nameOf(ind.species)}</td>
+                    <td className="mono">
+                      {ind.status ? "unavailable"
+                        : ind.years_to_breakthrough != null
+                          ? `${fmt(ind.years_to_breakthrough, 1)} yr` : "not expected"}
+                    </td>
+                    <td className="mono">
+                      {ind.layer2_retardation != null ? `${fmt(ind.layer2_retardation, 1)}×` : "–"}
+                    </td>
+                    <td>
+                      {ind.source_exceeds_limit == null
+                        ? <span className="muted">no limit modelled</span>
+                        : ind.source_exceeds_limit ? "yes" : "no"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       <div className="muted small" style={{ marginTop: 8, lineHeight: "var(--lh-base)" }}>

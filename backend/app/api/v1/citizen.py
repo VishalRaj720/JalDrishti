@@ -47,7 +47,8 @@ from app.models.user import User, UserRole
 from app.services import audit
 from app.ratelimit import AUTH_RATE_LIMIT, limiter
 from app.services import health_bands
-from app.services.alerts import URANIUM_LIMIT_PPB, AlertService
+from app.services.alerts import (URANIUM_LIMIT_PPB, AlertService, arrival_words,
+                                 vertical_headline)
 from app.services.auth import create_access_token, hash_password
 
 router = APIRouter(prefix="/citizen", tags=["Citizen"])
@@ -641,15 +642,29 @@ def _shallow_summary(r: Mapping[str, Any]) -> dict[str, Any]:
                          "record, not a finding that it does not.")}
 
     seasonal = v.get("seasonal") or {}
+    first_years, first_prob, first_species = vertical_headline(v)
     return {
         "recorded": True,
         "probability": v.get("shallow_impact_probability"),
         "risk_band": v.get("risk_band"),
         "years_to_breakthrough": v.get("years_to_vertical_breakthrough"),
+        # 2026-09-25: the screened species' own arrival above, and -- when the
+        # run recorded it -- whatever from the injected solution arrives FIRST.
+        # For a uranium screening those differ by centuries, and a resident
+        # shown only the uranium figure would read "nothing for 400 years".
+        "first_arrival": ({"species": first_species,
+                           "what": arrival_words(first_species),
+                           "years": first_years, "probability": first_prob}
+                          if first_species else None),
         "dominant_pathway": v.get("dominant_pathway"),
-        "dry_season_years": seasonal.get("breakthrough_years_dry"),
-        "note": ("Modelled time for contamination to rise from the ore zone to "
-                 "the shallow aquifer, if such a mine operated."),
+        # was `seasonal["breakthrough_years_dry"]`, a key the engine has never
+        # produced, so this read None on every run; the dry season is the
+        # static-deep-head end member's dry state.
+        "dry_season_years": (((seasonal.get("static_deep_head") or {})
+                              .get("dry_season") or {}).get("years_to_breakthrough")),
+        "note": ("Modelled time for the screened substance to rise from the ore "
+                 "zone to the shallow aquifer, if such a mine operated. "
+                 "`first_arrival`, where present, is what would get there first."),
     }
 
 

@@ -205,6 +205,101 @@ hand-copy a number the artifact already carries.
 
 ---
 
+## 1f. Closed (2026-09-25) — the vertical pathway moved water, not solute
+
+**Found in a review of why the plume "barely moves".** The upward-leakage time
+was `separation / (Kv·i/φ)` — the travel time of a water parcel — for every
+species. At Jaduguda (20-yr run) uranium, sulfate and TDS all "reached" the
+shallow aquifer in **17.5 yr**, and changing β from 3 to 0 did not move that
+number, while the same response's horizontal front retarded uranium ~270×
+through that β. The product paired its most optimistic horizontal answer with
+its most pessimistic vertical one, for the same rock.
+
+**What changed** (`P.VERTICAL_PATH`, `ml_pipeline/dashboard/vertical_path.py`,
+fidelity row 3.11). No retrain: the vertical screen is served analytically only.
+
+1. **Matrix retention on the path.** The solute front climbs on the same
+   Goltz & Roberts clock and `β_eff = β·R_m` as the horizontal front, with β
+   from the confining layer's own porosities (the R17 rule). The wellbore
+   pathway is deliberately *not* retarded — an open borehole has no matrix.
+2. **Series K.** The column's conductivity is the harmonic mean of the NAQUIM
+   K(z) law between the ore top and the shallow-aquifer base (Freeze & Cherry
+   1979), not K at ore depth, the tightest point on the path. Jaduguda:
+   0.563 → 1.32 m/day.
+3. **Kv/Kh measured, not chosen.** Fractured 0.03 → **0.12**, the geometric
+   mean of the five pumping-test interpretations from the Maheshwaram granite
+   (Maréchal, Wyns, Lachassagne & Subrahmanyam 2004, *J. Geol. Soc. India*
+   63(5), Tables 2–3; "2 to 30 times", Maréchal et al. 2003, *C. R.
+   Geoscience* 335). The old value sat below four of the five measurements.
+   The measured range 0.034–0.61 is re-evaluated on every run
+   (`anisotropy_band`).
+4. **The salts are reported beside the display species.** Chloride, TDS and
+   sulfate are screened on the same geometry, and `first_arrival` names the
+   earliest constituent whose source exceeds its drinking-water limit. The
+   backend's `aquifer_breach_due` and `aquifer_pathway` alerts now key on it
+   (`app.services.alerts.vertical_headline`); runs stored before this change
+   carry no `first_arrival` and are read exactly as before.
+
+**Before and after** (20-yr run, default operation, analytical engine; old =
+main `d2bb215`, same pins):
+
+| Pin | Before (every species) | Water | TDS | Sulfate | Uranium |
+|---|---|---|---|---|---|
+| Jaduguda | 17.5 yr [6.4–31.1] | 1.9 | **4.5** [1.0–9.8] | 22.7 | **448** [153–810] |
+| Dhanbad | 65.5 yr [24.8–97.2] | 4.7 | 15.0 | 66.9 | 1,130 |
+| Ranchi (non-ore) | 110.7 yr [40.7–186.5] | 10.2 | 35.7 | 154 | 2,479 (source suppressed) |
+
+**Direction of the change: both ways, for stated reasons.** The salts arrive
+**sooner** than the old headline (the series K and the measured Kv/Kh each
+speed the water up; TDS's small matrix storage slows it only ~4×). Uranium
+arrives **far later**: it is held back by the same matrix storage that holds
+its horizontal front to tens of metres. That ordering is the one NUREG-1569
+p.137 gives for rejecting uranium as an excursion indicator, and it is now
+visible in the vertical as well as the horizontal answer.
+
+**What is still true.**
+
+* **Kv/Kh is not a Singhbhum measurement.** It comes from the sub-horizontal
+  weathering fissures of a granite less than 35 m deep. For folded
+  metasediments such as the SSZ schists those fissures are "randomly dipping"
+  (Lachassagne, Dewandel & Wyns 2021, *Hydrogeol. J.*,
+  doi:10.1007/s10040-021-02339-7), i.e. less anisotropic. Maréchal et al.
+  (2004) note tectonic fissures take over beyond 70–90 m. Both point to the
+  served value **understating** vertical flow in the belt, which is why the
+  measured range is shown and not hidden.
+* **Foliation dip is not modelled.** The SSZ fabric dips moderately: "about
+  35º towards northeast in Turamdih area" (UCIL feature article on Turamdih,
+  p.5); the Jaduguda orebody has "a moderate dip of about 40°" (Bhasin, UCIL,
+  IAEA ETDE XA0103130, p.3). A dipping
+  permeable fabric would add a vertical component to flow, but rotating a
+  permeability tensor needs the along- vs across-foliation K ratio, and no
+  hydraulic measurement of it exists for the SSZ. Recorded rather than guessed.
+* **The upward gradient is still a scenario assumption** (0.005,
+  `UNGROUNDED_PARAMETERS`). A bleed-operated wellfield is a net sink, so over
+  the wellfield as a whole the gradient during operations points *into* the ore
+  zone; an upward push is realistic around individual injection wells, during
+  an imbalance, or in a natural discharge setting. The seasonal band brackets
+  it; no deep piezometry exists to replace it.
+* **No redox trapping on the vertical path.** The upper part of the column is
+  the oxidised weathering profile, where the reducing capacity the horizontal
+  uranium rate represents is not established; applying it would be
+  anti-conservative. Immaterial within the horizon (uranium arrives in
+  centuries).
+* **Cost.** Screening three indicators adds ~90 ms per `/api/predict`
+  (217 → 304 ms median at Jaduguda), paid again on each stored timeline frame.
+
+**Records that now read differently.** The submitted technical report
+(`docs/report/parts/06_results.md` §6.6, appendix row 22) quotes the registered
+site's uranium run at 18.7 yr / index 0.62 / *high* — a water-parcel time,
+species-blind, like every vertical figure before this change. Under this
+change a uranium run near that site reports uranium arriving in centuries
+(~448 yr at the Jaduguda reference pin) and TDS first within a few years
+(~4.5 yr there). The report is a historical record and is not edited; this
+section supersedes that figure. Published advisories keep the vertical block of
+the run they were published from until they are re-run.
+
+---
+
 ## 1b. Closed (2026-08-20) — the vertical breakthrough headline was too slow
 
 **Reported by the project owner from the UI, then reproduced arithmetically, then

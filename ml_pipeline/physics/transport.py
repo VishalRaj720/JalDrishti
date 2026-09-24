@@ -617,22 +617,96 @@ def _vertical_risk_band(p: float) -> str:
     return "high"
 
 
+def confining_path_conductivity(K_ref_m_day: float, z_shallow_m: float,
+                                z_deep_m: float,
+                                fracture_base_m: float | None = None,
+                                n: int = 400) -> float:
+    """Equivalent K for flow ACROSS the column between two depths [m/day].
+
+    The upward pathway runs from the ore top (z_deep) to the shallow-aquifer base
+    (z_shallow) through rock whose conductivity follows the NAQUIM-calibrated
+    K(z) = K_ref * depth_decay_factor(z) law the ore-depth K already uses. Flow in
+    series through that column is set by the HARMONIC mean of K(z) (Freeze &
+    Cherry 1979, equivalent conductivity of layered formations):
+
+        K_eq = L / integral_{z_shallow}^{z_deep} dz / K(z)
+
+    Before 2026-09-25 the pathway used K at ORE depth -- the least conductive
+    point on the column -- for the whole climb. The harmonic mean is still
+    dominated by the tightest rock, but no longer pretends every metre is as
+    tight as the bottom one. A column that lies wholly above the reference depth
+    returns K_ref exactly; one whose ends coincide returns K(z) there.
+    """
+    K_ref = max(float(K_ref_m_day), 0.0)
+    z0, z1 = float(z_shallow_m), float(z_deep_m)
+    if z1 <= z0:
+        return K_ref * P.depth_decay_factor(z0, fracture_base_m)
+    z = np.linspace(z0, z1, max(int(n), 2))
+    inv = np.array([1.0 / P.depth_decay_factor(float(zi), fracture_base_m) for zi in z])
+    # composite trapezoid, written out so it does not depend on the numpy
+    # version's name for it (trapz / trapezoid)
+    integral = float(np.sum(0.5 * (inv[1:] + inv[:-1]) * np.diff(z)))
+    return K_ref * (z1 - z0) / integral
+
+
+def vertical_solute_arrival_days(v_up_m_day: float, dz_m: float,
+                                 beta_eff: float = 0.0,
+                                 omega: float = P.DUAL_POROSITY["mass_transfer_omega"]
+                                 ) -> float:
+    """Days for a solute front to cross a vertical separation dz at pore-water
+    velocity v_up, with the SAME dual-porosity retarded clock the horizontal
+    front runs on (`retarded_clock`, Goltz & Roberts 1986).
+
+    The front sits at z(t) = v_up * I(t), so arrival solves I(t*) = dz / v_up.
+    I is monotone increasing with t/(1+beta) <= I(t) <= t, which brackets the
+    root in [dz/v_up, (1+beta)*dz/v_up] -- the water arrival and the fully
+    matured-capacity arrival. beta_eff = 0 returns the water arrival exactly,
+    which is what the pathway reported before matrix retention was applied.
+    Returns inf for a closed pathway (v_up = 0).
+    """
+    if v_up_m_day <= 1e-12:
+        return float("inf")
+    t_water = float(dz_m) / float(v_up_m_day)
+    if beta_eff <= 0.0 or omega <= 0.0:
+        return t_water
+    from scipy.optimize import brentq
+    target = t_water                                  # I(t*) must equal dz/v
+    hi = t_water * (1.0 + float(beta_eff))
+    f = lambda t: retarded_clock(t, beta_eff, omega) - target      # noqa: E731
+    if f(hi) <= 0.0:                                  # numerically at the cap
+        return hi
+    return float(brentq(f, t_water, hi, xtol=1e-6, rtol=1e-10))
+
+
 def _advective_leakage(i_up: float, *, Kv: float, phi_confining: float,
-                       dz_adv: float, t_days: float, conc_factor: float) -> dict:
+                       dz_adv: float, t_days: float, conc_factor: float,
+                       beta_eff: float = 0.0,
+                       omega: float = P.DUAL_POROSITY["mass_transfer_omega"]) -> dict:
     """Upward Darcy leakage through the confining zone at vertical gradient i_up.
 
     Split out of shallow_impact_screening (3.7) so the SAME pathway can be
     re-evaluated at the wet- and dry-season gradients without duplicating the
     law. A non-positive gradient closes the pathway (no upward flow) -- it never
-    produces a negative risk, so i_up is floored at 0 by the caller."""
+    produces a negative risk, so i_up is floored at 0 by the caller.
+
+    SOLUTE, NOT WATER (2026-09-25, P.VERTICAL_PATH). The front advances on the
+    dual-porosity clock, z(t) = v_up * I(t), with the confining rock's own
+    sorbing capacity ratio `beta_eff`. `years_to_breakthrough` is the SOLUTE
+    arrival; `water_arrival_years` is what this pathway used to report for every
+    species, kept beside it so the retention is visible rather than implied.
+    beta_eff = 0 reproduces the previous result bit for bit."""
     v_up = Kv * max(i_up, 0.0) / max(phi_confining, 1e-3)          # m/day
-    barrier = float(np.clip(v_up * max(t_days, 0.0) / dz_adv, 0.0, 1.0))
-    yrs = (dz_adv / v_up / 365.0) if v_up > 1e-9 else float("inf")
+    front = v_up * retarded_clock(max(t_days, 0.0), beta_eff, omega)
+    barrier = float(np.clip(front / dz_adv, 0.0, 1.0))
+    water = (dz_adv / v_up / 365.0) if v_up > 1e-9 else float("inf")
+    solute = (vertical_solute_arrival_days(v_up, dz_adv, beta_eff, omega) / 365.0
+              if v_up > 1e-9 else float("inf"))
     return {"gradient": round(float(i_up), 5),
             "v_up_m_day": round(float(v_up), 6),
             "barrier_crossed": round(barrier, 3),
             "p_advective": round(barrier * conc_factor, 3),
-            "years_to_breakthrough": (None if not np.isfinite(yrs) else round(yrs, 1))}
+            "years_to_breakthrough": (None if not np.isfinite(solute) else round(solute, 1)),
+            "water_arrival_years": (None if not np.isfinite(water) else round(water, 1))}
 
 
 def _duty_cycle_gradient(i0: float, amp: float) -> float:
@@ -683,16 +757,31 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                              water_table_m: float | None = None,
                              water_table_wet_m: float | None = None,
                              water_table_dry_m: float | None = None,
-                             water_table_now_m: float | None = None) -> dict:
+                             water_table_now_m: float | None = None,
+                             layer2_beta_eff: float = 0.0,
+                             layer2_omega: float = P.DUAL_POROSITY["mass_transfer_omega"],
+                             Kv_Kh_band: tuple[float, float] | None = None) -> dict:
     """SCREENING estimate of how much the deep plume could impact the Layer-1
     (shallow drinking-water) aquifer. Three independent pathways OR-combined:
 
       (1) dispersive  -- upward Domenico spreading; conc reaching Layer 1 vs the
                          incremental BIS threshold. Tiny for deep confined ore.
       (2) advective   -- upward Darcy leakage through the semi-confining fractured
-                         zone: v_up = Kv*i / phi ; barrier crossed if v_up*t >= dz.
+                         zone: v_up = Kv*i / phi ; the SOLUTE front z = v_up*I(t)
+                         on the dual-porosity clock (`layer2_beta_eff`, the
+                         confining rock's sorbing capacity ratio for THIS
+                         species -- see P.VERTICAL_PATH). 0 = water parcel, the
+                         pre-2026-09-25 behaviour.
       (3) wellbore    -- casing / legacy-borehole shortcut (base rate; Singhbhum
-                         has decades of AMD drilling).
+                         has decades of AMD drilling). Deliberately NOT retarded:
+                         an open borehole has no matrix to store solute in, which
+                         is why it is the one pathway by which uranium itself can
+                         reach the shallow aquifer quickly.
+
+    `K_m_day` is the horizontal conductivity of the CONFINING COLUMN (the server
+    passes `confining_path_conductivity`); Kv = K_m_day * Kv_Kh_ratio.
+    `Kv_Kh_band` (lo, hi), when given, reports the headline breakthrough at both
+    ends of the measured anisotropy range as `anisotropy_band`.
 
     Returns the combined index AND every component so it stays interpretable.
     This is a transparent screening index, NOT a calibrated probability."""
@@ -724,14 +813,20 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
     # barrier-crossed fraction is hydraulic (over the ore-top-to-shallow gap);
     # scale by conc_factor so a weak source that crosses is not a threshold breach.
     Kv = max(K_m_day, 0.0) * max(Kv_Kh_ratio, 0.0)
-    _leak = lambda i: _advective_leakage(                              # noqa: E731
-        i, Kv=Kv, phi_confining=phi_confining, dz_adv=dz_adv,
-        t_days=t_days, conc_factor=conc_factor)
+    _beta = max(float(layer2_beta_eff), 0.0)
+    _leak = lambda i, kv=Kv: _advective_leakage(                       # noqa: E731
+        i, Kv=kv, phi_confining=phi_confining, dz_adv=dz_adv,
+        t_days=t_days, conc_factor=conc_factor,
+        beta_eff=_beta, omega=layer2_omega)
     base = _leak(upward_gradient)
     barrier_crossed = base["barrier_crossed"]
     p_adv = base["p_advective"]
     yrs_break = (float("inf") if base["years_to_breakthrough"] is None
                  else base["years_to_breakthrough"])
+    # which leak state the HEADLINE is taken from (the duty cycle replaces it
+    # below where a seasonal band exists) -- carried so the water arrival and
+    # the anisotropy band are reported on the same basis as the headline
+    head_i, head = float(upward_gradient), base
 
     # (3) wellbore/legacy-borehole shortcut -- base rate, concentration-gated
     p_well = (float(wellbore_failure_prob) * conc_factor
@@ -836,6 +931,7 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
             None if not np.isfinite(yrs_break) else round(yrs_break, 1))
         if duty["years_to_breakthrough"] is not None:
             yrs_break = duty["years_to_breakthrough"]
+            head_i, head = i_duty, duty
         # TIMELINE: the state at the animation's CURRENT calendar month. Same
         # two end members, evaluated at this month's interpolated water table
         # instead of the seasonal extremes -- so the timeline reads out a point
@@ -858,6 +954,25 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
         water_table = round(float(water_table_m), 1)
         saturated_shallow_thickness_m = round(max(float(layer1_base_m)
                                                   - float(water_table_m), 0.0), 1)
+    # MEASURED ANISOTROPY RANGE (2026-09-25). Kv/Kh is the input the time scales
+    # on most directly (water: t ~ 1/Kv exactly; a retarded solute spreads MORE,
+    # because on a fast path it outruns the matrix uptake before the clock
+    # matures), and its only Indian measurements span 18x, so the headline is
+    # re-evaluated at both ends on the same gradient basis. A single number here
+    # would hide the widest uncertainty in the block.
+    anisotropy_band = None
+    if Kv_Kh_band is not None:
+        lo, hi = (float(Kv_Kh_band[0]), float(Kv_Kh_band[1]))
+        at_lo = _leak(head_i, kv=max(K_m_day, 0.0) * lo)
+        at_hi = _leak(head_i, kv=max(K_m_day, 0.0) * hi)
+        anisotropy_band = {
+            "Kv_Kh_low": lo, "Kv_Kh_high": hi, "Kv_Kh_served": float(Kv_Kh_ratio),
+            # low Kv/Kh -> slower; the band is ordered [fast, slow] like every
+            # other breakthrough range in this block
+            "years_to_breakthrough_range": [at_hi["years_to_breakthrough"],
+                                            at_lo["years_to_breakthrough"]],
+            "basis": "same gradient as the headline (duty cycle where present)",
+        }
     return {
         "separation_m": round(dz_adv, 1),   # intact confining rock: ore-top -> shallow base
         "layer1_base_m": round(float(layer1_base_m), 1),
@@ -876,6 +991,13 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                                            else round(yrs_break, 1)),
         "breakthrough_basis": ("duty_cycle" if (seasonal or {}).get("duty_cycle")
                                else "mean_gradient"),
+        # SOLUTE vs WATER (P.VERTICAL_PATH). The headline above is when THIS
+        # species' front arrives; this is when the pore water carrying it would,
+        # i.e. what the headline used to be for every species. The ratio is the
+        # matrix retention of the confining rock, stated rather than implied.
+        "water_arrival_years": head["water_arrival_years"],
+        "layer2_retardation": round(1.0 + _beta, 1),
+        "anisotropy_band": anisotropy_band,
         "shallow_impact_probability": round(p_shallow, 3),
         "risk_band": _vertical_risk_band(p_shallow),
         "pathways": {k: round(v, 3) for k, v in pathways.items()},

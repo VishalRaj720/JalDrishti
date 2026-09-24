@@ -671,43 +671,30 @@ def api_predict(req: PredictRequest):
     # transport engine uses (L = max(front reach, wellfield width)).
     L_disp = max(fm["Xc_m"], inputs["wellfield_width_m"], 1.0)
     alpha_L = P.longitudinal_dispersivity(L_disp)
-    from ml_pipeline.physics.transport import shallow_impact_screening
     # D3: per-district shallow-aquifer base from the NAQUIM reports (falls back to
     # the state-wide VERTICAL default for districts without a report).
     from ml_pipeline.data_prep.naquim_vertical import vertical_params_at
+    from ml_pipeline.dashboard.vertical_path import (
+        screening_geometry, screen_species, indicator_arrivals)
     vparams = vertical_params_at(req.lon, req.lat)
-    vertical = shallow_impact_screening(
-        C0=inputs["source_conc_C0"], background=inputs["background_conc_Cb"],
-        threshold=threshold, Xc_m=fm["Xc_m"],
-        source_width_m=inputs["wellfield_width_m"], alpha_L=alpha_L,
-        alpha_V=alpha_L * P.VERTICAL["alpha_V_ratio"],
-        ore_depth_m=req.ore_depth_m, ore_thickness_m=req.ore_thickness_m,
-        layer1_base_m=vparams["layer1_base_m"], K_m_day=inputs["K_m_day"],
-        # confining Layer-2 porosity is FIXED (fractured bedrock, not the ore
-        # regime); the regime enters through vertical anisotropy Kv/Kh instead.
-        phi_confining=P.VERTICAL["phi_confining"],
-        Kv_Kh_ratio=P.VERTICAL["Kv_Kh_by_regime"].get(inputs["regime"], 0.01),
-        upward_gradient=P.VERTICAL["upward_gradient"],
-        t_days=req.time_years * 365.0,
-        wellbore_failure_prob=P.VERTICAL["wellbore_failure_prob"],
-        # D1: real post-monsoon (shallowest) water table as receptor context
-        water_table_m=flow.get("depth_to_water_shallow_m"),
-        # 3.7: the wet/dry pair drives the seasonal vertical band. Both must be
-        # present for a per-pin band; otherwise the screening falls back to the
-        # state-wide CGWB campaign medians (flagged in `seasonal.water_table_source`).
-        water_table_wet_m=flow.get("depth_to_water_shallow_m"),
-        water_table_dry_m=flow.get("depth_to_water_deep_m"),
-        # TIMELINE: this month's interpolated table (None unless a start date was
-        # given). Amplitude is the pin's own wet/dry pair; only the monsoon
-        # TIMING is state-wide -- see P.water_table_shape for why.
-        water_table_now_m=(
-            P.water_table_at_month(
-                timeline["month"],
-                flow.get("depth_to_water_shallow_m", P.VERTICAL_SEASONAL["water_table_wet_m"])
-                or P.VERTICAL_SEASONAL["water_table_wet_m"],
-                flow.get("depth_to_water_deep_m", P.VERTICAL_SEASONAL["water_table_dry_m"])
-                or P.VERTICAL_SEASONAL["water_table_dry_m"])
-            if timeline else None))
+    # 2026-09-25 (P.VERTICAL_PATH): one geometry builder for the run's species
+    # and every indicator; the solute's own matrix retention and the column's
+    # series K are resolved in dashboard/vertical_path.py.
+    geometry = screening_geometry(req=req, inputs=inputs, hydro=hydro,
+                                  vparams=vparams, flow=flow, timeline=timeline)
+    run_vertical = screen_species(payload, species, geometry, inputs=inputs,
+                                  Xc_m=fm["Xc_m"], alpha_L=alpha_L)
+    vertical = run_vertical["screening"]
+    vertical["species"] = species
+    vertical["confining_path"] = {
+        **geometry["path"],
+        "Kv_Kh": geometry["kwargs"]["Kv_Kh_ratio"],
+        "Kv_Kh_citation": (P.VERTICAL["Kv_Kh_citation"]
+                           if inputs["regime"] == "fractured" else
+                           "screening value -- no Indian measurement for this regime"),
+        "retention": run_vertical["retention"],
+    }
+    vertical.update(indicator_arrivals(payload, geometry, run=run_vertical))
     # R-4: what a licensed programme would deploy to DETECT a vertical excursion,
     # so the screening index sits next to the monitoring that would find it.
     # NUREG/CR-6733 Sec. 4.3.3 (via NUREG-1569 p.139) also records that

@@ -504,12 +504,32 @@ weathered aquifer (Layer 1, 0–20 m, where hand-pump wells draw)? Three
 pathways are combined into a probability:
 
 1. **Advective leakage** through the confining rock: vertical Darcy velocity
-   `v_z = K_v·i_up/φ` with `K_v = (K_v/K_h ratio)·K_h` (fractured rock:
-   ~0.05–0.1; intact: ~0.01), giving
-   `t_breakthrough = separation / v_z` — compared against the evaluation time.
+   `v_z = K_v·i_up/φ` with `K_v = (K_v/K_h)·K_path`. Since 2026-09-25
+   (`P.VERTICAL_PATH`, fidelity row 3.11):
+   - `K_v/K_h` for fractured rock is **0.12**, the geometric mean of five
+     pumping-test values from the Maheshwaram granite (Maréchal et al. 2004);
+     the measured range 0.034–0.61 is re-evaluated and reported on every run
+     (`anisotropy_band`). Porous keeps its screening value 0.008.
+   - `K_path` is the **harmonic mean** of the NAQUIM K(z) law over the column
+     from the ore top to the shallow-aquifer base — series flow — not K at ore
+     depth, the tightest point on the path.
+   - The front is a **solute**, not a water parcel: `z(t) = v_z·I(t)` on the
+     same Goltz–Roberts dual-porosity clock as the horizontal front, with the
+     confining rock's own `β_eff = β·R_m` for the species. Uranium therefore
+     climbs ~250× slower than the water carrying it; TDS ~4×.
+     `water_arrival_years` is reported beside the solute time.
+   - The lixiviant indicators (chloride, TDS, sulfate) are screened on the same
+     geometry, and `first_arrival` names the earliest constituent whose source
+     exceeds its drinking-water limit — normally the salts, years ahead of
+     uranium. Built in `dashboard/vertical_path.py`, one geometry builder for
+     every species.
 2. **Vertical dispersion** from the plume (α_V ≪ α_L).
 3. **Wellbore failure** (a leaky abandoned borehole short-circuits the layers)
-   — a fixed probability from the literature.
+   — a fixed screening base rate (0.05). NUREG/CR-6733 establishes that the
+   vertical-excursion risk is non-trivial but gives no frequency, so this is a
+   registered scenario assumption, not a published failure rate. It is the one
+   pathway that is **not** retarded: an open borehole has no rock matrix, which
+   is why it is how uranium itself could reach the shallow aquifer quickly.
 
 The separation uses **per-district NAQUIM/CGWB data** (real fracture-zone
 depths, e.g. East Singhbhum's productive fractures at 20–258 m) and the real
