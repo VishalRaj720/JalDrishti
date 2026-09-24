@@ -1,0 +1,145 @@
+# 8. PROTOTYPE / SOFTWARE DETAILS
+
+The developed prototype, JalDrishti, is a web-based groundwater contamination screening and monitoring system for Jharkhand. It combines a physics-based contamination engine, a trained ML surrogate, a spatial database, an alert system and a role-based web portal. The prototype was built so that officials can study “what if” ISR scenarios anywhere in the state, see what the measured groundwater record says, find where monitoring is weakest, and inform residents, all from one place.
+
+## 8.1 Prototype Overview
+
+The prototype consists of the following major subsystems:
+
+- Physics-based contamination engine (plume, restoration, excursion test, shallow-aquifer screening)
+- ML surrogate with calibrated uncertainty bands
+- Spatial database (PostgreSQL + PostGIS) with row-level security
+- Backend API (FastAPI) with 152 endpoints
+- Water-quality assessment, monitoring-gap and trend modules
+- Alert module with tiers, explanations and email delivery
+- Web portal with 22 screens for five user roles
+
+## 8.2 Overall System Architecture
+
+The main path of a request through the system is:
+
+FLOW: User selects a location or site in the portal >> API checks login and role >> Location details resolved (rock type, K, gradient, fractures, layers, ore zone, background) >> Physics engine runs (plume map, metrics, excursion test, vertical screening) >> ML surrogate adds P10–P90 bands and checks for extrapolation >> Result saved and shown on the map >> Screening published >> Alerts raised for affected blocks and emailed to residents
+
+The physics engine is loaded inside the backend process, not as a separate service. This keeps the system simple and fast. A single adapter file is the only point where the backend calls the engine, and it only passes allowed inputs, so that measured chemistry is never fed into a model that was not calibrated for it. Every saved run records the exact model version that produced it.
+
+## 8.3 User Roles and Access
+
+TABLE: User roles in JalDrishti
+|{w=3.2,12.8}|
+|Role|What the role can do|
+|Admin (one account only)|Everything: publishes screenings, manages accounts, datasets, data sync, model operations, alert scans and email delivery, and reads the audit log. The single admin account is created by a setup script, never from the portal.|
+|Regulator|Reviews and decides field-officer submissions; can run the model and view reports and data screens; cannot publish or change datasets.|
+|Analyst|Runs the console, saves runs, compares sites, proposes screenings for publication, and uses the water-quality, groundwater, data-gap and network-plan screens.|
+|Field Officer (Data Submitter)|Submits field observations (water sample, water level or ore occurrence) and can withdraw them; reads other screens.|
+|Resident (Citizen)|Sees the front page, “My Area”, a citizen map, their alerts, published screenings and the methods page. Never sees exact site coordinates or model internals.|
+
+Residents are not shown exact coordinates of hypothetical sites. A precise point next to a named village could easily be misread as a real mining plan. Residents see the affected blocks, the modelled spread and whether the shallow aquifer might be reached.
+
+## 8.4 Portal Screens
+
+The portal has a public front page and a role-based application behind the login. Its 22 screens are:
+
+TABLE: Portal screens
+|{w=4.5,11.5}|
+|Group|Screens|
+|Public|Front page, public map, public view of published screenings|
+|Account|Login, overview (home), methods|
+|Modelling|Console, site report, compare sites, saved scenarios|
+|Publishing|Publications (propose, decide, withdraw)|
+|Data|Water quality, groundwater trends, data & gaps, network plan, field data|
+|Residents|My Area, citizen map, alerts|
+|Administration|Datasets, ingest, audit log, administration panel|
+
+![The deployed front page. The four figures on the right (districts assessed, wells checked, districts with a health exceedance and published screenings) are read live from the database.](docs/report/figures/fig_front_page.png){w=15}
+
+## 8.5 Console and Site Report
+
+### Console
+
+The console is the main working screen for analysts. The user clicks anywhere in Jharkhand, or chooses a registered hypothetical site. The system shows the local rock type, K, flow direction and ore zone, and the user sets the operating values: injection rate, bleed, wellfield width, years of operation, years of restoration and time since start. The engine then draws the plume on the map, shows the footprint, travel distance, ring concentration and excursion probability with their ML bands, and shows the 2-of-3 excursion panel and the shallow-aquifer screening. A timeline slider replays the plume over the years.
+
+![The engine view with a modelled plume on the map (June 2026 build). The coloured contours show concentration levels around the hypothetical wellfield; the left panel holds the operating settings.](assets/jun_engine_dark.png){w=15}
+
+### ISR site report
+
+For every published screening, a site report can be downloaded as a PDF. It states clearly at the top that no ISR mine operates in Jharkhand and that the document describes a modelled scenario. It gives a plain-language summary (for example: “uranium contamination would cover 8.2 hectares, with the furthest edge about 12 m from the wellfield”), the shallow-aquifer result, and a note that the physics engine is the authority and the ML model only adds uncertainty bands.
+
+![The ISR site report for the published Jaduguda screening, as a resident or officer downloads it (August 2026).](docs/report/figures/fig_site_report.png){w=12}
+
+## 8.6 Backend and API Design
+
+The backend is a FastAPI application with 25 routers and 152 endpoints under /api/v1. The main groups are:
+
+TABLE: Main API groups
+|{w=5,11}|
+|Router group|Purpose|
+|auth, users|Login, session refresh, account management|
+|districts, monitoring wells, water samples|Reference data|
+|isr_points|Register, edit and delete hypothetical sites|
+|ml|Location details, prediction, assumption register, drift check, map layers|
+|preview, simulations, lifecycle, scenarios|Quick previews, saved runs, restoration sweeps, lifecycles, comparison, timelines|
+|advisories|Propose, decide and withdraw screenings|
+|citizen, public_risk|My Area, alerts, block search and the public pages|
+|water_quality, groundwater, data_gaps|IS 10500 assessment, QA, trends, gap ranking, suggested sites|
+|field_observations|Submit, withdraw, review queue and decisions|
+|datasets, dataset_sync, ingest, model_ops, audit|Dataset manager with restore points, data sync, file ingest, model operations, audit log|
+
+There is no separate task queue. Simulations run as background tasks inside the FastAPI process, and the one scheduled job (the daily alert scan and email delivery) runs inside the application. A table of which role can call which endpoint is generated automatically from the running application, and a test fails if it changes without being updated.
+
+## 8.7 Database Design
+
+The database is PostgreSQL 16 with PostGIS. Its main tables are users and organisations; districts, blocks and aquifers; monitoring wells, water samples and monitoring stations; data sources and dataset versions; ISR points (hypothetical sites); scenarios and simulation runs (with plume geometry and timeline frames); advisories (published screenings); alerts, alert deliveries and block subscriptions; field observations; and the audit log. The schema was built through 26 Alembic migrations.
+
+Every table that holds sensitive data is protected by row-level security (RLS). For example, residents can never read the coordinates of a hypothetical site, residents can only read published screenings (not drafts), and the audit log has no update or delete permission for any role, so it can only grow. The API connects with a restricted database role that cannot bypass these rules; only database migrations use the owner account.
+
+## 8.8 Security Features
+
+- **Login:** JWT tokens with a sliding session; passwords hashed with argon2.
+- **Role check on every request:** the role is read from the database each time, not trusted from the token.
+- **Three layers of access control:** API checks, database row-level security, and a restricted database role.
+- **Single admin:** exactly one admin account is allowed by a database rule.
+- **Rate limiting:** repeated logins are blocked (tested: 10 logins accepted, then refused).
+- **Audit log:** every important action is recorded and cannot be edited or deleted.
+- **Safe production settings:** the server refuses to start in production with a placeholder secret, an empty database address, an open CORS setting, or row-level security switched off.
+- **Build guard:** the portal build fails if any password or secret is found in the code bundle.
+
+## 8.9 Alert and Notification Module
+
+When a screening is published, or when the daily scan finds a measured exceedance, the alert module creates alerts for the affected blocks (Section 4.9). Each alert has a tier (notice, warning, alert or critical) and seven fields explaining what happened, why, where, how sure the system is and what to do next. Residents who follow a block see the alert in their portal inbox and also receive it by email. Each email is recorded as sent, failed or skipped. The same email is never sent twice, and failed ones are retried. If no email server is configured, the system does not fail; it shows the number of unsent alerts on the administration screen.
+
+## 8.10 Deployment Details
+
+The prototype is deployed on three cloud services:
+
+TABLE: Deployment setup
+|{w=4,12}|
+|Part|Where it runs|
+|Portal (static build)|Cloudflare Workers, which also forwards /api calls to the backend, so the site works from one address|
+|Backend API, physics engine, ML models, scheduler|Render web service (free tier; the service sleeps when idle and takes about 53 seconds to wake)|
+|Database|Neon PostgreSQL 16 + PostGIS, with separate owner and application roles|
+|Email|Brevo SMTP relay (port 2525)|
+
+Secret values such as database passwords, the JWT secret and the SMTP key are kept in the hosting settings, never in the code.
+
+## 8.11 Prototype Features
+
+The final prototype provides the following capabilities:
+
+- Contamination screening at any location in Jharkhand
+- Four chemicals: uranium, sulphate, TDS and radium-226, plus chloride as an excursion indicator
+- Plume maps with P10–P90 uncertainty bands and timelines
+- Restoration and lifecycle analysis
+- Shallow-aquifer (vertical) screening
+- IS 10500 assessment of 397 wells with “not tested” shown in grey
+- Water-level and chemistry trends
+- Monitoring-gap ranking and suggested well sites
+- Tiered alerts with email delivery
+- Field-observation workflow with review
+- PDF site reports
+- Five roles with database-level security and an audit log
+- Light and dark themes
+- Low-cost deployment on free cloud tiers
+
+## 8.12 Final Prototype Description
+
+The completed prototype brings together real Jharkhand groundwater data, a physics-based contamination model, a calibrated ML surrogate and a secure web portal into one decision-support system. An analyst can test a hypothetical ISR scenario anywhere in the state in a few seconds and see how each chemical would spread, with its uncertainty. The system shows where the measured water is already a health concern, points to the blocks where monitoring is weakest, and informs residents through tiered, explained alerts. At every step it separates measured results from modelled ones, and it never shows missing data as safe.

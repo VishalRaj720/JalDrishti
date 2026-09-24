@@ -1,0 +1,144 @@
+# 5. TOOLS & TECHNOLOGIES USED
+
+The development of JalDrishti involved programming languages, a web backend framework, a spatial database, scientific and machine learning libraries, a web frontend framework, cloud hosting services, and open datasets from several agencies. Together these made it possible to build a system that runs a groundwater model, trains and serves ML models, stores spatial data securely, and presents the results through a web portal. All the software used is open source or has a free tier, and no hardware was purchased.
+
+## 5.1 Programming Languages
+
+TABLE: Programming languages
+|{w=4.5,11.5}|
+|Language|Purpose|
+|Python 3.12|Physics engine, data preparation, machine learning, backend API and tests|
+|TypeScript 5.7|Web portal (frontend) with type checking|
+|SQL (PostgreSQL / PostGIS)|Spatial queries, database migrations and row-level security policies|
+|HTML and CSS|Page layout and styling of the portal, including light and dark themes|
+
+### Python
+
+Python was used for most of the project. The physics engine, the synthetic data generator, the ML training pipeline and the backend server are all written in Python, because it has strong scientific libraries (NumPy, SciPy, pandas) and good support for web APIs (FastAPI).
+
+### TypeScript
+
+TypeScript was used for the portal. Its type checking catches mistakes when the shape of the data sent by the backend changes, which happened often during development.
+
+## 5.2 Backend Technologies
+
+TABLE: Backend technologies
+|{w=5,11}|
+|Technology|Purpose|
+|FastAPI 0.115|Asynchronous REST API framework with automatic API documentation [@fastapi]|
+|Uvicorn|ASGI server that runs the FastAPI application|
+|SQLAlchemy 2.0 + asyncpg|Database access from Python (asynchronous)|
+|GeoAlchemy2|Spatial (geometry) columns in SQLAlchemy models|
+|Alembic 1.14|Database schema migrations (26 migrations in total)|
+|Pydantic 2|Request and response validation, settings management|
+|python-jose|JSON Web Tokens (JWT) for login sessions|
+|passlib + argon2|Secure password hashing|
+|slowapi|Rate limiting of API requests (for example, on login)|
+|loguru|Application logging|
+|smtplib (Python standard library)|Sending alert emails through an SMTP relay|
+
+### FastAPI
+
+FastAPI was chosen because it is fast, supports asynchronous code, and creates interactive API documentation automatically. The backend was first started in Node.js in November 2025 and moved to FastAPI in December 2025. Using Python for both the backend and the ML code kept the whole system in one language.
+
+### Authentication and security
+
+Users log in with JWT tokens. Passwords are hashed with argon2. The user’s role is read again from the database on every request instead of being trusted from the token. Rate limiting protects the login endpoint from repeated password guessing.
+
+## 5.3 Database
+
+TABLE: Database technologies
+|{w=5,11}|
+|Technology|Purpose|
+|PostgreSQL 16|Main relational database|
+|PostGIS|Spatial data types and queries (points, polygons, “which block contains this well”) [@postgis]|
+|Row-Level Security (RLS)|Database-level rules that decide which rows each role can read or change|
+|Neon|Managed cloud hosting for the PostgreSQL database|
+
+PostGIS was essential because almost everything in the project is spatial: wells, blocks, districts, aquifers, deposit outlines and plume footprints. For example, an alert is raised for a block when the plume footprint polygon intersects the block polygon, which is a single PostGIS query. Row-level security gives a second line of protection: even if an API check were missed, the database itself refuses to show a resident a hypothetical site coordinate or a draft screening.
+
+## 5.4 Machine Learning and Scientific Libraries
+
+TABLE: Machine learning and scientific libraries
+|{w=5,11}|
+|Library|Purpose|
+|NumPy 1.26|Numerical arrays and the physics calculations|
+|SciPy 1.13|Special functions (erf, erfc), statistics and integration|
+|pandas 2.2|Reading and cleaning tabular data (CSV, Excel)|
+|GeoPandas 1.0 / Shapely 2.0|Reading map data (GeoJSON, shapefiles) and geometry operations|
+|XGBoost 3.3|Gradient-boosted tree models for the quantile surrogate [@chen2016]|
+|scikit-learn 1.5|Cross-validation, baseline models and metrics|
+|SHAP|Explaining which features the ML model relies on [@lundberg2017]|
+|joblib|Saving and loading trained models|
+|Matplotlib|Charts for flow field, fracture field, SHAP and sensitivity results|
+|openpyxl|Reading the Texas ISR Excel data and the IAEA UDEPO sheet|
+
+### XGBoost
+
+XGBoost was chosen over the Random Forest and SVM models named in the proposal for three reasons: it supports quantile (percentile) training directly, it allows monotone constraints so that physical rules can be built into the model, and it trains quickly (all ten models train in about 200 seconds). Random Forest and logistic regression were used in the earlier pipelines of March to May 2026 (Chapter 6).
+
+## 5.5 Frontend Technologies
+
+TABLE: Frontend technologies
+|{w=5,11}|
+|Technology|Purpose|
+|React 18|Component-based user interface [@react]|
+|Vite 6|Fast development server and production build tool|
+|Leaflet 1.9|Interactive maps: districts, blocks, wells, plumes and alerts [@leaflet]|
+|TanStack Query 5|Fetching and caching data from the API|
+|React Router 6|Page navigation for the 22 screens|
+|html2pdf.js|Downloading the ISR site report as a PDF|
+|OpenStreetMap and Esri tiles|Background maps (street and satellite views)|
+
+The portal has a public front page and a role-based application behind the login. It supports a light and a dark theme. Every colour is defined in one place, so that both themes stay consistent.
+
+## 5.6 Deployment and Hosting
+
+TABLE: Deployment and hosting services
+|{w=5,11}|
+|Service|Purpose|
+|Neon|Managed PostgreSQL + PostGIS database in the cloud|
+|Render|Hosting of the FastAPI backend, the physics engine and the trained models|
+|Cloudflare Workers|Hosting of the portal and forwarding of API calls to the backend|
+|Brevo (SMTP relay)|Sending alert emails to residents|
+|GitHub|Source code hosting and version control (173 commits)|
+
+The deployed system is available at jaldrishti.letsmailvishal111.workers.dev (portal) and jaldrishti-api.onrender.com (API).
+
+## 5.7 Data Sources
+
+TABLE: Datasets used in the project
+|{w=4.2,4.2,7.6}|
+|Dataset|Source|Used for|
+|Groundwater quality 2023 (397 wells, 24 districts)|CGWB [@cgwb_gwq]|IS 10500 assessment, health bands, measured alerts, background chemistry|
+|Groundwater quality 2000–2021 (1,632 analyses, 366 stations)|CGWB via NWDP [@nwdp]|Station baselines and chemistry trends|
+|Groundwater levels 2013–2021 (9,583 readings, 398 stations)|CGWB / India-WRIS [@cgwb_levels]|Flow field, seasonal change, level trends|
+|Aquifer polygons (24)|CGWB|Rock type, K, porosity, thickness|
+|NAQUIM reports (22)|CGWB [@naquim]|Aquifer layer depths per district|
+|Lineaments (1,889 features)|GSI and NRSC, Bhuvan [@lineaments]|Fracture directions|
+|Uranium deposits (7 outlines + belt) and grades|Project-digitised outlines; IAEA UDEPO [@udepo]|Ore zones and source strength|
+|Elevation model (GLO-30, 30 m)|ESA Copernicus via OpenTopography [@dem]|Water-table height and flow direction|
+|Perennial rivers (4,577 reaches)|HydroRIVERS [@hydrorivers]|Distance to rivers|
+|District and block boundaries|Government of India|Block-level results and alerts|
+|Texas ISR water quality and operations|USGS [@usgs_tx; @usgs_ops]|Source strength, restoration results and duration|
+|Jaduguda mine-water and radium studies|BARC [@sethy2013; @tripathi2008]|Radium source and background|
+
+## 5.8 Development and Testing Tools
+
+TABLE: Development and testing tools
+|{w=5,11}|
+|Tool|Purpose|
+|Git and GitHub|Version control, pull requests and code history|
+|Visual Studio Code|Code editor|
+|pytest, pytest-asyncio, httpx|Automated tests for the engine (373) and the backend (522)|
+|Swagger UI (FastAPI)|Testing API endpoints in the browser|
+|Docker|Local database and service setup in the early months|
+|Browser developer tools|Checking the portal screens, network calls and console errors|
+
+## 5.9 Technology Integration
+
+All the tools above work together as one system. The overall technology workflow can be shown as:
+
+FLOW: Open Datasets (CGWB, GSI–NRSC, IAEA, USGS, Copernicus) >> Python Data Preparation (pandas, GeoPandas, NumPy) >> Physics Engine (NumPy, SciPy) >> ML Surrogate (XGBoost, scikit-learn, SHAP) >> FastAPI Backend + PostgreSQL / PostGIS >> React + Leaflet Portal >> Residents and Officials (web portal and email alerts)
+
+The selected tools gave a low-cost, flexible and maintainable platform for building a groundwater contamination screening system that can be used anywhere in Jharkhand.

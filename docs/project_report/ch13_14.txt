@@ -1,0 +1,173 @@
+# 13. REFERENCES
+
+{{REFERENCES}}
+
+# 14. ANNEXURES
+
+The following annexures give supporting information, technical details, code excerpts, screenshots and records related to the development of JalDrishti.
+
+## Annexure A: Datasets Used
+
+TABLE: Datasets used in JalDrishti, with size and use
+|{w=3.5,3.0,4.1,5.4}|
+|Dataset|Provider|Size / extent|File in the project|
+|Groundwater quality, 2023|CGWB|397 wells, 24 districts, 17 substances, one sample per well|waterQuality_jharkhand.csv|
+|Groundwater quality, 2000–2021|CGWB via NWDP|1,632 analyses at 366 stations|cgwb_gwq_chemical_jharkhand_2000_2021.csv (+ physical file)|
+|Groundwater levels, 2013–2021|CGWB / India-WRIS|9,583 readings at 398 stations|cgwb_waterlevel_jharkhand.csv|
+|Aquifer polygons|CGWB|24 polygons, 12 rock types|Aquifers_Jharkhand.geojson|
+|District and block boundaries|Government of India|24 districts, 264 blocks used (275 loaded)|District_ and Sub_District_Boundary_JH.geojson|
+|NAQUIM aquifer layer table|CGWB NAQUIM reports and booklet|24 districts|naquim_vertical.csv|
+|Lineaments|GSI and NRSC (Bhuvan)|1,889 features (1,826 structural used)|jharkhand_lineaments.geojson|
+|Perennial rivers|HydroRIVERS|4,577 river reaches|jharkhand_rivers.geojson|
+|Uranium deposits|Project-digitised outlines; IAEA UDEPO grades|7 deposits + belt envelope|jharkhand_uranium_deposits.csv, udepo_uranium_deposits.xlsx|
+|Elevation model|ESA Copernicus GLO-30 via OpenTopography|Whole state, 30 m|jharkhand_glo30_dem.tif|
+|Texas ISR water quality|USGS|Baseline 86, end-of-mining 9, post-restoration 86 rows|TX_ISR_Final.xlsx|
+|Texas ISR operations|USGS|13 restoration records and operating tables|Restoration.csv and related files|
+|Training set (generated)|This project|900 scenarios × 5 times × 4 chemicals = 18,000 rows|regenerated from a fixed seed|
+
+## Annexure B: Database Tables and Migrations
+
+The main database tables are:
+
+- **users, orgs:** accounts (with home block and email opt-in) and organisations
+- **districts, blocks, aquifers:** administrative and aquifer geometry
+- **monitoring_wells, water_samples, monitoring_stations:** measured data, with the source of every row
+- **data_sources, dataset_versions:** checksums and versions of loaded files
+- **isr_points:** hypothetical sites with operating settings and injection start date
+- **scenarios, simulation_runs:** saved scenarios and runs, with plume geometry, timeline frames, vertical screening and the model version used
+- **advisories:** screenings with their status (draft, published, withdrawn)
+- **alerts, alert_deliveries, block_subscriptions:** alerts with tier and explanation, the email delivery log, and residents’ followed blocks
+- **field_observations:** submissions from field officers and their review
+- **audit_log:** record of every important action (cannot be edited or deleted)
+
+The schema was built through 26 Alembic migrations, from 0001_initial to 0026_alert_tiers_and_explanation. Important steps included: 0004 (wells and samples), 0007 (organisations, provenance and audit log), 0009 (row-level security), 0011 (fix of swapped district coordinates), 0012 (simulation runs), 0017 (advisories), 0018 (resident alerts), 0022 (single admin and restored regulator role), 0025 (home block and email delivery log) and 0026 (alert tiers and explanations).
+
+## Annexure C: Source Code Excerpts
+
+The following excerpts are taken from the project’s source code. Long comments have been shortened; the code lines are unchanged.
+
+### C.1 Plume shape: Ogata–Banks and Domenico factors (ml_pipeline/physics/transport.py)
+
+```python
+def _ogata_banks_second_term(X, Xc, aL):
+    """Second Ogata-Banks (1961) term (comment shortened)."""
+    expo = X / aL
+    safe = (expo < 700.0) & (X > 0.0)
+    arg2 = (X + Xc) / (2.0 * np.sqrt(aL * Xc))
+    return np.where(safe, 0.5 * np.exp(np.where(safe, expo, 0.0)) * erfc(arg2), 0.0)
+
+
+def _long_factor(X: np.ndarray, Xc: float, aL: float) -> np.ndarray:
+    Xc = max(Xc, 1e-3)
+    aL = max(aL, 1e-3)
+    return np.clip(0.5 * erfc((X - Xc) / (2.0 * np.sqrt(aL * Xc)))
+                   + _ogata_banks_second_term(X, Xc, aL), 0.0, 1.0)
+
+
+def _tran_factor(X: np.ndarray, Y: np.ndarray, aT: float, W: float) -> np.ndarray:
+    aT = max(aT, 1e-4)
+    Xpos = np.where(X > 0.1, X, 0.1)
+    tw = 2.0 * np.sqrt(aT * Xpos)
+    return 0.5 * (erf((Y + W / 2.0) / tw) - erf((Y - W / 2.0) / tw))
+```
+
+### C.2 Dual-porosity slowing: the retarded clock (ml_pipeline/physics/transport.py)
+
+```python
+def apparent_retardation(t_days: float, beta: float, omega: float) -> float:
+    """R_app(t) = 1 + beta*(1 - e^(-a t)), a = omega*(1+beta)/beta.
+    [Goltz & Roberts 1986] (comment shortened)"""
+    if beta <= 0.0 or omega <= 0.0:
+        return 1.0
+    a = omega * (1.0 + beta) / beta
+    return 1.0 + beta * (1.0 - math.exp(-a * max(t_days, 0.0)))
+
+
+def retarded_clock(t_days: float, beta: float, omega: float) -> float:
+    """Closed-form I(t) = int_0^t dt'/R_app(t') [days] (comment shortened)."""
+    t = max(t_days, 0.0)
+    if beta <= 0.0 or omega <= 0.0:
+        return t
+    a = omega * (1.0 + beta) / beta
+    I = t / (1.0 + beta) + math.log1p(-beta * math.expm1(-a * t)) / (a * (1.0 + beta))
+    if not math.isfinite(I) or I < 0.0:                # unreachable by construction
+        raise ValueError(f"retarded_clock non-finite: t={t}, beta={beta}, omega={omega}")
+    return I
+```
+
+### C.3 The 2-of-3 excursion test (ml_pipeline/dashboard/isr_excursion.py)
+
+```python
+    indicators, n_over = [], 0
+    for sp in P.ISR_EXCURSION_INDICATORS:
+        try:
+            r = _ring_concentration(payload, sp, ring)
+        except Exception as e:                       # never break the main answer
+            indicators.append({"species": sp, "status": f"unavailable: {e}"})
+            continue
+        ucl = P.isr_upper_control_limit(r["baseline"], r["lixiviant_C0"], inc)
+        over = bool(r["ring_conc"] >= ucl) if ucl == ucl and ucl != float("inf") else False
+        n_over += int(over)
+        # ... (output fields omitted)
+        indicators.append(r)
+
+    n_available = sum(1 for i in indicators if "status" not in i)
+    declared = n_over >= P.ISR_EXCURSION_MIN_INDICATORS
+```
+
+## Annexure D: Sample Alert Record and Assumption Register
+
+### D.1 One alert of each type, shown as the seven-field record
+
+TABLE: Sample alerts (measured and modelled)
+|{w=3.0,6.5,6.5}|
+|Field|Measured alert: Biru, Simdega|Modelled alert: Jaduguda screening, an East Singhbhum block|
+|Basis|observed|modelled|
+|Driver|nitrate 121 mg/L; limit 45 mg/L (no relaxation); 2.7 times the limit|uranium; modelled P50 footprint touches the block; excursion probability 0.00|
+|Where|Biru block, Simdega district; well “Biru”|block in East Singhbhum district; footprint about 9 ha|
+|Tier|critical (at least 2 times the limit; project-defined rule)|notice (a modelled alert can never be critical)|
+|Confidence|laboratory result, sampled 2023|engine value 20.5 m; ML band 2.7–100 m; no extrapolation|
+|Next action|re-sample; nitrate is not removed by boiling; test for iron, arsenic and manganese; consider another water source|no monitoring well lies inside the P90 reach; the ring is first expected to exceed on the indicator panel at year 12|
+|What happened|a government monitoring well in this block was tested and found nitrate 2.7 times the drinking-water limit|a hypothetical screening was published for a block the modelled footprint touches; no mine exists|
+
+### D.2 Assumption register (constants with no local measurement)
+
+TABLE: The 12 unmeasured constants listed in the assumption register
+|{w=4.6,3.0,8.4}|
+|Constant|Value used|What would replace it with a measurement|
+|Leach-zone growth gain|0.40|Field data on how far lixiviant spreads beyond the well pattern|
+|Leach-zone growth scale|2.0 bulk volumes|Same as above|
+|Attribution floor|10% of the limit|A regulator’s rule on how much of a poor baseline a mine is responsible for|
+|Control-limit increase|20% over baseline|Repeated baseline samples at each monitoring well|
+|Matrix storage ratio β (range)|0.3 to 20; central value from porosities|A tracer test in the Singhbhum shear zone|
+|Matrix exchange rate ω|0.001 per day|Same as above|
+|Fracture opening|0.1 to 0.5 mm|A packer test in the shear zone|
+|Matrix diffusion coefficient|5 × 10⁻⁶ m²/day|No defensible range exists yet|
+|Vertical to horizontal permeability ratio|0.03 (fractured), 0.008 (porous)|Structural analysis or packer tests|
+|Upward hydraulic gradient|0.005|Deep piezometers in the belt|
+|Old-well failure probability|0.05|Failure statistics of ISR wells|
+|Pump downtime and drift ranges|operating ranges|Records of real excursions and downtime|
+
+## Annexure E: Software Screenshots
+
+![Blocks page of the early platform (February 2026), listing Dhanbad blocks with aquifer properties.](assets/feb_blocks_page.png){w=14}
+
+![The June 2026 engine view on satellite imagery, with the hypothetical site and its plume.](assets/jun_engine_satellite.png){w=15}
+
+![Sobol sensitivity indices for uranium at the belt location, where β becomes the most important input for travel distance.](docs/report/figures/fig_sens_belt_uranium.png){w=13}
+
+![Sobol sensitivity indices for sulphate at the Jaduguda deposit location.](docs/report/figures/fig_sens_jaduguda_sulfate.png){w=13}
+
+## Annexure F: Financial Documents
+
+The purchase bills, subscription invoices and payment receipts for the expenditure listed in Chapter 10 are attached after this page.
+
+TABLE: List of attached financial documents
+|{w=1.6,6.4,4.6,3.4}|
+|Sl. No.|Document|Month|Amount (₹)|
+|1|Invoice: research tools (hydrogeology and plume modelling)|January 2026|1,600.00|
+|2|Invoice: Claude Pro subscription|February 2026|2,196.00|
+|3|Invoices and bills: Claude Pro subscription, and books and e-books|May 2026|7,346.00 (2,226 + 5,120)|
+|4|Invoice: Claude Pro subscription|June 2026|2,273.00|
+|5|Invoice: Claude Pro subscription|July 2026|__________|
+|6|Invoices: cloud hosting (Neon, Render, Cloudflare) and Claude Pro subscription|August 2026|__________|

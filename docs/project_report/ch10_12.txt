@@ -1,0 +1,113 @@
+# 10. EXPENDITURE / FINANCIAL UTILIZATION
+
+JalDrishti is a software project, so no hardware components were purchased. The fellowship funds were used for research tools and subscriptions, books and e-books on hydrogeology and contaminant modelling, and cloud hosting for deployment. The amounts below are taken from the “Utilization of Fellowship / Grant” section of each monthly progress report (MPR). Each MPR records ₹10,000 as the fellowship amount received.
+
+## 10.1 Month-wise Expenditure
+
+TABLE: Month-wise utilization of the fellowship grant (as recorded in the MPRs)
+|{w=1.4,2.6,8.8,3.2}|
+|Sl. No.|Month|Purpose of utilization|Amount (₹)|
+|1|Nov 2025|Not applicable (no expenditure)|–|
+|2|Dec 2025|Not applicable (no expenditure)|–|
+|3|Jan 2026|Advanced research tools for understanding hydrogeology and plume modelling|1,600.00|
+|4|Feb 2026|Claude Pro subscription for research and system design|2,196.00|
+|5|Mar 2026|Not applicable (no expenditure)|–|
+|6|Apr 2026|Not applicable (no expenditure)|–|
+|7|May 2026|Claude Pro subscription, and books and e-books (₹2,226 + ₹5,120)|7,346.00|
+|8|Jun 2026|Claude Pro subscription|2,273.00|
+|9|Jul 2026|Claude Pro subscription (research and system design)|__________|
+|10|Aug 2026|Cloud hosting and deployment (Neon, Render, Cloudflare); Claude Pro subscription|__________|
+| | |**Total recorded (Nov 2025 – Jun 2026)**|**13,415.00**|
+| | |**Total including July and August 2026**|**__________**|
+
+## 10.2 Expenditure Summary
+
+Most of the expenditure was on research resources: books and e-books for learning hydrogeology and contaminant transport, a research tool subscription, and an AI research and system-design subscription used from February onwards. Because the project is entirely software-based, no electronic components or fabrication materials were needed. The backend was hosted on free cloud tiers wherever possible, and the August MPR records spending on cloud hosting and deployment.
+
+The amounts for July and August 2026 were not filled in the MPRs and are to be completed from the corresponding bills. All expenditure was made only for project-related purposes, and the purchase bills and invoices are attached as supporting documents in Annexure F.
+
+# 11. CONCLUSION
+
+The aim of this fellowship project was to build a system that can screen how groundwater contamination from a hypothetical ISR uranium operation would behave in Jharkhand, check what the existing groundwater record says, find where monitoring is weakest, and inform the people concerned. The project achieved this through JalDrishti, a web-based decision-support system that is deployed and working.
+
+The most important step of the project was a change of method. The first five months followed the proposal and trained machine learning models on measured and synthetic water-quality data. In June 2026 a careful check showed that these models were not learning how contamination spreads, because the measured data had no information about distance or time. The prediction core was rebuilt as a physics-based contaminant transport engine, using the Domenico and Ogata–Banks solutions adapted for fractured hard rock, with dual-porosity slowing, matrix diffusion, a leach zone, restoration based on Texas ISR records, uranium attenuation and the NUREG-1569 2-of-3 excursion test. The engine uses real Jharkhand data: aquifer maps, a groundwater flow field from 398 CGWB stations, a fracture field from GSI lineaments, NAQUIM layers and uranium deposit grades. An XGBoost surrogate trained on 18,000 engine scenarios gives fast answers with calibrated 80% uncertainty bands.
+
+The main results are:
+
+- The ML surrogate reproduces the physics engine with an R² (log scale) of 0.89 to 0.95, performs better than all baseline models, and keeps its 80% coverage on real-location test cases. The radium results do not meet the target and are reported openly.
+- The engine matches an exact numerical solution after a missing formula term was found and restored.
+- In the measured record, uranium is within its limit at every tested well, while nitrate (22 wells) and fluoride (32 wells) are the real health concerns, in 14 of 24 districts. Iron, arsenic and manganese have never been tested.
+- At the hypothetical Jaduguda site, uranium spreads about 20 m in 20 years, sulphate 73 m and TDS 254 m. The chemical indicators, not uranium, give the first warning.
+- The shallow-aquifer screening gives a high index (0.62) with a breakthrough time of about 18.7 years at the registered site.
+- The 25 most poorly monitored blocks all lie in the uranium belt.
+- The alert system raises 53 tiered alerts from the measured data and delivers them to residents by email.
+- The system is supported by 373 engine tests and 522 backend tests and runs online with five secure user roles.
+
+The project also has clear limits. No real ISR plume exists in Jharkhand, so the model cannot be validated against a measured plume, and its uncertainty bands cover only the uncertainty of the input values, not errors in the model itself. The two inputs that control the plume extent most, hydraulic conductivity and the matrix storage ratio β, are not measured at ore depth in the shear zone. Trend forecasting of health-related water quality was not possible, because no repeated measurements exist. The system works on the manual monitoring network; it is a decision-support tool ready for sensors, not a live sensor network.
+
+In conclusion, JalDrishti shows that a useful and honest groundwater contamination screening tool can be built for hard-rock India from open data, standard groundwater physics and machine learning, and deployed at low cost. Its main strength is not only the model but the discipline around it: every modelled number comes with its uncertainty and its source, measured and modelled results are kept apart, missing data is never shown as safe, and the places where more monitoring is needed are clearly identified.
+
+# 12. FUTURE SCOPE
+
+JalDrishti provides a base for more advanced groundwater monitoring and screening in the mining sector. The current prototype works well within the limits of the available data. Several improvements can make it more accurate and more useful.
+
+## 12.1 Field Measurements in the Uranium Belt
+
+The sensitivity analysis showed that the plume extent depends mostly on hydraulic conductivity and the matrix storage ratio β, which are not measured at ore depth in the Singhbhum shear zone.
+
+Possible work includes:
+
+- A tracer test or packer test in the shear zone to measure β, fracture opening and matrix diffusion.
+- Deep piezometers under the belt to measure the upward head difference that controls the shallow-aquifer screening.
+- Updating the model inputs and retraining the surrogate with the new values.
+
+## 12.2 Better Monitoring Data
+
+Many of the gaps found in this project can be closed with low-cost changes to the sampling programme.
+
+Recommended steps include:
+
+- Testing the 55 existing Singhbhum samples for uranium.
+- Adding iron, manganese and arsenic to the statewide testing panel.
+- Repeating sampling at the same wells every year, so that trends and rate-of-change alerts become possible.
+- Recording well depth and screen depth with every sample.
+- Adding wells in the 53 blocks with no well and level stations in the 83 blocks with none, starting from the priority ranking.
+
+## 12.3 Integration of Real-Time Sensors
+
+The data layer of JalDrishti is ready to accept new data. If water-quality or water-level sensors are installed in the belt, the system can become a true cyber-physical system [@lee2008].
+
+Possible applications include:
+
+- Automatic intake of sensor readings through a data interface
+- Live alerts when a sensor value crosses a limit
+- Comparison of sensor trends with the modelled plume
+
+## 12.4 Water Quality Trend Forecasting
+
+When repeated measurements of nitrate, fluoride and other health substances become available, the existing trend module can be extended to forecast water quality and to raise alerts when values rise quickly.
+
+## 12.5 Improved Radium Model
+
+A two-stage ML model can be built for radium: the first stage decides whether radium moves at all, and the second estimates how far. This is expected to fix the low accuracy of the current radium surrogate.
+
+## 12.6 Cross-Check with a Numerical Groundwater Model
+
+A detailed numerical model (such as MODFLOW with MT3D, or a discrete fracture network model) can be built for one site to measure how far the analytical engine differs from a more complete model.
+
+## 12.7 More Ways to Reach Residents
+
+Many residents in rural Jharkhand may not use email. Future versions can add:
+
+- SMS alerts
+- Alerts in Hindi and other regional languages
+- A mobile-friendly app for field officers and residents
+- Paid hosting, so that the scheduler never sleeps
+
+## 12.8 Other Mining Contexts
+
+The chemical list in the engine is modular. The system can be extended to other mining problems, such as acid drainage from coal mines (sulphate, iron and manganese), after the model is checked for those conditions.
+
+### Future Vision
+
+The long-term vision of this project is a groundwater safety platform for the mining regions of Jharkhand that combines field measurements, sensors, physics-based models and machine learning. Such a platform can help regulators plan monitoring before any new mining begins, give residents timely and clear information about the water they drink, and support safe and sustainable mining in the state.
