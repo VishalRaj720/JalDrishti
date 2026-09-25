@@ -1875,9 +1875,15 @@ UNGROUNDED_PARAMETERS = {
     "ISR_UCL_BASELINE_INCREASE": {
         "value": ISR_UCL_BASELINE_INCREASE, "kind": "scenario_assumption",
         "leverage": "when the NUREG 2-of-N indicator excursion test fires",
-        "grounding": ("per-well TEMPORAL baseline series, which would enable "
-                      "NUREG-1569's preferred mean+5sd / ASTM D6312 rules; the "
-                      "CGWB file has one sample per well and cannot support them"),
+        # 2026-09-25: MEASURED for the shallow aquifer (CGWB 2023 + 2024 pre/post,
+        # validation/baseline_variability.py): at x1.2, 33% of clean station
+        # pairs trip 2-of-3 on natural swing alone; x2.5 -> 8%, x3.0 -> 3.5%.
+        # Not applied here because the ring samples the deeper ore-zone aquifer,
+        # which damps the seasonal signal -- see LIMITATIONS.md 1h.
+        "grounding": ("an ore-zone (deep) temporal baseline series; the shallow "
+                      "aquifer's natural swing is now measured (LIMITATIONS 1h) "
+                      "and shows x1.2 would false-alarm on a third of clean wells "
+                      "there"),
     },
     "DUAL_POROSITY.beta_prior": {
         "value": None, "kind": "foreign_analogue_literature",

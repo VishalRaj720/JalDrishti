@@ -354,6 +354,56 @@ plane-fit (a flow-field rebuild with the DEM), not an assumed spread.
 
 ---
 
+## 1h. The CGWB 2024 quality table (2026-09-25) — what it adds, and what it does not
+
+**Source.** CGWB, *Ground Water Quality Data (2024)*, the national PDF table.
+The Jharkhand rows (pages 19–20 pre-monsoon, 101–103 post-monsoon) are
+extracted by `ml_pipeline/data_prep/cgwb_gwq_pdf.py` to
+`Datasets/cgwb_gwq_2024_jharkhand.csv`. That gives **288 samples** (138 pre, 150
+post) in all 24 districts, with contiguous serial numbers (no row lost). The
+extractor refuses any page whose header differs from the expected 36 columns.
+The *Ground Water Year Book, Jharkhand 2024–25* was also reviewed: it holds
+district summaries and maps only. Its station tables (Annexures I–II) are not
+in the published file, so it cannot feed the flow field.
+
+**What it does not add: uranium.** Every Jharkhand row has "-" for U, As, Fe,
+Mn and the trace metals (other states carry values). The 2023 table
+(`waterQuality_jharkhand.csv`) remains the only source of measured uranium, and
+the uranium year-on-year comparison is still impossible.
+
+**What it does add: the first measured natural variability.** 127 stations
+were sampled in both 2024 seasons, and 275 of the 288 rows lie within 500 m of
+a 2023 station. So TDS, sulfate and chloride now have up to three samples per
+site. `ml_pipeline/validation/baseline_variability.py` measures how far CLEAN
+water moves by itself:
+
+| Excursion rule (2-of-3: TDS, SO₄, Cl) | Share of clean station-pairs that would alarm |
+|---|---|
+| UCL = baseline × 1.2 (**served**) | **33 %** |
+| × 1.5 | 20 % |
+| × 2.0 | 12 % |
+| × 2.5 | 8 % |
+| × 3.0 | 3.5 % |
+
+The single-indicator natural 95th-percentile swings are TDS 2.5×, chloride
+4.4× and sulfate 5.7× between seasons. **Consequence for the model:** the lixiviant still
+stands out at full strength everywhere tested — at Jaduguda TDS is 3.06×
+background against a natural 2.51×. But the margin there is thin, and a 20 %
+UCL on these waters would be mostly false alarms. **Caveat that bounds the
+use:** these are shallow wells. They are the right aquifer for an
+*overlying-aquifer* (vertical-excursion) monitor, but an upper bound for the
+deeper ore-zone ring, which damps seasonal swings. The served UCL is therefore
+not changed. The register entry now records the measurement, and the value
+for the ore-zone ring stays an owner decision.
+
+**Recorded, not used: nitrate.** 116 of 288 samples exceed 45 mg/L (2024 median
+~40 mg/L) against 22 of 393 in 2023 (median 18 mg/L). A doubling in one year
+could be real, a different well set, or a reporting change. The table cannot
+tell which. It is not fed to any alert until checked against CGWB's own
+2024 report text.
+
+---
+
 ## 1b. Closed (2026-08-20) — the vertical breakthrough headline was too slow
 
 **Reported by the project owner from the UI, then reproduced arithmetically, then
