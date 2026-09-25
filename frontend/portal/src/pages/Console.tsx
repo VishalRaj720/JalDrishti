@@ -49,6 +49,7 @@ import {
 import RegisterForm from "../console/RegisterForm";
 import SiteEditForm from "../console/SiteEditForm";
 import RunResult from "../console/RunResult";
+import SiteBlockLauncher from "../console/SiteBlockLauncher";
 import TimelineControl, { useRunTimeline } from "../console/TimelineControl";
 import type { TimelineFrame } from "../api/client";
 import SweepChart, { type Sweep } from "../console/SweepChart";
@@ -1226,6 +1227,7 @@ This also destroys ${n} stored run(s) `
                 <strong>Unsaved run.</strong> {preview.persistence_note}
               </div>
               <RunResult r={preview} extrapolation={preview.extrapolation ?? []} />
+              <SiteBlockLauncher run={preview} site={site} defaultYear={runYears} />
             </>
           )}
 
@@ -1300,6 +1302,8 @@ This also destroys ${n} stored run(s) `
           {activeRun?.status === "completed" && storedPlume && (
             <>
               <RunResult r={storedPlume} extrapolation={activeRun.extrapolation ?? []} />
+              <SiteBlockLauncher run={activeRun} site={site}
+                                 defaultYear={Number(activeRun.request?.time_years ?? runYears)} />
               <div className="card-title" style={{ marginTop: 12 }}>Over time</div>
               {timeline.isLoading && <Loading label="Loading frames…" />}
               <TimelineControl tl={timeline.data} onFrame={onFrame} />

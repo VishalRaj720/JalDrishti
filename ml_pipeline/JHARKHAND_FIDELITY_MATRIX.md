@@ -57,7 +57,10 @@ Mostly **Jharkhand-real, but shallow-aquifer-real**:
 
 - **K, φ, T, thickness**: from the CGWB `Aquifers_Jharkhand.geojson` polygons —
   real Indian data (schist K 1.88 / 1.12 m/day), *not* Texas values. The D5
-  shear-zone correction (T = 207–570 m²/day, NAQUIM E. Singhbhum) is also real.
+  shear-zone correction (T = 207–570 m²/day) is real data but **misplaced**
+  (2026-09-25, LIMITATIONS §1j). CGWB's own table labels those wells Tertiary
+  sediments, 51–58 km east of the deposits. The hard-rock tests near the mines
+  read 4–19 m²/day. The served value awaits the owner's decision.
 - **Hydraulic gradient**: *not* a fixed baseline — the D1 flow field plane-fits
   real CGWB water-level stations (DEM fallback), so the ~0.0019–0.006 values are
   data-derived per pin. This is one of the most genuinely local parts.
@@ -116,7 +119,7 @@ boundary) — verified to sit inside the 80% conformal bands (6/6 + 12/12 checks
 
 | # | Component | Why it qualifies |
 |---|---|---|
-| 1.1 | **Aquifer properties** (K, φ, T, b per polygon) | CGWB-published Jharkhand data, incl. the D5 NAQUIM shear-zone transmissivity (207–570 m²/day) exactly where the mines are |
+| 1.1 | **Aquifer properties** (K, φ, T, b per polygon) | CGWB-published Jharkhand data. Caveat (2026-09-25, LIMITATIONS §1j): the D5 shear-zone transmissivity (207–570 m²/day) comes from Tertiary-sediment wells 51–58 km east of the deposits, **not** from where the mines are. Hard-rock tests near the mines give 4–19 m²/day. |
 | 1.2 | **Groundwater flow field** (gradient + azimuth per pin) | Plane-fit of real CGWB monitoring-station levels; DEM fallback; divide detection; the plume travels where Jharkhand water actually flows |
 | 1.3 | **Fracture fabric** (plume elongation + azimuth rotation) | Real GSI lineament map → axial statistics → anisotropy; the plume shape responds to the actual SSZ structural grain |
 | 1.4 | **Ore geography & grades** | UCIL deposit polygons + IAEA-UDEPO grades; uranium source exists only where uranium ore exists; per-deposit depths (Jaduguda 180 m, Banduhurang 60 m…) |

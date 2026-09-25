@@ -1545,6 +1545,12 @@ JADUGUDA_SOURCE_CITATION = ("Sethy et al. 2013, Radiat. Prot. Environ. 36(1):32-
                             "DOI 10.4103/0972-0464.121824")
 
 # D5: Singhbhum Shear Zone transmissivity correction (serve-time, no retrain).
+# !! PROVENANCE CORRECTED 2026-09-25 (LIMITATIONS 1j), VALUE NOT YET CHANGED:
+#    the 207-570 below are CGWB's TERTIARY-SEDIMENT wells (Kalapathar,
+#    Baharagora, Manusmuria; Phase-III Table 11), 51-58 km east of Jaduguda and
+#    outside the belt. The hard-rock tests near the mines read 4-19 m2/day
+#    (Hesel 4-6, Kudada 19 -- 3 km from Turamdih). Reverting or re-ranging this
+#    is the owner's decision: it moves every deposit-pin result.
 # The ore-belt fractured aquifer is anomalously transmissive -- CGWB NAQUIM gives
 # T = 207-570 m2/day for East Singhbhum (Jaduguda belt), vs the generic schist
 # aquifer polygon's T ~ 42 (K = 1.12). The lithology K therefore under-states

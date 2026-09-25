@@ -517,6 +517,104 @@ it. It remains in git history.
 
 ---
 
+## 1j. The belt's boreholes, and the 3-D site block (2026-09-25)
+
+**The belt report is recovered.** The NAQUIM report for the uranium districts
+covers East Singhbhum, Saraikela-Kharsawan and parts of West Singhbhum
+(Phase III, draft, water levels of 2015).
+* The project's copy had been a 404 page. CGWB has since removed the report,
+  and its current Publications Warehouse lists 48 Jharkhand items with none
+  for these districts.
+* The Internet Archive kept the file (2022-07-25). It is now
+  `Datasets/naquim_reference/cgwb_naquim_e_singhbhum_saraikela_w_singhbhum_parts.pdf`.
+* The Saraikela-Kharsawan booklet (2013) was recovered the same way. Much of
+  its text is copied from Godda's booklet (coordinates, geology), so only its
+  summary table is used, and cautiously.
+* The ten NAQUIM PDFs the owner supplied on the same day were word-for-word
+  duplicates of reports already held.
+
+**What was extracted.** CGWB's exploratory boreholes of the belt are in
+`Datasets/cgwb_exploratory_wells_singhbhum.csv` (48 holes, 43 placed) and
+`..._zones.csv`, served by `data_prep/cgwb_boreholes.py`. Sources:
+* the recovered report's Annexure III and Tables 11, 15 and 17;
+* the East Singhbhum booklet's Table 2 (wells as on March 2003).
+
+Rules of the transcription:
+* Values were read from the page images, because the text layer drops blank
+  cells.
+* Blanks stay blank. A value that sits between columns is noted, not used.
+* Five positions are left out: one plainly misprinted (AMD campus, about
+  150 km off) and four tests printed without a position.
+* Every disagreement between the sources is written into the row.
+
+**Three things they show.**
+1. **The shear-zone permeability the engine serves at the mines (D5) is not
+   from the mines.** `SHEAR_ZONE_T_M2DAY = 370` rests on 207–570 m²/day.
+   * CGWB's own pumping-test table (Table 11) labels those three wells
+     (Kalapathar, Baharagora, Manusmuria) **Tertiary sediments**. They are
+     51–58 km east of Jaduguda, outside the model's belt.
+   * The same tables give 2–101 m²/day for hard rock. The one test near a
+     deposit is Kudada, 3 km from Turamdih, at 19 m²/day. Hesel (Potka) gives
+     4–6 m²/day.
+   * Fidelity row 1.1 and the submitted report say the 207–570 values come
+     from "exactly where the mines are". That statement is superseded here.
+   * The served value is **unchanged, pending the owner's decision** between
+     reverting to the lithology value and sampling the district's measured
+     range.
+2. **The deep aquifer can push upward.** Kudada is recorded as an
+   **auto-flowing well** (Table 17), meaning its deep fractures (105–139 m)
+   carried water to the surface. The pumping test lists a static level of
+   2.42 m bgl, and both are printed.
+   * The West Singhbhum NAQUIM tables (2022) give three close
+     borehole/dug-well pairs over the same ground. Tantnagar (EW 8.0 vs DW
+     5.37/2.95 m bgl) and JNV Jhinkpani (EW 14.2 vs Jorapokhari 6.50/2.85 m)
+     push down. Dumirta (EW 2.49 vs DW 7.60/2.40 m) pushes up in the dry
+     season.
+   * These natural gradients are 0.03–0.23, against the scenario's 0.005
+     (`VERTICAL.upward_gradient`), and the sign depends on the site.
+   * They are one-time readings from open boreholes, drilled for water
+     supply. They bound the question; they do not measure it at a wellfield.
+3. **Deep water near Turamdih is low in the excursion indicators.** Kudada's
+   deep-fracture sample reads EC 721 µS/cm, Cl 7 and SO₄ 5 mg/L (Table 15).
+   A lixiviant would stand out there even more than against the shallow
+   baselines of §1h. It is one sample.
+
+The layer depths the engine serves for East Singhbhum (weathered base 20 m,
+fractures to 258 m) sit inside what the report records: weathered mantle
+15–34 m, fractures 30–200 m, and the deepest on file at 230–232 m (Hesel
+EW-2). The `naquim_vertical.csv` source text now cites the recovered report;
+no value changed.
+
+**The 3-D site block** (portal: Console → a site's run → *Open the 3-D site
+block*; `console/SiteBlock3D.tsx`, three.js, loaded only when opened).
+
+What it draws:
+
+| Element | Source | Status |
+|---|---|---|
+| Ground | GLO-30 excerpt | measured |
+| Walls and cut faces | CGWB three-layer convention at the **district's** NAQUIM depths | not measured at the site, and labelled so |
+| Water table | the pin's CGWB-derived depth, as a uniform offset below the ground | measured at points only |
+| Boreholes | CGWB drilling, from the published tables | measured |
+| Plume | the raster the map paints, laid on the ore top | model output |
+| Fronts | `vertical.front_series`, one ring per constituent | model output |
+
+The fronts use the same clock as the printed arrival years, so the animation
+cannot disagree with them. A corner is cut away so the ore horizon and the
+climb can be seen. Boreholes are drawn through the ground ("x-ray") and wider
+than life. Vertical exaggeration (×3 by default) is always printed.
+
+Most blocks hold no borehole: the nearest to Jaduguda are 8–9 km away
+(Dabanki, Kendadih, Pathargora). The block therefore lists the nearest ones
+with distance and bearing, instead of implying they are at the site.
+
+**What it is not.** It is not a three-dimensional transport model. The plume
+is the engine's two-dimensional answer laid on the ore horizon, and the
+vertical fronts come from the one-dimensional column screening (§1f). The
+block shows those answers in place; it adds no physics of its own.
+
+---
+
 ## 1b. Closed (2026-08-20) — the vertical breakthrough headline was too slow
 
 **Reported by the project owner from the UI, then reproduced arithmetically, then

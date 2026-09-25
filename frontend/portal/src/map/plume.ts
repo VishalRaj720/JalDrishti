@@ -97,11 +97,12 @@ function lutFor(view: "field" | "chance"): Uint8ClampedArray {
   return lut;
 }
 
-/** The engine's north-up raster for `view` as an image overlay, or null when
- *  the run carries none (stored before 2026-09-25, a timeline frame, or an
- *  engine that produced nothing above the display floor). */
-function rasterOverlay(r: any, view: PlumeView): L.ImageOverlay | null {
-  if (view === "contours") return null;
+/** The engine's north-up raster for `view` painted on a canvas (row 0 =
+ *  north), or null when the run carries none (stored before 2026-09-25, a
+ *  timeline frame, or an engine that produced nothing above the display
+ *  floor). Shared by the map overlay and the 3-D site block, so both paint the
+ *  same pixels with the same ramp. */
+export function rasterCanvas(r: any, view: "field" | "chance"): HTMLCanvasElement | null {
   const rs = r?.plume?.raster;
   const layer = view === "field" ? rs?.concentration : rs?.exceedance;
   if (!rs || !layer?.data) return null;
@@ -120,7 +121,14 @@ function rasterOverlay(r: any, view: PlumeView): L.ImageOverlay | null {
     if (v) img.data.set(lut.subarray(v * 4, v * 4 + 4), k * 4);
   }
   ctx.putImageData(img, 0, 0);
-  return L.imageOverlay(canvas.toDataURL(), rs.bounds as L.LatLngBoundsExpression, {
+  return canvas;
+}
+
+function rasterOverlay(r: any, view: PlumeView): L.ImageOverlay | null {
+  if (view === "contours") return null;
+  const canvas = rasterCanvas(r, view);
+  if (!canvas) return null;
+  return L.imageOverlay(canvas.toDataURL(), r.plume.raster.bounds as L.LatLngBoundsExpression, {
     pane: "panePlume", interactive: false,
   });
 }

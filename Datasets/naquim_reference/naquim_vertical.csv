@@ -4,7 +4,7 @@ Chatra,22,20,173,semi,Chatra NAQUIM p21/p38-41,high,Aquifer-I bottom 12-30 m; fr
 Deoghar,19,15,125,semi,Deoghar NAQUIM p22/p39,high,weathered 9-30 m avg 18.9; Aquifer-II 25-116 m; WL 2.6-12.5 mbgl
 Dhanbad,20,20,181,semi,Dhanbad NAQUIM p25-28,high,weathered 0-30 m (one VES 43); fractures 20-181 m; WL 4-10 mbgl
 Dumka,22,13,176,semi,Dumka NAQUIM p26/p31,high,weathering 6-41 m; fractures 13-176 m major to 100 m; WL 2-10.8 mbgl
-East Singhbum,20,20,258,yes,CGWB E-Singhbhum District Profile (belt; NAQUIM PDF broken),high,weathered 15-34 m; fractures 20-147 m to ~258 m; deep confined; WL 4-15 mbgl
+East Singhbum,20,20,258,yes,CGWB E-Singhbhum District Profile (2013) + NAQUIM Phase-III draft (archived copy),high,weathered mantle 15-34 m (avg 12 m Singhbhum granite; 16 m metasediments); fractures 30-200 m; deepest recorded 230-232 m (Hesel EW-2); 258 m from the Subarnarekha basin study; deep confined; WL 4-15 mbgl
 Garhwa,13,9,164,semi,Garhwa NAQUIM p25-28,high,weathered 5.6-35 m mostly <15; fractures 9-164 m; WL 3-16 mbgl
 Giridih,15,22,189,semi,Giridih NAQUIM p25-28,high,weathered 8-25 m (one 36); fractures 22-189 m major to 100 m; WL 3.3-13 mbgl
 Godda,20,17,100,semi,Godda NAQUIM p29/p48,high,weathered 9-30 m; Aquifer-II 17-100 m; WL 2.1-13 mbgl
@@ -20,6 +20,6 @@ Palamu,14,10,170,semi,regional estimate (no NAQUIM report; adjacent Garhwa/Lateh
 Ramgarh,18,20,150,semi,regional estimate (no NAQUIM report; adjacent Ranchi/Bokaro/Hazaribagh),regional_estimate,Damodar-valley granite-gneiss analogue
 Ranchi,20,30,121,semi,Khelri-Lapung & Khunti_lohar NAQUIM p20/p32,med,weathered to 30 m; Aquifer-II 30-121 m; WL 1.3-16 mbgl
 Sahebganj,18,30,156,semi,Sahebganj NAQUIM p53-56,high,weathered basalt/laterite 5-29 m (to 60 locally); Aquifer-II 10-156 m; WL 2.8-14.8 mbgl
-Saraikela Kharsawan,20,20,200,yes,belt analogue (E/W Singhbhum; bundled NAQUIM PDF broken),med,Singhbhum craton; weathered ~15-25 m; deep confined fractures
+Saraikela Kharsawan,20,20,200,yes,NAQUIM Phase-III draft (archived copy; covers the district) + CGWB booklet (2013),med,weathered 7-31 m; fractures 18-170 m in the district's exploratory wells (Murkum 169.5-170.5 m); T 2.7-48 m2/day; deep confined
 Simdega,18,11,182,semi,Simdega NAQUIM p22/p50-52,high,weathered 2.5-45 m Aquifer-I 5.5-24; Aquifer-II 11.5-182 m
 West Singhbhum,18,14,200,yes,W-Singhbhum NAQUIM p42-48,high,weathered 12-24 m (granite); productive fractures <45 m to 180-200; deep confined

@@ -16,7 +16,11 @@ around a pin:
                        clip keeps mean discharge >= 0.5 m3/s);
   * layers          -- the district's NAQUIM shallow-aquifer base and
                        fractured-zone range (the same `vertical_params_at` the
-                       screening uses).
+                       screening uses);
+  * boreholes       -- CGWB exploratory boreholes inside the block, with the
+                       casing, water-bearing zones and levels they recorded
+                       (data_prep/cgwb_boreholes.py); and the nearest ones
+                       outside it, with distance, since most blocks hold none.
 
 The engine outputs -- plume raster, leach zone, vertical fronts -- come from the
 `/api/predict` response of the same run, so the block cannot show a different
@@ -117,6 +121,15 @@ def site_block(lon: float, lat: float, half_km: float = 1.5) -> dict:
                                "props": {k: v for k, v in (f.get("properties") or {}).items()
                                          if k in ("DIS_AV_CMS", "ORD_STRA")}})
 
+    from ml_pipeline.data_prep.cgwb_boreholes import (
+        SOURCES, boreholes_in_box, nearest_boreholes)
+    inside = boreholes_in_box(box)
+    for b in inside:
+        g = elevation_at(b["lon"], b["lat"])
+        b["ground_m"] = None if g is None else round(g, 1)
+    nearby = nearest_boreholes(lon, lat, n=5, max_km=15.0,
+                               exclude={b["well_id"] for b in inside})
+
     vp = vertical_params_at(lon, lat)
     return {
         "center": [lon, lat], "half_km": half_km,
@@ -142,6 +155,9 @@ def site_block(lon: float, lat: float, half_km: float = 1.5) -> dict:
         # usually holds none; the nearest one is reported rather than implying
         # local monitoring exists
         "nearest_well": _nearest_station(lon, lat),
+        "boreholes": inside,
+        "nearest_boreholes": nearby,
+        "boreholes_source": SOURCES,
     }
 
 
