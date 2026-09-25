@@ -40,6 +40,19 @@ def test_the_refit_reproduces_the_served_flow_direction():
     assert meta["cells_with_fit_se"] > 1000
 
 
+def test_the_32_year_record_confirms_the_served_direction():
+    """The year-by-year check runs on the 1994-2025 record, and the LONG-TERM
+    direction fitted from it agrees with the served (2013-2021) direction inside
+    the served uncertainty in most cells -- the evidence that the flow field
+    does not need rebuilding from the longer record (LIMITATIONS 1i)."""
+    meta = json.loads(DIR_META.read_text(encoding="utf-8"))
+    assert meta["years"][0] == 1994 and meta["years"][-1] >= 2025
+    cmp = meta["long_record_vs_served_direction_deg"]
+    assert cmp["cells"] > 1000
+    assert cmp["p50"] < 5.0
+    assert cmp["share_within_served_sd"] > 0.85
+
+
 def test_a_perfect_plane_has_no_direction_error_and_noise_adds_it():
     rng = np.random.default_rng(3)
     lons = 86.3 + rng.uniform(-0.2, 0.2, 40)

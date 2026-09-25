@@ -353,12 +353,13 @@ stations and kernel. The refit reproduces the served direction exactly. It
 measures two ways:
 * the weighted-least-squares standard error of the plane's slope, propagated
   to an angle: 7° / **17°** / 46° (p10/p50/p90 over station cells);
-* the plane refitted to each monitoring year 2013–2020: circular SD 0.7° / 4° /
-  20°.
+* the plane refitted to each monitoring year: circular SD 0.7° / 4° / 20° over
+  2013–2020, and **2.8° / 9.9° / 39.5° over 1994–2025** once the 32-year record
+  (§1i) was extracted.
 
-The year-by-year spread is smaller because the same wells repeat the same
-spatial misfit every year, so the yearly fits agree even where the plane is a
-poor description. The fit error is the honest measure.
+The year-by-year spread is smaller than the fit error because nearby wells
+repeat the same spatial misfit every year, so the yearly fits agree even where
+the plane is a poor description. The fit error is the honest measure.
 Both estimate how well the LONG-TERM direction is known — a plume averages over
 yearly wobble — so the larger (fit error, or yearly spread / √years) is
 served, not their sum. At Jaduguda that is **±22°** (1σ): at a 2 km reach,
@@ -367,8 +368,10 @@ evenly spaced directions (rotations about the wellfield centre). A
 user-set bearing is not fanned, and DEM-fallback cells have no statistics and
 are drawn unfanned, said so. **This is a lower bound**: the plane is fitted over
 ~25 km, and local hills and streams can bend flow at the 300 m scale in ways
-no regional fit sees. The CGWB 2024–25 Year Book was checked for new station
-levels to extend the years; it publishes district summaries only (§1h).
+no regional fit sees. The year-by-year check was extended to 1994–2025 from
+CGWB's national water-level tables (§1i); the 2024–25 Year Book has district
+summaries only (§1h). Where stations are few the fit error says so: at Bagjata
+it is ±79°, which the fan draws as a near-circle rather than a direction.
 
 ---
 
@@ -419,6 +422,98 @@ for the ore-zone ring stays an owner decision.
 could be real, a different well set, or a reporting change. The table cannot
 tell which. It is not fed to any alert until checked against CGWB's own
 2024 report text.
+
+---
+
+## 1i. The CGWB water-level record 1994 – January 2026 (2026-09-25)
+
+**Source.** CGWB's national depth-to-water tables for the unconfined aquifer
+(dug wells), one PDF per campaign:
+* January 1994–2025 and January 2026;
+* pre-monsoon 1994–2025, plus three decade files;
+* August 1994–2025, plus 1994–2023;
+* post-monsoon (November) 1994–2023.
+
+`ml_pipeline/data_prep/cgwb_wl_pdf.py` extracts the Jharkhand rows. The
+full-span file per campaign is primary; the partial ones are supplementary.
+The result is `Datasets/cgwb_waterlevel_jharkhand_1994_2026.csv`: **26,009
+readings at about 700 wells, 1994 – January 2026**, against the 9,583 readings
+(2013–2021) the engine was built on. Every file extracts exactly as many
+Jharkhand rows as its text layer holds; none is refused. The early years are
+sparser: about 190 wells a year were read before 2013, 400–550 since 2020.
+
+**How it was checked, because the PDFs are unruled.**
+* Column starts are learned per page from the data rows. A word only counts as
+  a column start after a column-width gap: the header labels sit ~30 pt off the
+  data in some files, and multi-word states ("Jammu & Kashmir") on shared pages
+  otherwise create false columns. Both failures were found by tests and fixed.
+* One station's long name ("Hanuman Mandir (Near Ag.Office)", Bero) overprints
+  its latitude in recent years. Its latitude is recovered from the interleaved
+  characters, and the rows are flagged, not dropped.
+* **Independent check:** station by station, the record agrees with the
+  2013–2021 file already on disk. Of 300 stations with ≥ 4 shared months, 298
+  match within 0.1 m (median).
+
+**What the partial files turned out to be.**
+* **Three add nothing** (checked reading by reading against the record):
+  August 1994–2023, and the pre-monsoon 1994–2003 and 2004–2013 files. Every
+  reading is already in the full-span file, and none has more decimals. Where a
+  few differ by more than 0.05 m, the full-span file's value stands.
+* The pre-monsoon 2014–2024 file gives 732 readings with more decimals, which
+  are kept.
+* The same file also carries **187 readings (2022–2024) at wells absent from
+  every full-span file**. They are markedly deeper (median 9.2 m
+  vs 7.3 m), consistent with bore wells: the 2024–25 Year Book counts 122 bore
+  wells among Jharkhand's 582 monitoring wells. They are kept, **flagged**
+  (`note`), and left out of water-table analyses.
+* CGWB's tables print some wells twice at the same coordinates and date: the
+  Simdega well also under Gumla (its district until 2001), a Basia well under
+  two block names, and repeated Raidih and Karra rows. 104 identical repeats
+  collapse to one reading. **81 pairs differ in depth** (at Raidih, Basia,
+  Simdega and Borio). At Simdega in 2021–2024 the second row carries the
+  Gumla-town reading, 50 km away. Neither row of a pair can be assigned, so
+  both are kept, flagged and left out.
+
+`cgwb_wl_pdf.water_table_rows` is the one rule for which rows count. It keeps
+unflagged rows and the repaired Bero rows, whose coordinates are exact.
+
+**What it is used for.**
+1. **The flow-direction check now spans 32 years** (§1g). The long-term
+   direction fitted from 1994–2025 agrees with the served 2013–2021 direction
+   to a median **3.3°** (90th percentile 17°), inside the served uncertainty in
+   **90 %** of cells, and within 0.8–2° at Jaduguda, Turamdih, Dhanbad and
+   Ranchi. The flow field is therefore **not rebuilt**: the longer record
+   confirms it rather than changing it (test-pinned).
+2. **No widespread water-table decline**
+   (`ml_pipeline/validation/water_table_trends.py`: Theil–Sen slope,
+   Mann–Kendall test, wells with ≥ 15 years spanning ≥ 20).
+
+   | | Wells | Median trend | Deepening (p < 0.05) | Rising (p < 0.05) |
+   |---|---|---|---|---|
+   | Statewide, pre-monsoon | 177 | +0.011 m/yr | 29 | 20 |
+   | Statewide, post-monsoon | 173 | +0.008 m/yr | 23 | 18 |
+   | Uranium-belt districts, pre-monsoon | 24 | +0.003 m/yr | 5 | 5 |
+   | Uranium-belt districts, post-monsoon | 23 | −0.025 m/yr | 1 | 6 |
+
+   The steepest decline is one West Singhbhum well at 0.31 m/yr. The network
+   shows no net fall, so the 2013–2021 water tables that the vertical
+   screening uses remain representative. That is a statement about the
+   network, not a guarantee for any one well.
+
+**What it is not.**
+* It is not confined-aquifer data. The tables are for the unconfined aquifer,
+  so the vertical push (§1f, the upward gradient) is still unmeasured.
+* It does not replace `cgwb_waterlevel_jharkhand.csv`, which stays the live
+  file: the dataset manager appends approved readings to it, `model_ops`
+  rebuilds the flow field from it and `seed.py` loads it.
+* It is not yet loaded into the backend database, so the portal's water-level
+  views are unchanged.
+
+**Removed from `Datasets/` (2026-09-25):**
+`cgwb_gwq_physical_jharkhand_2000_2021.csv`. It was committed with the R17
+chemistry record, but its only measurement columns are temperature and
+turbidity, and all 1,205 rows leave both empty. No code, test or document read
+it. It remains in git history.
 
 ---
 

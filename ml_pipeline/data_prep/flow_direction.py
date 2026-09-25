@@ -12,8 +12,12 @@ the flow field's own grid, stations, heads and kernel:
                        (homoscedastic sandwich with Kish effective sample size),
                        propagated to an angle by the delta method;
   * year-by-year    -- the same plane refitted to each monitoring year's own
-                       heads (2013-2021) and the circular standard deviation of
-                       those yearly directions.
+                       heads and the circular standard deviation of those
+                       yearly directions: 1994-2025 from the CGWB long record
+                       when it is on disk (cgwb_wl_pdf.py), else 2013-2021.
+                       The long record's LONG-TERM direction is also fitted and
+                       compared with the served one (reported in the meta, not
+                       served).
 
 WHAT EACH ONE MEANS, and why the fan uses the larger of the two estimates of
 the SAME thing. A plume travelling for decades follows the LONG-TERM mean
@@ -134,6 +138,46 @@ def _yearly_heads(st) -> tuple[list[int], np.ndarray]:
     return years, H
 
 
+#: CGWB depth-to-water 1994 - Jan 2026, all four campaigns (extracted from the
+#: national PDF tables by data_prep/cgwb_wl_pdf.py). When present, the
+#: year-by-year check runs on it instead of the 2013-2021 file.
+LONG_RECORD_CSV = FF.REPO_ROOT / "Datasets" / "cgwb_waterlevel_jharkhand_1994_2026.csv"
+#: a station enters the long-term mean only with this many monitoring years
+MIN_YEARS_FOR_LONG_MEAN = 5
+
+
+def _long_record_heads():
+    """(years, lons, lats, H[year, station], H_long[station]) from the long record.
+
+    Stations are identified by coordinates rounded to 0.001 deg (~110 m): the
+    same well's coordinates differ in the last decimals between the season
+    files. A monitoring year Y is May, Aug, Nov of Y and the following January
+    (the flow field's convention). Per station-year, the mean of that year's
+    campaign means (at least MIN_SEASONS_PER_YEAR of them); head = DEM
+    elevation at the station - depth. H_long is each station's mean over its
+    years, for stations with at least MIN_YEARS_FOR_LONG_MEAN years. Flagged
+    rows that may not be the water table at those coordinates (possible bore
+    wells, same-spot conflicts) are left out -- cgwb_wl_pdf.water_table_rows."""
+    from ml_pipeline.data_prep.cgwb_wl_pdf import load_long_record, water_table_rows
+    df = water_table_rows(load_long_record(LONG_RECORD_CSV)).copy()
+    df["sid"] = (df["latitude"].round(3).astype(str) + "|" + df["longitude"].round(3).astype(str))
+    df["myear"] = df["date"].dt.year - (df["date"].dt.month <= 2).astype(int)
+    seas = (df.groupby(["sid", "myear", "season"])["depth_to_water_mbgl"].mean().reset_index())
+    agg = seas.groupby(["sid", "myear"])["depth_to_water_mbgl"].agg(["mean", "count"])
+    agg = agg[agg["count"] >= MIN_SEASONS_PER_YEAR]["mean"].unstack("myear")
+    years = sorted(int(y) for y in agg.columns)
+    coords = df.groupby("sid")[["longitude", "latitude"]].median().reindex(agg.index)
+    lons, lats = coords["longitude"].to_numpy(), coords["latitude"].to_numpy()
+    elev = FF._sample_dem(lons, lats)              # needs the DEM, like the flow field
+    dep = agg.reindex(columns=years).to_numpy().T  # [year, station]
+    H = elev[None, :] - dep
+    n_years = np.isfinite(dep).sum(axis=0)
+    with np.errstate(invalid="ignore"):
+        H_long = np.where(n_years >= MIN_YEARS_FOR_LONG_MEAN, np.nanmean(H, axis=0), np.nan)
+    ok = np.isfinite(elev)
+    return years, lons[ok], lats[ok], H[:, ok], H_long[ok]
+
+
 def build_direction_uncertainty() -> dict:
     ff = FF.load_flow_field()
     lon_c, lat_c = ff["lon_c"], ff["lat_c"]
@@ -141,7 +185,12 @@ def build_direction_uncertainty() -> dict:
     st = FF._load_stations()                      # samples FF.DEM_TIF at stations
     lons_s, lats_s = st["longitude"].to_numpy(), st["latitude"].to_numpy()
     h_ann = st["h_annual"].to_numpy()
-    years, H_year = _yearly_heads(st)
+    long_record = LONG_RECORD_CSV.exists()
+    if long_record:
+        years, lons_y, lats_y, H_year, H_long = _long_record_heads()
+    else:
+        years, H_year = _yearly_heads(st)
+        lons_y, lats_y, H_long = lons_s, lats_s, None
     sigma_m, radius_m = FF.SIGMA_KM * 1000.0, FF.RADIUS_KM * 1000.0
 
     Hn, Wn = len(lat_c), len(lon_c)
@@ -149,6 +198,10 @@ def build_direction_uncertainty() -> dict:
     year_sd = np.full((Hn, Wn), np.nan)
     n_years = np.zeros((Hn, Wn), dtype=np.int16)
     az_check = np.full((Hn, Wn), np.nan)
+    # the long-record LONG-TERM direction, for comparison with the served one
+    # (reported, not served: switching the served direction is a separate,
+    # deliberate change -- it moves every run's inputs)
+    az_long = np.full((Hn, Wn), np.nan)
     for j, lat0 in enumerate(lat_c):
         cos_lat = math.cos(math.radians(lat0))
         for i, lon0 in enumerate(lon_c):
@@ -162,25 +215,36 @@ def build_direction_uncertainty() -> dict:
             if fit is None:
                 continue
             az_check[j, i], se_fit[j, i] = fit[0], fit[1]
+            near_y = np.hypot((lons_y - lon0) * FF.M_PER_DEG * cos_lat,
+                              (lats_y - lat0) * FF.M_PER_DEG) <= radius_m
             az_y = []
             for yi in range(len(years)):
-                fy = plane_fit_with_se(lon0, lat0, lons_s[near], lats_s[near],
-                                       H_year[yi][near], sigma_m)
+                fy = plane_fit_with_se(lon0, lat0, lons_y[near_y], lats_y[near_y],
+                                       H_year[yi][near_y], sigma_m)
                 if fy is not None:
                     az_y.append(fy[0])
+            if H_long is not None:
+                fl = plane_fit_with_se(lon0, lat0, lons_y[near_y], lats_y[near_y],
+                                       H_long[near_y], sigma_m)
+                if fl is not None:
+                    az_long[j, i] = fl[0]
             if len(az_y) >= 3:
                 year_sd[j, i] = _circ_sd_deg(np.array(az_y))
                 n_years[j, i] = len(az_y)
 
     np.savez_compressed(DIR_NPZ, lon_c=lon_c, lat_c=lat_c, se_fit_deg=se_fit,
-                        year_sd_deg=year_sd, n_years=n_years, azimuth_deg=az_check)
+                        year_sd_deg=year_sd, n_years=n_years, azimuth_deg=az_check,
+                        azimuth_long_record_deg=az_long)
     sel = in_jh & np.isfinite(se_fit)
     sel_y = in_jh & np.isfinite(year_sd)
     mean_unc = np.maximum(np.nan_to_num(se_fit, nan=0.0),
                           np.nan_to_num(year_sd / np.sqrt(np.maximum(n_years, 1)), nan=0.0))
     meta = {
-        "source": "CGWB water levels (Datasets/cgwb_waterlevel_jharkhand.csv) + GLO-30 "
-                  "station elevations; flow_field's grid, kernel and radius",
+        "source": ("fit SE: CGWB water levels 2013-2021 (Datasets/cgwb_waterlevel_jharkhand.csv), "
+                   "the flow field's own fit; year-by-year: "
+                   + ("the 1994-2026 long record (Datasets/cgwb_waterlevel_jharkhand_1994_2026.csv)"
+                      if long_record else "the same 2013-2021 file")
+                   + "; GLO-30 station elevations; flow_field's grid, kernel and radius"),
         "years": years,
         "min_seasons_per_station_year": MIN_SEASONS_PER_YEAR,
         "cells_with_fit_se": int(sel.sum()),
@@ -195,6 +259,16 @@ def build_direction_uncertainty() -> dict:
     az_ff = np.degrees(np.arctan2(fe, fn)) % 360.0
     d = np.abs(((az_check - az_ff) + 180.0) % 360.0 - 180.0)
     meta["max_abs_azimuth_diff_vs_flow_field_deg"] = round(float(np.nanmax(d[sel])), 6)
+    # how far the long record's long-term direction is from the served one
+    dl = np.abs(((az_long - az_ff) + 180.0) % 360.0 - 180.0)
+    sel_l = sel & np.isfinite(dl)
+    meta["long_record_vs_served_direction_deg"] = (
+        None if not sel_l.any() else {
+            "cells": int(sel_l.sum()),
+            "p50": round(float(np.percentile(dl[sel_l], 50)), 2),
+            "p90": round(float(np.percentile(dl[sel_l], 90)), 2),
+            "share_within_served_sd": round(float(np.mean(dl[sel_l] <= mean_unc[sel_l])), 3),
+        })
     DIR_META.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return meta
 
