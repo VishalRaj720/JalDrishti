@@ -996,6 +996,9 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
         # i.e. what the headline used to be for every species. The ratio is the
         # matrix retention of the confining rock, stated rather than implied.
         "water_arrival_years": head["water_arrival_years"],
+        # pore-water velocity of the headline state -- what an animation of the
+        # rising fronts must use so it agrees with the headline times
+        "headline_v_up_m_day": head["v_up_m_day"],
         "layer2_retardation": round(1.0 + _beta, 1),
         "anisotropy_band": anisotropy_band,
         "shallow_impact_probability": round(p_shallow, 3),

@@ -49,6 +49,10 @@ def _plume_geometry(result: dict[str, Any]) -> Optional[dict[str, Any]]:
 
     return {
         "contours": contours,
+        # 2026-09-25: the continuous field and the exceedance-probability layer
+        # on one north-up grid (~50 kB base64). Stored so a saved run paints
+        # what the live one did; runs before this carry none and draw contours.
+        "raster": plume.get("raster"),
         "compliance_ring": ring,
         "source_zone": source,
         "ml_envelope": envelope,

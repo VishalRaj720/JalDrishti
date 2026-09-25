@@ -37,7 +37,8 @@ import { FloatingPanel, useResizableWidth } from "../components/panels";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
 import { lineOpacity, maskOpacity, OVERLAY, tune } from "../map/palette";
 import {
-  createPlumePanes, drawPlume, SPECIES_NAME, storedRunToPlume,
+  createPlumePanes, drawPlume, hasRaster, SPECIES_NAME, storedRunToPlume,
+  type PlumeView,
 } from "../map/plume";
 import { addScaleControl } from "../map/scale";
 import { useRail } from "../map/useRail";
@@ -123,6 +124,9 @@ export default function Console() {
   const [species, setSpecies] = useState("uranium_ppb");
   const [liveYears, setLiveYears] = useState(10);
   const [showBands, setShowBands] = useState(true);
+  // What the plume paints (2026-09-25): the continuous field by default, since
+  // flat contour fills alone read as "a block placed on the map".
+  const [plumeView, setPlumeView] = useState<PlumeView>("field");
   const [live, setLive] = useState<LiveRun | null>(null);
 
   // Stored-run controls (site mode). These two, and only these two, are what a
@@ -614,6 +618,9 @@ export default function Console() {
       ml_envelope: null,
       plume: {
         ...storedPlume.plume,
+        // the raster belongs to the run's horizon, like the ML envelope; a
+        // frame at year 3 must not be painted with year 20's field
+        raster: null,
         contours: [{ level: storedPlume.threshold, is_bis: true, polygons: frame.contours ?? [] }],
         source_zone: storedPlume.plume?.source_zone
           ? { ...storedPlume.plume.source_zone, polygon: frame.source_zone ?? null,
@@ -623,17 +630,19 @@ export default function Console() {
     };
   }, [frame, storedPlume]);
 
+  // One renderer, three sources: an unregistered pin, an unstored preview,
+  // and a stored run. They must never look different from each other, because
+  // a visual difference would read as a physics difference.
+  const shownPlume = mode === "pin" ? live
+    : mode === "site" ? (showStored ? (framePlume ?? storedPlume) : previewPlume)
+    : null;
+
   useEffect(() => {
     const g = plumeGroup.current;
     if (!g) return;
-    // One renderer, three sources: an unregistered pin, an unstored preview,
-    // and a stored run. They must never look different from each other, because
-    // a visual difference would read as a physics difference.
-    const r = mode === "pin" ? live
-      : mode === "site" ? (showStored ? (framePlume ?? storedPlume) : previewPlume)
-      : null;
+    const r = shownPlume;
     if (!r) { g.clearLayers(); lastFitted.current = null; return; }
-    drawPlume(g, r, framePlume ? false : showBands);
+    drawPlume(g, r, framePlume ? false : showBands, plumeView);
 
     // Bring the result into view the FIRST time each result is drawn. A
     // typical footprint is a few hectares — a few hundred metres across — and
@@ -646,10 +655,15 @@ export default function Console() {
     if (m && r !== lastFitted.current) {
       lastFitted.current = r;
       const b = L.latLngBounds([]);
-      g.eachLayer((l: any) => { if (typeof l.getBounds === "function") b.extend(l.getBounds()); });
+      // Fit the drawn geometry, not the raster: the raster's box is sized to
+      // the farthest-reaching Monte-Carlo draw, and fitting it would open every
+      // run zoomed out to the P90 tail with the plume itself a few pixels wide.
+      g.eachLayer((l: any) => {
+        if (typeof l.getBounds === "function" && !(l instanceof L.ImageOverlay)) b.extend(l.getBounds());
+      });
       if (b.isValid()) m.fitBounds(b.pad(0.5), { maxZoom: 15 });
     }
-  }, [mode, live, storedPlume, previewPlume, framePlume, showStored, showBands]);
+  }, [mode, live, storedPlume, previewPlume, framePlume, showStored, showBands, plumeView]);
 
   // The direction the plume travels, drawn on the map. The engine has always
   // returned `azimuth_deg`; the portal showed it as a number for an
@@ -868,8 +882,35 @@ export default function Console() {
           {(live || storedPlume) && (
             <>
               <div className="legend-hr" />
-              <div className="legend-row"><span className="sw" style={{ background: "#b71c1c" }} />
-                Concentration — <b>darker = higher</b></div>
+              <div className="seg seg-sm" style={{ marginBottom: 6 }} role="group"
+                   aria-label="What the plume layer shows">
+                {([["field", "Concentration"], ["chance", "Chance over limit"],
+                   ["contours", "Contours"]] as [PlumeView, string][]).map(([v, label]) => {
+                  const ok = hasRaster(shownPlume, v);
+                  return (
+                    <button key={v} className={plumeView === v ? "active" : ""}
+                            disabled={!ok}
+                            title={ok ? undefined
+                              : "This result carries no raster — stored before 2026-09-25, "
+                                + "a timeline frame, or nothing above the display floor."}
+                            onClick={() => setPlumeView(v)}>{label}</button>
+                  );
+                })}
+              </div>
+              {plumeView === "chance" && hasRaster(shownPlume, "chance") ? (
+                <div className="legend-row">
+                  <span className="sw" style={{ background: "linear-gradient(90deg, #ede9fe, #6d28d9, #2e1065)" }} />
+                  <span>Share of the engine's{" "}
+                    {shownPlume?.plume?.raster?.exceedance?.n_draws ?? "Monte-Carlo"} plausible
+                    parameter sets in which the drinking-water limit is exceeded here —
+                    <b> darker = more of them</b>. Flow direction is not varied.</span>
+                </div>
+              ) : (
+                <div className="legend-row"><span className="sw" style={{ background: "#b71c1c" }} />
+                  Concentration{plumeView === "field" && hasRaster(shownPlume, "field")
+                    ? <> (log scale, fades out at the display floor)</> : null} —{" "}
+                  <b>darker = higher</b></div>
+              )}
               <div className="legend-row"><span className="sw line" style={{ background: "#2bb3ff" }} />
                 Monitoring ring (dotted)</div>
               {showBands && (

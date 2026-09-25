@@ -13,6 +13,8 @@ from __future__ import annotations
 import math
 import numpy as np
 
+from ml_pipeline.config import parameters as P
+
 # local-tangent-plane conversion constants
 _M_PER_DEG_LAT = 111_320.0
 
@@ -49,6 +51,168 @@ def _choose_levels(c_abs: np.ndarray, threshold: float, background: float) -> li
     for L in sorted(set(round(v, 6) for v in levels)):
         out.append({"level": L, "is_bis": abs(L - threshold) < 1e-6})
     return out
+
+
+def lonlat_to_local(lon, lat, lon0: float, lat0: float, azimuth_deg: float):
+    """Inverse of `local_to_lonlat`: (lon, lat) -> flow-frame metres (x, y).
+    Vectorised over numpy arrays."""
+    A = math.radians(azimuth_deg)
+    sinA, cosA = math.sin(A), math.cos(A)
+    east = (np.asarray(lon) - lon0) * _M_PER_DEG_LAT * math.cos(math.radians(lat0))
+    north = (np.asarray(lat) - lat0) * _M_PER_DEG_LAT
+    # rows of the forward rotation are orthonormal, so the inverse is its transpose
+    x = east * sinA + north * cosA
+    y = -east * cosA + north * sinA
+    return x, y
+
+
+#: Longest side of a plume raster, in pixels. 160 keeps a stored run's two
+#: layers near 60 kB of base64 while resolving a 300 m wellfield in ~15 px.
+RASTER_MAX_PX = 160
+
+
+def _b64_u8(a: np.ndarray) -> str:
+    import base64
+    return base64.b64encode(np.ascontiguousarray(a, dtype=np.uint8).tobytes()).decode("ascii")
+
+
+def raster_grid(x_extent, y_extent, *, lon0: float, lat0: float, azimuth_deg: float,
+                x_offset_m: float = 0.0, max_px: int = RASTER_MAX_PX) -> dict | None:
+    """A north-up pixel grid covering a flow-frame box, with every pixel centre
+    mapped back into the SOLVER frame (x from the source plane, y across flow).
+
+    One grid is shared by every layer so the concentration and probability
+    pictures register exactly. Row 0 is the north edge.
+    """
+    xs = (float(x_extent[0]) + x_offset_m, float(x_extent[1]) + x_offset_m)
+    ys = (float(y_extent[0]), float(y_extent[1]))
+    corners = [local_to_lonlat(x, y, lon0, lat0, azimuth_deg) for x in xs for y in ys]
+    lon_w, lon_e = min(c[0] for c in corners), max(c[0] for c in corners)
+    lat_s, lat_n = min(c[1] for c in corners), max(c[1] for c in corners)
+    w_m = (lon_e - lon_w) * _M_PER_DEG_LAT * math.cos(math.radians(lat0))
+    h_m = (lat_n - lat_s) * _M_PER_DEG_LAT
+    if not (w_m > 0 and h_m > 0):
+        return None
+    scale = max(w_m, h_m) / float(max_px)
+    nx, ny = max(int(round(w_m / scale)), 2), max(int(round(h_m / scale)), 2)
+    lons = lon_w + (np.arange(nx) + 0.5) / nx * (lon_e - lon_w)
+    lats = lat_n - (np.arange(ny) + 0.5) / ny * (lat_n - lat_s)
+    LON, LAT = np.meshgrid(lons, lats)
+    X, Y = lonlat_to_local(LON, LAT, lon0, lat0, azimuth_deg)
+    return {"bounds": [[round(lat_s, 7), round(lon_w, 7)], [round(lat_n, 7), round(lon_e, 7)]],
+            "width": int(nx), "height": int(ny), "pixel_m": round(scale, 2),
+            "X": X - x_offset_m, "Y": Y}
+
+
+def _plume_on(grid: dict, params) -> np.ndarray:
+    """Plume-attributable concentration at every pixel -- the SAME display rules
+    as the contours: plume-only (the leach-zone disc is its own layer, bug A
+    2026-08-11) and zero up-gradient of the source plane (the Domenico
+    half-plane artifact `solve_plume` also masks)."""
+    from ml_pipeline.physics.transport import concentration_field
+    C = concentration_field(grid["X"], grid["Y"], params, include_disc=False)
+    return np.where(grid["X"] > 0.0, C, 0.0)
+
+
+def concentration_layer(grid: dict, params, *, threshold: float,
+                        background: float) -> dict | None:
+    """The central run's field, evaluated DIRECTLY at each pixel centre.
+
+    WHY. Two to six flat contour fills throw away the field between the levels.
+    The engine's field is analytical, so no interpolation or resampling of the
+    solver grid is involved: each pixel is handed to the same
+    `concentration_field` the contours and metrics come from. Absolute
+    concentration (plume + background), log scale, with the display floor
+    `_choose_levels` uses; below it a pixel is transparent, so the floor is
+    where the picture stops, not an implied zero.
+
+    Encoding: uint8, 0 = below the floor; 1..255 = log10(concentration) linear
+    in [log10_min, log10_max]. None when nothing clears the floor.
+    """
+    c_abs = _plume_on(grid, params) + background
+    floor = max(background * 1.05, threshold * 0.05, 1e-9)
+    top = float(np.nanmax(c_abs))
+    if not (top > floor):
+        return None
+    lo, hi = math.log10(floor), math.log10(top)
+    t = (np.log10(np.maximum(c_abs, floor)) - lo) / max(hi - lo, 1e-9)
+    q = np.where(c_abs > floor, 1 + np.round(np.clip(t, 0.0, 1.0) * 254), 0)
+    return {"log10_min": round(lo, 5), "log10_max": round(hi, 5),
+            "threshold": float(threshold),
+            "encoding": ("uint8, row 0 = north, base64; 0 = below the display "
+                         "floor (transparent); 1..255 = log10(absolute "
+                         "concentration) linear in [log10_min, log10_max]"),
+            "data": _b64_u8(q)}
+
+
+def exceedance_layer(grid: dict, draws: list, *, thr_inc: float) -> dict | None:
+    """Fraction of Monte-Carlo draws whose plume exceeds the drinking-water
+    limit at each pixel.
+
+    The draws are the ones the served `excursion_probability` already scores
+    (`ml.predict.mc_param_draws`: same scenario, same common random numbers,
+    same seed) -- local K heterogeneity, Kd, beta x4, gradient, dispersivity,
+    bleed drift, downtime and aperture over their REGISTERED ranges. So this is
+    not a new uncertainty model; it is the existing one drawn in space instead
+    of reduced to one number at the ring. It says where the limit is exceeded
+    in every plausible parameter set (1.0), in some (0-1), or in none.
+
+    Deliberately NOT sampled: flow direction. The engine solves in a
+    flow-aligned frame and has no measured direction uncertainty to draw from
+    yet, so the map fans only along and across flow, never sideways in bearing.
+
+    Encoding: uint8 = round(255 * fraction); 0 = no draw exceeds.
+    """
+    if not draws:
+        return None
+    hits = np.zeros(grid["X"].shape, dtype=np.int32)
+    for p in draws:
+        hits += (_plume_on(grid, p) >= thr_inc)
+    frac = hits / float(len(draws))
+    if not np.any(frac > 0):
+        return None
+    return {"n_draws": len(draws), "thr_inc": float(thr_inc),
+            "encoding": ("uint8, row 0 = north, base64; value/255 = fraction of "
+                         "Monte-Carlo draws exceeding the limit; 0 = none"),
+            "data": _b64_u8(np.round(frac * 255))}
+
+
+def draws_extent(draws: list, x_extent, y_extent) -> tuple[tuple, tuple]:
+    """Grow the central run's solver box so it covers every draw's plume --
+    otherwise a long P90 front is clipped at the edge of the central picture."""
+    from ml_pipeline.physics.transport import _auto_grid, _tang_reach, MAX_GRID_REACH_M
+    x0, x1 = float(x_extent[0]), float(x_extent[1])
+    y0, y1 = float(y_extent[0]), float(y_extent[1])
+    for p in draws:
+        reach = min(max(p.Xc, _tang_reach(p.t_days, p.Xw, p.sigma, level=1e-2)),
+                    MAX_GRID_REACH_M)
+        X, Y = _auto_grid(reach, p.aL, p.source_width_m, n=8,
+                          disc_radius=p.disc_radius_m,
+                          disc_center_x=p.disc_center_x_m, aT=p.aT)
+        x0, x1 = min(x0, float(X.min())), max(x1, float(X.max()))
+        y0, y1 = min(y0, float(Y.min())), max(y1, float(Y.max()))
+    return (x0, x1), (y0, y1)
+
+
+def plume_rasters(params, draws: list, *, x_extent, y_extent, lon0: float,
+                  lat0: float, azimuth_deg: float, threshold: float,
+                  background: float, x_offset_m: float = 0.0,
+                  max_px: int = RASTER_MAX_PX) -> dict | None:
+    """Both layers on one grid: the central concentration field and the
+    exceedance probability across the Monte-Carlo draws."""
+    if draws:
+        x_extent, y_extent = draws_extent(draws, x_extent, y_extent)
+    grid = raster_grid(x_extent, y_extent, lon0=lon0, lat0=lat0,
+                       azimuth_deg=azimuth_deg, x_offset_m=x_offset_m, max_px=max_px)
+    if grid is None:
+        return None
+    thr_inc = max(threshold - background, P.INCREMENTAL_FLOOR * threshold)
+    conc = concentration_layer(grid, params, threshold=threshold, background=background)
+    prob = exceedance_layer(grid, draws, thr_inc=thr_inc)
+    if conc is None and prob is None:
+        return None
+    return {"bounds": grid["bounds"], "width": grid["width"], "height": grid["height"],
+            "pixel_m": grid["pixel_m"], "concentration": conc, "exceedance": prob}
 
 
 def _extract_rings(X, Y, C, level: float):

@@ -27,6 +27,8 @@ project's most repeated defect.
 """
 from __future__ import annotations
 
+import numpy as np
+
 from ml_pipeline.config import parameters as P
 
 
@@ -228,6 +230,41 @@ def screen_species(payload: dict, species: str, geometry: dict,
     return out
 
 
+def front_series(run: dict, indicators: list[dict], *, n: int = 101,
+                 horizon_years: float | None = None) -> dict | None:
+    """Height of each front above the ore top, year by year -- for animating the
+    climb in the 3-D block.
+
+    Uses the SAME kinematics as the headline arrival times (`retarded_clock` at
+    the headline pore-water velocity, each species with its own confining-rock
+    retention), so an animation built on it arrives exactly when the numbers say
+    it does. `water` is beta = 0: the pore water itself. Heights are capped at
+    the separation (the front has entered the shallow aquifer).
+    """
+    from ml_pipeline.physics.transport import retarded_clock
+    v = run["screening"]
+    v_up = float(v.get("headline_v_up_m_day") or 0.0)
+    dz = float(v["separation_m"])
+    if v_up <= 0.0 or dz <= 0.0:
+        return None
+    H = float(horizon_years or P.HORIZON_SLIDER_MAX_YEARS)
+    years = np.linspace(0.0, H, n)
+
+    def climb(beta_eff: float, omega: float) -> list[float]:
+        return [round(min(v_up * retarded_clock(y * 365.0, beta_eff, omega), dz), 2)
+                for y in years]
+
+    fronts = {"water": climb(0.0, P.DUAL_POROSITY["mass_transfer_omega"]),
+              run["species"]: climb(run["retention"]["beta_eff"], run["retention"]["omega"])}
+    for r in indicators:
+        if "status" not in r:
+            fronts[r["species"]] = climb(r["retention"]["beta_eff"], r["retention"]["omega"])
+    return {"years": [round(float(y), 3) for y in years], "separation_m": dz,
+            "v_up_m_day": v_up, "fronts_m_above_ore_top": fronts,
+            "basis": ("headline gradient (duty cycle where present); same "
+                      "retarded clock as the arrival times")}
+
+
 def indicator_arrivals(payload: dict, geometry: dict, *, run: dict) -> dict:
     """Vertical arrival of each lixiviant indicator, and the FIRST arrival.
 
@@ -257,10 +294,15 @@ def indicator_arrivals(payload: dict, geometry: dict, *, run: dict) -> dict:
         except Exception as e:                       # never break the main answer
             indicators.append({"species": sp, "status": f"unavailable: {e}"})
             continue
+        indicators.append(r)
+    # the climb, from the full retention of every species, BEFORE it is trimmed
+    series = front_series(run, indicators)
+    for r in indicators:
+        if "status" in r:
+            continue
         r.pop("screening", None)
         r["retention"] = {k: r["retention"][k] for k in
                           ("beta", "retardation_asymptotic", "basis", "Kd_L_kg")}
-        indicators.append(r)
 
     def _entry(r: dict) -> dict:
         return {"species": r["species"], "years": r["years_to_breakthrough"],
@@ -277,6 +319,7 @@ def indicator_arrivals(payload: dict, geometry: dict, *, run: dict) -> dict:
                 if detect else None)
     return {
         "indicators": indicators,
+        "front_series": series,
         "first_arrival": (None if first is None else {
             **_entry(first),
             "basis": ("earliest arrival among the run's species and the "

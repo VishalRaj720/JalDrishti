@@ -56,7 +56,15 @@ ALLOWED_PAYLOAD_KEYS = frozenset({
     "gradient_i", "azimuth_deg", "monitor_ring_m",
     # Interactive map controls. Presentation and geometry, not chemistry.
     "regime", "mode", "start_date", "ore_depth_m", "ore_thickness_m",
+    # Presentation only (2026-09-25): skips the display rasters and indicator
+    # arrivals in callers that loop the engine and read metrics; no number moves.
+    "display_extras",
 })
+
+#: Overrides for the callers that evaluate the engine many times in one request
+#: or background task and read only metrics (lifecycle, sweep, timeline frames).
+#: ~250 ms and ~50 kB saved per call; every metric is identical.
+METRICS_ONLY = {"display_extras": False}
 
 #: Sliders a caller may set. `lon`/`lat` come from the ISR point, not the body.
 #:

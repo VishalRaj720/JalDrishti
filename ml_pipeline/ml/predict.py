@@ -165,6 +165,50 @@ def _surrogate() -> MLSurrogate:
 # --------------------------------------------------------------------------- #
 # Analytical engine (same schema; deterministic central + MC bands/excursion)
 # --------------------------------------------------------------------------- #
+def mc_scenario(inputs: dict, feat: dict) -> dict:
+    """The Monte-Carlo scenario dict for a resolved run -- ONE definition.
+
+    Factored out of `predict_analytical` (2026-09-25) so the served excursion
+    probability and the exceedance-probability map draw from the identical
+    scenario. Two copies of this dict would be the mirrored-site divergence
+    this project has hit repeatedly (radium residual, species tuple, Cb
+    defaults)."""
+    species = inputs["species"]
+    return dict(width=inputs["wellfield_width_m"], regime=inputs["regime"],
+                K=inputs["K_m_day"], phi_mobile=inputs["phi_mobile"],
+                n_total=inputs["n_total"], grain_density=inputs["grain_density"],
+                beta=inputs["beta"], gradient=inputs["gradient_i"],
+                Q_in=inputs["Q_in_m3_day"],
+                Q_net=inputs["Q_in_m3_day"] * inputs["bleed_fraction"],
+                bleed=inputs["bleed_fraction"],
+                thickness=inputs["thickness_m"],
+                downtime=float(inputs.get("downtime_fraction", 0.0) or 0.0),
+                seasonal_amp=float(inputs.get("gradient_seasonal_amp", 0.0) or 0.0),
+                aniso_ratio=inputs.get("aniso_ratio"),   # E1: V-derived (fractured)
+                # real-ISR upgrade: the SAME k the feature row used (0 unless U)
+                atten_k=float(feat["u_attenuation_k"]),
+                C0={species: inputs["source_conc_C0"]},
+                Cb={species: inputs["background_conc_Cb"]})
+
+
+def mc_param_draws(inputs: dict, *, n_mc: int = 48, seed: int = 0) -> list:
+    """The TransportParams of each Monte-Carlo draw -- the same draws, in the
+    same order, that `predict_analytical` scores for `excursion_probability`
+    (same scenario, same common-random-number matrix, same seed)."""
+    from ml_pipeline.synthetic.generate import (mc_draws, _draw_params,
+                                                _throughput_width)
+    _X, feat, _Xc = features_from_inputs(**inputs)
+    residual = feat.get("_residual_endpoint", feat["residual_fraction"])
+    op_days = inputs["operation_years"] * 365.0
+    t_days = inputs["time_years"] * 365.0
+    rest_days = float(inputs.get("restoration_years", 0.0) or 0.0) * 365.0
+    scn = mc_scenario(inputs, feat)
+    draws = mc_draws(n_mc, seed)
+    w_eff = _throughput_width(scn, t_days, op_days)
+    return [_draw_params(scn, inputs["species"], t_days, op_days, draws, i, w_eff,
+                         rest_days, residual) for i in range(len(draws["u_kd"]))]
+
+
 def predict_analytical(*, n_mc: int = 48, seed: int = 0,
                        compliance_x: float | None = None, **inputs) -> dict:
     """compliance_x: monitor-ring distance from the wellfield EDGE [m].
@@ -199,21 +243,7 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0,
 
     # excursion probability via the same parameter-uncertainty MC as Phase 2
     from ml_pipeline.synthetic.generate import excursion_probability, mc_draws
-    scn = dict(width=inputs["wellfield_width_m"], regime=inputs["regime"],
-               K=inputs["K_m_day"], phi_mobile=inputs["phi_mobile"],
-               n_total=inputs["n_total"], grain_density=inputs["grain_density"],
-               beta=inputs["beta"], gradient=inputs["gradient_i"],
-               Q_in=inputs["Q_in_m3_day"],
-               Q_net=inputs["Q_in_m3_day"] * inputs["bleed_fraction"],
-               bleed=inputs["bleed_fraction"],
-               thickness=inputs["thickness_m"],
-               downtime=float(inputs.get("downtime_fraction", 0.0) or 0.0),
-               seasonal_amp=float(inputs.get("gradient_seasonal_amp", 0.0) or 0.0),
-               aniso_ratio=inputs.get("aniso_ratio"),   # E1: V-derived (fractured)
-               # real-ISR upgrade: the SAME k the feature row used (0 unless U)
-               atten_k=float(feat["u_attenuation_k"]),
-               C0={species: inputs["source_conc_C0"]},
-               Cb={species: inputs["background_conc_Cb"]})
+    scn = mc_scenario(inputs, feat)
     draws = mc_draws(n_mc, seed)
     p_ex = excursion_probability(scn, species, t_days, op_days, draws,
                                  rest_days=rest_years * 365.0,

@@ -48,7 +48,7 @@ from ml_pipeline.dashboard.resolve import (
 )
 from ml_pipeline.dashboard.plume_geometry import (
     field_to_contours, compliance_ring, ml_envelope_ellipses,
-    source_zone_polygon,
+    source_zone_polygon, plume_rasters,
 )
 
 
@@ -206,6 +206,12 @@ class PredictRequest(BaseModel):
                                    ge=P.VERTICAL["ore_thickness_range_m"][0],
                                    le=P.VERTICAL["ore_thickness_range_m"][1])
     mode: str = "both"                             # analytical | ml | both
+    # DISPLAY-ONLY layers (2026-09-25): the per-pixel concentration/exceedance
+    # rasters and the lixiviant-indicator vertical arrivals. Together ~250 ms and
+    # ~50 kB per call. Callers that evaluate the engine in a loop and read only
+    # metrics (lifecycle, sweep, timeline frames) turn them off; every metric,
+    # contour and the run's own vertical screening are identical either way.
+    display_extras: bool = True
     # TIMELINE (3.7b): ISR start date, ISO "YYYY-MM-DD". Purely a presentation
     # anchor -- it converts `time_years` into a calendar date and selects the
     # month whose water table drives the seasonal vertical state. It does NOT
@@ -522,6 +528,18 @@ def api_aquifers():
     return _cached_geojson(json.loads(g.to_json()))
 
 
+@app.get("/api/site_block")
+def api_site_block(lon: float = Query(...), lat: float = Query(...),
+                   half_km: float = Query(1.5, ge=0.5, le=3.0)):
+    """Measured context for the 3-D site block: terrain, CGWB wells, rivers and
+    the district's NAQUIM layers around a pin (dashboard/site_block.py). The
+    engine outputs it is drawn with come from /api/predict for the same run."""
+    if not _in_jharkhand(lon, lat):
+        raise HTTPException(422, _OUTSIDE_JH)
+    from ml_pipeline.dashboard.site_block import site_block
+    return site_block(lon, lat, half_km)
+
+
 @app.post("/api/predict")
 def api_predict(req: PredictRequest):
     if not _in_jharkhand(req.lon, req.lat):
@@ -598,7 +616,26 @@ def api_predict(req: PredictRequest):
             req.lon, req.lat, azimuth, _prm.disc_radius_m, _prm.disc_center_x_m,
             x_offset_m=half_w) if _prm.disc_radius_m > 0 else None
     except Exception:
+        _prm = None
         field_for_contours, source_zone_poly = field, None
+    # The continuous field under the contours, and the chance of exceeding the
+    # limit across the SAME Monte-Carlo draws the excursion probability scores
+    # (2026-09-25). Same params, masks and display floor as the contours,
+    # evaluated per pixel. Display only -- a failure here must never cost the
+    # run its contours or metrics.
+    raster = None
+    if _prm is not None and req.display_extras:
+        try:
+            from ml_pipeline.ml.predict import mc_param_draws
+            raster = plume_rasters(
+                _prm, mc_param_draws(inputs),
+                x_extent=(float(field.X.min()), float(field.X.max())),
+                y_extent=(float(field.Y.min()), float(field.Y.max())),
+                lon0=req.lon, lat0=req.lat, azimuth_deg=azimuth,
+                threshold=threshold, background=inputs["background_conc_Cb"],
+                x_offset_m=half_w)
+        except Exception:
+            raster = None
     contours = field_to_contours(field_for_contours, lon0=req.lon, lat0=req.lat,
                                  azimuth_deg=azimuth, threshold=threshold,
                                  background=inputs["background_conc_Cb"],
@@ -694,7 +731,12 @@ def api_predict(req: PredictRequest):
                            "screening value -- no Indian measurement for this regime"),
         "retention": run_vertical["retention"],
     }
-    vertical.update(indicator_arrivals(payload, geometry, run=run_vertical))
+    if req.display_extras:
+        vertical.update(indicator_arrivals(payload, geometry, run=run_vertical))
+    else:
+        # not computed, and said so: absence must not read as "no indicator
+        # arrives" (the same rule as a run stored before the vertical block)
+        vertical["indicators_computed"] = False
     # R-4: what a licensed programme would deploy to DETECT a vertical excursion,
     # so the screening index sits next to the monitoring that would find it.
     # NUREG/CR-6733 Sec. 4.3.3 (via NUREG-1569 p.139) also records that
@@ -870,6 +912,7 @@ def api_predict(req: PredictRequest):
         "extrapolation": extrapolation,
         "plume": {
             "contours": contours,
+            "raster": raster,
             "compliance_ring": {"radius_m": round(ring_radius, 1), "polygon": ring},
             "peak_conc": round(fm["peak_conc"], 2),
             "off_scale": fm.get("off_scale", False),

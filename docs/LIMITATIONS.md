@@ -300,6 +300,60 @@ the run they were published from until they are re-run.
 
 ---
 
+## 1g. The plume map, drawn continuously — and why it is still a band (2026-09-25)
+
+**Raised by the project owner:** *"only a rectangle appears in the direction of
+the computed vector… it looks like no work has been done."* Two things were
+checked, and they have different answers.
+
+**What was a rendering choice, and is fixed.** The map drew two to six *flat*
+contour fills, which throws away the field between levels — a plume whose
+concentration falls a hundredfold along its length was painted as one block.
+The engine now returns the field as a north-up raster
+(`dashboard/plume_geometry.py`): each pixel is the analytical
+`concentration_field` evaluated at that pixel's own centre, not an interpolation,
+with the contours' own masks and display floor (pinned by
+`tests/test_plume_raster.py`). The console defaults to it; the contours stay on
+top as outlines.
+
+**What is the physics, and is not a defect.** Drawn continuously, the plume is
+still a straight-sided band as wide as the wellfield. That is what a wide source
+releasing into a steady, uniform regional flow produces when sideways spreading
+is small — and field tracer tests show sideways spreading *is* small: at Cape
+Cod, 0.96 m longitudinal against **1.8 cm** transverse horizontal dispersivity
+(Garabedian, LeBlanc, Gelhar & Celia 1991, *Water Resour. Res.* 27(5):911–924).
+Even the most generous literature ratio would soften a 300 m band's edges by
+tens of metres. Real plumes become irregular through **heterogeneity** (channelled
+flow) and **uncertainty** — the first is not measured anywhere near the
+deposits, the second is.
+
+**Why no fracture network was built.** A discrete fracture network was proposed
+and then checked against the data it would be conditioned on. Within ±5 km of
+Jaduguda the Bhuvan 1:50k map holds **one** lineament; within ±10 km, 16, of
+which only 3 are structural joints/fractures (the rest drainage- or
+ridge-parallel). Every trace is ≤ 3.0 km — cut up during harvesting — so no
+length distribution can be fitted, and no joint spacing, aperture or
+persistence data for the SSZ mines is published (fidelity row 3.4). A
+wellfield-scale network would therefore be almost wholly assumed: fingers drawn
+by the assumptions, not by Singhbhum. Declined for that reason.
+
+**What is drawn instead: the uncertainty the engine already carries.** The
+*chance over the limit* layer is the fraction of the engine's own Monte-Carlo
+draws — the 48 its served excursion probability already scores (K
+heterogeneity, Kd, β ×4, gradient, dispersivity, bleed drift, downtime,
+aperture, all registered) — in which the drinking-water limit is exceeded at
+each pixel. At the monitoring ring it reproduces the served excursion
+probability exactly (test-pinned). It is the existing uncertainty model drawn in
+space, not a new one.
+
+**Still open.** Flow **direction** is not sampled: the engine solves in a
+flow-aligned frame, and the flow field stores the fitted gradient but not its
+uncertainty, so the probability map fans along and across flow, never sideways
+in bearing. The grounded fix is regression standard errors from the CGWB head
+plane-fit (a flow-field rebuild with the DEM), not an assumed spread.
+
+---
+
 ## 1b. Closed (2026-08-20) — the vertical breakthrough headline was too slow
 
 **Reported by the project owner from the UI, then reproduced arithmetically, then
