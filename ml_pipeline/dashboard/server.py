@@ -542,6 +542,13 @@ def api_site_block(lon: float = Query(...), lat: float = Query(...),
 
 @app.post("/api/predict")
 def api_predict(req: PredictRequest):
+    # identical pin+species payloads resolve once within this request
+    from ml_pipeline.dashboard.resolve import request_memo
+    with request_memo():
+        return _api_predict(req)
+
+
+def _api_predict(req: PredictRequest):
     if not _in_jharkhand(req.lon, req.lat):
         raise HTTPException(422, _OUTSIDE_JH)
     payload = req.model_dump()
@@ -623,6 +630,19 @@ def api_predict(req: PredictRequest):
     # (2026-09-25). Same params, masks and display floor as the contours,
     # evaluated per pixel. Display only -- a failure here must never cost the
     # run its contours or metrics.
+    # How well the flow DIRECTION is known here (data_prep/flow_direction.py):
+    # the CGWB plane-fit standard error, checked against year-by-year refits.
+    # Only for a data-derived bearing -- a user-set azimuth is their scenario,
+    # and a DEM-fallback cell has no statistics (None, said so).
+    direction_unc = None
+    if azimuth_source.startswith("flow_field"):
+        try:
+            from ml_pipeline.data_prep.flow_direction import direction_uncertainty_at
+            direction_unc = direction_uncertainty_at(req.lon, req.lat)
+        except Exception:
+            direction_unc = None
+    if isinstance(hydro.get("flow"), dict):
+        hydro["flow"]["direction_uncertainty"] = direction_unc
     raster = None
     if _prm is not None and req.display_extras:
         try:
@@ -633,7 +653,7 @@ def api_predict(req: PredictRequest):
                 y_extent=(float(field.Y.min()), float(field.Y.max())),
                 lon0=req.lon, lat0=req.lat, azimuth_deg=azimuth,
                 threshold=threshold, background=inputs["background_conc_Cb"],
-                x_offset_m=half_w)
+                x_offset_m=half_w, direction=direction_unc)
         except Exception:
             raster = None
     contours = field_to_contours(field_for_contours, lon0=req.lon, lat0=req.lat,

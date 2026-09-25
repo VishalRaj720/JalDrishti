@@ -346,11 +346,29 @@ each pixel. At the monitoring ring it reproduces the served excursion
 probability exactly (test-pinned). It is the existing uncertainty model drawn in
 space, not a new one.
 
-**Still open.** Flow **direction** is not sampled: the engine solves in a
-flow-aligned frame, and the flow field stores the fitted gradient but not its
-uncertainty, so the probability map fans along and across flow, never sideways
-in bearing. The grounded fix is regression standard errors from the CGWB head
-plane-fit (a flow-field rebuild with the DEM), not an assumed spread.
+**Flow direction, measured (2026-09-25).** The flow field stored the fitted
+direction but never how sure it was, so the map fanned only along and across
+flow. `data_prep/flow_direction.py` measures it on the flow field's own grid,
+stations and kernel. The refit reproduces the served direction exactly. It
+measures two ways:
+* the weighted-least-squares standard error of the plane's slope, propagated
+  to an angle: 7° / **17°** / 46° (p10/p50/p90 over station cells);
+* the plane refitted to each monitoring year 2013–2020: circular SD 0.7° / 4° /
+  20°.
+
+The year-by-year spread is smaller because the same wells repeat the same
+spatial misfit every year, so the yearly fits agree even where the plane is a
+poor description. The fit error is the honest measure.
+Both estimate how well the LONG-TERM direction is known — a plume averages over
+yearly wobble — so the larger (fit error, or yearly spread / √years) is
+served, not their sum. At Jaduguda that is **±22°** (1σ): at a 2 km reach,
+about ±800 m sideways. The chance map combines every Monte-Carlo draw with 15
+evenly spaced directions (rotations about the wellfield centre). A
+user-set bearing is not fanned, and DEM-fallback cells have no statistics and
+are drawn unfanned, said so. **This is a lower bound**: the plane is fitted over
+~25 km, and local hills and streams can bend flow at the 300 m scale in ways
+no regional fit sees. The CGWB 2024–25 Year Book was checked for new station
+levels to extend the years; it publishes district summaries only (§1h).
 
 ---
 

@@ -1,0 +1,32 @@
+{
+  "source": "CGWB water levels (Datasets/cgwb_waterlevel_jharkhand.csv) + GLO-30 station elevations; flow_field's grid, kernel and radius",
+  "years": [
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020
+  ],
+  "min_seasons_per_station_year": 2,
+  "cells_with_fit_se": 1857,
+  "cells_with_year_sd": 1430,
+  "se_fit_deg_pctiles": [
+    7.36,
+    16.73,
+    45.69
+  ],
+  "year_sd_deg_pctiles": [
+    0.68,
+    4.41,
+    19.57
+  ],
+  "served_sd_deg_pctiles": [
+    7.37,
+    16.79,
+    45.69
+  ],
+  "max_abs_azimuth_diff_vs_flow_field_deg": 0.0
+}

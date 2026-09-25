@@ -903,7 +903,14 @@ export default function Console() {
                   <span>Share of the engine's{" "}
                     {shownPlume?.plume?.raster?.exceedance?.n_draws ?? "Monte-Carlo"} plausible
                     parameter sets in which the drinking-water limit is exceeded here —
-                    <b> darker = more of them</b>. Flow direction is not varied.</span>
+                    <b> darker = more of them</b>.{" "}
+                    {shownPlume?.plume?.raster?.exceedance?.direction_sd_deg != null
+                      ? <>Flow direction varied by ±{Math.round(
+                          shownPlume.plume.raster.exceedance.direction_sd_deg)}° (1σ, from
+                          the fit of CGWB water levels — a minimum; local terrain can
+                          bend it more).</>
+                      : <>Flow direction is not varied here (no well statistics, or a
+                          bearing you set).</>}</span>
                 </div>
               ) : (
                 <div className="legend-row"><span className="sw" style={{ background: "#b71c1c" }} />

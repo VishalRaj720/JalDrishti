@@ -101,7 +101,43 @@ def raster_grid(x_extent, y_extent, *, lon0: float, lat0: float, azimuth_deg: fl
     X, Y = lonlat_to_local(LON, LAT, lon0, lat0, azimuth_deg)
     return {"bounds": [[round(lat_s, 7), round(lon_w, 7)], [round(lat_n, 7), round(lon_e, 7)]],
             "width": int(nx), "height": int(ny), "pixel_m": round(scale, 2),
-            "X": X - x_offset_m, "Y": Y}
+            "X": X - x_offset_m, "Y": Y, "x_offset_m": float(x_offset_m),
+            # for rotating a layer about the pin in pixel space
+            "sx_m": w_m / nx, "sy_m": h_m / ny,
+            "pin_rc": ((lat_n - lat0) / (lat_n - lat_s) * ny - 0.5,
+                       (lon0 - lon_w) / (lon_e - lon_w) * nx - 0.5)}
+
+
+#: evenly spaced flow-direction quantiles per parameter draw. Parameter and
+#: direction uncertainty are independent, so every draw is combined with every
+#: direction -- 15 is enough that the fan is a continuous field, not rays.
+N_DIRECTIONS = 15
+
+
+def direction_offsets(sd_deg: float | None, n: int = N_DIRECTIONS) -> list[float] | None:
+    """Flow-direction offsets [deg]: the n evenly spaced quantiles of a normal
+    with the measured standard deviation. None / 0 -> no direction spread."""
+    if not sd_deg or sd_deg <= 0 or n <= 0:
+        return None
+    from scipy.stats import norm
+    return [float(sd_deg * v) for v in norm.ppf((np.arange(n) + 0.5) / n)]
+
+
+def _rotate_about_pin(layer: np.ndarray, grid: dict, delta_deg: float) -> np.ndarray:
+    """`layer` swung clockwise (in bearing) by `delta_deg` about the pin.
+
+    Output pixel P takes the value the unrotated layer has at P turned back by
+    delta about the pin. Pixels are square to within rounding; the separate
+    metric sizes sx, sy keep the turn a true rotation on the ground."""
+    from scipy.ndimage import affine_transform
+    d = math.radians(delta_deg)
+    c, s_ = math.cos(d), math.sin(d)
+    sx, sy = grid["sx_m"], grid["sy_m"]
+    r0, c0 = grid["pin_rc"]
+    M = np.array([[c, -(sx / sy) * s_], [(sy / sx) * s_, c]])
+    offset = np.array([r0 - M[0, 0] * r0 - M[0, 1] * c0,
+                       c0 - M[1, 0] * r0 - M[1, 1] * c0])
+    return affine_transform(layer, M, offset=offset, order=1, mode="constant", cval=0.0)
 
 
 def _plume_on(grid: dict, params) -> np.ndarray:
@@ -145,7 +181,24 @@ def concentration_layer(grid: dict, params, *, threshold: float,
             "data": _b64_u8(q)}
 
 
-def exceedance_layer(grid: dict, draws: list, *, thr_inc: float) -> dict | None:
+def _draw_box(p, thr_inc: float) -> tuple[float, float, float, float]:
+    """(x0, x1, y0, y1) in the solver frame outside which draw `p` cannot
+    exceed `thr_inc`: the same reach and auto-grid `solve_plume` sizes its own
+    grid to -- the Tang early-arrival tail taken at the INCREMENTAL threshold's
+    fraction of C0, not a fixed level, so a strongly sorbing species' faint tail
+    is not cut off."""
+    from ml_pipeline.physics.transport import _auto_grid, _tang_reach, MAX_GRID_REACH_M
+    level = float(np.clip(thr_inc / max(p.C0, 1e-9), 1e-4, 0.5))
+    reach = min(max(p.Xc, _tang_reach(p.t_days, p.Xw, p.sigma, level=level)),
+                MAX_GRID_REACH_M)
+    X, Y = _auto_grid(reach, p.aL, p.source_width_m, n=8,
+                      disc_radius=p.disc_radius_m,
+                      disc_center_x=p.disc_center_x_m, aT=p.aT)
+    return float(X.min()), float(X.max()), float(Y.min()), float(Y.max())
+
+
+def exceedance_layer(grid: dict, draws: list, *, thr_inc: float,
+                     direction: dict | None = None) -> dict | None:
     """Fraction of Monte-Carlo draws whose plume exceeds the drinking-water
     limit at each pixel.
 
@@ -154,61 +207,104 @@ def exceedance_layer(grid: dict, draws: list, *, thr_inc: float) -> dict | None:
     same seed) -- local K heterogeneity, Kd, beta x4, gradient, dispersivity,
     bleed drift, downtime and aperture over their REGISTERED ranges. So this is
     not a new uncertainty model; it is the existing one drawn in space instead
-    of reduced to one number at the ring. It says where the limit is exceeded
-    in every plausible parameter set (1.0), in some (0-1), or in none.
+    of reduced to one number at the ring.
 
-    Deliberately NOT sampled: flow direction. The engine solves in a
-    flow-aligned frame and has no measured direction uncertainty to draw from
-    yet, so the map fans only along and across flow, never sideways in bearing.
+    FLOW DIRECTION (2026-09-25). With `direction` (data_prep/flow_direction.py:
+    the measured uncertainty of the long-term flow direction), the draws'
+    fraction map is averaged over N_DIRECTIONS evenly spaced direction
+    quantiles, each a rotation about the wellfield centre. Rotation is linear,
+    so rotating the draw-averaged map equals combining every draw with every
+    direction -- the full independent product, at the cost of 15 image
+    rotations. Without it, every draw lies on the central bearing, which is
+    exactly the frame the served excursion probability is computed in.
 
     Encoding: uint8 = round(255 * fraction); 0 = no draw exceeds.
     """
     if not draws:
         return None
-    hits = np.zeros(grid["X"].shape, dtype=np.int32)
+    from ml_pipeline.physics.transport import concentration_field
+    X, Y = grid["X"], grid["Y"]
+    hits = np.zeros(X.shape, dtype=np.float64)
     for p in draws:
-        hits += (_plume_on(grid, p) >= thr_inc)
+        # evaluate only inside the draw's own plume box (and down-gradient of
+        # the source plane, the contours' mask): outside it the draw is below
+        # the threshold by construction, and most of a fanned grid is outside
+        x0, x1, y0, y1 = _draw_box(p, thr_inc)
+        sel = (X > max(x0, 0.0)) & (X <= x1) & (Y >= y0) & (Y <= y1)
+        if sel.any():
+            c = concentration_field(X[sel], Y[sel], p, include_disc=False)
+            hits[sel] += (c >= thr_inc)
     frac = hits / float(len(draws))
-    if not np.any(frac > 0):
+    offs = direction_offsets((direction or {}).get("served_sd_deg"))
+    if offs:
+        frac = np.mean([_rotate_about_pin(frac, grid, o) for o in offs], axis=0)
+    if not np.any(frac > 0.5 / 255):
         return None
-    return {"n_draws": len(draws), "thr_inc": float(thr_inc),
+    return {"n_draws": len(draws),
+            "n_directions": (len(offs) if offs else 1),
+            "thr_inc": float(thr_inc),
+            "direction_sd_deg": (direction.get("served_sd_deg") if offs else None),
+            "direction": (direction if offs else None),
             "encoding": ("uint8, row 0 = north, base64; value/255 = fraction of "
-                         "Monte-Carlo draws exceeding the limit; 0 = none"),
-            "data": _b64_u8(np.round(frac * 255))}
+                         "(parameter draw x flow direction) combinations "
+                         "exceeding the limit; 0 = none"),
+            "data": _b64_u8(np.round(np.clip(frac, 0.0, 1.0) * 255))}
 
 
-def draws_extent(draws: list, x_extent, y_extent) -> tuple[tuple, tuple]:
-    """Grow the central run's solver box so it covers every draw's plume --
-    otherwise a long P90 front is clipped at the edge of the central picture."""
+def draws_extent(draws: list, x_extent, y_extent, *, x_offset_m: float = 0.0,
+                 max_turn_deg: float = 0.0,
+                 thr_inc: float | None = None) -> tuple[tuple, tuple]:
+    """Grow the central run's solver box so it covers every draw's plume -- and,
+    with direction spread, every draw's plume swung about the wellfield centre.
+    Otherwise a long P90 front, or a draw pointing off the central bearing, is
+    clipped at the edge of the central picture."""
     from ml_pipeline.physics.transport import _auto_grid, _tang_reach, MAX_GRID_REACH_M
     x0, x1 = float(x_extent[0]), float(x_extent[1])
     y0, y1 = float(y_extent[0]), float(y_extent[1])
+    turns = (0.0, -max_turn_deg, max_turn_deg) if max_turn_deg else (0.0,)
     for p in draws:
-        reach = min(max(p.Xc, _tang_reach(p.t_days, p.Xw, p.sigma, level=1e-2)),
-                    MAX_GRID_REACH_M)
-        X, Y = _auto_grid(reach, p.aL, p.source_width_m, n=8,
-                          disc_radius=p.disc_radius_m,
-                          disc_center_x=p.disc_center_x_m, aT=p.aT)
-        x0, x1 = min(x0, float(X.min())), max(x1, float(X.max()))
-        y0, y1 = min(y0, float(Y.min())), max(y1, float(Y.max()))
+        if thr_inc is not None:
+            bx0, bx1, by0, by1 = _draw_box(p, thr_inc)
+        else:
+            reach = min(max(p.Xc, _tang_reach(p.t_days, p.Xw, p.sigma, level=1e-2)),
+                        MAX_GRID_REACH_M)
+            X, Y = _auto_grid(reach, p.aL, p.source_width_m, n=8,
+                              disc_radius=p.disc_radius_m,
+                              disc_center_x=p.disc_center_x_m, aT=p.aT)
+            bx0, bx1, by0, by1 = float(X.min()), float(X.max()), float(Y.min()), float(Y.max())
+        for rot in turns:
+            d = math.radians(rot)
+            c, s_ = math.cos(d), math.sin(d)
+            for xd in (bx0, bx1):
+                for yd in (by0, by1):
+                    xp = xd + x_offset_m                 # draw frame, pin-centred
+                    xc = c * xp + s_ * yd - x_offset_m   # back to the central frame
+                    yc = -s_ * xp + c * yd
+                    x0, x1 = min(x0, xc), max(x1, xc)
+                    y0, y1 = min(y0, yc), max(y1, yc)
     return (x0, x1), (y0, y1)
 
 
 def plume_rasters(params, draws: list, *, x_extent, y_extent, lon0: float,
                   lat0: float, azimuth_deg: float, threshold: float,
                   background: float, x_offset_m: float = 0.0,
+                  direction: dict | None = None,
                   max_px: int = RASTER_MAX_PX) -> dict | None:
     """Both layers on one grid: the central concentration field and the
-    exceedance probability across the Monte-Carlo draws."""
+    exceedance probability across the Monte-Carlo draws, each draw also swung
+    by the measured flow-direction uncertainty when `direction` is given."""
+    offs = direction_offsets((direction or {}).get("served_sd_deg"))
+    thr_inc = max(threshold - background, P.INCREMENTAL_FLOOR * threshold)
     if draws:
-        x_extent, y_extent = draws_extent(draws, x_extent, y_extent)
+        x_extent, y_extent = draws_extent(
+            draws, x_extent, y_extent, x_offset_m=x_offset_m,
+            max_turn_deg=(max(abs(o) for o in offs) if offs else 0.0), thr_inc=thr_inc)
     grid = raster_grid(x_extent, y_extent, lon0=lon0, lat0=lat0,
                        azimuth_deg=azimuth_deg, x_offset_m=x_offset_m, max_px=max_px)
     if grid is None:
         return None
-    thr_inc = max(threshold - background, P.INCREMENTAL_FLOOR * threshold)
     conc = concentration_layer(grid, params, threshold=threshold, background=background)
-    prob = exceedance_layer(grid, draws, thr_inc=thr_inc)
+    prob = exceedance_layer(grid, draws, thr_inc=thr_inc, direction=direction)
     if conc is None and prob is None:
         return None
     return {"bounds": grid["bounds"], "width": grid["width"], "height": grid["height"],

@@ -261,7 +261,41 @@ def _override(payload: dict, key: str, fallback: float) -> float:
     return float(v) if v is not None else float(fallback)
 
 
+#: Per-request memo for `resolve_inputs` (2026-09-25). One /api/predict resolves
+#: the same pin for several species -- the run's own, the three excursion-panel
+#: indicators and the same three again for the vertical indicator arrivals --
+#: and each resolve costs ~0.15 s of spatial queries. Scoped to a single request
+#: on purpose: nothing outlives it, so a dataset sync can never be answered from
+#: a stale cache, and every caller receives its own deep copy to mutate.
+import contextvars as _cv
+import copy as _copy
+_REQUEST_MEMO: "_cv.ContextVar[dict | None]" = _cv.ContextVar("resolve_memo", default=None)
+
+
+class request_memo:
+    """`with request_memo(): ...` -- identical payloads resolve once inside."""
+
+    def __enter__(self):
+        self._token = _REQUEST_MEMO.set({})
+        return self
+
+    def __exit__(self, *exc):
+        _REQUEST_MEMO.reset(self._token)
+        return False
+
+
 def resolve_inputs(payload: dict) -> tuple[dict, dict]:
+    memo = _REQUEST_MEMO.get()
+    if memo is None:
+        return _resolve_inputs(payload)
+    key = json.dumps(payload, sort_keys=True, default=str)
+    if key not in memo:
+        memo[key] = _resolve_inputs(payload)
+    inputs, hydro = memo[key]
+    return _copy.deepcopy(inputs), _copy.deepcopy(hydro)
+
+
+def _resolve_inputs(payload: dict) -> tuple[dict, dict]:
     """(predict_inputs, hydro_display). Slider values override pin defaults."""
     aq, wq, source_sig = _assets()
     lon, lat = float(payload["lon"]), float(payload["lat"])
