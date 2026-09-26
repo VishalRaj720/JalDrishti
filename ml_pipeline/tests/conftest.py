@@ -48,3 +48,21 @@ def _restore_config_globals():
             setattr(P, n, v)
         for n, v in saved_mutable.items():
             setattr(P, n, v)
+
+
+@pytest.fixture
+def retired_shear_zone(monkeypatch):
+    """The shear-zone hydrogeology as it was before 2026-09-26: T = 370 m2/day
+    over 150 m, served as K = T/b (LIMITATIONS.md 1j/1k).
+
+    For regression guards whose numbers were captured under it and that test
+    something ELSE (a display change, a switch, an excursion-only species).
+    Restoring it keeps them testing what they were written for instead of
+    freezing the D5 decision -- and, as a side effect, shows that the D5 change
+    is the only thing that moved them."""
+    from ml_pipeline.dashboard import resolve as R
+    monkeypatch.setattr(P, "SHEAR_ZONE_T_M2DAY", 370.0)
+    monkeypatch.setattr(P, "SHEAR_ZONE_THICKNESS_M", 150.0)
+    old_ref = dict(R.shear_zone_reference(), K_reference_m_day=370.0 / 150.0)
+    monkeypatch.setattr(R, "shear_zone_reference", lambda: old_ref)
+    yield

@@ -34,6 +34,7 @@ import json
 import math
 import os
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,7 +49,7 @@ from ml_pipeline.dashboard.resolve import (
 )
 from ml_pipeline.dashboard.plume_geometry import (
     field_to_contours, compliance_ring, ml_envelope_ellipses,
-    source_zone_polygon,
+    source_zone_polygon, plume_rasters,
 )
 
 
@@ -206,6 +207,12 @@ class PredictRequest(BaseModel):
                                    ge=P.VERTICAL["ore_thickness_range_m"][0],
                                    le=P.VERTICAL["ore_thickness_range_m"][1])
     mode: str = "both"                             # analytical | ml | both
+    # DISPLAY-ONLY layers (2026-09-25): the per-pixel concentration/exceedance
+    # rasters and the lixiviant-indicator vertical arrivals. Together ~250 ms and
+    # ~50 kB per call. Callers that evaluate the engine in a loop and read only
+    # metrics (lifecycle, sweep, timeline frames) turn them off; every metric,
+    # contour and the run's own vertical screening are identical either way.
+    display_extras: bool = True
     # TIMELINE (3.7b): ISR start date, ISO "YYYY-MM-DD". Purely a presentation
     # anchor -- it converts `time_years` into a calendar date and selects the
     # month whose water table drives the seasonal vertical state. It does NOT
@@ -223,6 +230,13 @@ class PredictRequest(BaseModel):
     # None -> literature mode (0.20) for uranium, 0 for sulfate/TDS. Values
     # above the trained max (0.70) are served analytically + flagged.
     u_attenuation_k_per_yr: float | None = Field(None, ge=0, le=2.0)
+    # 2026-09-26: which hydrogeology to run. None / "baseline" is the MEASURED
+    # baseline and is what every stored run and every alert uses.
+    # "isr_feasibility" runs the SECONDARY hypothetical (ore-zone K raised to the
+    # IAEA ISR level, P.ISR_FEASIBILITY) as the main answer -- for callers that
+    # want its geometry; the response labels it as such. Ordinary runs get the
+    # hypothetical's headline numbers alongside, under `hypotheticals`.
+    hydro_scenario: Literal["baseline", "isr_feasibility"] | None = None
 
 
 def _bands(d: dict) -> dict:
@@ -522,8 +536,110 @@ def api_aquifers():
     return _cached_geojson(json.loads(g.to_json()))
 
 
+@app.get("/api/site_block")
+def api_site_block(lon: float = Query(...), lat: float = Query(...),
+                   half_km: float = Query(1.5, ge=0.5, le=3.0)):
+    """Measured context for the 3-D site block: terrain, CGWB wells, rivers and
+    the district's NAQUIM layers around a pin (dashboard/site_block.py). The
+    engine outputs it is drawn with come from /api/predict for the same run."""
+    if not _in_jharkhand(lon, lat):
+        raise HTTPException(422, _OUTSIDE_JH)
+    from ml_pipeline.dashboard.site_block import site_block
+    return site_block(lon, lat, half_km)
+
+
+def _isr_feasibility_scenario(*, req, payload: dict, hydro: dict, base: dict,
+                              base_eta: float, base_vertical: dict, vparams: dict,
+                              flow: dict, timeline: dict | None) -> dict:
+    """The SECONDARY, HYPOTHETICAL answer beside a baseline run.
+
+    Same pin, species, operation and horizon; only the ore-zone K is raised to
+    the IAEA ISR working level (P.ISR_FEASIBILITY). Analytical engine only --
+    it is a sensitivity readout, like `beta_override`, not a second product.
+    """
+    from ml_pipeline.ml.predict import features_from_inputs
+    from ml_pipeline.dashboard.vertical_path import screening_geometry, screen_species
+    isr = hydro.get("isr_feasibility") or {}
+    cfg = P.ISR_FEASIBILITY
+    block = {
+        "hypothetical": True,
+        "label": cfg["label"],
+        "citation": cfg["citation"],
+        "K_scenario_m_day": cfg["K_scenario_m_day"],
+        "K_unfeasible_below_m_day": cfg["K_unfeasible_below_m_day"],
+        "K_ore_measured_m_day": isr.get("K_ore_measured_m_day"),
+        "baseline_below_unfeasible_floor": isr.get("below_unfeasible_floor"),
+        "note": ("Not a prediction. The measured rock is the baseline above; this "
+                 "shows how far the same operation would spread IF the ore horizon "
+                 "were permeable enough for in-situ leaching to work (IAEA: ~1 "
+                 "m/day advantageous, <~0.1 m/day usually unfeasible). Never used "
+                 "for alerts."),
+    }
+    if payload.get("K_m_day") is not None:
+        block.update(applies=False, reason=(
+            "an explicit K was supplied; it is a statement about the ore zone and "
+            "the hypothetical does not overrule it"))
+        return block
+    if (isr.get("K_ore_measured_m_day") or 0.0) >= cfg["K_scenario_m_day"]:
+        block.update(applies=False, reason=(
+            "the measured ore-zone K already meets the IAEA ISR level, so the "
+            "hypothetical is the baseline"))
+        return block
+
+    s_payload = dict(payload)
+    s_payload["hydro_scenario"] = "isr_feasibility"
+    s_inputs, s_hydro = resolve_inputs(s_payload)
+    s = predict_analytical(compliance_x=float(req.monitor_ring_m), **s_inputs)
+    s.pop("_field", None)
+    s_eta = features_from_inputs(**s_inputs)[1]["_eta_eff"]
+
+    # The confining column keeps its measured K (the IAEA criterion is about
+    # the ore horizon), so the vertical clock should not move -- computed, not
+    # assumed, so a future change that couples them shows up here.
+    L_disp = max(s["Xc_m"], s_inputs["wellfield_width_m"], 1.0)
+    geometry = screening_geometry(req=req, inputs=s_inputs, hydro=s_hydro,
+                                  vparams=vparams, flow=flow, timeline=timeline)
+    sv = screen_species(s_payload, s_inputs["species"], geometry, inputs=s_inputs,
+                        Xc_m=s["Xc_m"],
+                        alpha_L=P.longitudinal_dispersivity(L_disp))["screening"]
+
+    def _m(r):
+        return {"area_ha": round(r["area_ha"]["p50"], 3),
+                "migration_m": round(r["migration_m"]["p50"], 1),
+                "compliance_conc": round(r["compliance_conc"]["p50"], 3),
+                "excursion_probability": round(r["excursion_probability"], 3)}
+
+    block.update(
+        applies=True,
+        K_ore_m_day=round(float(s_inputs["K_m_day"]), 4),
+        thickness_m=round(float(s_inputs["thickness_m"]), 1),
+        metrics=_m(s),
+        baseline_metrics=_m(base),
+        containment_eta=round(float(s_eta), 4),
+        baseline_containment_eta=round(float(base_eta), 4),
+        vertical={
+            "years_to_vertical_breakthrough": sv.get("years_to_vertical_breakthrough"),
+            "baseline_years_to_vertical_breakthrough":
+                (base_vertical or {}).get("years_to_vertical_breakthrough"),
+            "note": ("The confining rock above the ore keeps its measured K in "
+                     "this hypothetical, so the vertical pathway does not change."),
+        },
+        # K = 1 m/day sits inside the surrogate's trained support; reported in
+        # case a future config moves it out
+        extrapolation=envelope_violations(s_inputs, s_hydro),
+    )
+    return block
+
+
 @app.post("/api/predict")
 def api_predict(req: PredictRequest):
+    # identical pin+species payloads resolve once within this request
+    from ml_pipeline.dashboard.resolve import request_memo
+    with request_memo():
+        return _api_predict(req)
+
+
+def _api_predict(req: PredictRequest):
     if not _in_jharkhand(req.lon, req.lat):
         raise HTTPException(422, _OUTSIDE_JH)
     payload = req.model_dump()
@@ -598,7 +714,39 @@ def api_predict(req: PredictRequest):
             req.lon, req.lat, azimuth, _prm.disc_radius_m, _prm.disc_center_x_m,
             x_offset_m=half_w) if _prm.disc_radius_m > 0 else None
     except Exception:
+        _prm = None
         field_for_contours, source_zone_poly = field, None
+    # The continuous field under the contours, and the chance of exceeding the
+    # limit across the SAME Monte-Carlo draws the excursion probability scores
+    # (2026-09-25). Same params, masks and display floor as the contours,
+    # evaluated per pixel. Display only -- a failure here must never cost the
+    # run its contours or metrics.
+    # How well the flow DIRECTION is known here (data_prep/flow_direction.py):
+    # the CGWB plane-fit standard error, checked against year-by-year refits.
+    # Only for a data-derived bearing -- a user-set azimuth is their scenario,
+    # and a DEM-fallback cell has no statistics (None, said so).
+    direction_unc = None
+    if azimuth_source.startswith("flow_field"):
+        try:
+            from ml_pipeline.data_prep.flow_direction import direction_uncertainty_at
+            direction_unc = direction_uncertainty_at(req.lon, req.lat)
+        except Exception:
+            direction_unc = None
+    if isinstance(hydro.get("flow"), dict):
+        hydro["flow"]["direction_uncertainty"] = direction_unc
+    raster = None
+    if _prm is not None and req.display_extras:
+        try:
+            from ml_pipeline.ml.predict import mc_param_draws
+            raster = plume_rasters(
+                _prm, mc_param_draws(inputs),
+                x_extent=(float(field.X.min()), float(field.X.max())),
+                y_extent=(float(field.Y.min()), float(field.Y.max())),
+                lon0=req.lon, lat0=req.lat, azimuth_deg=azimuth,
+                threshold=threshold, background=inputs["background_conc_Cb"],
+                x_offset_m=half_w, direction=direction_unc)
+        except Exception:
+            raster = None
     contours = field_to_contours(field_for_contours, lon0=req.lon, lat0=req.lat,
                                  azimuth_deg=azimuth, threshold=threshold,
                                  background=inputs["background_conc_Cb"],
@@ -671,43 +819,35 @@ def api_predict(req: PredictRequest):
     # transport engine uses (L = max(front reach, wellfield width)).
     L_disp = max(fm["Xc_m"], inputs["wellfield_width_m"], 1.0)
     alpha_L = P.longitudinal_dispersivity(L_disp)
-    from ml_pipeline.physics.transport import shallow_impact_screening
     # D3: per-district shallow-aquifer base from the NAQUIM reports (falls back to
     # the state-wide VERTICAL default for districts without a report).
     from ml_pipeline.data_prep.naquim_vertical import vertical_params_at
+    from ml_pipeline.dashboard.vertical_path import (
+        screening_geometry, screen_species, indicator_arrivals)
     vparams = vertical_params_at(req.lon, req.lat)
-    vertical = shallow_impact_screening(
-        C0=inputs["source_conc_C0"], background=inputs["background_conc_Cb"],
-        threshold=threshold, Xc_m=fm["Xc_m"],
-        source_width_m=inputs["wellfield_width_m"], alpha_L=alpha_L,
-        alpha_V=alpha_L * P.VERTICAL["alpha_V_ratio"],
-        ore_depth_m=req.ore_depth_m, ore_thickness_m=req.ore_thickness_m,
-        layer1_base_m=vparams["layer1_base_m"], K_m_day=inputs["K_m_day"],
-        # confining Layer-2 porosity is FIXED (fractured bedrock, not the ore
-        # regime); the regime enters through vertical anisotropy Kv/Kh instead.
-        phi_confining=P.VERTICAL["phi_confining"],
-        Kv_Kh_ratio=P.VERTICAL["Kv_Kh_by_regime"].get(inputs["regime"], 0.01),
-        upward_gradient=P.VERTICAL["upward_gradient"],
-        t_days=req.time_years * 365.0,
-        wellbore_failure_prob=P.VERTICAL["wellbore_failure_prob"],
-        # D1: real post-monsoon (shallowest) water table as receptor context
-        water_table_m=flow.get("depth_to_water_shallow_m"),
-        # 3.7: the wet/dry pair drives the seasonal vertical band. Both must be
-        # present for a per-pin band; otherwise the screening falls back to the
-        # state-wide CGWB campaign medians (flagged in `seasonal.water_table_source`).
-        water_table_wet_m=flow.get("depth_to_water_shallow_m"),
-        water_table_dry_m=flow.get("depth_to_water_deep_m"),
-        # TIMELINE: this month's interpolated table (None unless a start date was
-        # given). Amplitude is the pin's own wet/dry pair; only the monsoon
-        # TIMING is state-wide -- see P.water_table_shape for why.
-        water_table_now_m=(
-            P.water_table_at_month(
-                timeline["month"],
-                flow.get("depth_to_water_shallow_m", P.VERTICAL_SEASONAL["water_table_wet_m"])
-                or P.VERTICAL_SEASONAL["water_table_wet_m"],
-                flow.get("depth_to_water_deep_m", P.VERTICAL_SEASONAL["water_table_dry_m"])
-                or P.VERTICAL_SEASONAL["water_table_dry_m"])
-            if timeline else None))
+    # 2026-09-25 (P.VERTICAL_PATH): one geometry builder for the run's species
+    # and every indicator; the solute's own matrix retention and the column's
+    # series K are resolved in dashboard/vertical_path.py.
+    geometry = screening_geometry(req=req, inputs=inputs, hydro=hydro,
+                                  vparams=vparams, flow=flow, timeline=timeline)
+    run_vertical = screen_species(payload, species, geometry, inputs=inputs,
+                                  Xc_m=fm["Xc_m"], alpha_L=alpha_L)
+    vertical = run_vertical["screening"]
+    vertical["species"] = species
+    vertical["confining_path"] = {
+        **geometry["path"],
+        "Kv_Kh": geometry["kwargs"]["Kv_Kh_ratio"],
+        "Kv_Kh_citation": (P.VERTICAL["Kv_Kh_citation"]
+                           if inputs["regime"] == "fractured" else
+                           "screening value -- no Indian measurement for this regime"),
+        "retention": run_vertical["retention"],
+    }
+    if req.display_extras:
+        vertical.update(indicator_arrivals(payload, geometry, run=run_vertical))
+    else:
+        # not computed, and said so: absence must not read as "no indicator
+        # arrives" (the same rule as a run stored before the vertical block)
+        vertical["indicators_computed"] = False
     # R-4: what a licensed programme would deploy to DETECT a vertical excursion,
     # so the screening index sits next to the monitoring that would find it.
     # NUREG/CR-6733 Sec. 4.3.3 (via NUREG-1569 p.139) also records that
@@ -831,6 +971,25 @@ def api_predict(req: PredictRequest):
         except Exception as e:
             beta_override = {"status": f"unavailable: {type(e).__name__} ({e})"}
 
+    # TWO ANSWERS (2026-09-26, owner's framework). Everything above is the
+    # MEASURED-MAXIMUM BASELINE. Beside it, the SECONDARY HYPOTHETICAL: the same
+    # run with the ore-zone K raised to the IAEA ISR working level -- "how far
+    # would it spread if this rock were permeable enough for ISR to work". It is
+    # returned under `hypotheticals`, labelled, and read by nothing that alerts.
+    # Skipped for metrics-only callers (display_extras False), like the other
+    # display layers.
+    hypotheticals = None
+    if req.display_extras and req.hydro_scenario in (None, "baseline"):
+        try:
+            hypotheticals = {"isr_feasibility": _isr_feasibility_scenario(
+                req=req, payload=payload, hydro=hydro, base=a, base_eta=_feat_eta,
+                base_vertical=vertical, vparams=vparams, flow=flow,
+                timeline=timeline)}
+        except Exception as e:                   # never break the main answer
+            hypotheticals = {"isr_feasibility": {
+                "status": f"unavailable: {type(e).__name__} ({e})",
+                "hypothetical": True}}
+
     return {
         "pin": {"lon": req.lon, "lat": req.lat},
         "hydro": hydro,
@@ -863,6 +1022,12 @@ def api_predict(req: PredictRequest):
         "isr_excursion": isr_excursion,
         # V-7: default-beta comparison when the user overrode beta
         "beta_override": beta_override,
+        # 2026-09-26: the secondary, hypothetical ISR-feasibility answer (None
+        # for metrics-only calls and for a run that already IS the scenario)
+        "hypotheticals": hypotheticals,
+        # which hydrogeology THIS response is: the measured baseline unless the
+        # caller explicitly asked for the hypothetical
+        "hydro_scenario": req.hydro_scenario or "baseline",
         # wellfield_width_m is a well-PATTERN FOOTPRINT DIAMETER; the old label
         # invited reading it as a borehole width or a well spacing.
         "wellfield_geometry": {
@@ -883,6 +1048,7 @@ def api_predict(req: PredictRequest):
         "extrapolation": extrapolation,
         "plume": {
             "contours": contours,
+            "raster": raster,
             "compliance_ring": {"radius_m": round(ring_radius, 1), "polygon": ring},
             "peak_conc": round(fm["peak_conc"], 2),
             "off_scale": fm.get("off_scale", False),

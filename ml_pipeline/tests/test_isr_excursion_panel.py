@@ -190,7 +190,7 @@ def test_extra_registry_keys_are_inert_to_the_generator():
 
 
 @pytest.mark.parametrize("species", list(P.SPECIES))
-def test_existing_analytical_and_ml_outputs_are_unchanged(species):
+def test_existing_analytical_and_ml_outputs_are_unchanged(species, retired_shear_zone):
     """Pinned against values captured BEFORE chloride was introduced, at the
     PIN operating point. If adding an excursion-only constituent had leaked
     into the modelled species in any way, these would move.
@@ -199,7 +199,12 @@ def test_existing_analytical_and_ml_outputs_are_unchanged(species):
     (10). The serve path now derives beta from the porosities, so the legacy
     value is passed EXPLICITLY -- the override path is unchanged physics -- and
     this guard keeps testing what it was written for (chloride inertness)
-    instead of freezing the beta decision."""
+    instead of freezing the beta decision.
+
+    2026-09-26: likewise the values were captured on the RETIRED shear-zone
+    hydrogeology (T = 370 m2/day over 150 m); the `retired_shear_zone` fixture
+    restores it for the same reason, so this guard does not freeze the D5
+    decision either."""
     expected = {
         "uranium_ppb":      dict(area_ha=12.510, migration_m=12.9),
         "sulfate_mg_l":     dict(area_ha=13.184, migration_m=40.2),

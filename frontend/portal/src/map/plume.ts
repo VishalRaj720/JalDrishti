@@ -53,6 +53,93 @@ export function rampColor(t: number): string {
   return rgbToHex([0, 1, 2].map((k) => a[k] + (b[k] - a[k]) * f));
 }
 
+/**
+ * What the plume layer paints (2026-09-25).
+ *
+ * * `contours` — the filled contour bands only (what every run drew before).
+ * * `field`    — the engine's concentration evaluated at every pixel, on the
+ *   same log ramp; the contours stay on top as outlines. Two to six flat fills
+ *   throw away the field between their levels, which is much of why a plume
+ *   read as "a block placed on the map".
+ * * `chance`   — the share of the engine's own Monte-Carlo draws (the ones its
+ *   excursion probability already scores) in which the drinking-water limit
+ *   is exceeded at each pixel. A different hue on purpose: it is a probability,
+ *   not a concentration, and must not be read as one.
+ */
+export type PlumeView = "contours" | "field" | "chance";
+
+/** Probability ramp — violet, the hue the ML uncertainty envelope already uses. */
+const CHANCE_RAMP = ["#ede9fe", "#c4b5fd", "#8b5cf6", "#6d28d9", "#4c1d95", "#2e1065"];
+
+function rampAt(ramp: string[], t: number): number[] {
+  t = Math.max(0, Math.min(1, isFinite(t) ? t : 1));
+  const s = t * (ramp.length - 1);
+  const i = Math.min(Math.floor(s), ramp.length - 2);
+  const f = s - i;
+  const a = hexToRgb(ramp[i]), b = hexToRgb(ramp[i + 1]);
+  return [0, 1, 2].map((k) => a[k] + (b[k] - a[k]) * f);
+}
+
+/** 256-entry RGBA lookup for one encoded layer, built once per ramp. */
+const LUTS: Partial<Record<"field" | "chance", Uint8ClampedArray>> = {};
+function lutFor(view: "field" | "chance"): Uint8ClampedArray {
+  const cached = LUTS[view];
+  if (cached) return cached;
+  const lut = new Uint8ClampedArray(256 * 4);
+  for (let v = 1; v < 256; v++) {
+    // field: 1..255 = log position between the display floor and the peak;
+    // chance: value/255 = fraction of draws over the limit
+    const t = view === "field" ? (v - 1) / 254 : v / 255;
+    const [r, g, b] = rampAt(view === "field" ? CONC_RAMP : CHANCE_RAMP, t);
+    lut.set([r, g, b, Math.round(255 * (0.2 + 0.6 * t))], v * 4);
+  }
+  LUTS[view] = lut;
+  return lut;
+}
+
+/** The engine's north-up raster for `view` painted on a canvas (row 0 =
+ *  north), or null when the run carries none (stored before 2026-09-25, a
+ *  timeline frame, or an engine that produced nothing above the display
+ *  floor). Shared by the map overlay and the 3-D site block, so both paint the
+ *  same pixels with the same ramp. */
+export function rasterCanvas(r: any, view: "field" | "chance"): HTMLCanvasElement | null {
+  const rs = r?.plume?.raster;
+  const layer = view === "field" ? rs?.concentration : rs?.exceedance;
+  if (!rs || !layer?.data) return null;
+  const w = rs.width, h = rs.height;
+  const bin = atob(layer.data);
+  if (bin.length !== w * h) return null;           // never paint a misread grid
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const img = ctx.createImageData(w, h);
+  const lut = lutFor(view);
+  for (let k = 0; k < bin.length; k++) {
+    const v = bin.charCodeAt(k);
+    if (v) img.data.set(lut.subarray(v * 4, v * 4 + 4), k * 4);
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+function rasterOverlay(r: any, view: PlumeView): L.ImageOverlay | null {
+  if (view === "contours") return null;
+  const canvas = rasterCanvas(r, view);
+  if (!canvas) return null;
+  return L.imageOverlay(canvas.toDataURL(), r.plume.raster.bounds as L.LatLngBoundsExpression, {
+    pane: "panePlume", interactive: false,
+  });
+}
+
+/** Whether a result can be shown as `view` at all (for the control's state). */
+export function hasRaster(r: any, view: PlumeView): boolean {
+  if (view === "contours") return true;
+  const rs = r?.plume?.raster;
+  return !!(view === "field" ? rs?.concentration : rs?.exceedance);
+}
+
 /** Log-normalised position of each level within its own set. A single-value
  *  set maps to 1: if it is the only concentration on the map, it IS the
  *  highest one shown. */
@@ -144,6 +231,8 @@ export function storedRunToPlume(run: any): any | null {
     threshold: p.threshold,
     plume: {
       contours: p.contours ?? [],
+      // runs stored before 2026-09-25 carry none; `rasterOverlay` then draws nothing
+      raster: p.raster ?? null,
       compliance_ring: p.compliance_ring ?? null,
       source_zone: p.source_zone ?? null,
       peak_conc: p.peak_conc,
@@ -173,11 +262,19 @@ export function storedRunToPlume(run: any): any | null {
 }
 
 /** Render one engine result into `group`, which is cleared first. */
-export function drawPlume(group: L.LayerGroup, r: any, showEnvelope: boolean) {
+export function drawPlume(group: L.LayerGroup, r: any, showEnvelope: boolean,
+                          view: PlumeView = "contours") {
   group.clearLayers();
   if (!r?.plume) return;
 
   const unit = SPECIES_UNIT[r.species] ?? "";
+
+  // ── the continuous raster, under everything in the plume pane ──
+  const overlay = rasterOverlay(r, view);
+  if (overlay) overlay.addTo(group);
+  // With a raster painted, the contour bands become OUTLINES: their fills would
+  // double the colour the raster already carries and hide its gradient.
+  const outlinesOnly = !!overlay;
 
   // ── leach zone (source disc) — under everything, its own long dash ──
   const sz = r.plume.source_zone;
@@ -210,7 +307,8 @@ export function drawPlume(group: L.LayerGroup, r: any, showEnvelope: boolean) {
         color: c.is_bis ? "#8c1c24" : rampColor(Math.min(1, t + 0.15)),
         weight: c.is_bis ? 2.8 : 0.8,
         fillColor: col,
-        fillOpacity: 0.12 + 0.30 * t,
+        // a near-zero fill keeps the band hoverable for its tooltip
+        fillOpacity: outlinesOnly ? 0.01 : 0.12 + 0.30 * t,
       }).addTo(group).bindTooltip(
         `${c.is_bis ? "BIS limit · " : ""}${c.level} ${unit}`,
         { className: "plume-tip", sticky: true });

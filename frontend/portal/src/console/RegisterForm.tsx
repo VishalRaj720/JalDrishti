@@ -72,9 +72,23 @@ const PARAMS: ParamDef[] = [
         + "this site without editing it." },
 ];
 
+/** The operator-documented ore-depth range at a deposit pin (engine `/api/pin`
+ *  `ore_depth_range`, 2026-09-26). The seed is a representative choice inside
+ *  it; the range is the grounded part. */
+export interface OreDepthRange {
+  deposit: string;
+  top_m: number;
+  bottom_m: number;
+  seed_m: number | null;
+  source: string;
+  basis?: string;
+  confidence: "primary" | "secondary";
+}
+
 export default function RegisterForm({
-  lon, lat, onRegistered,
-}: { lon: number; lat: number; onRegistered: (site: IsrPoint) => void }) {
+  lon, lat, onRegistered, oreDepth = null,
+}: { lon: number; lat: number; onRegistered: (site: IsrPoint) => void;
+     oreDepth?: OreDepthRange | null }) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -102,7 +116,11 @@ export default function RegisterForm({
   const [v, setV] = useState<Partial<Payload>>({});
   const value = (p: ParamDef): number => {
     const got = v[p.key];
-    return got === undefined ? lim(p.bounds).def : got;
+    if (got !== undefined) return got;
+    // On a surveyed deposit the ore depth starts from that deposit's own
+    // documented range rather than the engine's statewide 150 m.
+    if (p.key === "ore_depth_m" && oreDepth?.seed_m != null) return oreDepth.seed_m;
+    return lim(p.bounds).def;
   };
 
   const errors = useMemo(() => {
@@ -168,10 +186,18 @@ export default function RegisterForm({
       {B && PARAMS.map((p) => {
         const { min, max } = lim(p.bounds);
         const err = touched ? errors[p.key] : null;
+        const documented = p.key === "ore_depth_m" && oreDepth ? (
+          <span title={oreDepth.basis ?? oreDepth.source}>
+            {" "}Documented for {oreDepth.deposit}:{" "}
+            <b>{oreDepth.top_m}–{oreDepth.bottom_m} m</b>
+            {oreDepth.confidence === "secondary" ? " (secondary source)" : " (UCIL)"}.
+            {oreDepth.seed_m != null && <> Started at {oreDepth.seed_m} m, inside it.</>}
+          </span>
+        ) : null;
         return (
           <Field key={p.key} label={`${p.label} (${p.unit})`} htmlFor={`p-${p.key}`}
                  error={err}
-                 hint={<>{p.hint ? `${p.hint} ` : ""}<span className="mono">{min}–{max}</span></>}>
+                 hint={<>{p.hint ? `${p.hint} ` : ""}<span className="mono">{min}–{max}</span>{documented}</>}>
             <input id={`p-${p.key}`} type="number" step={p.step} min={min} max={max}
                    value={value(p)} aria-invalid={!!err}
                    onChange={(e) => setV({ ...v, [p.key]: Number(e.target.value) })} />

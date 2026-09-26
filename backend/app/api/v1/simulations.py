@@ -332,7 +332,7 @@ async def sweep_simulation(
 
     results: list[SweepPoint] = []
     for v in values:
-        overrides = {"species": payload.species, varied: v, **held}
+        overrides = {"species": payload.species, varied: v, **held, **mlp.METRICS_ONLY}
         try:
             r = await mlp.predict(mlp.payload_from_site(site, overrides=overrides))
         except Exception as exc:  # noqa: BLE001

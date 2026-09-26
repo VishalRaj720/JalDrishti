@@ -154,6 +154,19 @@ async def ml_strike_field(response: Response, step: int = Query(2, ge=1, le=10),
     return await _forward("/api/strike_field", response, {"step": step})
 
 
+@router.get("/site-block")
+async def ml_site_block(response: Response,
+                        lon: float = Query(..., ge=-180, le=180),
+                        lat: float = Query(..., ge=-90, le=90),
+                        half_km: float = Query(1.5, ge=0.5, le=3.0),
+                        _=Depends(require_staff)):
+    """Measured context for the 3-D site block — terrain (DEM excerpt over the
+    uranium belt), CGWB wells, rivers and the district's NAQUIM layers. The
+    plume and vertical fronts it is drawn with come from the run itself."""
+    return await _forward("/api/site_block", response,
+                          {"lon": lon, "lat": lat, "half_km": half_km})
+
+
 # ── the engine itself ────────────────────────────────────────────────
 
 @router.get("/pin")

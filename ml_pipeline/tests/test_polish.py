@@ -43,7 +43,10 @@ from ml_pipeline.data_prep.ore_loader import deposit_ore_depth
 
 def test_deposit_ore_depth_by_mining_type():
     assert deposit_ore_depth("Banduhurang") == 60.0     # open-pit -> shallow
-    assert deposit_ore_depth("Mohuldih") == 250.0       # documented ~250 m
+    # 2026-09-26: "within a vertical depth of 250 m" is the BOTTOM of the ore,
+    # so the seed moved to the middle of the documented range
+    assert deposit_ore_depth("Mohuldih") == 150.0
+    assert deposit_ore_depth("Bhatin") == 90.0          # documented 0-135 m
     assert deposit_ore_depth("Jaduguda") == 180.0
     assert deposit_ore_depth("Not A Deposit") is None
     assert deposit_ore_depth(None) is None

@@ -65,6 +65,133 @@ const band = (m: any) =>
   m && typeof m === "object" && m.p10 != null && m.p90 != null
     ? { p10: m.p10, p90: m.p90 } : null;
 
+/**
+ * 2026-09-26 — WHICH ROCK THE ANSWER ABOVE IS FOR.
+ *
+ * Every run is the MEASURED baseline. In the Singhbhum shear zone that means
+ * the largest transmissivity measured in its own host rock near the mines
+ * (Kudada, CGWB — 19 m²/day), not a value borrowed from elsewhere; off the belt
+ * it is the CGWB aquifer map's K. Said once, under the numbers it governs.
+ */
+function BaselineNote({ r }: { r: any }) {
+  const h = r?.hydro;
+  if (!h) return null;
+  const sz = h.shear_zone;
+  const isr = h.isr_feasibility;
+  // A caller can ask the engine for the hypothetical as the main run; it must
+  // never be labelled as the measured baseline.
+  if (isr?.applied) {
+    return (
+      <div className="banner warn" style={{ marginTop: 6 }}>
+        <strong>Hypothetical run.</strong> Ore-zone K set to the IAEA ISR level
+        ({fmt(isr.K_scenario_m_day, 1)} m/day) instead of the measured
+        {" "}{fmt(isr.K_ore_measured_m_day, 3)} m/day. Not a prediction.
+      </div>
+    );
+  }
+  return (
+    <div className="muted small" style={{ marginTop: 6 }}>
+      <b>Measured baseline.</b>{" "}
+      {sz ? (
+        <>Shear-zone transmissivity <b>{fmt(sz.T_m2day, 0)} m²/day</b> — the largest
+          pumping test in the belt&apos;s host rock near the deposits
+          ({String(sz.source_well ?? "").replace(/_ew$/, "").replace(/^\w/, (c: string) => c.toUpperCase())},
+          CGWB), </>
+      ) : (
+        <>Aquifer K from the CGWB map ({h.lithology ?? "this lithology"}), </>
+      )}
+      decayed to the ore depth: <b>{fmt(h.K_m_day, 3)} m/day</b>
+      {isr?.below_unfeasible_floor && (
+        <> — below the 0.1 m/day at which the IAEA says in-situ leaching usually
+           becomes unfeasible</>
+      )}.
+    </div>
+  );
+}
+
+/**
+ * 2026-09-26 — THE SECOND ANSWER, AND ONLY EVER AS A HYPOTHETICAL.
+ *
+ * The same run with the ore-zone K raised to the IAEA's ~1 m/day working level
+ * for ISR: "how far would it spread if this rock were permeable enough for ISR
+ * to work at all". It is shown beside the baseline, labelled, and never feeds an
+ * alert — the backend's own test pins that no alerting code reads it.
+ */
+function IsrHypothetical({ h, unit, compact }: { h: any; unit: string; compact: boolean }) {
+  if (!h) return null;
+  if (h.status) {
+    return <div className="muted small" style={{ marginTop: 8 }}>
+      ISR-feasibility hypothetical: {h.status}</div>;
+  }
+  if (!h.applies) {
+    return (
+      <div className="muted small" style={{ marginTop: 8 }}>
+        <span className="chip neutral" style={{ fontSize: 9, padding: "1px 6px" }}>
+          hypothetical</span>{" "}
+        ISR-feasibility scenario not shown: {h.reason}.
+      </div>
+    );
+  }
+  const m = h.metrics ?? {}, b = h.baseline_metrics ?? {};
+  const reach = (v: unknown) => {
+    const x = distance(v);
+    return x.unit === "m" ? `${x.text} m` : "no measurable distance";
+  };
+  const pct = (v: unknown) => `${fmt(Number(v) * 100, 0)}%`;
+  if (compact) {
+    return (
+      <div className="banner" style={{ marginTop: 8 }}>
+        <span className="chip warn" style={{ fontSize: 9, padding: "1px 6px" }}>
+          hypothetical</span>{" "}
+        <b>If this rock were permeable enough for ISR</b> (ore-zone
+        K {fmt(h.K_scenario_m_day, 1)} m/day, the IAEA working level), the plume
+        would reach {reach(m.migration_m)} instead of {reach(b.migration_m)}, with
+        a {pct(m.excursion_probability)} chance of exceeding the limit at the ring
+        instead of {pct(b.excursion_probability)}. Not a prediction.
+      </div>
+    );
+  }
+  // units live in the row label so the two value columns stay narrow enough
+  // for the drawer
+  const rows: [string, ReactNode, ReactNode][] = [
+    ["Ore-zone K (m/day)", fmt(h.K_ore_measured_m_day, 3), fmt(h.K_ore_m_day, 2)],
+    ["Footprint (ha)", area(b.area_ha).text, area(m.area_ha).text],
+    ["Max migration (m)", distance(b.migration_m).text, distance(m.migration_m).text],
+    [`At the ring (${unit})`, fmt(b.compliance_conc, 1), fmt(m.compliance_conc, 1)],
+    ["Excursion probability", pct(b.excursion_probability), pct(m.excursion_probability)],
+    ["Containment η", fmt(h.baseline_containment_eta, 3), fmt(h.containment_eta, 3)],
+  ];
+  return (
+    <>
+      <div className="sec">
+        If ISR were feasible here{" "}
+        <span className="chip warn" style={{ fontSize: 9, padding: "1px 6px" }}>
+          hypothetical</span>
+      </div>
+      {/* three narrow columns: no `.table-scroll` wrapper, whose 460 px
+          minimum is meant for wide tables and clipped this one in the drawer */}
+      <table className="grid">
+        <thead>
+          <tr><th></th><th>Measured rock</th><th>ISR-grade ore</th></tr>
+        </thead>
+        <tbody>
+          {rows.map(([label, base, hypo]) => (
+            <tr key={label}>
+              <td>{label}</td><td className="mono">{base}</td><td className="mono">{hypo}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="muted small" style={{ marginTop: 6 }}>
+        {h.note} Only the ore-zone K changes (to {fmt(h.K_scenario_m_day, 1)} m/day, the
+        IAEA&apos;s “advantageous” level; below ~{fmt(h.K_unfeasible_below_m_day, 1)} m/day
+        it calls ISL usually unfeasible). {h.vertical?.note}{" "}
+        <span className="mono">{h.citation}</span>
+      </div>
+    </>
+  );
+}
+
 export default function RunResult({
   r, extrapolation = [], compact = false, showVertical = true,
 }: { r: any; extrapolation?: string[]; compact?: boolean; showVertical?: boolean }) {
@@ -72,6 +199,8 @@ export default function RunResult({
   const ml = r?.metrics?.ml;
   const unit = SPECIES_UNIT[r?.species] ?? "";
   const exc = r?.isr_excursion ?? r?.excursion;
+  // live / preview runs carry it at the top level, stored runs inside `hydro`
+  const hypo = r?.hypotheticals?.isr_feasibility ?? r?.hydro?.hypotheticals?.isr_feasibility;
 
   return (
     <>
@@ -122,6 +251,7 @@ export default function RunResult({
                 value={fmt(an?.compliance_conc, 3)} unit={unit}
                 mlBand={band(ml?.compliance_conc)} mlStatus={r?.ml_status} />
       </div>
+      <BaselineNote r={r} />
 
       {/* Which engine is which — stated once, next to the numbers it governs. */}
       <div className="banner" style={{ marginTop: 8 }}>
@@ -208,6 +338,10 @@ export default function RunResult({
           )}
         </div>
       )}
+
+      {/* 2026-09-26: the second answer — a labelled hypothetical, after the
+          baseline's own caveats and before the vertical screen. */}
+      <IsrHypothetical h={hypo} unit={unit} compact={compact} />
 
       {/* R2: the shallow-aquifer screening, which the portal never showed.
           R10: `showVertical` exists because the REPORT rendered this twice —

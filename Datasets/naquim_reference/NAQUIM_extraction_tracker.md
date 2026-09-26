@@ -43,7 +43,7 @@ Sources (manual web research, 2026-07-07):
 | 3 | Deoghar Final , JH.pdf | 71 | p.4,5,6,7 | p.22,39,40,41 | p.30,39,41,48 | p.7,22,23,24,29,42 | pending |
 | 4 | Dhanbad, JH.pdf | 82 | p.4,5,6,25 | p.4,26,27,48 | p.25,36,50 | p.26,27,28,35 | pending |
 | 5 | Dhanbad.pdf | 44 | p.27,30,36,39 | p.27,30,36,39 | p.– | p.21,27,42 | pending |
-| 6 | E-Singhbhum, Saraikela-Kharaswan & W-Singhum(Parts)_jharkhand.pdf | – | – | – | – | – | **broken PDF → replaced by web-sourced values above (see EXTRACTED VALUES) + `cgwb_east_singhbhum_profile.pdf`** |
+| 6 | E-Singhbhum, Saraikela-Kharaswan & W-Singhum(Parts)_jharkhand.pdf | 50 | p.10-11,30 | p.30,33-34 | p.10,45 | p.29-34,49-50 | **2026-09-25: recovered.** The local copy was a 404 page; CGWB has removed the report, but the Internet Archive kept it (2022-07-25). Saved as `cgwb_naquim_e_singhbhum_saraikela_w_singhbhum_parts.pdf`. Its borehole tables are extracted to `Datasets/cgwb_exploratory_wells_singhbhum*.csv` (data_prep/cgwb_boreholes.py). The Saraikela booklet is saved as `cgwb_saraikela_kharsawan_profile.pdf`; much of its text is copied from Godda's booklet. |
 | 7 | Final  NAQUIM-Godda District, Jharkhand.pdf | 82 | p.4,5,6,7 | p.4,22,30,32 | p.51,57 | p.7,32,39,48,57,58 | pending |
 | 8 | Final NAQUIM-Dumka district, Jharkhand 2018-19.pdf | 130 | p.4,5,6,7 | p.4,5,7,8 | p.26,33,61,65,74 | p.29,31,32,43,60 | pending |
 | 9 | Final NAQUIM-Jamtara district, Jharkhand 2018-19.pdf | 78 | p.4,5,6,21 | p.4,26,27,36 | p.26,44,54,62 | p.27,29,35,44,46,47 | pending |
@@ -184,6 +184,6 @@ Sources (manual web research, 2026-07-07):
 - p.43: "and width of fractures decreases with depth"
 
 ## Known gaps
-- **E-Singhbhum / Saraikela-Kharsawan / W-Singhbhum(parts)** — the file is a CGWB 404 HTML page, NOT a PDF. Re-download needed (ore-belt district — highest priority). `W SINGHBHUM FINAL JH.pdf` partially covers the same craton geology meanwhile.
+- ~~**E-Singhbhum / Saraikela-Kharsawan / W-Singhbhum(parts)** — the file is a CGWB 404 HTML page, NOT a PDF.~~ **Closed 2026-09-25:** the report was recovered from the Internet Archive (row 6). CGWB's current Publications Warehouse lists 48 Jharkhand items, with no East Singhbhum or Saraikela-Kharsawan report among them.
 - Some of the 24 districts have no dedicated report here; several reports bundle multiple districts/blocks — map coverage before extraction.
 - Extracting the actual numbers into `Datasets/naquim_vertical.csv` (district, layer1_base_m lo/hi, fracture_depth_m lo/hi, aq2_wl_mbgl lo/hi, source page) is a Phase-2 task; this tracker records where to look.

@@ -1,20 +1,21 @@
 {
-  "version": 5,
+  "version": 6,
   "e1_geometry": true,
   "reproducibility": {
     "training_csv": "synthetic_training.csv",
-    "training_csv_sha256": "8ac61f2db8540c046748765ac00be59bf4112a8d5cef1dc3ffeeae088a6d22b4",
+    "training_csv_sha256": "f7add484e6e443f84bd577eaa46c50e839a32844f169e932e9c1cba7afcff7a8",
     "training_rows": 18000,
     "training_scenarios": 900,
     "bake_meta": {
-      "version": 5,
+      "version": 6,
       "n_scenarios": 900,
       "n_rows": 18000,
       "n_mc": 48,
+      "depth_decay_share": 0.5,
       "seed": 42,
       "mc_seed": 43,
       "generator": "ml_pipeline.synthetic.generate",
-      "git_sha": "8d2499d0df481ed2f2d74da984c4114815a1ef32",
+      "git_sha": "774fb58abe302e212af41c0677ee0f5709c1a49d",
       "beta_prior": [
         0.3,
         20.0
@@ -85,17 +86,17 @@
       ],
       "point_target": "excursion_probability",
       "regime_counts": {
-        "fractured": 9440,
-        "porous": 8560
+        "porous": 9020,
+        "fractured": 8980
       },
       "n_polygons": 23,
       "mean_pex_by_species": {
-        "radium_226_mbq_l": 0.003,
-        "sulfate_mg_l": 0.297,
-        "tds_mg_l": 0.402,
-        "uranium_ppb": 0.152
+        "radium_226_mbq_l": 0.001,
+        "sulfate_mg_l": 0.169,
+        "tds_mg_l": 0.232,
+        "uranium_ppb": 0.091
       },
-      "restoration_share": 0.5,
+      "restoration_share": 0.5244444444444445,
       "compliance_buffer_m": 100.0,
       "incremental_floor": 0.1,
       "bis_thresholds": {
@@ -105,8 +106,8 @@
         "radium_226_mbq_l": 1000.0
       }
     },
-    "trainer_git_sha": "8d2499d0df481ed2f2d74da984c4114815a1ef32",
-    "trained_at": "2026-09-21T07:41:38Z",
+    "trainer_git_sha": "774fb58abe302e212af41c0677ee0f5709c1a49d",
+    "trained_at": "2026-09-26T06:55:00Z",
     "xgb_params": {
       "n_estimators": 450,
       "max_depth": 5,
@@ -194,34 +195,34 @@
   ],
   "deltas": {
     "affected_area_ha": {
-      "fractured|radium_226_mbq_l": 0.57403,
-      "fractured|sulfate_mg_l": 1.01705,
-      "fractured|tds_mg_l": 1.46606,
-      "fractured|uranium_ppb": 0.23754,
-      "porous|radium_226_mbq_l": 0.5786,
-      "porous|sulfate_mg_l": 1.10573,
-      "porous|tds_mg_l": 1.29442,
-      "porous|uranium_ppb": 0.29035
+      "fractured|radium_226_mbq_l": 0.83506,
+      "fractured|sulfate_mg_l": 1.06955,
+      "fractured|tds_mg_l": 1.42473,
+      "fractured|uranium_ppb": 0.19934,
+      "porous|radium_226_mbq_l": 0.65923,
+      "porous|sulfate_mg_l": 0.96886,
+      "porous|tds_mg_l": 1.29875,
+      "porous|uranium_ppb": 0.21035
     },
     "max_migration_distance_m": {
-      "fractured|radium_226_mbq_l": 0.23263,
-      "fractured|sulfate_mg_l": 1.1173,
-      "fractured|tds_mg_l": 1.74105,
-      "fractured|uranium_ppb": 0.86174,
-      "porous|radium_226_mbq_l": 0.51784,
-      "porous|sulfate_mg_l": 1.86818,
-      "porous|tds_mg_l": 2.10978,
-      "porous|uranium_ppb": 0.99124
+      "fractured|radium_226_mbq_l": 0.12828,
+      "fractured|sulfate_mg_l": 1.05735,
+      "fractured|tds_mg_l": 1.52754,
+      "fractured|uranium_ppb": 0.77348,
+      "porous|radium_226_mbq_l": 0.42634,
+      "porous|sulfate_mg_l": 1.27109,
+      "porous|tds_mg_l": 1.74089,
+      "porous|uranium_ppb": 0.79281
     },
     "compliance_conc": {
-      "fractured|radium_226_mbq_l": 0.07564,
-      "fractured|sulfate_mg_l": 1.27418,
-      "fractured|tds_mg_l": 0.6949,
-      "fractured|uranium_ppb": 1.9276,
-      "porous|radium_226_mbq_l": 0.0426,
-      "porous|sulfate_mg_l": 1.29902,
-      "porous|tds_mg_l": 0.66096,
-      "porous|uranium_ppb": 2.04922
+      "fractured|radium_226_mbq_l": 0.05889,
+      "fractured|sulfate_mg_l": 0.90901,
+      "fractured|tds_mg_l": 0.44981,
+      "fractured|uranium_ppb": 0.62115,
+      "porous|radium_226_mbq_l": 0.03971,
+      "porous|sulfate_mg_l": 1.18371,
+      "porous|tds_mg_l": 0.47583,
+      "porous|uranium_ppb": 0.89319
     }
   },
   "monotone_maps": {
@@ -384,12 +385,12 @@
         0.025
       ],
       "retardation_Rd": [
-        1.3026203454753087,
-        20.639027022139526
+        1.3046743407999557,
+        20.97064254257636
       ],
       "K_m_day": [
-        0.0443875111561223,
-        10.55316685302084
+        0.0021269443802451,
+        9.839144706254563
       ]
     },
     "porous": {
@@ -399,11 +400,53 @@
       ],
       "retardation_Rd": [
         1.0,
-        50534.9178224406
+        10934.855430467403
       ],
       "K_m_day": [
-        0.0959191327647306,
-        29.710321417727474
+        0.00481936516688,
+        26.500431912293774
+      ]
+    }
+  },
+  "species_support": {
+    "radium_226_mbq_l": {
+      "source_conc_C0": [
+        12.061500244803424,
+        1705.7639985605774
+      ],
+      "background_conc_Cb": [
+        10.021201019188243,
+        22.976908768770567
+      ]
+    },
+    "sulfate_mg_l": {
+      "source_conc_C0": [
+        273.36823357151746,
+        2973.0802354735324
+      ],
+      "background_conc_Cb": [
+        2.0,
+        190.0
+      ]
+    },
+    "tds_mg_l": {
+      "source_conc_C0": [
+        1591.1065323332716,
+        5716.303432128131
+      ],
+      "background_conc_Cb": [
+        97.92,
+        1563.52
+      ]
+    },
+    "uranium_ppb": {
+      "source_conc_C0": [
+        9015.819944243667,
+        41496.76526632357
+      ],
+      "background_conc_Cb": [
+        0.0011972169096267,
+        25.265096243485274
       ]
     }
   },

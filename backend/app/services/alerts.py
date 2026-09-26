@@ -51,6 +51,47 @@ from app.services import alert_tiers as tiers
 #: `EXCURSION_THRESHOLDS`.
 
 
+#: How each species the engine can name as a first arrival is described to a
+#: resident. The salts are what arrives first from an injected solution; saying
+#: "contamination" without naming them would let a reader assume uranium.
+_ARRIVAL_WORDS = {
+    "tds_mg_l": "dissolved salts from the injected solution (total dissolved solids)",
+    "sulfate_mg_l": "sulfate from the injected solution",
+    "uranium_ppb": "uranium",
+    "radium_226_mbq_l": "radium-226",
+}
+
+
+def vertical_headline(v: Mapping[str, Any]) -> tuple[Optional[float], Optional[float],
+                                                     Optional[str]]:
+    """(years, probability, species) that the vertical alerts key on.
+
+    2026-09-25 (ml_pipeline LIMITATIONS.md 1f). The engine's upward pathway used
+    to move a water parcel, so `years_to_vertical_breakthrough` was the same for
+    every species. It now carries the run's OWN species through the rock's
+    matrix storage -- centuries for uranium at Jaduguda -- and reports
+    `first_arrival`: the earliest constituent whose source exceeds its
+    drinking-water limit, normally the injected salts, within years. Keying an
+    alert on the display species would silence every uranium advisory while the
+    salts from the same wellfield arrive first. Runs stored before the change
+    carry no `first_arrival`; their headline was the species-blind water time,
+    and they are read as exactly that (species None).
+    """
+    fa = v.get("first_arrival") or None
+    if fa and fa.get("years") is not None:
+        return (float(fa["years"]), fa.get("shallow_impact_probability"),
+                fa.get("species"))
+    yrs = v.get("years_to_vertical_breakthrough")
+    return (None if yrs is None else float(yrs),
+            v.get("shallow_impact_probability"), None)
+
+
+def arrival_words(species: Optional[str]) -> str:
+    """Resident-facing name for what arrives; the pre-2026-09-25 runs stay
+    'contamination' because their number did not belong to any species."""
+    return _ARRIVAL_WORDS.get(species or "", "contamination")
+
+
 class AlertService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -573,8 +614,7 @@ class AlertService:
                                          "injection would have begun.")})
                 continue
 
-            yrs = v.get("years_to_vertical_breakthrough")
-            prob = v.get("shallow_impact_probability")
+            yrs, prob, _arriving = vertical_headline(v)
             elapsed = (now - start).days / 365.2425
 
             state = {
@@ -670,8 +710,8 @@ class AlertService:
         """), {"pid": r["isr_point_id"], "aid": str(aq["id"]),
                "reach": reach_m})).mappings().all()
 
-        yrs = v.get("years_to_vertical_breakthrough")
-        prob = float(v.get("shallow_impact_probability") or 0.0)
+        yrs, prob, arriving = vertical_headline(v)
+        prob = float(prob or 0.0)
         tier, rule = tiers.modelled_tier("aquifer_breach_due")
         made = 0
         for b in blocks:
@@ -683,9 +723,9 @@ class AlertService:
                 f"recovery operation near {b['name']}.\n\n"
                 f"NO SUCH MINE EXISTS. None is planned. The screening asked what "
                 f"would happen if one operated, and it modelled that "
-                f"contamination would take about {float(yrs):.0f} years to rise "
-                f"from the ore zone into the shallow aquifer that supplies "
-                f"wells and handpumps.\n\n"
+                f"{arrival_words(arriving)} would take about {float(yrs):.0f} "
+                f"years to rise from the ore zone into the shallow aquifer that "
+                f"supplies wells and handpumps.\n\n"
                 f"Counting from {r['injection_start_date'].date().isoformat()}, "
                 f"the date recorded for when such an operation would have begun, "
                 f"{elapsed:.0f} years have now passed — more than the "
@@ -703,7 +743,8 @@ class AlertService:
             )
             explanation = tiers.explain_modelled(
                 kind="aquifer_breach_due", tier=tier, rule=rule,
-                block=b["name"], district=b["district"], species=r["species"],
+                block=b["name"], district=b["district"],
+                species=arriving or r["species"],
                 overlap_ha=None, footprint_ha=None,
                 horizon_years=(r["request"] or {}).get("time_years")
                 if isinstance(r["request"], dict) else None,
@@ -900,7 +941,7 @@ class AlertService:
                              "saved before R11 did not keep one — that is a gap "
                              "in the record, not a finding of no pathway.")}
 
-        yrs = v.get("years_to_vertical_breakthrough")
+        yrs, prob, arriving = vertical_headline(v)
         horizon = float((run.request or {}).get("time_years") or 0) or None
         if yrs is None:
             return {"alerts": 0, "reason": "no_breakthrough",
@@ -1009,7 +1050,8 @@ class AlertService:
             body = (
                 f"A groundwater screening for a hypothetical uranium in-situ "
                 f"recovery operation about {dist} km away estimates that "
-                f"lixiviant could reach the shallow aquifer within {yrs:g} "
+                f"{arrival_words(arriving) if arriving else 'lixiviant'} could "
+                f"reach the shallow aquifer within {yrs:g} "
                 f"years. {name} block draws on the same shallow aquifer "
                 f"({row['name']}).\n\n"
                 f"This is not a finding that your water is affected, and "
@@ -1027,7 +1069,8 @@ class AlertService:
 
             explanation = tiers.explain_modelled(
                 kind="aquifer_pathway", tier=tier, rule=rule,
-                block=name, district=b["district"], species=advisory.species,
+                block=name, district=b["district"],
+                species=arriving or advisory.species,
                 overlap_ha=None, footprint_ha=advisory.footprint_ha,
                 horizon_years=ctx.get("horizon_years", advisory.time_years),
                 engine=ctx.get("engine"), metrics=ctx.get("metrics"),
@@ -1035,7 +1078,7 @@ class AlertService:
                 data_confidence=ctx.get("data_confidence"),
                 beta_band=ctx.get("beta_band"),
                 years_to_breakthrough=float(yrs),
-                breakthrough_probability=v.get("shallow_impact_probability"),
+                breakthrough_probability=prob,
                 reach_km=reach_km, what_it_means=advisory.what_it_means)
             res = await self.db.execute(text("""
                 INSERT INTO alerts (kind, block_id, advisory_id, headline, body,

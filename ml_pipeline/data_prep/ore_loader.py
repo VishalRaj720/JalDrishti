@@ -35,21 +35,94 @@ ORE_CSV = REPO_ROOT / "Datasets" / "Jharkhand Ore" / "jharkhand_uranium_deposits
 
 _DEG_TO_KM = 111.0
 
-# Polish #2: representative ISR-target depth (m) per deposit -- so a deposit pin
-# defaults the ore-depth slider to that deposit's real mineralisation depth rather
-# than a flat 150 m. Grounded in mining type: Banduhurang is the country's first
-# open-PIT U mine (shallow); Mohuldih's ore is documented over ~250 m vertical;
-# the rest are deep underground mines in the E-Singhbhum fracture window (45-260 m).
+# DOCUMENTED ORE-DEPTH RANGE per deposit (2026-09-26, LIMITATIONS 1k). What the
+# operator's own documents say about how deep the ore is -- the grounded part.
+# The single number below it (DEPOSIT_ORE_DEPTH_M) is only the slider seed.
+# Sources are UCIL's public technical notes and 2017 pre-feasibility reports
+# (copies in Datasets/ucil_reference/); "secondary" marks the one deposit with no
+# operator document found.
+DEPOSIT_ORE_DEPTH_RANGE_M = {
+    "Jaduguda": {
+        "top_m": 0.0, "bottom_m": 900.0, "confidence": "primary",
+        "basis": ("two mineable lodes 'extend as thin veins from surface ... "
+                  "along strike (600m length) and dip (900m depth)'; shaft to "
+                  "640 m, deepened to 905 m"),
+        "source": ("Sarangi & Singh (UCIL), 'Vein type uranium mineralisation in "
+                   "Jaduguda uranium deposit, Singhbhum, India' (extended abstract); "
+                   "UCIL (2004) 'Uranium mining in Jharkhand - new ventures', "
+                   "JHMIN-04, Dhanbad")},
+    "Bhatin": {
+        "top_m": 0.0, "bottom_m": 135.0, "confidence": "primary",
+        "basis": ("entry by an adit at ground elevation; winzes to 135 m below "
+                  "surface; levels every 28 m to 84 m"),
+        "source": "UCIL (2004) 'Uranium mining in Jharkhand - new ventures', JHMIN-04"},
+    "Narwapahar": {
+        "top_m": 100.0, "bottom_m": 380.0, "confidence": "primary",
+        "basis": ("'Material above the 100 mRL was considered to be thoroughly "
+                  "oxidized and therefore excluded' from reserves (levels are named "
+                  "by depth in this report); mine developed to 380 m (6th level), a "
+                  "700 m shaft proposed"),
+        "source": ("UCIL, Pre-Feasibility Report, Narwapahar Mine expansion to 0.6 "
+                   "MTPA (2017), environmentclearance.nic.in")},
+    "Turamdih": {
+        "top_m": 50.0, "bottom_m": 200.0, "confidence": "primary",
+        "basis": ("'The economic grade of uranium mineralisation at Turamdih, in "
+                  "general starts at a depth of 50 m and extends upto 200 m'"),
+        "source": "UCIL, 'Some observations on uranium mineralisation at Turamdih'"},
+    "Banduhurang": {
+        "top_m": 0.0, "bottom_m": 164.0, "confidence": "primary",
+        "basis": ("open pit in the ore-bearing ridge; 'maximum depth of pit from "
+                  "surface will be about 164m'"),
+        "source": "UCIL (2004) 'Uranium mining in Jharkhand - new ventures', JHMIN-04"},
+    "Mohuldih": {
+        "top_m": 0.0, "bottom_m": 250.0, "confidence": "secondary",
+        "basis": ("'mineralisation is established over 1 km strike length and "
+                  "within a vertical depth of 250 m'"),
+        "source": ("DSPMU Ranchi teaching note 'Uranium deposits of Jharkhand' "
+                   "(quoted by a search index; the page is offline); no UCIL "
+                   "document with a depth was found")},
+    "Bagjata": {
+        "top_m": 0.0, "bottom_m": 270.0, "confidence": "primary",
+        "basis": ("reserves identified 'upto a depth of 270m'; exploratory mine "
+                  "developed to 100 m by two inclines following the orebody, levels "
+                  "at 60 and 100 m; footwall lode proven down-dip to 600 m"),
+        "source": ("UCIL, 'Radiological impact assessment in Bagjata uranium "
+                   "deposit'; UCIL (2004) 'Uranium mining in Jharkhand - new ventures'")},
+}
+
+# Polish #2: representative ISR-target depth (m) per deposit -- the slider seed.
+# 2026-09-26: every seed now lies INSIDE its documented range above (tested).
+# Five already did and are unchanged -- they remain a representative choice, not
+# a measurement, and are registered as such (P.UNGROUNDED_PARAMETERS
+# "DEPOSIT_ORE_DEPTH_M"). Two were outside or misread, and move to the midpoint
+# of the documented range inside the model's 50-600 m domain, to the form's 5 m
+# step:
+#   Bhatin    150 -> 90   (documented 0-135 m; 150 was below the ore)
+#   Mohuldih  250 -> 150  (the source says "within a vertical depth of 250 m";
+#                          250 was the bottom of the ore, not its depth)
 # User-overridable (it only seeds the slider). Off-deposit pins keep 150.
 DEPOSIT_ORE_DEPTH_M = {
-    "Jaduguda": 180.0, "Bhatin": 150.0, "Narwapahar": 150.0, "Turamdih": 140.0,
-    "Banduhurang": 60.0, "Mohuldih": 250.0, "Bagjata": 160.0,
+    "Jaduguda": 180.0, "Bhatin": 90.0, "Narwapahar": 150.0, "Turamdih": 140.0,
+    "Banduhurang": 60.0, "Mohuldih": 150.0, "Bagjata": 160.0,
 }
 
 
 def deposit_ore_depth(name: str | None) -> float | None:
     """Representative ISR-target depth (m) for a surveyed deposit, or None."""
     return DEPOSIT_ORE_DEPTH_M.get((name or "").strip())
+
+
+def deposit_ore_depth_range(name: str | None) -> dict | None:
+    """The documented ore-depth range for a surveyed deposit, with its source,
+    and the part of it inside the model's ore-depth domain; None elsewhere."""
+    rec = DEPOSIT_ORE_DEPTH_RANGE_M.get((name or "").strip())
+    if rec is None:
+        return None
+    lo, hi = P.VERTICAL["ore_depth_range_m"]
+    return {**rec, "deposit": (name or "").strip(),
+            "seed_m": DEPOSIT_ORE_DEPTH_M.get((name or "").strip()),
+            "model_domain_m": [lo, hi],
+            "within_model_m": [max(rec["top_m"], lo), min(rec["bottom_m"], hi)]}
 
 
 @functools.lru_cache(maxsize=1)

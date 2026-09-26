@@ -37,7 +37,8 @@ import { FloatingPanel, useResizableWidth } from "../components/panels";
 import { attachBasemaps, BASEMAP_LABEL, type BasemapKey } from "../map/basemaps";
 import { lineOpacity, maskOpacity, OVERLAY, tune } from "../map/palette";
 import {
-  createPlumePanes, drawPlume, SPECIES_NAME, storedRunToPlume,
+  createPlumePanes, drawPlume, hasRaster, SPECIES_NAME, storedRunToPlume,
+  type PlumeView,
 } from "../map/plume";
 import { addScaleControl } from "../map/scale";
 import { useRail } from "../map/useRail";
@@ -48,6 +49,7 @@ import {
 import RegisterForm from "../console/RegisterForm";
 import SiteEditForm from "../console/SiteEditForm";
 import RunResult from "../console/RunResult";
+import SiteBlockLauncher from "../console/SiteBlockLauncher";
 import TimelineControl, { useRunTimeline } from "../console/TimelineControl";
 import type { TimelineFrame } from "../api/client";
 import SweepChart, { type Sweep } from "../console/SweepChart";
@@ -56,6 +58,23 @@ import PublishFromPreview from "../console/PublishFromPreview";
 import LifecycleChart, { LifecycleNarrative } from "../console/LifecycleChart";
 
 const CENTRE: [number, number] = [23.6, 85.3];
+
+/** Where a pin's uranium / radium background came from, in a few words: the
+ *  mining-area survey that dominates the blend, or the far-field anchor. */
+function backgroundSource(b: any): string {
+  const d = b?.dominant;
+  if (!d) return "–";
+  if (d.area === "anchor") {
+    const src = String(d.citation ?? "");
+    if (b?.anchor?.borrowed_outside_survey_districts) return "regional survey, borrowed here";
+    if (src.startsWith("nearest CGWB")) return "nearest CGWB well";
+    if (src.startsWith("CGWB statewide")) return "CGWB statewide median";
+    return "regional survey";
+  }
+  const m = /^([^,(&]+?)\s*[,(&].*?\((\d{4})\)/.exec(String(d.citation ?? ""));
+  const who = m ? `${m[1].trim()} et al. ${m[2]}` : "BARC";
+  return `${String(d.area).replace(/_/g, " ")} survey, ${who}`;
+}
 
 export default function Console() {
   const { me } = useAuth();
@@ -123,6 +142,9 @@ export default function Console() {
   const [species, setSpecies] = useState("uranium_ppb");
   const [liveYears, setLiveYears] = useState(10);
   const [showBands, setShowBands] = useState(true);
+  // What the plume paints (2026-09-25): the continuous field by default, since
+  // flat contour fills alone read as "a block placed on the map".
+  const [plumeView, setPlumeView] = useState<PlumeView>("field");
   const [live, setLive] = useState<LiveRun | null>(null);
 
   // Stored-run controls (site mode). These two, and only these two, are what a
@@ -614,6 +636,9 @@ export default function Console() {
       ml_envelope: null,
       plume: {
         ...storedPlume.plume,
+        // the raster belongs to the run's horizon, like the ML envelope; a
+        // frame at year 3 must not be painted with year 20's field
+        raster: null,
         contours: [{ level: storedPlume.threshold, is_bis: true, polygons: frame.contours ?? [] }],
         source_zone: storedPlume.plume?.source_zone
           ? { ...storedPlume.plume.source_zone, polygon: frame.source_zone ?? null,
@@ -623,17 +648,19 @@ export default function Console() {
     };
   }, [frame, storedPlume]);
 
+  // One renderer, three sources: an unregistered pin, an unstored preview,
+  // and a stored run. They must never look different from each other, because
+  // a visual difference would read as a physics difference.
+  const shownPlume = mode === "pin" ? live
+    : mode === "site" ? (showStored ? (framePlume ?? storedPlume) : previewPlume)
+    : null;
+
   useEffect(() => {
     const g = plumeGroup.current;
     if (!g) return;
-    // One renderer, three sources: an unregistered pin, an unstored preview,
-    // and a stored run. They must never look different from each other, because
-    // a visual difference would read as a physics difference.
-    const r = mode === "pin" ? live
-      : mode === "site" ? (showStored ? (framePlume ?? storedPlume) : previewPlume)
-      : null;
+    const r = shownPlume;
     if (!r) { g.clearLayers(); lastFitted.current = null; return; }
-    drawPlume(g, r, framePlume ? false : showBands);
+    drawPlume(g, r, framePlume ? false : showBands, plumeView);
 
     // Bring the result into view the FIRST time each result is drawn. A
     // typical footprint is a few hectares — a few hundred metres across — and
@@ -646,10 +673,15 @@ export default function Console() {
     if (m && r !== lastFitted.current) {
       lastFitted.current = r;
       const b = L.latLngBounds([]);
-      g.eachLayer((l: any) => { if (typeof l.getBounds === "function") b.extend(l.getBounds()); });
+      // Fit the drawn geometry, not the raster: the raster's box is sized to
+      // the farthest-reaching Monte-Carlo draw, and fitting it would open every
+      // run zoomed out to the P90 tail with the plume itself a few pixels wide.
+      g.eachLayer((l: any) => {
+        if (typeof l.getBounds === "function" && !(l instanceof L.ImageOverlay)) b.extend(l.getBounds());
+      });
       if (b.isValid()) m.fitBounds(b.pad(0.5), { maxZoom: 15 });
     }
-  }, [mode, live, storedPlume, previewPlume, framePlume, showStored, showBands]);
+  }, [mode, live, storedPlume, previewPlume, framePlume, showStored, showBands, plumeView]);
 
   // The direction the plume travels, drawn on the map. The engine has always
   // returned `azimuth_deg`; the portal showed it as a number for an
@@ -868,8 +900,42 @@ export default function Console() {
           {(live || storedPlume) && (
             <>
               <div className="legend-hr" />
-              <div className="legend-row"><span className="sw" style={{ background: "#b71c1c" }} />
-                Concentration — <b>darker = higher</b></div>
+              <div className="seg seg-sm" style={{ marginBottom: 6 }} role="group"
+                   aria-label="What the plume layer shows">
+                {([["field", "Concentration"], ["chance", "Chance over limit"],
+                   ["contours", "Contours"]] as [PlumeView, string][]).map(([v, label]) => {
+                  const ok = hasRaster(shownPlume, v);
+                  return (
+                    <button key={v} className={plumeView === v ? "active" : ""}
+                            disabled={!ok}
+                            title={ok ? undefined
+                              : "This result carries no raster — stored before 2026-09-25, "
+                                + "a timeline frame, or nothing above the display floor."}
+                            onClick={() => setPlumeView(v)}>{label}</button>
+                  );
+                })}
+              </div>
+              {plumeView === "chance" && hasRaster(shownPlume, "chance") ? (
+                <div className="legend-row">
+                  <span className="sw" style={{ background: "linear-gradient(90deg, #ede9fe, #6d28d9, #2e1065)" }} />
+                  <span>Share of the engine's{" "}
+                    {shownPlume?.plume?.raster?.exceedance?.n_draws ?? "Monte-Carlo"} plausible
+                    parameter sets in which the drinking-water limit is exceeded here —
+                    <b> darker = more of them</b>.{" "}
+                    {shownPlume?.plume?.raster?.exceedance?.direction_sd_deg != null
+                      ? <>Flow direction varied by ±{Math.round(
+                          shownPlume.plume.raster.exceedance.direction_sd_deg)}° (1σ, from
+                          the fit of CGWB water levels — a minimum; local terrain can
+                          bend it more).</>
+                      : <>Flow direction is not varied here (no well statistics, or a
+                          bearing you set).</>}</span>
+                </div>
+              ) : (
+                <div className="legend-row"><span className="sw" style={{ background: "#b71c1c" }} />
+                  Concentration{plumeView === "field" && hasRaster(shownPlume, "field")
+                    ? <> (log scale, fades out at the display floor)</> : null} —{" "}
+                  <b>darker = higher</b></div>
+              )}
               <div className="legend-row"><span className="sw line" style={{ background: "#2bb3ff" }} />
                 Monitoring ring (dotted)</div>
               {showBands && (
@@ -925,6 +991,35 @@ export default function Console() {
                 <dt>Flow azimuth</dt><dd>{fmt(pinInfo.data.flow?.azimuth_deg, 1)}°</dd>
                 <dt>Gradient</dt><dd>{fmt(pinInfo.data.flow?.gradient_i, 5)}</dd>
                 <dt>Nearest well</dt><dd>{fmt(pinInfo.data.data_confidence?.nearest_well_km, 1)} km</dd>
+                {/* 2026-09-26: the grounded numbers a run here rests on */}
+                {pinInfo.data.shear_zone && (
+                  <><dt>Shear-zone T</dt>
+                    <dd title={pinInfo.data.shear_zone.citation}>
+                      {fmt(pinInfo.data.shear_zone.T_m2day, 0)} m²/day
+                      <span className="muted small"> · Kudada pumping test, the measured maximum</span>
+                    </dd></>
+                )}
+                {pinInfo.data.ore_depth_range && (
+                  <><dt>Ore depth</dt>
+                    <dd title={pinInfo.data.ore_depth_range.source}>
+                      {fmt(pinInfo.data.ore_depth_range.top_m, 0)}–{fmt(pinInfo.data.ore_depth_range.bottom_m, 0)} m
+                      <span className="muted small"> documented
+                        {pinInfo.data.ore_depth_range.confidence === "secondary" ? " (secondary source)" : " (UCIL)"}
+                      </span>
+                    </dd></>
+                )}
+                {pinInfo.data.backgrounds && (
+                  <><dt>Background U</dt>
+                    <dd title={pinInfo.data.backgrounds.uranium_ppb?.dominant?.citation}>
+                      {fmt(pinInfo.data.backgrounds.uranium_ppb?.value, 2)} µg/L
+                      <span className="muted small"> · {backgroundSource(pinInfo.data.backgrounds.uranium_ppb)}</span>
+                    </dd>
+                    <dt>Background Ra-226</dt>
+                    <dd title={pinInfo.data.backgrounds.radium_226_mbq_l?.dominant?.citation}>
+                      {fmt(pinInfo.data.backgrounds.radium_226_mbq_l?.value, 1)} mBq/L
+                      <span className="muted small"> · {backgroundSource(pinInfo.data.backgrounds.radium_226_mbq_l)}</span>
+                    </dd></>
+                )}
               </dl>
               <div className="muted small">
                 Resolved by the engine from its own datasets — not from this portal's
@@ -1000,6 +1095,7 @@ export default function Console() {
 
           {pinInfo.data && (
             <RegisterForm lon={pin.lon} lat={pin.lat}
+                          oreDepth={pinInfo.data.ore_depth_range ?? null}
                           onRegistered={(s) => openSite(s)} />
           )}
         </aside>
@@ -1178,6 +1274,7 @@ This also destroys ${n} stored run(s) `
                 <strong>Unsaved run.</strong> {preview.persistence_note}
               </div>
               <RunResult r={preview} extrapolation={preview.extrapolation ?? []} />
+              <SiteBlockLauncher run={preview} site={site} defaultYear={runYears} />
             </>
           )}
 
@@ -1252,6 +1349,8 @@ This also destroys ${n} stored run(s) `
           {activeRun?.status === "completed" && storedPlume && (
             <>
               <RunResult r={storedPlume} extrapolation={activeRun.extrapolation ?? []} />
+              <SiteBlockLauncher run={activeRun} site={site}
+                                 defaultYear={Number(activeRun.request?.time_years ?? runYears)} />
               <div className="card-title" style={{ marginTop: 12 }}>Over time</div>
               {timeline.isLoading && <Loading label="Loading frames…" />}
               <TimelineControl tl={timeline.data} onFrame={onFrame} />

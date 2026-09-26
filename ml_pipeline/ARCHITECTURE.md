@@ -504,12 +504,32 @@ weathered aquifer (Layer 1, 0–20 m, where hand-pump wells draw)? Three
 pathways are combined into a probability:
 
 1. **Advective leakage** through the confining rock: vertical Darcy velocity
-   `v_z = K_v·i_up/φ` with `K_v = (K_v/K_h ratio)·K_h` (fractured rock:
-   ~0.05–0.1; intact: ~0.01), giving
-   `t_breakthrough = separation / v_z` — compared against the evaluation time.
+   `v_z = K_v·i_up/φ` with `K_v = (K_v/K_h)·K_path`. Since 2026-09-25
+   (`P.VERTICAL_PATH`, fidelity row 3.11):
+   - `K_v/K_h` for fractured rock is **0.12**, the geometric mean of five
+     pumping-test values from the Maheshwaram granite (Maréchal et al. 2004);
+     the measured range 0.034–0.61 is re-evaluated and reported on every run
+     (`anisotropy_band`). Porous keeps its screening value 0.008.
+   - `K_path` is the **harmonic mean** of the NAQUIM K(z) law over the column
+     from the ore top to the shallow-aquifer base — series flow — not K at ore
+     depth, the tightest point on the path.
+   - The front is a **solute**, not a water parcel: `z(t) = v_z·I(t)` on the
+     same Goltz–Roberts dual-porosity clock as the horizontal front, with the
+     confining rock's own `β_eff = β·R_m` for the species. Uranium therefore
+     climbs ~250× slower than the water carrying it; TDS ~4×.
+     `water_arrival_years` is reported beside the solute time.
+   - The lixiviant indicators (chloride, TDS, sulfate) are screened on the same
+     geometry, and `first_arrival` names the earliest constituent whose source
+     exceeds its drinking-water limit — normally the salts, years ahead of
+     uranium. Built in `dashboard/vertical_path.py`, one geometry builder for
+     every species.
 2. **Vertical dispersion** from the plume (α_V ≪ α_L).
 3. **Wellbore failure** (a leaky abandoned borehole short-circuits the layers)
-   — a fixed probability from the literature.
+   — a fixed screening base rate (0.05). NUREG/CR-6733 establishes that the
+   vertical-excursion risk is non-trivial but gives no frequency, so this is a
+   registered scenario assumption, not a published failure rate. It is the one
+   pathway that is **not** retarded: an open borehole has no rock matrix, which
+   is why it is how uranium itself could reach the shallow aquifer quickly.
 
 The separation uses **per-district NAQUIM/CGWB data** (real fracture-zone
 depths, e.g. East Singhbhum's productive fractures at 20–258 m) and the real
@@ -711,35 +731,35 @@ artifacts by discipline; it has to be mechanical.
 
 **These numbers are GENERATED from `ml/artifacts/metrics.json` by `python -m ml_pipeline.tools.sync_docs`. Do not hand-edit this block — edit the model, retrain, and re-run the generator.**
 
-Model card version 5 · 40 features · 3 band targets · species: radium_226_mbq_l, sulfate_mg_l, tds_mg_l, uranium_ppb
+Model card version 6 · 40 features · 3 band targets · species: radium_226_mbq_l, sulfate_mg_l, tds_mg_l, uranium_ppb
 
 | target | R² (P50, back-transformed) | R² (log) | scenario coverage | rows coverage |
 |---|---|---|---|---|
-| `affected_area_ha` | 0.7825 | 0.8926 | 0.8633 | 0.9553 |
-| `max_migration_distance_m` | 0.5043 | 0.9255 | 0.8783 | 0.9517 |
-| `compliance_conc` | -4.4826 | 0.9467 | 0.8656 | 0.9483 |
-| `excursion_probability` | 0.9146 | — | — | — |
+| `affected_area_ha` | 0.7522 | 0.8922 | 0.8687 | 0.9577 |
+| `max_migration_distance_m` | 0.3774 | 0.9298 | 0.8653 | 0.9471 |
+| `compliance_conc` | -0.2674 | 0.9684 | 0.8572 | 0.9346 |
+| `excursion_probability` | 0.9134 | — | — | — |
 
 **Per-species R² (log space).** The pooled back-transformed figure mixes ppb, mg/L and mBq/L, so its denominator depends on the species *mix* rather than on model quality — judge on these.
 
 | target | radium_226_mbq_l | sulfate_mg_l | tds_mg_l | uranium_ppb |
 |---|---|---|---|---|
-| `affected_area_ha` | 0.892 | 0.789 | 0.820 | 0.943 |
-| `max_migration_distance_m` | **0.500** | 0.878 | 0.884 | 0.930 |
-| `compliance_conc` | **0.235** | 0.917 | 0.962 | 0.847 |
+| `affected_area_ha` | 0.890 | 0.797 | 0.814 | 0.957 |
+| `max_migration_distance_m` | **0.412** | 0.907 | 0.898 | 0.945 |
+| `compliance_conc` | 0.746 | 0.909 | 0.972 | 0.909 |
 
 **Acceptance gates.** Per-species R²(log) ≥ 0.60; scenario coverage ≥ 0.80.
 
 - Coverage: all targets pass.
-- Per-species R²(log): **FAILS on 2 cell(s)** — `max_migration_distance_m` / radium_226_mbq_l = 0.500; `compliance_conc` / radium_226_mbq_l = 0.235. Reported as a miss, not reframed. The conformal bands on those cells still cover (see the coverage columns), and the ANALYTICAL engine serves the authoritative central value, so the failure is in the surrogate's point estimate, not in the uncertainty guarantee.
+- Per-species R²(log): **FAILS on 1 cell(s)** — `max_migration_distance_m` / radium_226_mbq_l = 0.412. Reported as a miss, not reframed. The conformal bands on those cells still cover (see the coverage columns), and the ANALYTICAL engine serves the authoritative central value, so the failure is in the surrogate's point estimate, not in the uncertainty guarantee.
 
 **Field-resampled coverage** (the serving-distribution gate mandated by `E1_geometry_design.md` §6 gate 5): 120 scenarios pinned to the real flow/strike field, held out from training.
 
 | target | scenario coverage | rows | verdict |
 |---|---|---|---|
-| `affected_area_ha` | 0.8852 | 0.9651 | PASS |
-| `max_migration_distance_m` | 0.8747 | 0.9491 | PASS |
-| `compliance_conc` | 0.8812 | 0.9496 | PASS |
+| `affected_area_ha` | 0.9000 | 0.9729 | PASS |
+| `max_migration_distance_m` | 0.9208 | 0.9749 | PASS |
+| `compliance_conc` | 0.9021 | 0.9629 | PASS |
 
 <!-- END GENERATED: metrics -->
 
@@ -889,19 +909,25 @@ What happens when you drop a pin at Jaduguda and press *Run*:
 2. **Boundary gate**: outside Jharkhand → 422 (predictions elsewhere would be
    fabricated — the datasets end at the border).
 3. **`resolve_inputs`**: pin → aquifer polygon (K, φ, thickness, regime) →
-   nearest water-quality well (backgrounds) → ore-zone mask (uranium C0 exists
-   only on deposits/belt; grade-scaled by UDEPO; suppressed elsewhere) →
-   Singhbhum shear-zone K override (fractured deposit pins are far more
-   transmissive than the generic schist polygon) → flow field (default azimuth
-   + gradient) → strike field (anisotropy) → Kd defaults from the same ranges
-   training sampled.
+   backgrounds (nearest CGWB well; uranium and radium blended from the BARC
+   mining-area surveys, `data_prep/groundwater_baselines.py`, the same function
+   the generator calls) → ore-zone mask (uranium C0 exists only on
+   deposits/belt; grade-scaled by UDEPO; suppressed elsewhere) → Singhbhum
+   shear-zone K (the **measured-maximum baseline**: Kudada's 19 m²/day,
+   converted so the K(z) law returns it over the tested interval — tighter than
+   the generic schist polygon, LIMITATIONS §1k) → K(z) decay to the ore depth →
+   the IAEA ISR-feasibility check on that K (`hydro.isr_feasibility`) → flow
+   field (default azimuth + gradient) → strike field (anisotropy) → Kd defaults
+   from the same ranges training sampled.
 4. **`envelope_violations`**: every input checked against the trained support —
    anything outside is listed in `extrapolation` (the ML bands are unvalidated
    there; the analytical engine still serves). Three sources, because the
    deployed model card does not cover all of them:
    the operational sliders from the card's `training_envelope`; the resolved
    hydrogeology from its per-regime `hydro_support`; and `source_conc_C0` /
-   `background_conc_Cb` per species from `P.TRAINED_SPECIES_SUPPORT`.
+   `background_conc_Cb` per species from the card's `species_support` (recorded
+   by the trainer since v6, 2026-09-26), falling back to
+   `P.TRAINED_SPECIES_SUPPORT`.
    Those last two had **no card entry at all**, so until 2026-08-12 the lookup
    fell through to `(-inf, inf)` and they were never checked — a baseline
    outside trained support extrapolated with the 80 % band still printed. The
@@ -915,6 +941,12 @@ What happens when you drop a pin at Jaduguda and press *Run*:
 7. **Context blocks**: vertical screening (per-district NAQUIM), river
    crossing (`plume_river_discharge` on the BIS contour), far-field note,
    restoration diagnostic (elapsed-credited), λ radial flag, drift record.
+7b. **The second answer** (2026-09-26): `hypotheticals.isr_feasibility` — the
+   same run, analytical engine only, with the ore-zone K raised to the IAEA's
+   ~1 m/day ISR working level (`P.ISR_FEASIBILITY`). Labelled hypothetical,
+   skipped for metrics-only callers, never read by anything that alerts. The
+   confining column keeps its measured K, so the vertical answer is unchanged
+   and the block shows it computed, not assumed.
 8. **Frontend renders**: contour polygons + compliance ring + ML envelope on
    the map; metric cards; depth schematic with the district fracture band.
 
@@ -927,7 +959,8 @@ What happens when you drop a pin at Jaduguda and press *Run*:
 | `test_physics_laws.py` | The monotone sign table against the *labels* (raw operating-point sweeps): K↑⇒bigger, bleed↑⇒smaller, Q_in law at fixed Q_net, front phases, retarded clock, Tang, restoration reduces impact. |
 | `test_restoration_continuity.py` | The QA F-1/F-2 fixes: elapsed-credit law, no step at rest = t−op, monotone non-increase, rest→0⁺ continuity, mid-sweep credit, causality (planned future irrelevant), realized-fraction feature. |
 | `test_polish.py` | Plume×river crossing (incl. invalid-ring healing), per-deposit ore depths, disc-flush half-life law. |
-| `test_shear_transmissivity.py` | D5 shear-zone K override on/off. |
+| `test_shear_transmissivity.py` | D5 shear-zone K override on/off; the reference K returns the measured T over the tested interval. |
+| `test_grounded_baselines.py` | The 2026-09-26 grounding pass: survey backgrounds (one served row per area, continuity, generator = serve), the measured-maximum T (it is the placed host-rock maximum; the mine discharge bounds it), the ISR-feasibility hypothetical (moves only the ore-zone K, never alerts, labelled), and every deposit's ore-depth seed inside its documented range. |
 | `test_strike_field.py` | Axial statistics, anisotropy-from-V anchoring. |
 | `test_flow_field.py` | D1 gradients/azimuths sane, divide handling. |
 | `test_ore_mask.py` / `test_ore_grades.py` | Deposit/belt/none C0 ordering, grade clipping. |
@@ -963,7 +996,7 @@ This section exists because the project's rule is *critique your own tool*.
 | **First-order (infinite-sink) attenuation** for uranium redox trapping (§4.12) — real reducing capacity is finite and spatially variable | Very-long-horizon attenuation may be overstated where capacity is exhausted; understated where fresh. | Mitigated by sampling k over [0.05, 0.70]/yr into the bands and keeping the mode well below the intact-rock field value. Sulfate/TDS carry no decay at all (fully conservative). |
 | **Plug-flow travel-time decay** (τ = x/v_c) rather than the full decay-modified Domenico front | Slightly simplified front shape near the toe. | Standard screening approximation; error is second-order vs the k uncertainty itself. |
 | **Front held (v=0) during restoration** instead of reversed | Real groundwater sweep pulls near-field water *back* into the wellfield. | Conservative (model cleans slower than reality). |
-| **2-D single layer** + separate vertical screening | No true 3-D plume. | Standard for screening tools (BIOSCREEN class). |
+| **2-D single layer** + separate vertical screening | No true 3-D plume. The portal's 3-D site block (2026-09-25) is a *view* of these two answers in place — the plume raster laid on the ore horizon, the column fronts climbing above it — with measured terrain and CGWB boreholes around them; it adds no physics (LIMITATIONS §1j). | Standard for screening tools (BIOSCREEN class). |
 | **Homogeneous aquifer per polygon** (MC draws add heterogeneity statistically, not spatially) | No channeling along specific fractures/paleochannels. | Inherent to closed-form solutions. |
 | **Domenico upstream half-plane at C0** (the dropped Ogata–Banks term) | The source-zone box is painted at C0; handled deliberately by the disc + deficit-wave design, but it is an artifact zone. | Documented; the QA F-1 fix made its behaviour continuous, and since 2026-08-05 the box is **excluded** from every travel metric and from the plume's area contribution (the disc carries the source footprint instead). |
 | **Fixed matrix-transfer rate ω under a sorption-scaled capacity ratio** (§4.2) | β_eff = β·R_m makes the fractured front respond to Kd, but ω is held at 10⁻³/day, so the continuum branch reaches full matrix equilibration in ~2.7 yr where the geometry implies ~14 yr for uranium. | Deliberate, and bounded: the **Tang branch is the exact solution and governs through the `max()`** wherever the continuum over-retards. Deriving ω from geometry was implemented, measured and **rejected** — β_eff·ω cancels R_m, making early-time retardation species-blind (radium rose to 9.50 m vs uranium 13.22 m). A first-order mobile/immobile model cannot reproduce early-time matrix diffusion at all: true uptake grows as √(R_m·D_e·t), so retardation scales as √R_m, which the first-order form cannot deliver. `OMEGA_FROM_GEOMETRY` and the √t-clock derivation are kept in config, default off. |

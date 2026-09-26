@@ -1,0 +1,64 @@
+well_id,kind,top_m,bottom_m,yield_lps,yield_note,source
+hesel_ew1,W,39,40,0.41,,"P3 Annex-III (depth, yield); ESP Table 2 (interval)"
+hesel_ew1,F,57,60,0.45,,"P3 Annex-III (59 m, yield); ESP Table 2 (interval)"
+hesel_ew1,F,83,84,0.4,,"P3 Annex-III; ESP Table 2"
+hesel_ew1,F,105,106,1,,"P3 Annex-III; ESP Table 2"
+hesel_ew1,F,131,132,2.1,,"P3 Annex-III; ESP Table 2"
+hesel_ew1,F,140,141,5.9,,"P3 Annex-III; ESP Table 2"
+hesel_ew2,F,40,41,,,ESP Table 2
+hesel_ew2,F,230,232,,,ESP Table 2
+hesel_ow1,F,30,31,,,ESP Table 2
+hesel_ow1,F,45,46,,,ESP Table 2
+kudada_ew,F,105,106,0.41,,"P3 Annex-III; ESP Table 2"
+kudada_ew,F,117,118,0.6,,"P3 Annex-III; ESP Table 2"
+kudada_ew,F,137,139,11.5,,"P3 Annex-III; ESP Table 2"
+ulda_ew1,F,40.91,41.91,0.75,,P3 Annex-III
+ulda_ew1,F,65.77,66.77,1.58,,P3 Annex-III
+ulda_ew1,F,129,130,9.16,,P3 Annex-III
+ulda_ow1,F,34,35,,,ESP Table 2
+ulda_ow1,F,94,97,,,ESP Table 2
+ulda_ow1,F,146,147,,,ESP Table 2
+ulda_ow2,F,28,30,,,ESP Table 2
+ulda_ow2,F,43,45,,,ESP Table 2
+ulda_ow2,F,58,68,,,ESP Table 2
+haldipokhar_ew,F,159.5,160.8,,meagre,P3 Annex-III
+potamda_bo_ew,F,58.75,60.25,,meagre,P3 Annex-III
+manusmuria_ew,G,32,33,,meagre,P3 Annex-III
+manusmuria_ew,G,43,44,0.45,,P3 Annex-III
+manusmuria_ew,G,50,51,,meagre,P3 Annex-III
+manusmuria_ew,G,71,72,0.45,,P3 Annex-III
+baharagora_ew,W,20,21,0.45,,P3 Annex-III
+baharagora_ew,F,61,62,0.45,,P3 Annex-III
+dugni_ew,F,107,107,0.75,,P3 Annex-III
+kuchai_bo_ew,W,46,47,3.4,,P3 Annex-III
+kuchai_bo_ew,F,65,65.5,0.45,,P3 Annex-III
+chouka_ew,W,25.2,26.3,0.45,,P3 Annex-III
+chouka_ew,W,39.8,40.2,0.45,,P3 Annex-III
+murkum_ew,W,37,38,0.8,,P3 Annex-III
+murkum_ew,F,61.5,62,,meagre,P3 Annex-III
+murkum_ew,F,132.2,133.5,0.8,,P3 Annex-III
+murkum_ew,F,169.5,170.5,0.45,,P3 Annex-III
+rola_ew,W,30,31,,meagre,P3 Annex-III
+purnadih_ew,F,42.8,43.8,0.45,,P3 Annex-III
+chandil_dam_ew,W,36,37,,meagre,P3 Annex-III
+chaulibasa_ew,W,33,34,1.2,,P3 Annex-III
+chaulibasa_ew,F,42,43,3.4,,P3 Annex-III
+basahatu_ew,W,39,40,3.4,,P3 Annex-III
+basahatu_ew,F,160,161,2.2,,P3 Annex-III
+kharsawan_bsmtc_ew,W,28.9,31.9,0.45,,P3 Annex-III
+kharsawan_bsmtc_ew,F,65.5,66.5,1.2,,P3 Annex-III
+kharsawan_bsmtc_ew,F,71.6,72.6,1,,P3 Annex-III
+kharsawan_bsmtc_ew,F,77.7,78.7,2.2,,P3 Annex-III
+chakradharpur_ew,F,12.61,25.61,,,West Singhbhum NAQUIM (2022) Annex-II
+chakradharpur_ew,F,176.94,179.94,4.5,,"P3 Annex-III (yield); West Singhbhum NAQUIM (2022) Annex-II (interval)"
+matamkabera_ew,W,28.9,29.9,,meagre,P3 Annex-III
+matamkabera_ew,F,181.4,182,0.45,,P3 Annex-III
+tantnagar_ew,F,54.7,55.5,,,West Singhbhum NAQUIM (2022) Annex-II
+tantnagar_ew,F,85.2,86.2,,,West Singhbhum NAQUIM (2022) Annex-II
+purnia_ew,W,28.9,29.9,2.2,,P3 Annex-III
+purnia_ew,F,59.4,60.4,0.45,,P3 Annex-III
+purnia_ew,F,102.1,103.1,1.8,,P3 Annex-III
+amd_jamshedpur_ew,F,80,81,0.45,,P3 Annex-III
+amd_jamshedpur_ew,F,133.2,134,1.35,,P3 Annex-III
+amd_jamshedpur_ew,F,152.5,153,1.6,,P3 Annex-III
+amd_jamshedpur_ew,F,160,161,16,,P3 Annex-III

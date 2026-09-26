@@ -341,6 +341,19 @@ export default function IsrReport() {
                           <b>{fmt(v.years_to_vertical_breakthrough, 1)} years</b> if it
                           happens</>
                       : <>, with no breakthrough expected inside the screened horizon</>}.
+                    {/* 2026-09-25: for a uranium screening the salts from the
+                        injected solution arrive centuries earlier; a report
+                        that gave only the uranium figure would read as "nothing
+                        for 400 years". */}
+                    {v.first_arrival && v.species && v.first_arrival.species !== v.species && (
+                      <> What the injected solution carries gets there first:{" "}
+                        <b>{SPECIES_NAME[v.first_arrival.species] ?? v.first_arrival.species}{" "}
+                          after about {fmt(v.first_arrival.years, 1)} years</b>
+                        {v.first_arrival.shallow_impact_probability != null && (
+                          <> ({(v.first_arrival.shallow_impact_probability * 100).toFixed(0)}%)</>
+                        )}, because the rock does not hold it back the way it holds{" "}
+                        {(SPECIES_NAME[v.species] ?? v.species).toLowerCase()}.</>
+                    )}
                   </p>
                 )}
 

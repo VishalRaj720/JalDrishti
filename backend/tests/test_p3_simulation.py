@@ -81,6 +81,10 @@ def test_payload_allowlist_contains_no_measured_chemistry():
         # presentation, not chemistry: which regime to assume, whether to
         # return ML bands, the calendar anchor, and the target-zone depth.
         "regime", "mode", "start_date", "ore_depth_m", "ore_thickness_m",
+        # 2026-09-25: presentation only -- lets the metrics-only loops
+        # (lifecycle, sweep, timeline frames) skip the display rasters and
+        # indicator arrivals. It selects what is drawn, never a number.
+        "display_extras",
     }
 
 

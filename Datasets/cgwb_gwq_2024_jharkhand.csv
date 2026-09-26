@@ -1,0 +1,289 @@
+s_no,year,season,state,district,block,station,longitude,latitude,pH,EC_uS_cm,TDS_mg_L,CO3_mg_L,HCO3_mg_L,total_alkalinity_mg_L,Cl_mg_L,NO3_mg_L,SO4_mg_L,PO4_mg_L,SiO2_mg_L,F_mg_L,total_hardness_mg_L,Ca_mg_L,Mg_mg_L,Na_mg_L,K_mg_L,Fe_mg_L,As_ppb,U_ppb,Mn_mg_L,Cu_mg_L,Pb_mg_L,Zn_mg_L,Ni_mg_L,Cd_mg_L,Cr_mg_L,source_page
+1885,2024,Pre-Monsoon,Jharkhand,Deoghar,Deoghar,Deoghar new,86.7100,24.4864,7.43,1268,824,0,384,,146,51,68,0,,0.57,390,102,33,112,1,,,,,,,,,,,19
+1886,2024,Pre-Monsoon,Jharkhand,Deoghar,Madhupur,Madhupur,86.6473,24.2677,7.57,1036,673,0,293,,117,46,72,0,,0.89,290,90,16,102,3,,,,,,,,,,,19
+1887,2024,Pre-Monsoon,Jharkhand,Deoghar,Palajori,Palajori,87.0110,24.2394,7.17,795,517,0,275,,85,33,25,0,,0.66,295,76,26,46,2,,,,,,,,,,,19
+1888,2024,Pre-Monsoon,Jharkhand,Dumka,Jama,Jama1,87.1497,24.3488,7.00,634,412,0,201,,67,24,36,0,,0.51,250,54,28,29,1,,,,,,,,,,,19
+1889,2024,Pre-Monsoon,Jharkhand,Dumka,Jharmundi,Jarmundi db.ib,87.0538,24.3927,7.08,970,631,0,226,,131,53,65,0,,0.51,410,78,52,33,2,,,,,,,,,,,19
+1890,2024,Pre-Monsoon,Jharkhand,Dumka,Raneswar,Raneswar,87.4100,24.0455,7.64,625,406,0,116,,96,39,50,0,,0.46,195,48,18,53,1,,,,,,,,,,,19
+1891,2024,Pre-Monsoon,Jharkhand,Dumka,Shikaripara,Sikaripara,87.4687,24.2384,7.76,626,407,0,189,,78,30,23,0,,0.70,270,52,34,20,1,,,,,,,,,,,19
+1892,2024,Pre-Monsoon,Jharkhand,Dumka,Ramgargh,Ramgargh,87.2483,24.5637,7.50,1091,709,0,153,,234,56,40,0,,0.59,390,102,33,71,1,,,,,,,,,,,19
+1893,2024,Pre-Monsoon,Jharkhand,Godda,Godda,Godda,87.2389,24.8367,7.37,1649,1072,0,427,,277,18,65,0,,1.30,500,90,67,145,5,,,,,,,,,,,19
+1894,2024,Pre-Monsoon,Jharkhand,Godda,Godda,Jainipaharpur,87.2610,24.8040,7.28,2002,1301,0,555,,295,51,83,0,,0.66,600,180,36,180,7,,,,,,,,,,,19
+1895,2024,Pre-Monsoon,Jharkhand,Godda,Boarijor,Lalmatia,87.3630,25.0520,7.68,840,546,0,378,,36,23,41,0,,0.92,360,94,30,25,5,,,,,,,,,,,19
+1896,2024,Pre-Monsoon,Jharkhand,Godda,Godda,Maheshpur2,87.2895,24.7998,7.14,1375,894,0,366,,220,33,43,0,,1.51,405,94,41,129,1,,,,,,,,,,,19
+1897,2024,Pre-Monsoon,Jharkhand,Godda,Poraiya Haat,Poraiyahaat,87.1790,24.6770,7.00,1103,717,0,293,,153,52,50,0,,0.72,460,104,49,41,3,,,,,,,,,,,19
+1898,2024,Pre-Monsoon,Jharkhand,Godda,Poreyahat,Chamudih,87.1294,24.6297,7.11,1303,847,0,323,,170,49,99,0,,1.20,475,120,43,80,2,,,,,,,,,,,19
+1899,2024,Pre-Monsoon,Jharkhand,Godda,Poreyahat,Bargacha Hariyari,87.1890,24.7170,7.37,648,421,0,256,,53,12,26,0,,1.35,255,52,30,31,2,,,,,,,,,,,19
+1900,2024,Pre-Monsoon,Jharkhand,Pakur,Litipara,Litipara 2,87.6142,24.7100,6.91,661,430,0,342,,25,5,11,0,,0.30,245,70,17,35,6,,,,,,,,,,,19
+1901,2024,Pre-Monsoon,Jharkhand,Sahibganj,Mandro,Mandro,87.4979,25.1383,7.36,2009,1306,0,531,,316,54,79,0,,0.50,580,124,66,185,17,,,,,,,,,,,19
+1902,2024,Pre-Monsoon,Jharkhand,Sahibganj,Sahebganj,Sahebganj1,87.6580,25.2368,7.72,1349,877,0,439,,138,60,65,0,,0.45,415,120,28,121,0,,,,,,,,,,,19
+1903,2024,Pre-Monsoon,Jharkhand,Sahibganj,Sahibganj,Sakrigali,87.7125,25.2428,7.17,1770,1151,0,403,,291,58,92,0,,0.53,550,160,36,154,2,,,,,,,,,,,19
+1904,2024,Pre-Monsoon,Jharkhand,Sahibganj,Udhwa,Udhwa,87.8420,24.9720,7.32,2205,1433,0,470,,376,78,116,0,,0.57,660,160,63,203,1,,,,,,,,,,,19
+1905,2024,Pre-Monsoon,Jharkhand,Sahibganj,Sahibganj,Dihari,87.5202,25.2669,7.44,1243,808,0,458,,121,8,66,0,,0.28,370,98,30,112,8,,,,,,,,,,,19
+1906,2024,Pre-Monsoon,Jharkhand,Sahibganj,Rajmahal,Mangal hat,87.7767,25.0761,7.19,964,627,0,268,,114,47,63,0,,0.28,325,126,2,49,40,,,,,,,,,,,19
+1907,2024,Pre-Monsoon,Jharkhand,Bokaro,Chas,Jaina More,86.0262,23.6699,7.26,1520,988,0,329,,142,65,137,0,,0.29,430,122,30,109,2,,,,,,,,,,,19
+1908,2024,Pre-Monsoon,Jharkhand,Bokaro,Chas,Pindarjora new,86.2023,23.5139,7.10,1093,710,0,153,,114,59,115,0,,1.73,285,70,27,77,1,,,,,,,,,,,19
+1909,2024,Pre-Monsoon,Jharkhand,Bokaro,Chandankiyari,Chandankiyari,86.3553,23.5758,7.43,1154,750,0,317,,53,58,153,0,,1.01,320,84,27,98,6,,,,,,,,,,,19
+1910,2024,Pre-Monsoon,Jharkhand,Bokaro,Chandankiyari,Baramasia,86.3084,23.4805,7.19,1609,1046,0,31,,14,7,19,0,,0.00,40,12,2,14,0,,,,,,,,,,,19
+1911,2024,Pre-Monsoon,Jharkhand,Bokaro,Peterwar,Chandrapura,86.1185,23.7514,7.56,810,527,0,256,,46,45,64,0,,2.53,290,78,23,41,0,,,,,,,,,,,19
+1912,2024,Pre-Monsoon,Jharkhand,Bokaro,Gomia,Gomia,85.8219,23.8001,7.33,1587,1032,0,476,,124,72,91,0,,1.83,360,118,16,165,4,,,,,,,,,,,19
+1913,2024,Pre-Monsoon,Jharkhand,Bokaro,Petarbar,Petarbar,85.8468,23.6162,6.40,838,545,0,92,,149,63,76,0,,0.00,295,78,24,53,3,,,,,,,,,,,19
+1914,2024,Pre-Monsoon,Jharkhand,Bokaro,Gomia,Tenughat,85.8445,23.7228,7.44,849,552,0,165,,64,68,97,0,,0.37,280,70,26,48,0,,,,,,,,,,,19
+1915,2024,Pre-Monsoon,Jharkhand,Dhanbad,Katras,Balajee mandir,86.3050,23.7975,7.77,830,540,0,262,,92,56,18,0,,0.12,250,64,22,70,2,,,,,,,,,,,19
+1916,2024,Pre-Monsoon,Jharkhand,Dhanbad,Dhanbad,Basudeopur,86.3684,23.7820,7.80,2012,1308,0,604,,170,105,208,0,,0.70,755,216,52,72,102,,,,,,,,,,,19
+1917,2024,Pre-Monsoon,Jharkhand,Dhanbad,Gobindpur,Govindpur,86.5238,23.8311,7.64,1354,880,0,403,,96,94,112,0,,1.29,455,102,49,94,5,,,,,,,,,,,19
+1918,2024,Pre-Monsoon,Jharkhand,Dhanbad,Nirsa,Nirsa,86.7068,23.7862,7.37,1042,677,0,275,,82,72,137,0,,0.00,355,62,49,73,22,,,,,,,,,,,19
+1919,2024,Pre-Monsoon,Jharkhand,Dhanbad,Rajganj,Rajganj,86.3354,23.8731,7.68,1574,1023,0,384,,188,67,127,0,,0.30,590,130,64,83,1,,,,,,,,,,,19
+1920,2024,Pre-Monsoon,Jharkhand,Dhanbad,Topchanchi,Topchanchi,86.2029,23.9026,7.17,1089,708,0,220,,103,82,119,0,,0.90,390,78,47,60,1,,,,,,,,,,,19
+1921,2024,Pre-Monsoon,Jharkhand,Dhanbad,Tundi,Tundi,86.4527,23.9854,7.33,1412,918,0,287,,206,64,128,0,,0.26,550,152,41,73,4,,,,,,,,,,,19
+1922,2024,Pre-Monsoon,Jharkhand,Giridih,BAGODAR,Bagodar,85.8336,24.0840,7.40,494,321,0,146,,39,5,30,0,,0.35,165,42,15,21,0,,,,,,,,,,,19
+1923,2024,Pre-Monsoon,Jharkhand,Giridih,BENGABAD,Bengabad,86.3569,24.3048,7.14,1390,904,0,378,,202,55,44,0,,0.00,255,78,15,141,97,,,,,,,,,,,19
+1924,2024,Pre-Monsoon,Jharkhand,Giridih,PIRTANR,Chirki (pirtanr),86.1599,24.0410,7.44,972,632,0,311,,64,64,79,0,,0.99,400,92,41,33,5,,,,,,,,,,,19
+1925,2024,Pre-Monsoon,Jharkhand,Giridih,GIRIDIH,Dhanidih,86.1991,24.2264,7.16,751,488,0,177,,64,76,64,0,,0.10,290,76,24,35,2,,,,,,,,,,,19
+1926,2024,Pre-Monsoon,Jharkhand,Giridih,DHANWAR,Dhanwar,85.9792,24.4055,7.52,1454,945,0,366,,170,68,110,0,,0.01,490,84,68,100,2,,,,,,,,,,,19
+1927,2024,Pre-Monsoon,Jharkhand,Giridih,DUMRI,Dumri,86.0196,23.9908,7.64,1282,833,0,317,,121,62,139,0,,0.57,520,106,62,46,2,,,,,,,,,,,19
+1928,2024,Pre-Monsoon,Jharkhand,Giridih,GIRIDIH,Giridih,86.3053,24.1887,7.10,1330,865,0,122,,234,86,154,0,,0.23,500,130,43,75,0,,,,,,,,,,,19
+1929,2024,Pre-Monsoon,Jharkhand,Giridih,JAMUA,Jamua pwd ib,86.1512,24.3697,7.03,1360,884,0,110,,234,79,184,0,,0.19,515,138,41,74,1,,,,,,,,,,,19
+1930,2024,Pre-Monsoon,Jharkhand,Giridih,Tisri,Khijri,86.0976,24.5466,7.59,1906,1239,0,482,,231,91,170,0,,2.01,460,128,34,218,30,,,,,,,,,,,19
+1931,2024,Pre-Monsoon,Jharkhand,Giridih,GANDEY,Pandri,86.3869,24.0763,7.13,852,554,0,214,,85,53,79,0,,0.02,290,62,33,52,10,,,,,,,,,,,19
+1932,2024,Pre-Monsoon,Jharkhand,Giridih,Saria,Saria,85.8791,24.1660,7.68,796,517,0,232,,43,57,57,0,,0.83,300,72,29,25,1,,,,,,,,,,,19
+1933,2024,Pre-Monsoon,Jharkhand,Jamtara,Jamtara,Jamatara,86.7995,23.9622,7.46,781,508,0,220,,36,45,80,0,,0.96,275,60,30,35,1,,,,,,,,,,,19
+1934,2024,Pre-Monsoon,Jharkhand,Jamtara,Kundahit,Dhootala,87.1678,23.9194,7.43,355,231,0,122,,18,35,16,0,,0.49,110,36,5,25,4,,,,,,,,,,,19
+1935,2024,Pre-Monsoon,Jharkhand,Jamtara,Narayanpur,Narayanpur,86.6174,24.0443,7.10,140,91,0,49,,14,4,10,0,,0.00,50,14,4,9,1,,,,,,,,,,,19
+1936,2024,Pre-Monsoon,Jharkhand,Jamtara,Karmatarn,Jasaydih,86.7011,24.0619,7.41,756,491,0,165,,89,61,57,0,,0.83,300,70,30,32,4,,,,,,,,,,,19
+1937,2024,Pre-Monsoon,Jharkhand,Jamtara,Narayanpur,Mohanpur,86.6625,24.0194,7.35,1091,709,0,256,,114,78,101,0,,0.36,420,98,43,56,2,,,,,,,,,,,19
+1938,2024,Pre-Monsoon,Jharkhand,Koderma,Koderma,Jhumri Tilaiya,85.5279,24.4342,7.65,1232,801,0,439,,92,67,70,0,,1.01,285,50,39,152,0,,,,,,,,,,,19
+1939,2024,Pre-Monsoon,Jharkhand,Koderma,Koderma,Kodarma,85.5927,24.4652,7.54,1242,807,0,317,,82,70,81,0,,0.13,380,92,36,59,2,,,,,,,,,,,19
+1940,2024,Pre-Monsoon,Jharkhand,Koderma,Jainagar,Jainagar,85.6430,24.3759,7.34,1972,1282,0,409,,270,80,143,0,,0.04,680,146,77,108,10,,,,,,,,,,,19
+1941,2024,Pre-Monsoon,Jharkhand,Koderma,Tilaya,Buchitar,85.6668,24.4358,7.30,1088,707,0,177,,170,59,78,0,,0.02,400,122,23,48,4,,,,,,,,,,,19
+1942,2024,Pre-Monsoon,Jharkhand,Khunti,Khunti,Kurapurti,85.4261,23.0033,8.26,1058,688,0,372,,107,23,100,,,0.86,450,144,22,34,3,,,,,,,,,,,19
+1943,2024,Pre-Monsoon,Jharkhand,Khunti,Khunti,Khunti,85.2798,23.0826,7.52,220,143,0,61,,28,18,9,,,0.91,85,16,11,9,2,,,,,,,,,,,19
+1944,2024,Pre-Monsoon,Jharkhand,Lohardaga,Lohardaga,Lohardaga(pwdib,84.6907,23.4466,7.85,333,216,0,85,,46,19,33,,,0.83,120,24,15,20,2,,,,,,,,,,,19
+1945,2024,Pre-Monsoon,Jharkhand,Ramgarh,Patratu,Bhurkunda,85.3606,23.6525,7.74,873,567,0,348,,71,22,63,,,0.63,290,46,43,54,22,,,,,,,,,,,19
+1946,2024,Pre-Monsoon,Jharkhand,Ramgarh,Mandu,Kuju,85.5068,23.7267,7.80,1156,751,0,250,,202,42,98,,,0.90,360,140,2,99,2,,,,,,,,,,,19
+1947,2024,Pre-Monsoon,Jharkhand,Ramgarh,Mandu,Mandu,85.4698,23.8079,7.72,252,164,0,98,,21,15,2,,,1.30,60,20,2,30,1,,,,,,,,,,,19
+1948,2024,Pre-Monsoon,Jharkhand,Ramgarh,Patratu,Barkakhana,85.4722,23.6215,7.65,514,334,0,165,,53,22,50,,,0.68,175,38,19,37,2,,,,,,,,,,,19
+1949,2024,Pre-Monsoon,Jharkhand,Ramgarh,Mandu,Thakur Gora,85.4553,23.7107,7.94,863,561,0,305,,71,41,93,,,0.76,265,64,26,76,0,,,,,,,,,,,19
+1950,2024,Pre-Monsoon,Jharkhand,Ramgarh,Ramgarh,Barlong,85.6061,23.5965,7.32,454,295,0,153,,50,23,23,,,0.55,150,26,21,35,2,,,,,,,,,,,19
+1951,2024,Pre-Monsoon,Jharkhand,Ramgarh,Dulmi,Kusumbha,85.5974,23.5592,7.81,1146,745,0,342,,149,35,99,,,0.41,425,116,33,59,16,,,,,,,,,,,19
+1952,2024,Pre-Monsoon,Jharkhand,Ramgarh,Mandu,Barkachumba,85.4414,23.6851,7.71,719,467,0,201,,99,22,66,,,0.35,240,28,41,54,1,,,,,,,,,,,19
+1953,2024,Pre-Monsoon,Jharkhand,Ramgarh,Mandu,Kanjgi,85.4619,23.6712,7.53,828,538,0,238,,114,24,80,,,0.27,215,36,30,90,2,,,,,,,,,,,19
+1954,2024,Pre-Monsoon,Jharkhand,Ranchi,Angara,Angara1,85.6069,23.4456,7.78,797,518,0,226,,121,3,75,,,0.32,280,72,24,54,2,,,,,,,,,,,19
+1955,2024,Pre-Monsoon,Jharkhand,Ranchi,Ratu,Bajra,85.2793,23.3730,7.51,845,549,0,159,,149,49,81,,,0.31,285,62,32,61,4,,,,,,,,,,,19
+1956,2024,Pre-Monsoon,Jharkhand,Ranchi,Angara,Barwadag,85.6923,23.3586,7.84,628,408,0,244,,46,19,60,,,0.54,255,30,44,23,8,,,,,,,,,,,19
+1957,2024,Pre-Monsoon,Jharkhand,Ranchi,Chanho,Bijupara Tangar,85.0223,23.4825,7.65,648,421,0,146,,107,25,61,,,0.21,180,26,28,65,4,,,,,,,,,,,19
+1958,2024,Pre-Monsoon,Jharkhand,Ranchi,Bundu,Bundu,85.5886,23.1755,7.69,865,562,0,287,,117,1,63,,,0.25,315,86,24,53,2,,,,,,,,,,,20
+1959,2024,Pre-Monsoon,Jharkhand,Ranchi,Kanke,Buti,85.3815,23.3964,7.76,728,473,0,165,,128,16,63,,,0.41,215,30,34,64,8,,,,,,,,,,,20
+1960,2024,Pre-Monsoon,Jharkhand,Ranchi,Ormanjhi,Chutupalu,85.5039,23.5217,7.37,336,218,0,98,,50,20,3,,,0.63,120,20,17,19,4,,,,,,,,,,,20
+1961,2024,Pre-Monsoon,Jharkhand,Ranchi,Angarha,Gondlipokhar,85.4876,23.4066,7.48,644,419,0,140,,124,22,27,,,0.22,205,22,36,54,2,,,,,,,,,,,20
+1962,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkum,Hatia,85.3058,23.3128,7.40,316,205,0,79,,25,46,35,,,0.22,105,24,11,23,3,,,,,,,,,,,20
+1963,2024,Pre-Monsoon,Jharkhand,Ranchi,Itki,Itki,85.1180,23.3378,7.80,623,405,0,226,,75,5,39,,,0.18,230,48,27,35,3,,,,,,,,,,,20
+1964,2024,Pre-Monsoon,Jharkhand,Ranchi,Kanke,Kanke1,85.3180,23.4357,7.60,555,361,0,128,,89,4,83,,,0.21,170,28,24,46,6,,,,,,,,,,,20
+1965,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkom,Kharsidag,85.4490,23.2536,7.35,231,150,0,73,,32,13,2,,,0.11,80,14,11,9,12,,,,,,,,,,,20
+1966,2024,Pre-Monsoon,Jharkhand,Ranchi,Silli,Kita,85.7599,23.3654,7.61,524,341,0,177,,64,1,46,,,0.64,125,36,9,62,1,,,,,,,,,,,20
+1967,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkom,Lalganj,85.4150,23.3836,7.00,305,198,0,43,,67,23,2,,,0.22,115,24,13,15,4,,,,,,,,,,,20
+1968,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkom,Lowadih,85.3619,23.3594,7.29,419,272,0,92,,64,44,20,,,0.31,115,32,9,37,10,,,,,,,,,,,20
+1969,2024,Pre-Monsoon,Jharkhand,Ranchi,Silli,Patrahatu,85.7642,23.2941,7.49,345,224,0,110,,50,8,8,,,0.26,80,18,9,41,5,,,,,,,,,,,20
+1970,2024,Pre-Monsoon,Jharkhand,Ranchi,Silli,Silli,85.8415,23.3602,7.72,475,309,0,220,,28,4,29,,,0.48,160,42,13,32,5,,,,,,,,,,,20
+1971,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkom,Siramtoli,85.3320,23.3528,7.61,487,317,0,146,,75,8,21,,,0.52,150,32,17,41,2,,,,,,,,,,,20
+1972,2024,Pre-Monsoon,Jharkhand,Ranchi,Bundu,Taimara,85.4974,23.2021,7.65,254,165,0,110,,21,7,3,,,0.36,95,26,7,10,9,,,,,,,,,,,20
+1973,2024,Pre-Monsoon,Jharkhand,Ranchi,Kanke,Daily Market,85.3247,23.3658,7.78,1213,788,0,250,,234,22,103,,,0.49,365,98,29,103,12,,,,,,,,,,,20
+1974,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkom,Tati Silway(E.F.),85.4442,23.3761,7.20,465,302,0,128,,57,33,44,,,0.13,120,30,11,45,12,,,,,,,,,,,20
+1975,2024,Pre-Monsoon,Jharkhand,Ranchi,Ormanjhi,Hombai B.I.T. Mesra,85.4111,23.4233,7.24,645,419,0,85,,146,48,11,,,0.26,145,40,11,72,18,,,,,,,,,,,20
+1976,2024,Pre-Monsoon,Jharkhand,Ranchi,Kanke,Ramkrishna mission Morabadi,85.3383,23.3992,7.63,688,447,0,214,,92,2,70,,,0.41,205,50,19,63,2,,,,,,,,,,,20
+1977,2024,Pre-Monsoon,Jharkhand,Ranchi,Kanke,Hochar,85.4257,23.4274,7.24,178,116,0,49,,18,18,10,,,0.88,70,14,9,8,1,,,,,,,,,,,20
+1978,2024,Pre-Monsoon,Jharkhand,Ranchi,Kanke,Sukurhutu,85.3216,23.4358,7.35,391,254,0,98,,64,18,19,,,0.55,90,26,6,44,7,,,,,,,,,,,20
+1979,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkom,Ladnapiri,85.4447,23.2543,8.14,825,536,0,244,,110,11,90,,,0.85,300,58,38,50,2,,,,,,,,,,,20
+1980,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkom,Mani Tola (Doranda),85.3200,23.3308,8.06,635,413,0,268,,46,16,31,,,0.68,165,36,18,62,16,,,,,,,,,,,20
+1981,2024,Pre-Monsoon,Jharkhand,Ranchi,Namkom,Hanuman Mandir (Near AG.Office),85.3158,23.3411,7.90,463,301,0,134,,71,5,34,,,0.48,165,36,18,29,4,,,,,,,,,,,20
+1982,2024,Pre-Monsoon,Jharkhand,Gumla,Sisai,Sisai,84.7576,23.1677,7.27,1022,664,0,336,,117,50,60,,,0.70,285,70,27,92,19,,,,,,,,,,,20
+1983,2024,Pre-Monsoon,Jharkhand,Latehar,Manika,Manika,84.3458,23.8503,7.45,1319,857,0,378,,202,48,50,,,0.96,530,174,23,57,5,,,,,,,,,,,20
+1984,2024,Pre-Monsoon,Jharkhand,Latehar,Balumath,Balumath,84.7899,23.8271,7.43,1605,1043,0,464,,241,54,68,,,0.78,530,190,13,97,49,,,,,,,,,,,20
+1985,2024,Pre-Monsoon,Jharkhand,Latehar,Balumath,Barjatu,84.7996,23.8867,7.53,1311,852,0,445,,149,58,55,,,1.04,515,88,72,62,6,,,,,,,,,,,20
+1986,2024,Pre-Monsoon,Jharkhand,Latehar,Mahuadanr,Mahuadanr,84.1141,23.3944,7.70,171,111,0,61,,18,10,2,,,0.80,65,14,7,9,1,,,,,,,,,,,20
+1987,2024,Pre-Monsoon,Jharkhand,Simdega,Koleberia,Koleberia,84.6937,22.6981,7.14,1475,959,0,421,,199,40,150,,,1.10,385,100,33,152,15,,,,,,,,,,,20
+1988,2024,Pre-Monsoon,Jharkhand,Chatra,Simaria,Birhu,85.1824,23.9862,7.16,770,501,0,275,,82,30,44,0,,1.01,290,66,30,41,2,,,,,,,,,,,20
+1989,2024,Pre-Monsoon,Jharkhand,Chatra,Simaria,Tutilawa1,85.0331,24.0387,7.55,1444,939,0,488,,170,43,83,0,,1.05,510,138,40,99,2,,,,,,,,,,,20
+1990,2024,Pre-Monsoon,Jharkhand,Chatra,Chatra,Behra Chocha,84.9830,24.2187,7.85,1178,766,0,458,,103,32,73,0,,1.24,225,46,27,164,3,,,,,,,,,,,20
+1991,2024,Pre-Monsoon,Jharkhand,Chatra,Simaria,Piri,85.1139,24.0043,7.14,190,124,0,61,,14,25,12,0,,0.78,60,10,9,16,1,,,,,,,,,,,20
+1992,2024,Pre-Monsoon,Jharkhand,Chatra,Lavalong,Bandu,84.7583,24.0685,7.36,422,274,0,214,,14,2,22,0,,1.48,155,32,18,24,3,,,,,,,,,,,20
+1993,2024,Pre-Monsoon,Jharkhand,Chatra,Kanha Chatti,Kanha Chatti,85.0318,24.2908,7.32,1494,971,0,336,,284,40,77,0,,0.82,420,96,44,140,19,,,,,,,,,,,20
+1994,2024,Pre-Monsoon,Jharkhand,Chatra,Gidhaur,Gidhaur,85.0247,24.1757,7.22,1817,1181,0,512,,298,45,55,0,,1.51,485,56,84,174,37,,,,,,,,,,,20
+1995,2024,Pre-Monsoon,Jharkhand,Chatra,Hunterganj,Lohsinghna Khurd,84.8025,24.3459,7.42,1559,1013,0,622,,135,34,92,0,,1.72,355,38,63,196,1,,,,,,,,,,,20
+1996,2024,Pre-Monsoon,Jharkhand,Garhwa,Nagar Utari,Nagar Utari,83.5039,24.2815,7.99,873,567,0,366,,78,0,41,0,,0.95,255,32,43,84,1,,,,,,,,,,,20
+1997,2024,Pre-Monsoon,Jharkhand,Garhwa,Ramna,Ramna1,83.6018,24.2319,7.58,1555,1011,0,482,,234,23,52,0,,1.05,345,78,36,197,3,,,,,,,,,,,20
+1998,2024,Pre-Monsoon,Jharkhand,Garhwa,Ranka,Godarmana,83.7939,23.8095,7.63,985,640,0,397,,78,43,41,0,,1.30,400,76,51,38,6,,,,,,,,,,,20
+1999,2024,Pre-Monsoon,Jharkhand,Garhwa,Meral,Meral,83.7016,24.1814,7.37,1438,935,0,384,,238,46,60,0,,0.90,450,100,49,117,10,,,,,,,,,,,20
+2000,2024,Pre-Monsoon,Jharkhand,Garhwa,Garhwa,Lagama,83.7362,24.1721,7.59,774,503,0,238,,92,50,39,0,,1.15,290,42,45,43,1,,,,,,,,,,,20
+2001,2024,Pre-Monsoon,Jharkhand,Garhwa,Garhwa,Obra,83.8271,24.0862,7.90,1025,666,0,451,,71,29,32,0,,1.43,370,66,50,59,10,,,,,,,,,,,20
+2002,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Amritnagar,85.4123,23.9938,7.00,557,362,0,183,,53,40,32,0,,0.91,205,48,21,32,4,,,,,,,,,,,20
+2003,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Barkagaon,Barkagaon,85.2193,23.8560,7.07,535,348,0,104,,96,33,30,0,,0.94,215,52,21,23,1,,,,,,,,,,,20
+2004,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Daru,Daru,85.5478,24.0139,7.10,423,275,0,116,,57,26,25,0,,1.10,125,26,15,39,2,,,,,,,,,,,20
+2005,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Keredari,Garrikalan,85.1638,23.8706,7.37,784,510,0,226,,103,46,38,0,,0.95,275,70,24,53,1,,,,,,,,,,,20
+2006,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Habib Nagar,85.3528,23.9830,7.41,759,493,0,299,,67,23,42,0,,0.52,255,50,32,56,2,,,,,,,,,,,20
+2007,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Hatyari,85.4062,23.9037,7.10,492,320,0,153,,50,44,30,0,,0.81,155,30,19,39,5,,,,,,,,,,,20
+2008,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Hazaribagh,85.3675,23.9924,7.36,982,638,0,397,,82,41,37,0,,0.60,315,54,44,79,2,,,,,,,,,,,20
+2009,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Keredari,Keredari,85.0867,23.8604,7.69,2118,1377,0,616,,355,19,70,0,,1.40,600,98,86,209,4,,,,,,,,,,,20
+2010,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh Sadar,Kud Ashram,85.3534,23.9781,7.67,629,409,0,299,,25,22,30,0,,1.10,190,8,41,57,1,,,,,,,,,,,20
+2011,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh Sadar,Masipiri,85.3732,23.9641,7.74,520,338,0,256,,21,11,27,0,,0.80,190,52,15,31,3,,,,,,,,,,,20
+2012,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Meru (Silwar),85.4518,24.0038,7.31,339,220,0,79,,43,45,16,0,,0.65,100,26,9,30,0,,,,,,,,,,,20
+2013,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh Sadar,Old Bus Stand,85.3632,23.9935,7.29,1665,1082,0,311,,355,48,69,0,,0.46,600,150,55,106,3,,,,,,,,,,,20
+2014,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Padma,Padma,85.3651,24.2055,7.12,496,322,0,226,,25,14,33,0,,1.20,175,28,26,32,4,,,,,,,,,,,20
+2015,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Barkathha,Sakrej,85.5355,24.2086,7.62,895,582,0,360,,64,49,40,0,,1.10,245,42,34,93,2,,,,,,,,,,,20
+2016,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Hazaribagh Sadar,Sindur,85.3828,24.0280,7.43,1308,850,0,287,,245,51,60,0,,1.40,435,68,64,99,2,,,,,,,,,,,20
+2017,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Bishnugarh,Tatijharia,85.6191,24.0221,7.07,478,311,0,122,,64,39,23,0,,1.14,165,32,21,32,1,,,,,,,,,,,20
+2018,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Barkagaon,Urimari,85.3096,24.6948,7.00,502,326,0,183,,57,6,29,0,,1.02,180,32,24,30,4,,,,,,,,,,,20
+2019,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Chowparan,Chauparan1,85.2508,24.3899,7.61,2728,1773,0,549,,604,3,116,0,,1.08,840,182,94,240,4,,,,,,,,,,,20
+2020,2024,Pre-Monsoon,Jharkhand,Hazaribagh,Barhi,Konra Barhi,85.4284,24.2983,7.82,1014,659,0,403,,92,11,63,0,,1.56,260,30,45,110,5,,,,,,,,,,,20
+2021,2024,Pre-Monsoon,Jharkhand,Palamu,Bishrampur,Bishrampur,83.9417,24.2458,7.82,1061,690,0,470,,60,22,70,0,,1.52,295,24,57,108,2,,,,,,,,,,,20
+2022,2024,Pre-Monsoon,Jharkhand,Palamu,Chhatarpur,Chhatarpur,84.1988,24.3775,7.69,1042,677,0,476,,71,2,50,0,,0.86,300,58,38,100,3,,,,,,,,,,,20
+9923,2024,Post-Monsoon,Jharkhand,Bokaro,Chandankiyari,Chandankiyari,86.3553,23.5758,7.71,1048,681,0,214,,110,52,141,,,1.14,287,86,17,108,3,,,,,,,,,,,101
+9924,2024,Post-Monsoon,Jharkhand,Bokaro,Chandankiyari,Baramasia,86.3084,23.4805,7.31,519,337,0,122,,32,43,74,,,0.29,195,50,17,28,3,,,,,,,,,,,101
+9925,2024,Post-Monsoon,Jharkhand,Bokaro,Chas,Jaina More,86.0262,23.6699,7.37,1665,1082,0,378,,234,70,131,,,0.65,585,165,42,111,3,,,,,,,,,,,101
+9926,2024,Post-Monsoon,Jharkhand,Bokaro,Chas,Pindarjora new,86.2023,23.5139,7.42,1241,807,0,214,,174,48,151,,,1.38,437,164,6,83,4,,,,,,,,,,,101
+9927,2024,Post-Monsoon,Jharkhand,Bokaro,Gomia,Gomia,85.8219,23.8001,7.94,1807,1175,0,677,,117,42,141,,,1.57,471,102,53,193,10,,,,,,,,,,,101
+9928,2024,Post-Monsoon,Jharkhand,Bokaro,Gomia,Tenughat,85.8445,23.7228,7.58,749,487,0,214,,36,54,103,,,0.48,326,60,43,19,5,,,,,,,,,,,101
+9929,2024,Post-Monsoon,Jharkhand,Bokaro,Petarbar,Petarbar,85.8468,23.6162,6.68,945,614,0,122,,156,56,101,,,0.25,356,138,3,52,4,,,,,,,,,,,101
+9930,2024,Post-Monsoon,Jharkhand,Bokaro,Peterwar,Chandrapura,86.1185,23.7514,7.87,954,620,0,317,,64,33,91,,,1.62,391,144,8,39,2,,,,,,,,,,,101
+9931,2024,Post-Monsoon,Jharkhand,Chatra,Chatra,Behra chocha,84.9830,24.2187,7.46,980,637,0,281,,142,34,62,,,0.89,365,112,21,55,3,,,,,,,,,,,101
+9932,2024,Post-Monsoon,Jharkhand,Chatra,Gidhaur,Gidhaur,85.0247,24.1757,7.50,1930,1255,0,555,,263,63,159,,,0.92,620,28,134,154,4,,,,,,,,,,,101
+9933,2024,Post-Monsoon,Jharkhand,Chatra,Hunterganj,Lohsinghna Khurd,84.8025,24.3459,7.91,1293,840,0,482,,110,57,86,,,1.91,340,76,36,139,3,,,,,,,,,,,101
+9934,2024,Post-Monsoon,Jharkhand,Chatra,Kanha Chatti,Kanha Chatti,85.0318,24.2908,7.10,1513,983,0,482,,202,59,40,,,1.09,450,118,38,124,27,,,,,,,,,,,101
+9935,2024,Post-Monsoon,Jharkhand,Chatra,Lavalong,Bandu,84.7583,24.0685,7.56,795,517,0,433,,18,14,16,,,1.06,310,36,53,40,2,,,,,,,,,,,101
+9936,2024,Post-Monsoon,Jharkhand,Chatra,Simaria,Birhu,85.1824,23.9862,7.00,278,181,0,110,,18,19,17,,,0.57,110,20,15,11,2,,,,,,,,,,,101
+9937,2024,Post-Monsoon,Jharkhand,Chatra,Simaria,Tutilawa1,85.0331,24.0387,7.40,988,642,0,329,,96,55,78,,,0.57,410,98,40,31,10,,,,,,,,,,,101
+9938,2024,Post-Monsoon,Jharkhand,Chatra,Simaria,Piri,85.1139,24.0043,7.20,1005,653,0,305,,114,45,100,,,0.80,405,84,47,25,32,,,,,,,,,,,101
+9939,2024,Post-Monsoon,Jharkhand,Deoghar,Deoghar,Deoghar new,86.7100,24.4864,8.04,1625,1056,0,506,,213,9,86,,,0.89,430,140,19,161,24,,,,,,,,,,,102
+9940,2024,Post-Monsoon,Jharkhand,Deoghar,Madhupur,Madhupur,86.6473,24.2677,7.94,2017,1311,0,543,,277,62,118,,,0.69,605,186,34,182,5,,,,,,,,,,,102
+9941,2024,Post-Monsoon,Jharkhand,Deoghar,Palajori,Palajori,87.0110,24.2394,7.79,1579,1026,0,561,,167,49,48,,,0.95,555,108,69,107,5,,,,,,,,,,,102
+9942,2024,Post-Monsoon,Jharkhand,Dhanbad,Dhanbad,Basudeopur,86.3684,23.7820,7.65,2078,1351,0,641,,170,78,203,,,0.68,735,225,42,125,24,,,,,,,,,,,102
+9943,2024,Post-Monsoon,Jharkhand,Dhanbad,Gobindpur,Govindpur,86.5238,23.8311,7.31,1713,1113,0,415,,185,65,191,,,1.43,691,211,40,74,4,,,,,,,,,,,102
+9944,2024,Post-Monsoon,Jharkhand,Dhanbad,Katras,Balajee mandir,86.3050,23.7975,7.12,365,237,0,134,,18,3,45,,,0.28,150,46,8,12,4,,,,,,,,,,,102
+9945,2024,Post-Monsoon,Jharkhand,Dhanbad,Nirsa,Nirsa,86.7068,23.7862,7.91,1079,701,0,305,,78,38,144,,,0.25,356,101,25,75,15,,,,,,,,,,,102
+9946,2024,Post-Monsoon,Jharkhand,Dhanbad,Rajganj,Rajganj,86.3354,23.8731,7.61,1185,770,0,293,,135,48,118,,,0.71,461,156,17,58,3,,,,,,,,,,,102
+9947,2024,Post-Monsoon,Jharkhand,Dhanbad,Topchanchi,Topchanchi,86.2029,23.9026,7.89,1451,943,0,244,,209,49,182,,,1.10,585,165,42,61,5,,,,,,,,,,,102
+9948,2024,Post-Monsoon,Jharkhand,Dhanbad,Tundi,Tundi,86.4527,23.9854,7.55,991,644,0,250,,110,44,92,,,0.52,342,93,27,69,4,,,,,,,,,,,102
+9949,2024,Post-Monsoon,Jharkhand,Dumka,Jama,Jama1,87.1497,24.3488,7.00,1179,766,0,244,,178,52,91,,,0.65,400,108,32,86,4,,,,,,,,,,,102
+9950,2024,Post-Monsoon,Jharkhand,Dumka,Jharmundi,Jarmundi db.ib,87.0538,24.3927,7.36,811,527,0,195,,117,26,54,,,0.73,330,120,7,34,3,,,,,,,,,,,102
+9951,2024,Post-Monsoon,Jharkhand,Dumka,Ramgargh,Ramgargh,87.2483,24.5637,7.69,1168,759,0,183,,238,62,48,,,0.28,455,94,53,57,3,,,,,,,,,,,102
+9952,2024,Post-Monsoon,Jharkhand,Dumka,Raneswar,Raneswar,87.4100,24.0455,7.20,317,206,0,116,,25,27,6,,,0.89,60,12,7,44,2,,,,,,,,,,,102
+9953,2024,Post-Monsoon,Jharkhand,Dumka,Shikaripara,Sikaripara,87.4687,24.2384,7.98,693,450,0,183,,103,17,34,,,0.75,255,52,30,41,3,,,,,,,,,,,102
+9954,2024,Post-Monsoon,Jharkhand,East Singhbhum,Jamshed-pur,Sundarnagar,86.1725,22.8278,8.23,607,395,0,196,,53,21,50,,,0.52,200,60,12,46,2,,,,,,,,,,,102
+9955,2024,Post-Monsoon,Jharkhand,East Singhbhum,Jugsalai/Jamshedpur sadar,Baridih,86.2053,22.8153,7.93,1094,711,0,360,,92,50,77,,,0.83,415,119,28,58,3,,,,,,,,,,,102
+9956,2024,Post-Monsoon,Jharkhand,East Singhbhum,Mosabani,Mosabani,86.4667,22.5250,8.08,1403,912,0,503,,107,9,127,,,0.39,598,152,53,40,12,,,,,,,,,,,102
+9957,2024,Post-Monsoon,Jharkhand,East Singhbhum,Potka,Kalikapur,86.2908,22.5958,7.50,2509,1631,0,622,,355,24,216,,,1.35,817,226,61,193,14,,,,,,,,,,,102
+9958,2024,Post-Monsoon,Jharkhand,Garhwa,Garhwa,Lagama,83.7362,24.1721,7.53,1342,872,0,397,,153,62,139,,,0.99,320,114,9,158,4,,,,,,,,,,,102
+9959,2024,Post-Monsoon,Jharkhand,Garhwa,Garhwa,Obra,83.8271,24.0862,7.25,1413,918,0,384,,178,43,197,,,0.71,540,72,87,74,3,,,,,,,,,,,102
+9960,2024,Post-Monsoon,Jharkhand,Garhwa,Meral,Meral,83.7016,24.1814,7.37,1755,1141,0,506,,238,63,132,,,1.35,395,68,55,219,4,,,,,,,,,,,102
+9961,2024,Post-Monsoon,Jharkhand,Garhwa,NAGAR UTARI,Nagaruntari,83.5039,24.2815,7.78,1038,675,0,384,,114,1,69,,,0.64,260,16,53,116,2,,,,,,,,,,,102
+9962,2024,Post-Monsoon,Jharkhand,Garhwa,RAMNA,Ramna1,83.6018,24.2319,7.55,1826,1187,0,531,,249,43,144,,,0.97,355,38,63,246,5,,,,,,,,,,,102
+9963,2024,Post-Monsoon,Jharkhand,Garhwa,Ranka,Godarmana,83.7939,23.8095,7.31,617,401,0,214,,39,55,58,,,0.49,245,54,27,19,15,,,,,,,,,,,102
+9964,2024,Post-Monsoon,Jharkhand,Giridih,BAGODAR,Bagodar,85.8336,24.0840,7.34,682,443,0,238,,28,6,92,,,1.16,260,58,28,37,2,,,,,,,,,,,102
+9965,2024,Post-Monsoon,Jharkhand,Giridih,BENGABAD,Bengabad,86.3569,24.3048,7.69,1675,1089,0,336,,252,17,188,,,0.43,575,211,12,112,14,,,,,,,,,,,102
+9966,2024,Post-Monsoon,Jharkhand,Giridih,DHANWAR,Dhanwar,85.9792,24.4055,7.40,1379,896,0,323,,192,48,113,,,0.28,436,142,19,111,8,,,,,,,,,,,102
+9967,2024,Post-Monsoon,Jharkhand,Giridih,DUMRI,Dumri,86.0196,23.9908,7.53,1642,1067,0,390,,185,53,192,,,0.66,620,156,56,90,3,,,,,,,,,,,102
+9968,2024,Post-Monsoon,Jharkhand,Giridih,GANDEY,Pandri,86.3869,24.0763,7.49,615,400,0,134,,67,44,66,,,0.32,218,60,17,38,4,,,,,,,,,,,102
+9969,2024,Post-Monsoon,Jharkhand,Giridih,GIRIDIH,Dhanidih,86.1991,24.2264,7.20,1832,1191,0,421,,273,58,132,,,0.99,507,179,14,166,37,,,,,,,,,,,102
+9970,2024,Post-Monsoon,Jharkhand,Giridih,GIRIDIH,Giridih,86.3053,24.1887,7.83,859,558,0,336,,50,2,77,,,0.67,264,69,22,70,11,,,,,,,,,,,102
+9971,2024,Post-Monsoon,Jharkhand,Giridih,JAMUA,Jamua pwd ib,86.1512,24.3697,7.21,1963,1276,0,360,,330,62,165,,,0.56,664,207,35,141,8,,,,,,,,,,,102
+9972,2024,Post-Monsoon,Jharkhand,Giridih,PIRTANR,Chirki (pirtanr),86.1599,24.0410,7.72,1199,779,0,433,,64,56,101,,,1.10,475,128,37,52,11,,,,,,,,,,,102
+9973,2024,Post-Monsoon,Jharkhand,Giridih,Saria,Saria,85.8791,24.1660,7.45,1391,904,0,390,,146,15,152,,,0.54,344,87,31,158,4,,,,,,,,,,,102
+9974,2024,Post-Monsoon,Jharkhand,Giridih,Tisri,Khijui,86.0976,24.5466,7.36,2511,1632,0,519,,398,59,209,,,1.74,819,210,71,199,5,,,,,,,,,,,102
+9975,2024,Post-Monsoon,Jharkhand,Godda,Boarijor,Lalmatia,87.3630,25.0520,8.23,1455,946,0,415,,178,27,108,,,0.85,320,56,44,184,8,,,,,,,,,,,102
+9976,2024,Post-Monsoon,Jharkhand,Godda,Godda,Godda,87.2389,24.8367,7.72,588,382,0,146,,75,21,49,,,0.96,200,52,17,41,2,,,,,,,,,,,102
+9977,2024,Post-Monsoon,Jharkhand,Godda,Godda,Jainipaharpur,87.2610,24.8040,7.00,357,232,0,153,,21,3,18,,,0.48,145,34,15,15,2,,,,,,,,,,,102
+9978,2024,Post-Monsoon,Jharkhand,Godda,Godda,Maheshpur2,87.2895,24.7998,8.01,3557,2312,0,610,,746,76,156,,,1.21,1175,460,6,275,7,,,,,,,,,,,102
+9979,2024,Post-Monsoon,Jharkhand,Godda,Poraiya Haat,Poraiyahaat,87.1790,24.6770,7.71,1351,878,0,317,,206,44,82,,,0.87,535,82,80,64,3,,,,,,,,,,,102
+9980,2024,Post-Monsoon,Jharkhand,Godda,Poreyahat,Chamudih,87.1294,24.6297,7.73,348,226,0,128,,36,1,15,,,1.07,115,28,11,25,2,,,,,,,,,,,102
+9981,2024,Post-Monsoon,Jharkhand,Godda,Poreyahat,Bargacha Hariyari,87.1890,24.7170,7.85,678,441,0,262,,36,25,48,,,1.03,210,28,34,58,3,,,,,,,,,,,102
+9982,2024,Post-Monsoon,Jharkhand,Gumla,Sisai,Sisai,84.7576,23.1677,7.19,1065,692,0,311,,99,55,89,,,0.10,290,78,23,101,19,,,,,,,,,,,102
+9983,2024,Post-Monsoon,Jharkhand,Hazaribagh,Barhi,Konra-Barhi,85.4284,24.2983,7.93,1214,789,0,406,,124,17,74,,,0.70,381,87,39,99,11,,,,,,,,,,,102
+9984,2024,Post-Monsoon,Jharkhand,Hazaribagh,Barkagaon,Barkagaon,85.2193,23.8560,7.26,1565,1017,0,427,,195,51,112,,,0.91,435,146,17,144,26,,,,,,,,,,,102
+9985,2024,Post-Monsoon,Jharkhand,Hazaribagh,Barkagaon,Urimari,85.3096,23.6948,7.18,716,465,0,210,,75,22,61,,,0.83,264,73,19,36,11,,,,,,,,,,,102
+9986,2024,Post-Monsoon,Jharkhand,Hazaribagh,Barkathha,Sakrej,85.5355,24.2086,7.71,1138,740,0,336,,110,48,92,,,0.88,449,119,37,54,3,,,,,,,,,,,102
+9987,2024,Post-Monsoon,Jharkhand,Hazaribagh,Bishnugarh,Tatijharia,85.6191,24.0221,7.77,502,326,0,168,,36,25,42,,,0.34,190,50,16,25,5,,,,,,,,,,,102
+9988,2024,Post-Monsoon,Jharkhand,Hazaribagh,Chowparan,Chauparan1,85.2508,24.3899,7.61,3319,2157,0,670,,604,39,216,,,0.86,1246,388,67,185,10,,,,,,,,,,,102
+9989,2024,Post-Monsoon,Jharkhand,Hazaribagh,Daru,Daru,85.5478,24.0139,7.14,841,547,0,159,,114,47,87,,,0.29,294,78,24,55,7,,,,,,,,,,,102
+9990,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Amritnagar,85.4123,23.9938,7.18,953,619,0,220,,124,37,88,,,0.67,410,128,22,28,3,,,,,,,,,,,102
+9991,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Habib nagar,85.3528,23.9830,7.28,1537,999,0,237,,284,52,127,,,0.10,618,165,50,66,3,,,,,,,,,,,102
+9992,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Hatyari,85.4062,23.9037,7.00,717,466,0,237,,50,3,88,,,0.43,287,69,28,29,6,,,,,,,,,,,102
+9993,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Hazaribagh,85.3675,23.9924,7.17,1251,813,0,299,,178,24,106,,,0.56,497,142,34,52,10,,,,,,,,,,,102
+9994,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh,Meru(Silwar),85.4518,24.0038,7.42,779,506,0,172,,85,51,84,,,0.40,250,78,13,60,6,,,,,,,,,,,102
+9995,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh sadar,Kud Ashram,85.3534,23.9781,7.51,968,629,0,271,,121,29,62,,,0.57,322,55,45,70,8,,,,,,,,,,,102
+9996,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh sadar,Masipiri,85.3732,23.9641,7.80,1563,1016,0,477,,124,23,185,,,0.95,485,180,8,124,22,,,,,,,,,,,102
+9997,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh sadar,Old Bus Stand,85.3632,23.9935,7.32,1845,1199,0,378,,312,50,125,,,0.70,780,229,50,63,6,,,,,,,,,,,102
+9998,2024,Post-Monsoon,Jharkhand,Hazaribagh,Hazaribagh sadar,Sindur,85.3828,24.0280,7.52,1491,969,0,352,,209,54,110,,,0.73,542,143,45,88,11,,,,,,,,,,,102
+9999,2024,Post-Monsoon,Jharkhand,Hazaribagh,Keredari,Garrikalan,85.1638,23.8706,7.65,986,641,0,336,,110,13,48,,,0.60,356,96,28,58,10,,,,,,,,,,,102
+10000,2024,Post-Monsoon,Jharkhand,Hazaribagh,Keredari,Keradari,85.0867,23.8604,7.64,2835,1843,0,658,,447,61,188,,,0.88,894,192,101,236,9,,,,,,,,,,,102
+10001,2024,Post-Monsoon,Jharkhand,Hazaribagh,Padma,Padma,85.3651,24.2055,7.70,1937,1259,0,439,,266,53,182,,,1.05,624,188,37,147,18,,,,,,,,,,,102
+10002,2024,Post-Monsoon,Jharkhand,Jamtara,Jamtara,Jamatara,86.7995,23.9622,7.58,1817,1181,0,360,,259,52,195,,,0.58,620,185,38,131,4,,,,,,,,,,,102
+10003,2024,Post-Monsoon,Jharkhand,Jamtara,Karmatarn,Jasaydih,86.7011,24.0619,7.61,1295,842,0,262,,178,50,132,,,0.90,482,128,39,71,10,,,,,,,,,,,102
+10004,2024,Post-Monsoon,Jharkhand,Jamtara,Kundahit,Dhootala,87.1678,23.9194,8.06,423,275,0,146,,28,16,37,,,0.95,155,46,10,23,4,,,,,,,,,,,102
+10005,2024,Post-Monsoon,Jharkhand,Jamtara,Narayanpur,Narayanpur,86.6174,24.0443,7.19,297,193,0,67,,36,14,27,,,0.24,125,24,16,10,1,,,,,,,,,,,102
+10006,2024,Post-Monsoon,Jharkhand,Jamtara,Narayanpur,Mohanpur,86.6625,24.0194,7.84,661,430,0,183,,64,24,66,,,0.27,250,78,13,36,4,,,,,,,,,,,102
+10007,2024,Post-Monsoon,Jharkhand,Khunti,Khunti,Karapurti,85.4261,23.0033,7.55,1122,729,0,305,,82,43,151,,,0.61,450,138,26,38,24,,,,,,,,,,,102
+10008,2024,Post-Monsoon,Jharkhand,Khunti,Khunti,Khunti,85.2798,23.0826,7.30,1262,820,0,366,,185,13,58,,,0.43,365,116,18,118,6,,,,,,,,,,,102
+10009,2024,Post-Monsoon,Jharkhand,Koderma,Jainagar,Jainagar,85.6430,24.3759,7.62,2031,1320,0,506,,249,55,193,,,1.39,717,189,59,129,16,,,,,,,,,,,102
+10010,2024,Post-Monsoon,Jharkhand,Koderma,Koderma,Jhumri Tilaiya,85.5279,24.4342,7.77,2007,1305,0,488,,249,53,198,,,0.97,577,188,26,186,20,,,,,,,,,,,102
+10011,2024,Post-Monsoon,Jharkhand,Koderma,Koderma,Kodarma,85.5927,24.4652,7.70,1674,1088,0,390,,256,24,130,,,0.44,566,193,21,113,22,,,,,,,,,,,102
+10012,2024,Post-Monsoon,Jharkhand,Koderma,Tilaya,Buchitar,85.6668,24.4358,7.71,2258,1468,0,296,,447,48,206,,,0.51,676,169,62,206,5,,,,,,,,,,,102
+10013,2024,Post-Monsoon,Jharkhand,Latehar,Balumath,Balumath,84.7899,23.8271,7.70,1309,851,0,287,,209,64,70,,,0.31,455,152,18,88,4,,,,,,,,,,,102
+10014,2024,Post-Monsoon,Jharkhand,Latehar,Balumath,Barjatu,84.7996,23.8867,8.07,1319,857,0,366,,156,55,92,,,0.19,495,116,50,73,4,,,,,,,,,,,102
+10015,2024,Post-Monsoon,Jharkhand,Latehar,Mahuadanr,Mahuadanr,84.1141,23.3944,7.84,278,181,0,92,,32,1,18,,,0.37,100,20,12,16,2,,,,,,,,,,,102
+10016,2024,Post-Monsoon,Jharkhand,Latehar,Manika,Manika,84.3458,23.8503,7.95,1342,872,0,293,,209,58,84,,,0.71,480,152,24,85,6,,,,,,,,,,,102
+10017,2024,Post-Monsoon,Jharkhand,Lohardaga,Lohardaga,Lohardaga(pwdib,84.6907,23.4466,7.00,422,274,0,153,,32,2,37,,,0.42,150,32,17,25,6,,,,,,,,,,,102
+10018,2024,Post-Monsoon,Jharkhand,Pakur,Litipara,Litipara 2,87.6142,24.7100,7.73,595,387,0,281,,25,2,30,,,0.58,210,50,21,38,2,,,,,,,,,,,102
+10019,2024,Post-Monsoon,Jharkhand,Palamu,Bishrampur,Bishrampur,83.9417,24.2458,7.59,1224,796,0,494,,114,32,30,,,1.59,285,42,44,145,9,,,,,,,,,,,102
+10020,2024,Post-Monsoon,Jharkhand,Palamu,Chhatarpur,Chhatarpur,84.1988,24.3775,7.42,1216,790,0,500,,114,20,31,,,1.09,280,18,57,145,9,,,,,,,,,,,102
+10021,2024,Post-Monsoon,Jharkhand,Ramgarh,Dulmi,Kusumbha,85.5974,23.5592,7.70,1639,1065,0,439,,160,62,174,,,0.61,600,226,9,87,24,,,,,,,,,,,102
+10022,2024,Post-Monsoon,Jharkhand,Ramgarh,Mandu,Kuju,85.5068,23.7267,7.64,1488,967,0,366,,174,51,152,,,0.93,530,202,6,93,8,,,,,,,,,,,102
+10023,2024,Post-Monsoon,Jharkhand,Ramgarh,Mandu,Mandu,85.4698,23.8079,6.85,838,545,0,287,,60,5,91,,,1.03,260,82,13,70,4,,,,,,,,,,,102
+10024,2024,Post-Monsoon,Jharkhand,Ramgarh,Mandu,Thakur Gora,85.4553,23.7107,6.92,721,469,0,165,,89,47,61,,,0.28,225,62,17,59,4,,,,,,,,,,,103
+10025,2024,Post-Monsoon,Jharkhand,Ramgarh,Mandu,Barkachumba,85.4414,23.6851,7.09,961,625,0,226,,138,15,85,,,0.88,325,82,29,68,4,,,,,,,,,,,103
+10026,2024,Post-Monsoon,Jharkhand,Ramgarh,Mandu,Kanjgi,85.4619,23.6712,7.40,771,501,0,183,,110,42,45,,,0.33,185,54,12,90,3,,,,,,,,,,,103
+10027,2024,Post-Monsoon,Jharkhand,Ramgarh,Patratu,Bhurkunda,85.3606,23.6525,7.33,1153,749,0,354,,64,44,150,,,0.65,450,112,41,46,23,,,,,,,,,,,103
+10028,2024,Post-Monsoon,Jharkhand,Ramgarh,Patratu,Barkakhana,85.4722,23.6215,7.53,1081,703,0,281,,107,62,105,,,0.90,325,92,23,96,4,,,,,,,,,,,103
+10029,2024,Post-Monsoon,Jharkhand,Ramgarh,Ramgarh,Barlong,85.6061,23.5965,7.76,1122,729,0,354,,114,2,105,,,0.55,460,124,36,44,3,,,,,,,,,,,103
+10030,2024,Post-Monsoon,Jharkhand,Ranchi,Angara,Angara1,85.6069,23.4456,7.49,605,393,0,165,,75,16,46,,,0.42,250,86,9,21,6,,,,,,,,,,,103
+10031,2024,Post-Monsoon,Jharkhand,Ranchi,Angara,Barwadag,85.6923,23.3586,7.48,694,451,0,256,,46,19,54,,,0.85,280,44,41,25,8,,,,,,,,,,,103
+10032,2024,Post-Monsoon,Jharkhand,Ranchi,Angarha,Gondlipokhar,85.4876,23.4066,7.52,598,389,0,153,,75,52,27,,,0.28,195,52,16,41,10,,,,,,,,,,,103
+10033,2024,Post-Monsoon,Jharkhand,Ranchi,Bundu,Bundu,85.5886,23.1755,7.77,948,616,0,268,,107,2,100,,,0.78,370,108,24,45,3,,,,,,,,,,,103
+10034,2024,Post-Monsoon,Jharkhand,Ranchi,Bundu,Taimara,85.4974,23.2021,7.33,311,202,0,92,,18,18,37,,,0.44,105,32,6,19,8,,,,,,,,,,,103
+10035,2024,Post-Monsoon,Jharkhand,Ranchi,Chanho,Bijupara Tangar,85.0223,23.4825,7.26,718,467,0,153,,114,43,40,,,0.31,195,44,21,76,4,,,,,,,,,,,103
+10036,2024,Post-Monsoon,Jharkhand,Ranchi,Itki,Itki,85.1180,23.3378,6.22,255,166,0,73,,36,8,13,,,0.06,95,12,16,13,2,,,,,,,,,,,103
+10037,2024,Post-Monsoon,Jharkhand,Ranchi,Kanke,Bunti,85.3815,23.3964,7.47,794,516,0,244,,64,24,85,,,0.41,225,50,24,73,9,,,,,,,,,,,103
+10038,2024,Post-Monsoon,Jharkhand,Ranchi,Kanke,Kanke1,85.3180,23.4357,7.00,1037,674,0,275,,121,48,79,,,0.33,355,62,49,72,7,,,,,,,,,,,103
+10039,2024,Post-Monsoon,Jharkhand,Ranchi,Kanke,Daily Market,85.3247,23.3658,7.09,1271,826,0,244,,202,36,114,,,0.55,385,108,28,107,15,,,,,,,,,,,103
+10040,2024,Post-Monsoon,Jharkhand,Ranchi,Kanke,Ramkrishna mission Morabadi,85.3383,23.3992,7.00,651,423,0,183,,107,9,17,,,0.44,185,62,7,62,3,,,,,,,,,,,103
+10041,2024,Post-Monsoon,Jharkhand,Ranchi,Kanke,Hochar,85.4257,23.4274,6.77,196,127,0,43,,18,30,14,,,0.38,70,20,5,11,3,,,,,,,,,,,103
+10042,2024,Post-Monsoon,Jharkhand,Ranchi,Kanke,Sukurhutu,85.3216,23.4358,7.36,552,359,0,134,,71,6,56,,,0.35,175,54,10,43,6,,,,,,,,,,,103
+10043,2024,Post-Monsoon,Jharkhand,Ranchi,Namkom,Kharsidag,85.4490,23.2536,6.69,248,161,0,85,,21,12,13,,,0.68,60,14,6,22,12,,,,,,,,,,,103
+10044,2024,Post-Monsoon,Jharkhand,Ranchi,Namkom,Lalganj,85.4150,23.3836,6.90,321,209,0,61,,36,43,23,,,0.07,100,16,15,25,6,,,,,,,,,,,103
+10045,2024,Post-Monsoon,Jharkhand,Ranchi,Namkom,Lowadih,85.3619,23.3594,7.56,754,490,0,171,,99,39,65,,,0.20,175,50,12,81,19,,,,,,,,,,,103
+10046,2024,Post-Monsoon,Jharkhand,Ranchi,Namkom,Siramtoli,85.3320,23.3528,7.26,653,424,0,207,,67,14,49,,,0.39,215,44,26,49,3,,,,,,,,,,,103
+10047,2024,Post-Monsoon,Jharkhand,Ranchi,Namkom,Tati Silway(E.F.),85.4442,23.3761,7.70,562,365,0,92,,82,21,67,,,0.68,195,60,11,39,2,,,,,,,,,,,103
+10048,2024,Post-Monsoon,Jharkhand,Ranchi,Namkom,Ladnapiri,85.4447,23.2543,7.95,738,480,0,183,,124,15,31,,,0.47,350,106,21,6,3,,,,,,,,,,,103
+10049,2024,Post-Monsoon,Jharkhand,Ranchi,Namkom,Mani Tola (Doranda),85.3200,23.3308,7.94,719,467,0,232,,71,9,59,,,0.43,205,56,16,59,18,,,,,,,,,,,103
+10050,2024,Post-Monsoon,Jharkhand,Ranchi,Namkom,Hanuman Mandir (Near AG.Office),85.3158,23.3411,7.75,526,342,0,140,,60,14,50,,,0.36,190,44,19,30,5,,,,,,,,,,,103
+10051,2024,Post-Monsoon,Jharkhand,Ranchi,Namkum,Hatia,85.3058,23.3128,6.58,481,313,0,110,,50,51,34,,,0.39,175,38,19,28,4,,,,,,,,,,,103
+10052,2024,Post-Monsoon,Jharkhand,Ranchi,Ormanjhi,Chutupalu,85.5039,23.5217,7.86,952,619,0,256,,89,48,99,,,0.48,285,64,30,79,14,,,,,,,,,,,103
+10053,2024,Post-Monsoon,Jharkhand,Ranchi,Ormanjhi,Hombai B.I.T. Mesra,85.4111,23.4233,7.55,726,472,0,153,,89,54,68,,,0.41,160,62,1,78,25,,,,,,,,,,,103
+10054,2024,Post-Monsoon,Jharkhand,Ranchi,Ratu,Bajra,85.2793,23.3730,7.44,664,432,0,140,,67,47,79,,,0.19,210,70,9,53,7,,,,,,,,,,,103
+10055,2024,Post-Monsoon,Jharkhand,Ranchi,Silli,Kita,85.7599,23.3654,7.50,664,432,0,165,,85,2,70,,,0.12,195,48,18,62,3,,,,,,,,,,,103
+10056,2024,Post-Monsoon,Jharkhand,Ranchi,Silli,Patrahatu,85.7642,23.2941,6.90,371,241,0,104,,46,3,32,,,0.52,105,30,7,32,8,,,,,,,,,,,103
+10057,2024,Post-Monsoon,Jharkhand,Ranchi,Silli,Silli,85.8415,23.3602,7.47,716,465,0,244,,46,51,50,,,0.41,260,78,16,40,8,,,,,,,,,,,103
+10058,2024,Post-Monsoon,Jharkhand,Sahibganj,Mandro,Mandro,87.4979,25.1383,7.56,1905,1238,0,512,,266,65,102,,,0.47,515,156,30,133,114,,,,,,,,,,,103
+10059,2024,Post-Monsoon,Jharkhand,Sahibganj,Rajmahal,Mangal hat,87.7767,25.0761,7.73,1341,872,0,366,,160,66,88,,,0.51,410,130,21,105,23,,,,,,,,,,,103
+10060,2024,Post-Monsoon,Jharkhand,Sahibganj,Sahebganj,Sahebganj1,87.6580,25.2368,7.67,1496,972,0,464,,135,59,126,,,0.73,540,154,38,93,2,,,,,,,,,,,103
+10061,2024,Post-Monsoon,Jharkhand,Sahibganj,Sahibganj,Sakrigali,87.7125,25.2428,7.80,1911,1242,0,458,,298,64,104,,,0.87,700,226,33,115,3,,,,,,,,,,,103
+10062,2024,Post-Monsoon,Jharkhand,Sahibganj,Sahibganj,Dihari,87.5202,25.2669,8.23,1025,666,0,445,,53,17,54,,,0.39,385,90,39,48,19,,,,,,,,,,,103
+10063,2024,Post-Monsoon,Jharkhand,Sahibganj,Udhwa,Udhwa,87.8420,24.9720,7.88,1112,723,0,427,,71,18,84,,,0.55,380,124,17,67,24,,,,,,,,,,,103
+10064,2024,Post-Monsoon,Jharkhand,Saraikela,Chandil,Bhaludih,86.2481,22.7994,8.00,1065,692,0,275,,128,3,121,,,0.76,434,142,19,43,4,,,,,,,,,,,103
+10065,2024,Post-Monsoon,Jharkhand,Saraikela,Gamharia/adityapur,kandra,86.0583,22.8583,8.08,1112,723,0,266,,107,52,136,,,0.40,450,88,56,47,4,,,,,,,,,,,103
+10066,2024,Post-Monsoon,Jharkhand,Saraikela,Rajnagar,Keshargaria,85.9358,22.5861,8.22,467,304,0,183,,25,4,44,,,0.48,183,46,17,20,5,,,,,,,,,,,103
+10067,2024,Post-Monsoon,Jharkhand,Saraikela,Rajnagar,Bagra Sai,86.0456,22.6319,7.99,581,378,0,256,,21,1,43,,,1.19,213,78,4,35,2,,,,,,,,,,,103
+10068,2024,Post-Monsoon,Jharkhand,Simdega,Koleberia,Kolebira,84.6932,22.6997,7.19,521,339,0,177,,39,15,48,,,0.22,190,40,22,21,18,,,,,,,,,,,103
+10069,2024,Post-Monsoon,Jharkhand,West Singhbhum,Chakradharpur,CKP (Ulidih),85.6517,22.6711,8.15,1541,1002,0,531,,146,0,122,,,0.51,397,101,35,170,4,,,,,,,,,,,103
+10070,2024,Post-Monsoon,Jharkhand,West Singhbhum,Hatgamhariya,Hat Gamhariya,85.7358,22.2617,7.96,1027,668,0,189,,199,18,58,,,0.51,322,106,14,83,11,,,,,,,,,,,103
+10071,2024,Post-Monsoon,Jharkhand,West Singhbhum,Jhinkpani,Jhinkpani,85.7736,22.4167,7.83,995,647,0,412,,60,25,52,,,0.78,312,83,26,76,15,,,,,,,,,,,103
+10072,2024,Post-Monsoon,Jharkhand,West Singhbhum,Sonua,Sonua,85.4625,22.5797,7.77,415,270,0,183,,18,1,32,,,0.33,161,37,17,20,2,,,,,,,,,,,103

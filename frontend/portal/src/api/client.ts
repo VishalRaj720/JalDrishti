@@ -814,7 +814,98 @@ export interface VerticalScreening {
     separation_m: number | null;
     static_deep_head?: Record<string, any>;
   } | null;
+  /** 2026-09-25: the screened species, so the panel can tell whether the first
+   *  arrival is something else. Absent on runs stored before then. */
+  species?: string;
+  /** When the pore water carrying the solute would arrive — what the headline
+   *  used to be for every species, before matrix retention was applied. */
+  water_arrival_years?: number | null;
+  /** How strongly the confining rock's matrix holds this species back. */
+  layer2_retardation?: number | null;
+  /** The headline re-evaluated at the ends of the measured Kv/Kh range. */
+  anisotropy_band?: {
+    Kv_Kh_low: number; Kv_Kh_high: number; Kv_Kh_served: number;
+    years_to_breakthrough_range: [number | null, number | null];
+    basis: string;
+  } | null;
+  first_arrival?: {
+    species: string; years: number;
+    shallow_impact_probability: number | null; risk_band: string | null;
+    basis: string;
+  } | null;
+  first_detectable?: { species: string; years: number; basis: string } | null;
+  indicators?: VerticalIndicator[];
+  confining_path?: Record<string, any> | null;
   [k: string]: any;
+}
+
+/** One CGWB exploratory borehole of the Singhbhum belt and the water-bearing
+ *  zones it cut, transcribed from CGWB's own tables (engine
+ *  `data_prep/cgwb_boreholes.py`). Blank in the source stays null here. */
+export interface Borehole {
+  well_id: string; name: string; block: string | null; district: string | null;
+  lon: number; lat: number; formation: string | null; kind: string | null;
+  depth_m: number | null; casing_m: number | null; status: string | null;
+  swl_mbgl: number | null; discharge_lps: number | null; drawdown_m: number | null;
+  transmissivity_m2day: number | null; storativity: number | null;
+  /** CGWB recorded the well as auto-flowing (artesian). */
+  flowing: boolean;
+  coord_note: string | null; note: string | null; sources: string;
+  /** W = water strike in the weathered/fissured zone, F = fracture,
+   *  G = granular zone (sediments) — CGWB's own labels. */
+  zones: Array<{ kind: string; top_m: number; bottom_m: number;
+                 yield_lps: number | null; yield_note: string | null; source: string }>;
+  ground_m?: number | null;
+  km?: number; bearing_deg?: number;
+}
+
+/** `GET /ml/site-block` — the measured context the 3-D block is drawn from.
+ *  The plume and the vertical fronts come from the run itself. */
+export interface SiteBlock {
+  center: [number, number]; half_km: number;
+  /** [[south, west], [north, east]] */
+  bounds: [[number, number], [number, number]];
+  ground_m: number | null;
+  /** int16 metres, row 0 = north, first cell centre at (lon_first, lat_first);
+   *  rows step SOUTH by dlat, columns EAST by dlon. */
+  terrain: {
+    nx: number; ny: number; lon_first: number; lat_first: number;
+    dlon: number; dlat: number; encoding: string; elev_m: string; source: string;
+  } | null;
+  terrain_note: string | null;
+  wells: Array<{
+    name: string; district: string | null; lon: number; lat: number;
+    ground_m: number | null; depth_to_water_m: Record<string, number | null>;
+    depth_to_water_range_m: [number, number] | null;
+    n_readings: number; years: [number, number];
+  }>;
+  wells_source: string;
+  rivers: Array<{ coordinates: [number, number][]; props: Record<string, number> }>;
+  layers: {
+    layer1_base_m: number; fracture_min_m: number | null; fracture_max_m: number | null;
+    district: string | null; source: string | null; confidence: string | null;
+  };
+  nearest_well: { name: string; km: number; district: string | null } | null;
+  boreholes: Borehole[];
+  nearest_boreholes: Borehole[];
+  boreholes_source: Record<string, string>;
+}
+
+export const fetchSiteBlock = (lon: number, lat: number, halfKm = 1.5) =>
+  api.get<SiteBlock>(`/ml/site-block?lon=${lon}&lat=${lat}&half_km=${halfKm}`);
+
+/** One lixiviant indicator's climb through the same confining rock. */
+export interface VerticalIndicator {
+  species: string;
+  years_to_breakthrough?: number | null;
+  water_arrival_years?: number | null;
+  layer2_retardation?: number | null;
+  health_limit?: number | null;
+  source_exceeds_limit?: boolean | null;
+  shallow_impact_probability?: number | null;
+  risk_band?: string | null;
+  note?: string;
+  status?: string;
 }
 
 export interface ModelBundle {

@@ -113,7 +113,11 @@ def audit_labels() -> None:
                     (df[f"{c}_p50"] > df[f"{c}_p90"])).sum())
                for c in ("affected_area_ha", "max_migration_distance_m", "compliance_conc"))
     check("labels", "band ordering p10<=p50<=p90", viol == 0, f"{viol} violations")
-    num = df.select_dtypes("number")
+    # v6 audit column `ore_depth_sampled_m` is NaN BY DESIGN where a scenario kept
+    # the polygon's shallow K (generate.DEPTH_DECAY_SHARE); it is neither a
+    # feature nor a label, so it is left out of this check.
+    num = df.select_dtypes("number").drop(columns=["ore_depth_sampled_m"],
+                                          errors="ignore")
     check("labels", "no NaN / inf labels",
           int(num.isna().sum().sum()) == 0 and int(np.isinf(num.to_numpy()).sum()) == 0)
     # labels must reflect the CURRENT source envelope (V-2)

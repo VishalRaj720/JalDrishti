@@ -98,8 +98,11 @@ async def compute_timeline(site: Any, request: dict[str, Any], *,
     ring_radius_from_centre: Optional[float] = None
     errors = 0
     for y in years:
+        # frames keep contours and metrics only, so the engine's display-only
+        # rasters and indicator arrivals are skipped (the adapter's
+        # METRICS_ONLY, spelled out here to keep this module adapter-free)
         overrides = {**(request or {}), "species": species, "time_years": y,
-                     "restoration_years": rest}
+                     "restoration_years": rest, "display_extras": False}
         try:
             r = await predict(payload_from_site(site, overrides=overrides))
         except Exception as exc:  # noqa: BLE001

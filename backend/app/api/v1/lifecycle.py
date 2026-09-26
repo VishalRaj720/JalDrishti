@@ -162,7 +162,8 @@ async def lifecycle(
         threshold: Optional[float] = None
 
         for y in ordered:
-            overrides = {"species": sp, "time_years": y, "restoration_years": rest}
+            overrides = {"species": sp, "time_years": y, "restoration_years": rest,
+                         **mlp.METRICS_ONLY}
             try:
                 r = await mlp.predict(mlp.payload_from_site(site, overrides=overrides))
             except Exception as exc:  # noqa: BLE001

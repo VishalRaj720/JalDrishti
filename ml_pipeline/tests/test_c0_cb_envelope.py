@@ -42,14 +42,23 @@ def test_every_species_has_finite_c0_and_cb_bounds():
             assert lo <= hi
 
 
-def test_the_model_card_still_lacks_these_keys():
-    """Documents *why* the config constant is the source of truth. If a future
-    retrain records `species_support` in the card, `_species_support` prefers it
-    and this test should be updated rather than deleted."""
+def test_the_model_card_now_records_the_species_support():
+    """UPDATED 2026-09-26 (v6). This test used to document that the card had no
+    concentration support, which is why P.TRAINED_SPECIES_SUPPORT was the source
+    of truth. The v6 trainer records `species_support` in the card, so
+    `_species_support` prefers it -- and the config fallback must agree with it,
+    or the two would be two answers to one question."""
     from ml_pipeline.dashboard.resolve import _model_card
-    env = _model_card().get("training_envelope", {})
-    assert "source_conc_C0" not in env
-    assert "background_conc_Cb" not in env
+    card = _model_card()
+    env = card.get("training_envelope", {})
+    assert "source_conc_C0" not in env and "background_conc_Cb" not in env
+    rec = card.get("species_support")
+    assert rec, "the v6 card must record species_support"
+    for sp, keys in rec.items():
+        for key, (lo, hi) in keys.items():
+            c_lo, c_hi = P.TRAINED_SPECIES_SUPPORT[sp][key]
+            assert lo == pytest.approx(c_lo, rel=1e-3, abs=1e-9), (sp, key)
+            assert hi == pytest.approx(c_hi, rel=1e-3, abs=1e-9), (sp, key)
 
 
 def test_recorded_support_matches_the_training_set():
@@ -127,14 +136,20 @@ def test_the_check_is_per_species_not_global():
         {**inp_r, "source_conc_C0": u_c0}, hyd_r)
 
 
-def test_degenerate_radium_baseline_accepts_its_single_value():
-    """Radium Cb is one constant for every training row (lo == hi). The
-    tolerance must accept it rather than flag every radium run."""
+def test_radium_baseline_support_covers_every_served_background():
+    """REWRITTEN 2026-09-26 (v6). Radium's background used to be one constant
+    for every training row (lo == hi == 23) and this test checked the tolerance
+    accepted it. It is now the BARC survey blend (10-23 mBq/L, LIMITATIONS.md
+    1k), trained over that whole range -- so every mining area's own value and
+    the far-field anchor must sit inside support, unflagged."""
     lo, hi = _species_support()["radium_226_mbq_l"]["background_conc_Cb"]
-    assert lo == hi
-    inp, hyd = _inputs(*JADUGUDA, "radium_226_mbq_l")
-    assert "conc:background_conc_Cb" not in envelope_violations(
-        {**inp, "background_conc_Cb": lo}, hyd)
+    assert lo < hi
+    pins = [(86.347, 22.652), (86.186, 22.729), (86.2609, 22.6985),
+            (86.491, 22.470), FAR_NON_ORE]
+    for lon, lat in pins:
+        inp, hyd = _inputs(lon, lat, "radium_226_mbq_l")
+        assert lo * 0.98 <= inp["background_conc_Cb"] <= hi * 1.02, (lon, lat)
+        assert "conc:background_conc_Cb" not in envelope_violations(inp, hyd), (lon, lat)
 
 
 # ── the suppression rule ─────────────────────────────────────────────

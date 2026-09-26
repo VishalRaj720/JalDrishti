@@ -291,7 +291,12 @@ def test_radium_uses_measured_local_source_and_who_threshold():
     assert "10.4103/0972-0464.121824" in rc["citation"]
     # judged against the WHO guidance level, not a BIS limit (BIS has none)
     assert P.EXCURSION_THRESHOLDS["radium_226_mbq_l"] == 1000.0
-    assert inp["background_conc_Cb"] == pytest.approx(P.RADIUM_BACKGROUND_MBQ_L)
+    # 2026-09-26: the background is the BARC survey blend, which at Jaduguda
+    # returns ~Jaduguda's own measured 23 mBq/L (Tripathi et al. 2008) -- not
+    # the regional anchor -- and the context block reports the served value
+    assert inp["background_conc_Cb"] == pytest.approx(rc["background_mbq_l"], abs=0.01)
+    assert 20.0 < inp["background_conc_Cb"] <= 23.0
+    assert h["background_provenance"]["dominant"]["area"] == "jaduguda_bhatin"
 
 
 @pytest.mark.parametrize("regime", ["fractured", "porous"])
@@ -360,10 +365,13 @@ def test_radium_is_ore_zone_gated():
     """Ra-226 is a uranium-decay product: no ore body, no radium source."""
     _, dep = resolve_inputs(dict(**RADIUM))
     _, belt = resolve_inputs(dict(lon=86.25, lat=22.63, species="radium_226_mbq_l"))
-    _, none = resolve_inputs(dict(lon=85.33, lat=23.36, species="radium_226_mbq_l"))
+    none_inp, none = resolve_inputs(dict(lon=85.33, lat=23.36, species="radium_226_mbq_l"))
     assert dep["source_conc_C0"] > belt["source_conc_C0"] > none["source_conc_C0"]
-    # off the ore, the source collapses to background -> zero incremental term
-    assert none["source_conc_C0"] == pytest.approx(none["background_conc_Cb"])
+    # off the ore, the source collapses to background -> zero incremental term.
+    # Compared on the unrounded INPUTS: the hydro block rounds C0 to 1 dp and Cb
+    # to 2 dp, which only agreed while the background was exactly 23.0 (it is a
+    # survey blend since 2026-09-26, ~10.05 here).
+    assert none_inp["source_conc_C0"] == pytest.approx(none_inp["background_conc_Cb"])
     assert none["u_suppressed"] is True
 
 

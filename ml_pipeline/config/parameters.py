@@ -117,12 +117,22 @@ RADIUM_SOURCE_MBQ_L = {"min": 40.0, "gm": 371.3, "max": 1706.0, "gsd": 2.6}
 # -- which is why the max is used rather than scaling up by a uranium-like
 # ISR factor.
 RADIUM_SOURCE_STATISTIC = "max"
-# Regional background: uranium-mine-area groundwater Ra-226 ~ 23 mBq/L
-# (BARC: Tripathi et al., Appl. Radiat. Isot. 66(11) (2008) 1666-1670,
-# doi:10.1016/j.apradiso.2007.12.019), with potable wells spanning
-# <3.5-208 mBq/L (Tripathi et al., Radiat. Prot. Dosim. 148(2) (2012) 211-218,
-# doi:10.1093/rpd/ncr014; Jaduguda ground-water ingestion-dose study).
-RADIUM_BACKGROUND_MBQ_L = 23.0
+# Regional background -- REVISED 2026-09-26 (grounding pass, LIMITATIONS 1k).
+# Until now this ONE number was the radium background at every pin in the state:
+# 23 mBq/L, the Jaduguda-area "regional average" of Tripathi et al. (2008),
+# Appl. Radiat. Isot. 66(11):1666-1670, doi:10.1016/j.apradiso.2007.12.019.
+# Four BARC mining-area surveys and one regional survey are now on disk
+# (Datasets/singhbhum_groundwater_radionuclide_baselines.csv), and the served
+# background is BLENDED from them (data_prep/groundwater_baselines.py). So this
+# constant is only the REGIONAL ANCHOR the blend falls back to away from the
+# mines: the geometric mean of 108 post-monsoon wells across East Singhbhum and
+# Saraikela-Kharsawan (Molla et al. 2025, J. Radioanal. Nucl. Chem. 334:1021,
+# doi:10.1007/s10967-024-09888-7). Jaduguda's own 23 mBq/L is still what a
+# Jaduguda pin serves -- it is one of the survey rows. Outside those two
+# districts it is BORROWED (no radium survey exists elsewhere in Jharkhand), and
+# the served provenance says so. tests/test_grounded_baselines.py pins this
+# constant to the CSV row so the two cannot drift.
+RADIUM_BACKGROUND_MBQ_L = 10.0
 
 # Kd (L/kg). Source: EPA 402-R-04-002C Vol III, archived at
 # Datasets/phase1_sources/EPA_Kd_VolIII_As_Ra.pdf.
@@ -137,8 +147,10 @@ RADIUM_BACKGROUND_MBQ_L = 23.0
 # This tool models a GROUNDWATER plume, so (a) is the applicable medium. The
 # same EPA document warns of (b) at p.96 that those values "are unusually large,
 # and orders of magnitude greater than those reported by most researchers".
-# (b) is retained ONLY as the immobile upper end member of the sampled band, so
+# (b) was retained ONLY as the immobile upper end member of the sampled band, so
 # the BARC (2008) tailings-pond observation stays reachable by a Monte-Carlo draw.
+# Since 2026-09-26 that end member is a LOCAL measurement instead (Turamdih
+# soils, Maity et al. 2015 -- see the note at the end of RADIUM_KD_RANGES).
 #
 # Chemistry that justifies radium sorbing more strongly than alkaline uranium at
 # all: Ra exists only as the uncomplexed divalent Ra2+ over pH 3-10 (ibid. p.90)
@@ -183,17 +195,36 @@ RADIUM_KD_RANGES = {
     #                   sorption measured in the lower ionic strength
     #                   groundwater solution." Alkaline ISR is the high-ionic-
     #                   strength case by construction.
-    #   hi   the retained Thibault soil values -- so the IMMOBILE end member
-    #                   stays inside the sampled range and the BARC (2008)
-    #                   observation that radium does not migrate from the
-    #                   Jaduguda tailings remains reachable by a draw.
+    #   hi   the IMMOBILE end member, so the BARC (2008) observation that
+    #                   radium does not migrate from the Jaduguda tailings
+    #                   remains reachable by a draw. Was the retained Thibault
+    #                   soil value; now the local Turamdih maximum (below).
     #
     # Net effect: the band now spans ~2.5 orders of magnitude and contains BOTH
     # hypotheses -- mobile radium in a high-TDS lixiviant, and the immobile
     # tailings-pond behaviour actually observed at Jaduguda. It no longer picks
     # one and hides the choice.
-    "fractured": (6.7, 13.2, 2000.0),
-    "porous":    (6.7, 13.2, 9100.0),
+    #
+    # UPPER END GROUNDED LOCALLY -- 2026-09-26 (LIMITATIONS 1k). The immobile end
+    # member was a FOREIGN soil number (Thibault clay 9,100; fractured 2,000 had
+    # no stated source). It is now the largest radium Kd MEASURED at a Singhbhum
+    # mine: Maity, Sahu & Pandit (2015), Radioprotection 50(2):129-134,
+    # doi:10.1051/radiopro/2014040 -- seven locations around Turamdih, batch
+    # method with the site's own groundwater (pH 6.8-7.3), mostly sandy soils:
+    #     top soil      580 - 1,835 L/kg
+    #     1 m depth     796 - 2,285 L/kg      Kd = 239 + 100*CEC (R2 0.50)
+    # Mishra, Maity & Pandit (2012), Radiat. Prot. Dosim. 152:229, report
+    # log Kd ~2-3 for Ra in soils near the mines in all three waters of
+    # different ionic strength they tested (abstract; full text not obtained).
+    # WHY THE MODE STAYS AT 13.2 AND NOT AT A LOCAL VALUE. Every local number is
+    # for SOIL (0-1 m, 4-7 % organic matter, which is what Ra binds to here:
+    # R2 0.68 against OM) in AMBIENT groundwater. The plume crosses fractured
+    # rock at 50-200 m with no organic matter, carrying an ISR lixiviant's
+    # ionic strength. The local data therefore bound the IMMOBILE end, and show
+    # the served mode sits ~40-170x on the mobile side of anything measured
+    # locally -- conservative by construction, stated rather than hidden.
+    "fractured": (6.7, 13.2, 2285.0),
+    "porous":    (6.7, 13.2, 2285.0),
 }
 
 # Radioactive decay: Ra-226 half-life 1600 yr. Over this tool's 0-50 yr horizon
@@ -283,10 +314,14 @@ RADON_222_MODELLED = False
 # Training C0 range for the synthetic generator (2026-08-02 retrain). Radium has
 # no Texas ISR series to sample a source envelope from (see RADIUM_SOURCE_MBQ_L
 # above), so the generator draws C0 uniformly over the FULL range the SERVE path
-# can ever produce: background-only at a non-ore pin (23 mBq/L) up to the
-# measured Jaduguda maximum used as the deposit ceiling (1706 mBq/L). This makes
-# the trained feature support match the served input support exactly, rather
-# than the model ever extrapolating on its own training range.
+# can ever produce: background-only at a non-ore pin up to the measured Jaduguda
+# maximum used as the deposit ceiling (1706 mBq/L). This makes the trained
+# feature support match the served input support exactly, rather than the model
+# ever extrapolating on its own training range.
+# 2026-09-26: the lower end is the REGIONAL anchor (10 mBq/L), not Jaduguda's 23.
+# The served background is a weighted average of the survey values (all >= the
+# anchor) and the anchor itself, so it can never fall below the anchor -- the
+# smallest background-only C0 a non-ore pin can serve.
 RADIUM_C0_TRAINING_RANGE_MBQ_L = (RADIUM_BACKGROUND_MBQ_L, RADIUM_SOURCE_MBQ_L["max"])
 
 # Restoration endpoint residual for radium (C_rest/C0 after a reference sweep).
@@ -412,8 +447,17 @@ SPECIES_ONEHOT = [f"is_{sp}" for sp in SPECIES]
 # Fallback ambient background when the nearest CGWB well has no value for a
 # species. Radium has no CGWB column at all, so it always takes its measured
 # BARC regional value.
+#
+# URANIUM, CORRECTED 2026-09-26 (LIMITATIONS 1k). This read 1.0 with no source,
+# and it was not a rare fallback: the CGWB well nearest EVERY one of the seven
+# deposits has no uranium measurement (checked at the deposit centres), so 1.0
+# was the uranium background served at every deposit pin. It is now the
+# statewide median of the 342 CGWB wells that do measure uranium
+# (Datasets/waterQuality_jharkhand.csv, 397 wells), re-derived by
+# tests/test_grounded_baselines.py. Around the mines the BARC surveys override
+# it anyway (data_prep/groundwater_baselines.py).
 BACKGROUND_DEFAULTS = {
-    "uranium_ppb": 1.0,
+    "uranium_ppb": 0.775,
     "sulfate_mg_l": 20.0,
     "tds_mg_l": 300.0,
     "radium_226_mbq_l": RADIUM_BACKGROUND_MBQ_L,
@@ -433,6 +477,25 @@ SPECIES_UNITS = {
 def background_default_for(species: str) -> float:
     """Ambient background to use when the nearest well carries no measurement."""
     return float(BACKGROUND_DEFAULTS[species])
+
+
+# MINING-AREA BASELINE SURVEYS -> ONE CONTINUOUS BACKGROUND FIELD  [2026-09-26]
+# ---------------------------------------------------------------------------
+# Uranium and Ra-226 were measured in village wells around each Singhbhum mine
+# by BARC (Datasets/singhbhum_groundwater_radionuclide_baselines.csv: one row per
+# study x area x species, with the served row chosen by a stated rule -- a
+# robust central statistic over an arithmetic mean, then the larger sample).
+# The served background is an inverse-distance-squared (Shepard) blend of the
+# mining-area values with a far-field ANCHOR -- the nearest CGWB well (uranium,
+# when it measured one; else the statewide median above) or the regional survey
+# (radium) -- whose weight equals one survey's at this distance:
+#     Cb = (sum_i v_i/d_i^2 + A/R^2) / (sum_i 1/d_i^2 + 1/R^2)
+# It returns a survey's own value at its mining area, the anchor far away, and is
+# continuous in between (no seam at an arbitrary footprint line -- this project
+# has removed three of those already). R is the scale of the surveys' own
+# footprints (Kumar 2015 sectors to 5 km; Rana 2010 within 10 km) and is a
+# MODELLING POLICY, registered below.
+BASELINE_SURVEY_BLEND_KM = 5.0
 
 
 def kd_range_for(species: str, regime: str) -> tuple:
@@ -722,6 +785,19 @@ KD_RANGES = {  # L/kg
         # weathered/alluvial: more clay + Fe/Mn oxides -> moderate retardation,
         # but still suppressed by uranyl-carbonate complexation. [DAVIS, EPA99]
         "porous":    (0.5, 2.5, 8.0),
+        # LOCAL EVIDENCE, 2026-09-26 -- recorded, deliberately NOT served.
+        # Uranium Kd has been measured at Turamdih: 69-5,524 L/kg in soils at 9
+        # sites (top soil 129-5,524; 1 m depth 69-3,862), batch method, log Kd
+        # falling with soil CaCO3 and rising with pH across 5-6 (Maity, Mishra &
+        # Pandit 2013, J. Radioanal. Nucl. Chem. 295:1581; INIS 2pgdr-pmb29 and
+        # y353v-3m886 -- abstracts only), and log Kd ~2-3 for U(VI) in all three
+        # waters of different ionic strength tested by Mishra, Maity & Pandit
+        # (2012), Radiat. Prot. Dosim. 152:229. Those are SOILS at pH 5-7 in
+        # ambient water. An alkaline ISR plume carries uranium as uranyl-
+        # carbonate, which is exactly what suppresses its sorption (DAVIS,
+        # EPA99), and the CaCO3 trend Maity reports points the same way. So the
+        # local numbers bound the ambient case from above; the served values sit
+        # 1-3 orders of magnitude on the mobile, conservative side of them.
     },
     "sulfate_mg_l": {  # near-conservative anion
         "fractured": (0.0, 0.05, 0.3),
@@ -1320,25 +1396,30 @@ OPERATIONAL_RANGES = {
 # `tests/test_c0_cb_envelope.py::test_recorded_support_matches_the_training_set`
 # re-derives these from the CSV whenever it is present, so a retrain that shifts
 # the support fails the suite instead of quietly invalidating the guard.
+#
+# v6 (2026-09-26): re-measured from the v6 training set. Since v6 the trainer
+# also RECORDS this box in the model card (`species_support`), which the guard
+# prefers; this constant is the clean-clone fallback and
+# test_c0_cb_envelope pins the two to each other. Radium's background is no
+# longer degenerate at 23: it is drawn over the served survey-blend range
+# (the regional anchor 10 up to Jaduguda's 23; LIMITATIONS.md 1k).
 # ---------------------------------------------------------------------------
 TRAINED_SPECIES_SUPPORT = {
     "uranium_ppb": {
-        "source_conc_C0":     (9026.96, 41594.9),
-        "background_conc_Cb": (0.0, 25.31),
+        "source_conc_C0":     (9015.82, 41496.77),
+        "background_conc_Cb": (0.001197, 25.2651),
     },
     "sulfate_mg_l": {
-        "source_conc_C0":     (273.753, 2975.66),
+        "source_conc_C0":     (273.368, 2973.08),
         "background_conc_Cb": (2.0, 190.0),
     },
     "tds_mg_l": {
-        "source_conc_C0":     (1591.71, 5698.63),
-        "background_conc_Cb": (97.92, 1513.6),
+        "source_conc_C0":     (1591.11, 5716.30),
+        "background_conc_Cb": (97.92, 1563.52),
     },
     "radium_226_mbq_l": {
-        "source_conc_C0":     (25.7058, 1698.52),
-        # Degenerate on purpose: there is no measured Jharkhand radium baseline,
-        # so the generator used the single config constant for every row.
-        "background_conc_Cb": (23.0, 23.0),
+        "source_conc_C0":     (12.0615, 1705.764),
+        "background_conc_Cb": (10.0212, 22.9769),
     },
 }
 
@@ -1544,21 +1625,111 @@ JADUGUDA_MINE_WATER_RA226_MBQL = {"min": 40.0, "gm": 371.3, "max": 1706.0, "gsd"
 JADUGUDA_SOURCE_CITATION = ("Sethy et al. 2013, Radiat. Prot. Environ. 36(1):32-37, "
                             "DOI 10.4103/0972-0464.121824")
 
-# D5: Singhbhum Shear Zone transmissivity correction (serve-time, no retrain).
-# The ore-belt fractured aquifer is anomalously transmissive -- CGWB NAQUIM gives
-# T = 207-570 m2/day for East Singhbhum (Jaduguda belt), vs the generic schist
-# aquifer polygon's T ~ 42 (K = 1.12). The lithology K therefore under-states
-# leakiness ~5-14x EXACTLY where ISR uranium mining happens. At fractured
-# deposit/belt pins the served K + aquifer thickness are replaced with the
-# measured shear-zone values (T and b corrected jointly so seepage velocity stays
-# physical -- a high K in a thin layer would be unphysically fast). K is already a
-# model feature spanning ~0.04-10.6, so K = T/b ~ 2.5 is in-support -> no retrain.
-# Higher T -> lower containment eta ~ Q_net/(T*i*W) -> LARGER ore-belt plume
-# (safety-conservative). Applies only to the fractured Singhbhum shear zone; the
-# rest of the state keeps its lithology K (already within ~2x of district NAQUIM).
-SHEAR_ZONE_T_M2DAY = 370.0          # representative fractured T (E-Singhbhum central)
-SHEAR_ZONE_THICKNESS_M = 150.0      # productive fractured thickness (fractures 20-258 m)
-# K = T/b = 2.47 m/day (vs the schist polygon's 1.12)
+# D5: Singhbhum Shear Zone transmissivity -- the MEASURED-MAXIMUM BASELINE.
+# REVISED 2026-09-26 on the owner's decision (LIMITATIONS 1k).
+#
+# WHAT IT WAS. T = 370 m2/day over b = 150 m (K = 2.47), described as "207-570
+# exactly where the mines are". LIMITATIONS 1j (2026-09-25) found the 207-570 are
+# CGWB's TERTIARY-SEDIMENT wells (Kalapathar, Baharagora, Manusmuria; Phase-III
+# Table 11), 51-58 km east of Jaduguda and outside the belt, and 370 was a
+# "representative" pick from them (commit da71d4b), not a mean.
+#
+# WHAT IT IS NOW -- the largest transmissivity MEASURED in the shear zone's own
+# host rock near the deposits:
+#   Kudada EW (CGWB), metasediments, 3 km NE of Turamdih: T = 19 m2/day,
+#   S = 6.9e-4, discharge 8.83 L/s at 18.2 m drawdown, well 145.4 m deep, cased
+#   to 15.6 m, fractures at 105-106, 117-118 and 137-139 m (CGWB Phase-III
+#   Annex-III p.49, Table 11 p.12; Datasets/cgwb_exploratory_wells_singhbhum.csv).
+# The owner's framework (2026-09-26): the BASELINE uses the measured maximum,
+# capped at T <= 20 m2/day, and the ISR-feasibility level is shown only as a
+# secondary hypothetical (ISR_FEASIBILITY below).
+#
+# WHY 19 AND NOT A LARGER NUMBER. Two independent checks bound it from above:
+#  * THE MINES THEMSELVES. A dewatered mine is a pumping test at km2 scale.
+#    UCIL's 2017 pre-feasibility reports give mine discharge of 2,700 m3/day
+#    (Narwapahar, developed to 380 m) and >= 3,170 m3/day (Turamdih, 260 m).
+#    Thiem, T = Q ln(R/r_e) / (2 pi s), over every plausible radius ratio and
+#    drawdown gives a BULK T of 1.4-9.1 (Turamdih) and 0.8-5.3 m2/day
+#    (Narwapahar) -- upper bounds, since the pumped water includes stowing,
+#    drilling and rain water. 370 would force >= 17x the reported discharge even
+#    with only 55 m of drawdown; 19 roughly matches it
+#    (validation/mine_inflow_transmissivity.py).
+#  * THE OTHER TESTS. Hesel EW-1/EW-2 (Potka, granite/unrecorded) 4 and 6;
+#    granite wells 2-39 across the belt districts.
+# DISCLOSED, NOT SERVED: AMD Jamshedpur EW, also metasediments, T = 101 m2/day
+# -- no position is published, and the mine discharge rules out ~100 at deposit
+# scale. A single well can intersect a productive fracture; the bulk rock around
+# the ore bodies does not behave like one. The ISR-feasibility hypothetical
+# (K = 1 m/day, i.e. T ~ 130 over this thickness) spans that value.
+#
+# THICKNESS = the interval the 19 was measured over (open hole 15.6-145.4 m =
+# 129.8 m), so K = T/b is the conductivity the test actually implies. The old
+# 150 m was a choice. The depth decay K(z) below is still applied from the
+# shallow reference depth to the ore depth, exactly as before.
+#
+# CONSEQUENCE, stated plainly: at the deposits' ore-depth seeds this K is
+# 0.03-0.18 m/day -- below the IAEA's 0.1 m/day ISR-feasibility floor at five of
+# the seven (the shallow Bhatin and Banduhurang seeds sit just above it), short
+# of the IAEA's ~1 m/day working level at all of them, and below the
+# surrogate's former trained K support -- the 2026-09-26 retrain extends that
+# support (generate.py DEPTH_DECAY_SHARE). Applies only to the fractured
+# Singhbhum shear zone; the rest of the state keeps its lithology K.
+SHEAR_ZONE_T_M2DAY = 19.0           # Kudada EW pumping test -- measured maximum
+SHEAR_ZONE_THICKNESS_M = 130.0      # Kudada EW open-hole tested interval (129.8 m)
+# K = T/b = 0.146 m/day (vs the schist polygon's 1.12)
+SHEAR_ZONE_T_SOURCE = {
+    "well_id": "kudada_ew",
+    "framework": ("measured maximum of the shear zone's host-rock pumping tests "
+                  "near the deposits, capped at T <= 20 m2/day (owner decision "
+                  "2026-09-26)"),
+    "cap_m2day": 20.0,
+    "citation": ("CGWB NAQUIM Phase-III (East Singhbhum, Saraikela-Kharsawan & "
+                 "West Singhbhum parts) Annex-III p.49 and Table 11 p.12"),
+    "disclosed_not_served": ("AMD Jamshedpur EW, metasediments, T = 101 m2/day, "
+                             "position unpublished; mine discharge rules out ~100 "
+                             "at deposit scale"),
+    "mine_discharge_bulk_T_m2day": {"Turamdih": (1.4, 9.1), "Narwapahar": (0.8, 5.3)},
+    "mine_discharge_citation": ("UCIL pre-feasibility reports, 2017 "
+                                "(environmentclearance.nic.in): Narwapahar 2,700 "
+                                "m3/day; Turamdih >= 3,170 m3/day"),
+}
+
+# ---------------------------------------------------------------------------
+# ISR-FEASIBILITY -- the SECONDARY, HYPOTHETICAL answer  [2026-09-26]
+# ---------------------------------------------------------------------------
+# The owner's second answer: not what the measured rock does, but how far a
+# plume would spread IF the ore horizon were permeable enough for in-situ
+# leaching to work at all. Shown beside the baseline, labelled hypothetical,
+# never fed to alerts, never served as the answer.
+#
+# THE THRESHOLD IS THE IAEA's, not ours:
+#   IAEA Nuclear Energy Series NF-T-1.4 (2016), "In Situ Leach Uranium Mining:
+#   An Overview of Operations", p.10: "As a rule of thumb, permeability of the
+#   order of 1 m/d (1.2 darcy) or higher is advantageous. Usually, ISL becomes
+#   unfeasible at values of the order of about 0.1 m/d and less."
+#   IAEA-TECDOC-1239 (2001), p.56: "practically impermeable (clays, loams,
+#   argillites, clayey schists and solid rocks), where C = 0 to 0.1 m/day ...
+#   The most favourable deposits for ISL extraction are those ... with
+#   C > 1 m/day. In some cases, the minimum acceptable hydraulic conductivity may
+#   be below 0.5 and even 0.1 m/day."
+#   UCIL's own note on ISL lists "the host rock should have a good permeability"
+#   among its preconditions (ucil.gov.in, "Uranium mining by in-situ leaching").
+#
+# THE SCENARIO: the ORE-ZONE K is raised to the IAEA's 1 m/day working level
+# (never lowered -- where the measured K already exceeds it the scenario equals
+# the baseline). Everything else is the baseline's: thickness, gradient,
+# porosities, source, operation, and the CONFINING column above the ore, which
+# keeps its measured K -- the IAEA criterion is about the ore horizon, so the
+# vertical pathway is unchanged by construction and the response says so.
+# Every run also reports whether its baseline ore-zone K falls below the 0.1
+# m/day floor, i.e. whether ISR would even be feasible at the measured rock.
+ISR_FEASIBILITY = {
+    "K_scenario_m_day": 1.0,           # IAEA "advantageous" rule of thumb
+    "K_unfeasible_below_m_day": 0.1,   # IAEA "usually unfeasible" floor
+    "citation": ("IAEA Nuclear Energy Series NF-T-1.4 (2016) p.10; "
+                 "IAEA-TECDOC-1239 (2001) pp.56-57"),
+    "label": "Hypothetical -- if the ore horizon were permeable enough for ISR",
+}
 
 # ---------------------------------------------------------------------------
 # 8. Vertical stratification (Module 5A -- 2.5D). Hard-rock Jharkhand profile:
@@ -1590,10 +1761,40 @@ VERTICAL = {
     # sub-vertical joint sets raise vertical conductivity; weathered/porous is more
     # layered (Kv << Kh). This is the physically-correct channel for "fractured is
     # riskier vertically".
-    # !! SCENARIO ASSUMPTION -- screening values, no Singhbhum measurement.
-    #    The DIRECTION (fractured > porous) is standard hard-rock hydrogeology;
-    #    the magnitudes are chosen. Registered in UNGROUNDED_PARAMETERS.
-    "Kv_Kh_by_regime": {"fractured": 0.03, "porous": 0.008},
+    #
+    # FRACTURED VALUE NOW MEASURED, NOT CHOSEN (2026-09-25). The only published
+    # vertical-anisotropy measurements for Indian hard rock are five pumping-test
+    # interpretations in the weathered-fissured layer of the Maheshwaram granite
+    # (Indo-French Centre for Groundwater Research, NGRI-BRGM, ~30 km S of
+    # Hyderabad): Maréchal, Wyns, Lachassagne & Subrahmanyam (2004), J. Geol.
+    # Soc. India 63(5), Tables 2-3 -- Kz/Kr = 0.606, 0.125, 0.034 (Neuman method,
+    # observation wells) and 1/18.7, 1/5.5 (Gringarten method, pumping wells);
+    # summarised by the same group as "the horizontal permeability is 2 to 30
+    # times higher than the vertical" (Maréchal et al. 2003, C. R. Geoscience
+    # 335:451-460). Served central = their GEOMETRIC MEAN, 0.12 (K is
+    # log-normal); the band is the measured minimum and maximum. The value it
+    # replaces, 0.03, was a screening choice that sat below four of the five
+    # measurements -- it made the upward pathway ~4x slower than any Indian
+    # hard-rock test supports.
+    # WHAT IT STILL IS NOT: a Singhbhum measurement. Two documented reasons it
+    # may UNDERSTATE vertical conductivity in the ore belt: (1) the measured
+    # anisotropy comes from sub-horizontal weathering fissures in GRANITE;
+    # in folded metasediments such as the SSZ schists those fissures are
+    # "randomly dipping ... (no preferential orientation)" (Lachassagne,
+    # Dewandel & Wyns 2021, Hydrogeol. J., doi:10.1007/s10040-021-02339-7, SFL
+    # description), i.e. less anisotropic; (2) Maréchal et al. (2004) note that
+    # tectonic fissures take over "beyond 70-90 m", and no anisotropy
+    # measurement exists for that zone anywhere in Jharkhand. Hence the band is
+    # REPORTED on every run (`anisotropy_band` in the vertical block), never
+    # hidden behind the central.
+    # POROUS value unchanged: no Indian measurement exists for the sedimentary
+    # (alluvium / Gondwana sandstone / laterite) aquifers it applies to.
+    "Kv_Kh_by_regime": {"fractured": 0.12, "porous": 0.008},
+    "Kv_Kh_band_by_regime": {"fractured": (0.034, 0.61), "porous": None},
+    "Kv_Kh_citation": ("Maréchal, Wyns, Lachassagne & Subrahmanyam (2004) J. Geol. "
+                       "Soc. India 63(5) Tables 2-3 (Maheshwaram granite, five "
+                       "pumping-test interpretations); Maréchal et al. (2003) "
+                       "C. R. Geoscience 335:451-460"),
     # !! SCENARIO ASSUMPTION -- net upward head gradient (injection driven).
     #    Now BRACKETED by the measured monsoon swing (fix 3.7 / VERTICAL_SEASONAL
     #    reports a two-end-member band around it), but the baseline itself has no
@@ -1621,6 +1822,62 @@ VERTICAL = {
     "ore_thickness_default_m": 20.0,
     "ore_depth_range_m": (50.0, 600.0),
     "ore_thickness_range_m": (2.0, 100.0),
+}
+
+# ---------------------------------------------------------------------------
+# 8a. THE VERTICAL PATH GETS THE SAME PHYSICS AS THE HORIZONTAL ONE (2026-09-25)
+#
+# WHAT WAS WRONG. The upward-leakage pathway moved a WATER PARCEL, not a solute:
+# breakthrough = separation / (Kv*i/phi). So at Jaduguda (20-yr run) uranium and
+# TDS both reached the shallow aquifer in 17.4 yr, and changing the matrix
+# storage ratio beta from 3 to 0 did not move that number -- while the same
+# run's HORIZONTAL front retarded uranium ~270x through exactly that beta. The
+# product therefore paired its most optimistic horizontal answer with its most
+# pessimistic vertical one, for the same rock, in the same response.
+#
+# Two corrections, each reusing a law the engine already applies elsewhere:
+#
+#  matrix_retention  Layer 2 is fractured bedrock (that is why phi_confining is
+#                    fixed at the fractured value). A solute crossing it is
+#                    stored in the matrix between the fractures exactly as it is
+#                    horizontally: same Goltz & Roberts (1986) retarded clock,
+#                    same sorbing capacity ratio beta_eff = beta * R_m, same
+#                    species Kd, beta derived from THIS layer's porosities
+#                    (beta_from_porosities(n_total, phi_confining)) -- the R17
+#                    rule that beta and the mobile porosity the transport runs
+#                    on may not disagree about the same rock.
+#                    NOT applied: first-order uranium redox trapping. The upper
+#                    part of the path crosses the oxidised weathering profile,
+#                    where the reducing capacity that rate represents is not
+#                    established, so applying it would be anti-conservative.
+#                    (Immaterial within the horizon: uranium's retarded arrival
+#                    is centuries.)
+#  depth_resolved_K  The path runs from the ore TOP up to the shallow-aquifer
+#                    base, through rock whose K rises toward the surface (the
+#                    NAQUIM-calibrated K(z) law, section 5d). Flow in series
+#                    through that column is governed by the HARMONIC mean of
+#                    K(z) (Freeze & Cherry 1979, layered systems), not by K at
+#                    ore depth -- the least conductive point on the path, which
+#                    is what was used. Evaluated with the same
+#                    `depth_decay_factor` and fracture base the ore-depth K uses.
+#
+# Both default ON. Setting either False restores the pre-2026-09-25 behaviour
+# exactly (tests pin that), so the change is reversible and auditable.
+# Neither touches a trained feature or label: the vertical screening is served
+# analytically only, so no re-bake / retrain is involved.
+# ---------------------------------------------------------------------------
+VERTICAL_PATH = {
+    "matrix_retention": True,
+    "depth_resolved_K": True,
+    # lixiviant constituents whose vertical arrival is reported beside the run's
+    # own species -- the same panel NUREG-1569 asks licensees to monitor, for the
+    # same reason: they are not attenuated, so they arrive first.
+    "indicator_species": ISR_EXCURSION_INDICATORS,
+    "citation_retention": ("Goltz & Roberts (1986) Water Resour. Res. 22(7):1139 "
+                           "-- the mobile/immobile clock the horizontal front uses"),
+    "citation_series_K": ("Freeze & Cherry (1979) Groundwater, layered-formation "
+                          "equivalent conductivity (harmonic mean for flow "
+                          "across layers)"),
 }
 
 # ---------------------------------------------------------------------------
@@ -1789,9 +2046,15 @@ UNGROUNDED_PARAMETERS = {
     "ISR_UCL_BASELINE_INCREASE": {
         "value": ISR_UCL_BASELINE_INCREASE, "kind": "scenario_assumption",
         "leverage": "when the NUREG 2-of-N indicator excursion test fires",
-        "grounding": ("per-well TEMPORAL baseline series, which would enable "
-                      "NUREG-1569's preferred mean+5sd / ASTM D6312 rules; the "
-                      "CGWB file has one sample per well and cannot support them"),
+        # 2026-09-25: MEASURED for the shallow aquifer (CGWB 2023 + 2024 pre/post,
+        # validation/baseline_variability.py): at x1.2, 33% of clean station
+        # pairs trip 2-of-3 on natural swing alone; x2.5 -> 8%, x3.0 -> 3.5%.
+        # Not applied here because the ring samples the deeper ore-zone aquifer,
+        # which damps the seasonal signal -- see LIMITATIONS.md 1h.
+        "grounding": ("an ore-zone (deep) temporal baseline series; the shallow "
+                      "aquifer's natural swing is now measured (LIMITATIONS 1h) "
+                      "and shows x1.2 would false-alarm on a third of clean wells "
+                      "there"),
     },
     "DUAL_POROSITY.beta_prior": {
         "value": None, "kind": "foreign_analogue_literature",
@@ -1819,9 +2082,18 @@ UNGROUNDED_PARAMETERS = {
                       "one would relabel an assumption as data"),
     },
     "VERTICAL.Kv_Kh_by_regime": {
-        "value": None, "kind": "scenario_assumption",
-        "leverage": "advective upward leakage rate in the shallow-impact screen",
-        "grounding": "GSI Bhukosh structural analysis or local packer data",
+        # 2026-09-25: the FRACTURED value is now the geometric mean of five
+        # Indian hard-rock pumping tests (Maheshwaram granite, Maréchal et al.
+        # 2004) and its measured range is reported on every run. It stays on
+        # this register because the measurements are from a granite fissured
+        # layer <35 m deep, not from Singhbhum schist at ore depth.
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": ("advective upward leakage rate in the shallow-impact screen; "
+                     "breakthrough time scales as 1/(Kv/Kh). The measured "
+                     "0.034-0.61 range spans 18x in time"),
+        "grounding": ("a packer or pumping test with an observation well in the "
+                      "Singhbhum Shear Zone below 70 m (none published); the "
+                      "porous value has no Indian measurement at all"),
     },
     "VERTICAL.upward_gradient": {
         "value": None, "kind": "scenario_assumption",
@@ -1840,6 +2112,74 @@ UNGROUNDED_PARAMETERS = {
         "value": None, "kind": "scenario_assumption",
         "leverage": "width of the P10-P90 bands (not the central estimate)",
         "grounding": "TCEQ/NRC excursion and downtime records (never obtained)",
+    },
+    # ---- added by the 2026-09-26 grounding pass (LIMITATIONS 1k) ----------
+    # Constants the 2026-09-25 audit found missing from this register: they were
+    # neither measured nor declared.
+    "SHEAR_ZONE_T_M2DAY": {
+        # The VALUE is measured (Kudada EW, CGWB); what is a policy is taking the
+        # MAXIMUM of the host-rock tests as the baseline, capped at 20 m2/day.
+        "value": SHEAR_ZONE_T_M2DAY, "kind": "modelling_policy",
+        "leverage": ("K at every fractured deposit / belt pin, hence plume reach, "
+                     "containment and the vertical path's reference K"),
+        "grounding": ("a pumping test AT a deposit; the mine discharge "
+                      "(validation/mine_inflow_transmissivity.py) already bounds "
+                      "the bulk value at <= 9 m2/day"),
+    },
+    "ISR_FEASIBILITY.K_scenario_m_day": {
+        "value": None, "kind": "modelling_policy",
+        "leverage": ("the SECONDARY hypothetical answer only -- never the "
+                     "baseline, never an alert"),
+        "grounding": ("IAEA NF-T-1.4 (2016) p.10 rule of thumb; choosing its "
+                      "'advantageous' 1 m/day rather than the 0.1 m/day floor is "
+                      "the policy"),
+    },
+    "BASELINE_SURVEY_BLEND_KM": {
+        "value": None, "kind": "modelling_policy",
+        "leverage": ("how far a mining-area survey's uranium / radium background "
+                     "reaches before the far-field anchor takes over; small -- "
+                     "backgrounds sit 1-3 orders below their thresholds"),
+        "grounding": ("the survey footprints themselves (Kumar 2015 sectors to "
+                      "5 km, Rana 2010 within 10 km); a denser well-by-well "
+                      "radionuclide map would replace the blend"),
+    },
+    "DEPOSIT_ORE_DEPTH_M": {
+        # data_prep/ore_loader.py. The RANGES are documented (UCIL); the single
+        # slider seed inside each range is the choice.
+        "value": None, "kind": "modelling_policy",
+        "leverage": ("K(z) at the ore and the length of the vertical path, for a "
+                     "deposit pin's default run"),
+        "grounding": ("the documented ranges in ore_loader.DEPOSIT_ORE_DEPTH_RANGE_M; "
+                      "a site-specific ISR target would replace the seed"),
+    },
+    "TOTAL_POROSITY / GRAIN_DENSITY": {
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": ("rho_b / n_total in every Kd retardation, and the porosity-"
+                     "derived dual-porosity beta"),
+        "grounding": ("Banerjee et al. 2011, Radiat. Phys. Chem. 80:614 measured "
+                      "porosity on 16 Singhbhum Shear Zone rocks (full text not "
+                      "obtained). Corroboration only: UCIL's Narwapahar PFR takes "
+                      "the ore's specific gravity as 2.8 vs schist 2,750 kg/m3 here"),
+    },
+    "K_DEPTH_RESIDUAL_AT_FRACTURE_BASE": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": ("K at every ore depth below the district's fracture base "
+                     "(the factor is held at this value there)"),
+        "grounding": ("deep packer tests in Singhbhum (none published); the "
+                      "integrated K(z) column is now checked against the mine "
+                      "discharge (validation/mine_inflow_transmissivity.py)"),
+    },
+    "BELT_C0_FRACTION": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": "uranium / radium source strength at belt pins between deposits",
+        "grounding": ("drill-hole grades for the belt between the mined deposits "
+                      "(AMD, unpublished)"),
+    },
+    "TRANSVERSE_ANISOTROPY": {
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": ("plume width where no fracture-strike dispersion is mapped "
+                     "(fractured pins use the V-derived ratio instead)"),
+        "grounding": "a tracer test in the belt (fidelity row 3.4 -- none published)",
     },
 }
 

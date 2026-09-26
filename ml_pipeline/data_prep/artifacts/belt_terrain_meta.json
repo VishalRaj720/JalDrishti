@@ -1,0 +1,25 @@
+{
+  "source": "Copernicus GLO-30 DEM (Datasets/jharkhand_glo30_dem.tif)",
+  "clip": "Singhbhum Thrust Belt envelope (ore_loader) + 4.0 km margin",
+  "block_average_factor": 2,
+  "cell_deg": [
+    0.0005555555555555556,
+    0.0005555555555555556
+  ],
+  "cell_m_approx": 61.8,
+  "shape": [
+    724,
+    927
+  ],
+  "bounds": [
+    86.04938741948207,
+    22.400283569789863,
+    86.56478210196425,
+    22.802426892690377
+  ],
+  "elev_range_m": [
+    62,
+    751
+  ],
+  "use": "display context for the 3-D site block only; never a transport input"
+}

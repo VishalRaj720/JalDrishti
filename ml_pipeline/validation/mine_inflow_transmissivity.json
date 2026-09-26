@@ -1,0 +1,65 @@
+{
+  "method": "Thiem, T = Q ln(R/r_e) / (2 pi s), swept over ln(R/r_e) 0.7-2.3 and drawdown from half to all of the drained column below a 5 m water table; every T is an upper bound",
+  "mines": {
+    "Turamdih": {
+      "discharge_m3_day": 3170.0,
+      "discharge_is_lower_bound": true,
+      "deepest_drained_m": 260.0,
+      "quote": "Water requirement will be 3430 m3/day out of which 3170 m3/day will be met by mine discharge water",
+      "source": "UCIL, Pre-Feasibility Report, Turamdih Mine augmentation to 0.75 MTPA (2017), secs. 1.0 and 3.8.1; levels 60-230 m bgl, main shaft bottom 260 m (sec. 3.5.3)",
+      "bulk_T_m2day": [
+        1.38,
+        3.69,
+        9.1
+      ],
+      "drawdown_m": [
+        127.5,
+        255.0
+      ],
+      "engine_column": {
+        "K_reference_m_day": 0.2284,
+        "fracture_base_m": 258.0,
+        "column_T_m2day": 24.59
+      },
+      "engine_column_over_mine_upper_bound": 2.7
+    },
+    "Narwapahar": {
+      "discharge_m3_day": 2700.0,
+      "discharge_is_lower_bound": false,
+      "deepest_drained_m": 380.0,
+      "quote": "2700 m3/d of water is discharged from the mine",
+      "source": "UCIL, Pre-Feasibility Report, Narwapahar Mine expansion to 0.6 MTPA (2017), sec. 3.7; developed to 380 m (sec. 1.0)",
+      "bulk_T_m2day": [
+        0.8,
+        2.14,
+        5.27
+      ],
+      "drawdown_m": [
+        187.5,
+        375.0
+      ],
+      "engine_column": {
+        "K_reference_m_day": 0.2284,
+        "fracture_base_m": 258.0,
+        "column_T_m2day": 25.96
+      },
+      "engine_column_over_mine_upper_bound": 4.93
+    }
+  },
+  "forced_discharge_turamdih": {
+    "19": {
+      "m3_day": 2855,
+      "times_reported": 0.9
+    },
+    "101": {
+      "m3_day": 15175,
+      "times_reported": 4.8
+    },
+    "370": {
+      "m3_day": 55593,
+      "times_reported": 17.5
+    }
+  },
+  "baseline_T_m2day": 19.0,
+  "reading": "The mines bound the bulk transmissivity of the shear zone around the ore at single digits of m2/day. The served baseline (Kudada, 19) sits above that bound -- the measured maximum is the conservative side of the mine data -- and the retired 370 would have forced ~17x the discharge UCIL reports even in the most generous geometry."
+}

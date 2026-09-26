@@ -1,0 +1,87 @@
+{
+ "source": "Datasets/cgwb_waterlevel_jharkhand_1994_2026.csv (water-table rows)",
+ "rule": {
+  "min_years": 15,
+  "min_span_years": 20,
+  "alpha": 0.05,
+  "trend": "Theil-Sen",
+  "test": "Mann-Kendall (Kendall tau vs year)",
+  "sign": "+ = water table deeper each year"
+ },
+ "statewide": {
+  "pre-monsoon": {
+   "wells": 177,
+   "median_slope_m_per_yr": 0.011,
+   "significant_deepening": 29,
+   "significant_rising": 20
+  },
+  "post-monsoon": {
+   "wells": 173,
+   "median_slope_m_per_yr": 0.008,
+   "significant_deepening": 23,
+   "significant_rising": 18
+  }
+ },
+ "uranium_belt_districts": {
+  "districts": [
+   "East Singhbum",
+   "Saraikela Kharsawan",
+   "West Singhbhum"
+  ],
+  "pre-monsoon": {
+   "wells": 24,
+   "median_slope_m_per_yr": 0.003,
+   "significant_deepening": 5,
+   "significant_rising": 5
+  },
+  "post-monsoon": {
+   "wells": 23,
+   "median_slope_m_per_yr": -0.025,
+   "significant_deepening": 1,
+   "significant_rising": 6
+  }
+ },
+ "steepest_deepening": [
+  {
+   "season": "pre-monsoon",
+   "district": "West Singhbhum",
+   "span": "1994-2025",
+   "years": 28,
+   "slope_m_per_yr": 0.305,
+   "p": 0.0019
+  },
+  {
+   "season": "pre-monsoon",
+   "district": "Palamu",
+   "span": "1995-2019",
+   "years": 16,
+   "slope_m_per_yr": 0.222,
+   "p": 0.022
+  },
+  {
+   "season": "pre-monsoon",
+   "district": "Pakur",
+   "span": "1995-2025",
+   "years": 28,
+   "slope_m_per_yr": 0.211,
+   "p": 0.0002
+  },
+  {
+   "season": "post-monsoon",
+   "district": "Palamu",
+   "span": "1994-2022",
+   "years": 26,
+   "slope_m_per_yr": 0.2,
+   "p": 0.0003
+  },
+  {
+   "season": "pre-monsoon",
+   "district": "Palamu",
+   "span": "1995-2019",
+   "years": 15,
+   "slope_m_per_yr": 0.19,
+   "p": 0.0597
+  }
+ ],
+ "caveat": "unconfined dug wells; the fractured aquifer below is not measured; a statement about the network, not about any one well"
+}

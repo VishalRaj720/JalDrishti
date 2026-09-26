@@ -777,9 +777,18 @@ function renderVertical(v) {
   badge.textContent = v.risk_band;
   badge.className = "badge " + v.risk_band;
   const yrs = v.years_to_vertical_breakthrough;
+  // 2026-09-25: the headline is this species' own (retarded) arrival; the water
+  // time it used to be, and whatever from the lixiviant arrives first, sit beside
+  // it so a uranium run cannot read as "nothing for centuries".
+  const held = (v.water_arrival_years != null && (v.layer2_retardation || 1) > 1.05)
+    ? ` (water ~${v.water_arrival_years} yr, held back ${Math.round(v.layer2_retardation)}×)` : "";
+  const fa = v.first_arrival;
+  const first = (fa && v.species && fa.species !== v.species)
+    ? ` · <b>arrives first: ${SPECIES_NAME[fa.species] || fa.species} ~${fa.years} yr</b>` : "";
   note.innerHTML = `${v.separation_m} m confining separation · dominant: `
     + `${v.dominant_pathway.replace(/_/g, " ")}`
-    + (yrs != null ? ` · ~${yrs} yr to vertical breakthrough` : "")
+    + (yrs != null ? ` · ~${yrs} yr to vertical breakthrough${held}` : "")
+    + first
     + renderSeasonalBand(v.seasonal);
   renderDepth(v);
 }

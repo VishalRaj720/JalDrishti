@@ -40,11 +40,12 @@ not quantify structural model error, and nothing in this product can.
 | Item | Status | Why |
 |---|---|---|
 | ~~**Plume extent rests on β, an unmeasured matrix-storage ratio; the band samples inside the assumption**~~ | ✅ **Closed (R17, 2026-09-20) — see §1d** | β is now derived from the run's own porosities (3.0 at Jaduguda, 1–4 across the lithology table), the training prior is log-uniform on [0.3, 20] and the Monte-Carlo band spans a factor of 4 either side. The v4 retrain passes every gate. β is still not a *measurement* — §2 stands |
-| **Per-species R²(log) ≥ 0.60 — radium migration (0.515), compliance (0.227)** | 🔴 **Fails the project's own Gate-4 bar** | Not a tuning failure, a label-shape property. Radium's migration label is **81.8 % exact zeros**, compliance **95.8 % pinned at the 23 mBq/L background**. A squared-error regressor on `log1p` cannot fit a point mass, and R² divides by a near-zero SST. The v4 retrain (R17) left migration unchanged (0.516→0.515) and **worsened compliance (0.431→0.227)** — the wider β prior moved a few more radium scenarios off the background pin, and a point mass with a thin tail is exactly what this learner cannot fit. The remedy is a **zero-inflated / two-stage head** — a new ML approach, not authorised; the conformal band on those cells still covers (0.92–0.95 per cell, 0.879 field-resampled) |
+| **Per-species R²(log) ≥ 0.60 — radium migration (0.412, v6)** | 🔴 **Fails the project's own Gate-4 bar** | Not a tuning failure, a label-shape property. Radium's migration label is **86.3 % exact zeros** (v6). A squared-error regressor on `log1p` cannot fit a point mass, and R² divides by a near-zero SST. The remedy is a **zero-inflated / two-stage head** — a new ML approach, not authorised; the conformal band on those cells still covers (0.91 fractured, 0.95 porous). **Radium compliance now clears the bar (0.235 → 0.746, v6 retrain 2026-09-26), but read why:** its label is still 96.8 % pinned at the scenario's own background, and v6 varies that background (10–23 mBq/L, the BARC survey blend) instead of fixing it at 23 — so the head learns "ring = background" from a feature. The gain is real for serving and says nothing new about radium transport |
 
 **Why this does not invalidate the product:** the analytical engine serves the
-authoritative central value for radium, and the conformal bands on those cells cover
-0.891–0.986 field-resampled — all above the 0.80 gate. The product shows both, and labels
+authoritative central value for radium. The conformal bands on those cells cover
+0.951–0.963 field-resampled (v6, 2026-09-26; every target passes at 0.90–0.92
+scenario coverage), all above the 0.80 gate. The product shows both, and labels
 which engine produced which. **If you consider that gate binding for release, the
 pipeline is not ready** until the two-stage head is built.
 
@@ -202,6 +203,655 @@ per site and species). Results in `ml/artifacts/sensitivity.json` and the
 `sensitivity_*.png` figures; the summary table is reproduced in the report.
 The headline is reported there rather than here so this file does not
 hand-copy a number the artifact already carries.
+
+---
+
+## 1f. Closed (2026-09-25) — the vertical pathway moved water, not solute
+
+**Found in a review of why the plume "barely moves".** The upward-leakage time
+was `separation / (Kv·i/φ)` — the travel time of a water parcel — for every
+species. At Jaduguda (20-yr run) uranium, sulfate and TDS all "reached" the
+shallow aquifer in **17.5 yr**, and changing β from 3 to 0 did not move that
+number, while the same response's horizontal front retarded uranium ~270×
+through that β. The product paired its most optimistic horizontal answer with
+its most pessimistic vertical one, for the same rock.
+
+**What changed** (`P.VERTICAL_PATH`, `ml_pipeline/dashboard/vertical_path.py`,
+fidelity row 3.11). No retrain: the vertical screen is served analytically only.
+
+1. **Matrix retention on the path.** The solute front climbs on the same
+   Goltz & Roberts clock and `β_eff = β·R_m` as the horizontal front, with β
+   from the confining layer's own porosities (the R17 rule). The wellbore
+   pathway is deliberately *not* retarded — an open borehole has no matrix.
+2. **Series K.** The column's conductivity is the harmonic mean of the NAQUIM
+   K(z) law between the ore top and the shallow-aquifer base (Freeze & Cherry
+   1979), not K at ore depth, the tightest point on the path. Jaduguda:
+   0.563 → 1.32 m/day.
+3. **Kv/Kh measured, not chosen.** Fractured 0.03 → **0.12**, the geometric
+   mean of the five pumping-test interpretations from the Maheshwaram granite
+   (Maréchal, Wyns, Lachassagne & Subrahmanyam 2004, *J. Geol. Soc. India*
+   63(5), Tables 2–3; "2 to 30 times", Maréchal et al. 2003, *C. R.
+   Geoscience* 335). The old value sat below four of the five measurements.
+   The measured range 0.034–0.61 is re-evaluated on every run
+   (`anisotropy_band`).
+4. **The salts are reported beside the display species.** Chloride, TDS and
+   sulfate are screened on the same geometry, and `first_arrival` names the
+   earliest constituent whose source exceeds its drinking-water limit. The
+   backend's `aquifer_breach_due` and `aquifer_pathway` alerts now key on it
+   (`app.services.alerts.vertical_headline`); runs stored before this change
+   carry no `first_arrival` and are read exactly as before.
+
+**Before and after** (20-yr run, default operation, analytical engine; old =
+main `d2bb215`, same pins):
+
+| Pin | Before (every species) | Water | TDS | Sulfate | Uranium |
+|---|---|---|---|---|---|
+| Jaduguda | 17.5 yr [6.4–31.1] | 1.9 | **4.5** [1.0–9.8] | 22.7 | **448** [153–810] |
+| Dhanbad | 65.5 yr [24.8–97.2] | 4.7 | 15.0 | 66.9 | 1,130 |
+| Ranchi (non-ore) | 110.7 yr [40.7–186.5] | 10.2 | 35.7 | 154 | 2,479 (source suppressed) |
+
+**Direction of the change: both ways, for stated reasons.** The salts arrive
+**sooner** than the old headline (the series K and the measured Kv/Kh each
+speed the water up; TDS's small matrix storage slows it only ~4×). Uranium
+arrives **far later**: it is held back by the same matrix storage that holds
+its horizontal front to tens of metres. That ordering is the one NUREG-1569
+p.137 gives for rejecting uranium as an excursion indicator, and it is now
+visible in the vertical as well as the horizontal answer.
+
+**What is still true.**
+
+* **Kv/Kh is not a Singhbhum measurement.** It comes from the sub-horizontal
+  weathering fissures of a granite less than 35 m deep. For folded
+  metasediments such as the SSZ schists those fissures are "randomly dipping"
+  (Lachassagne, Dewandel & Wyns 2021, *Hydrogeol. J.*,
+  doi:10.1007/s10040-021-02339-7), i.e. less anisotropic. Maréchal et al.
+  (2004) note tectonic fissures take over beyond 70–90 m. Both point to the
+  served value **understating** vertical flow in the belt, which is why the
+  measured range is shown and not hidden.
+* **Foliation dip is not modelled.** The SSZ fabric dips moderately: "about
+  35º towards northeast in Turamdih area" (UCIL feature article on Turamdih,
+  p.5); the Jaduguda orebody has "a moderate dip of about 40°" (Bhasin, UCIL,
+  IAEA ETDE XA0103130, p.3). A dipping
+  permeable fabric would add a vertical component to flow, but rotating a
+  permeability tensor needs the along- vs across-foliation K ratio, and no
+  hydraulic measurement of it exists for the SSZ. Recorded rather than guessed.
+* **The upward gradient is still a scenario assumption** (0.005,
+  `UNGROUNDED_PARAMETERS`). A bleed-operated wellfield is a net sink, so over
+  the wellfield as a whole the gradient during operations points *into* the ore
+  zone; an upward push is realistic around individual injection wells, during
+  an imbalance, or in a natural discharge setting. The seasonal band brackets
+  it; no deep piezometry exists to replace it.
+* **No redox trapping on the vertical path.** The upper part of the column is
+  the oxidised weathering profile, where the reducing capacity the horizontal
+  uranium rate represents is not established; applying it would be
+  anti-conservative. Immaterial within the horizon (uranium arrives in
+  centuries).
+* **Cost.** Screening three indicators adds ~90 ms per `/api/predict`
+  (217 → 304 ms median at Jaduguda), paid again on each stored timeline frame.
+
+**Records that now read differently.** The submitted technical report
+(`docs/report/parts/06_results.md` §6.6, appendix row 22) quotes the registered
+site's uranium run at 18.7 yr / index 0.62 / *high* — a water-parcel time,
+species-blind, like every vertical figure before this change. Under this
+change a uranium run near that site reports uranium arriving in centuries
+(~448 yr at the Jaduguda reference pin) and TDS first within a few years
+(~4.5 yr there). The report is a historical record and is not edited; this
+section supersedes that figure. Published advisories keep the vertical block of
+the run they were published from until they are re-run.
+
+---
+
+## 1g. The plume map, drawn continuously — and why it is still a band (2026-09-25)
+
+**Raised by the project owner:** *"only a rectangle appears in the direction of
+the computed vector… it looks like no work has been done."* Two things were
+checked, and they have different answers.
+
+**What was a rendering choice, and is fixed.** The map drew two to six *flat*
+contour fills, which throws away the field between levels — a plume whose
+concentration falls a hundredfold along its length was painted as one block.
+The engine now returns the field as a north-up raster
+(`dashboard/plume_geometry.py`): each pixel is the analytical
+`concentration_field` evaluated at that pixel's own centre, not an interpolation,
+with the contours' own masks and display floor (pinned by
+`tests/test_plume_raster.py`). The console defaults to it; the contours stay on
+top as outlines.
+
+**What is the physics, and is not a defect.** Drawn continuously, the plume is
+still a straight-sided band as wide as the wellfield. That is what a wide source
+releasing into a steady, uniform regional flow produces when sideways spreading
+is small — and field tracer tests show sideways spreading *is* small: at Cape
+Cod, 0.96 m longitudinal against **1.8 cm** transverse horizontal dispersivity
+(Garabedian, LeBlanc, Gelhar & Celia 1991, *Water Resour. Res.* 27(5):911–924).
+Even the most generous literature ratio would soften a 300 m band's edges by
+tens of metres. Real plumes become irregular through **heterogeneity** (channelled
+flow) and **uncertainty** — the first is not measured anywhere near the
+deposits, the second is.
+
+**Why no fracture network was built.** A discrete fracture network was proposed
+and then checked against the data it would be conditioned on. Within ±5 km of
+Jaduguda the Bhuvan 1:50k map holds **one** lineament; within ±10 km, 16, of
+which only 3 are structural joints/fractures (the rest drainage- or
+ridge-parallel). Every trace is ≤ 3.0 km — cut up during harvesting — so no
+length distribution can be fitted, and no joint spacing, aperture or
+persistence data for the SSZ mines is published (fidelity row 3.4). A
+wellfield-scale network would therefore be almost wholly assumed: fingers drawn
+by the assumptions, not by Singhbhum. Declined for that reason.
+
+**What is drawn instead: the uncertainty the engine already carries.** The
+*chance over the limit* layer is the fraction of the engine's own Monte-Carlo
+draws — the 48 its served excursion probability already scores (K
+heterogeneity, Kd, β ×4, gradient, dispersivity, bleed drift, downtime,
+aperture, all registered) — in which the drinking-water limit is exceeded at
+each pixel. At the monitoring ring it reproduces the served excursion
+probability exactly (test-pinned). It is the existing uncertainty model drawn in
+space, not a new one.
+
+**Flow direction, measured (2026-09-25).** The flow field stored the fitted
+direction but never how sure it was, so the map fanned only along and across
+flow. `data_prep/flow_direction.py` measures it on the flow field's own grid,
+stations and kernel. The refit reproduces the served direction exactly. It
+measures two ways:
+* the weighted-least-squares standard error of the plane's slope, propagated
+  to an angle: 7° / **17°** / 46° (p10/p50/p90 over station cells);
+* the plane refitted to each monitoring year: circular SD 0.7° / 4° / 20° over
+  2013–2020, and **2.8° / 9.9° / 39.5° over 1994–2025** once the 32-year record
+  (§1i) was extracted.
+
+The year-by-year spread is smaller than the fit error because nearby wells
+repeat the same spatial misfit every year, so the yearly fits agree even where
+the plane is a poor description. The fit error is the honest measure.
+Both estimate how well the LONG-TERM direction is known — a plume averages over
+yearly wobble — so the larger (fit error, or yearly spread / √years) is
+served, not their sum. At Jaduguda that is **±22°** (1σ): at a 2 km reach,
+about ±800 m sideways. The chance map combines every Monte-Carlo draw with 15
+evenly spaced directions (rotations about the wellfield centre). A
+user-set bearing is not fanned, and DEM-fallback cells have no statistics and
+are drawn unfanned, said so. **This is a lower bound**: the plane is fitted over
+~25 km, and local hills and streams can bend flow at the 300 m scale in ways
+no regional fit sees. The year-by-year check was extended to 1994–2025 from
+CGWB's national water-level tables (§1i); the 2024–25 Year Book has district
+summaries only (§1h). Where stations are few the fit error says so: at Bagjata
+it is ±79°, which the fan draws as a near-circle rather than a direction.
+
+---
+
+## 1h. The CGWB 2024 quality table (2026-09-25) — what it adds, and what it does not
+
+**Source.** CGWB, *Ground Water Quality Data (2024)*, the national PDF table.
+The Jharkhand rows (pages 19–20 pre-monsoon, 101–103 post-monsoon) are
+extracted by `ml_pipeline/data_prep/cgwb_gwq_pdf.py` to
+`Datasets/cgwb_gwq_2024_jharkhand.csv`. That gives **288 samples** (138 pre, 150
+post) in all 24 districts, with contiguous serial numbers (no row lost). The
+extractor refuses any page whose header differs from the expected 36 columns.
+The *Ground Water Year Book, Jharkhand 2024–25* was also reviewed: it holds
+district summaries and maps only. Its station tables (Annexures I–II) are not
+in the published file, so it cannot feed the flow field.
+
+**What it does not add: uranium.** Every Jharkhand row has "-" for U, As, Fe,
+Mn and the trace metals (other states carry values). The 2023 table
+(`waterQuality_jharkhand.csv`) remains the only source of measured uranium, and
+the uranium year-on-year comparison is still impossible.
+
+**What it does add: the first measured natural variability.** 127 stations
+were sampled in both 2024 seasons, and 275 of the 288 rows lie within 500 m of
+a 2023 station. So TDS, sulfate and chloride now have up to three samples per
+site. `ml_pipeline/validation/baseline_variability.py` measures how far CLEAN
+water moves by itself:
+
+| Excursion rule (2-of-3: TDS, SO₄, Cl) | Share of clean station-pairs that would alarm |
+|---|---|
+| UCL = baseline × 1.2 (**served**) | **33 %** |
+| × 1.5 | 20 % |
+| × 2.0 | 12 % |
+| × 2.5 | 8 % |
+| × 3.0 | 3.5 % |
+
+The single-indicator natural 95th-percentile swings are TDS 2.5×, chloride
+4.4× and sulfate 5.7× between seasons. **Consequence for the model:** the lixiviant still
+stands out at full strength everywhere tested — at Jaduguda TDS is 3.06×
+background against a natural 2.51×. But the margin there is thin, and a 20 %
+UCL on these waters would be mostly false alarms. **Caveat that bounds the
+use:** these are shallow wells. They are the right aquifer for an
+*overlying-aquifer* (vertical-excursion) monitor, but an upper bound for the
+deeper ore-zone ring, which damps seasonal swings. The served UCL is therefore
+not changed. The register entry now records the measurement, and the value
+for the ore-zone ring stays an owner decision.
+
+**Recorded, not used: nitrate.** 116 of 288 samples exceed 45 mg/L (2024 median
+~40 mg/L) against 22 of 393 in 2023 (median 18 mg/L). A doubling in one year
+could be real, a different well set, or a reporting change. The table cannot
+tell which. It is not fed to any alert until checked against CGWB's own
+2024 report text.
+
+---
+
+## 1i. The CGWB water-level record 1994 – January 2026 (2026-09-25)
+
+**Source.** CGWB's national depth-to-water tables for the unconfined aquifer
+(dug wells), one PDF per campaign:
+* January 1994–2025 and January 2026;
+* pre-monsoon 1994–2025, plus three decade files;
+* August 1994–2025, plus 1994–2023;
+* post-monsoon (November) 1994–2023.
+
+`ml_pipeline/data_prep/cgwb_wl_pdf.py` extracts the Jharkhand rows. The
+full-span file per campaign is primary; the partial ones are supplementary.
+The result is `Datasets/cgwb_waterlevel_jharkhand_1994_2026.csv`: **26,009
+readings at about 700 wells, 1994 – January 2026**, against the 9,583 readings
+(2013–2021) the engine was built on. Every file extracts exactly as many
+Jharkhand rows as its text layer holds; none is refused. The early years are
+sparser: about 190 wells a year were read before 2013, 400–550 since 2020.
+
+**How it was checked, because the PDFs are unruled.**
+* Column starts are learned per page from the data rows. A word only counts as
+  a column start after a column-width gap: the header labels sit ~30 pt off the
+  data in some files, and multi-word states ("Jammu & Kashmir") on shared pages
+  otherwise create false columns. Both failures were found by tests and fixed.
+* One station's long name ("Hanuman Mandir (Near Ag.Office)", Bero) overprints
+  its latitude in recent years. Its latitude is recovered from the interleaved
+  characters, and the rows are flagged, not dropped.
+* **Independent check:** station by station, the record agrees with the
+  2013–2021 file already on disk. Of 300 stations with ≥ 4 shared months, 298
+  match within 0.1 m (median).
+
+**What the partial files turned out to be.**
+* **Three add nothing** (checked reading by reading against the record):
+  August 1994–2023, and the pre-monsoon 1994–2003 and 2004–2013 files. Every
+  reading is already in the full-span file, and none has more decimals. Where a
+  few differ by more than 0.05 m, the full-span file's value stands.
+* The pre-monsoon 2014–2024 file gives 732 readings with more decimals, which
+  are kept.
+* The same file also carries **187 readings (2022–2024) at wells absent from
+  every full-span file**. They are markedly deeper (median 9.2 m
+  vs 7.3 m), consistent with bore wells: the 2024–25 Year Book counts 122 bore
+  wells among Jharkhand's 582 monitoring wells. They are kept, **flagged**
+  (`note`), and left out of water-table analyses.
+* CGWB's tables print some wells twice at the same coordinates and date: the
+  Simdega well also under Gumla (its district until 2001), a Basia well under
+  two block names, and repeated Raidih and Karra rows. 104 identical repeats
+  collapse to one reading. **81 pairs differ in depth** (at Raidih, Basia,
+  Simdega and Borio). At Simdega in 2021–2024 the second row carries the
+  Gumla-town reading, 50 km away. Neither row of a pair can be assigned, so
+  both are kept, flagged and left out.
+
+`cgwb_wl_pdf.water_table_rows` is the one rule for which rows count. It keeps
+unflagged rows and the repaired Bero rows, whose coordinates are exact.
+
+**What it is used for.**
+1. **The flow-direction check now spans 32 years** (§1g). The long-term
+   direction fitted from 1994–2025 agrees with the served 2013–2021 direction
+   to a median **3.3°** (90th percentile 17°), inside the served uncertainty in
+   **90 %** of cells, and within 0.8–2° at Jaduguda, Turamdih, Dhanbad and
+   Ranchi. The flow field is therefore **not rebuilt**: the longer record
+   confirms it rather than changing it (test-pinned).
+2. **No widespread water-table decline**
+   (`ml_pipeline/validation/water_table_trends.py`: Theil–Sen slope,
+   Mann–Kendall test, wells with ≥ 15 years spanning ≥ 20).
+
+   | | Wells | Median trend | Deepening (p < 0.05) | Rising (p < 0.05) |
+   |---|---|---|---|---|
+   | Statewide, pre-monsoon | 177 | +0.011 m/yr | 29 | 20 |
+   | Statewide, post-monsoon | 173 | +0.008 m/yr | 23 | 18 |
+   | Uranium-belt districts, pre-monsoon | 24 | +0.003 m/yr | 5 | 5 |
+   | Uranium-belt districts, post-monsoon | 23 | −0.025 m/yr | 1 | 6 |
+
+   The steepest decline is one West Singhbhum well at 0.31 m/yr. The network
+   shows no net fall, so the 2013–2021 water tables that the vertical
+   screening uses remain representative. That is a statement about the
+   network, not a guarantee for any one well.
+
+**What it is not.**
+* It is not confined-aquifer data. The tables are for the unconfined aquifer,
+  so the vertical push (§1f, the upward gradient) is still unmeasured.
+* It does not replace `cgwb_waterlevel_jharkhand.csv`, which stays the live
+  file: the dataset manager appends approved readings to it, `model_ops`
+  rebuilds the flow field from it and `seed.py` loads it.
+* It is not yet loaded into the backend database, so the portal's water-level
+  views are unchanged.
+
+**Removed from `Datasets/` (2026-09-25):**
+`cgwb_gwq_physical_jharkhand_2000_2021.csv`. It was committed with the R17
+chemistry record, but its only measurement columns are temperature and
+turbidity, and all 1,205 rows leave both empty. No code, test or document read
+it. It remains in git history.
+
+---
+
+## 1j. The belt's boreholes, and the 3-D site block (2026-09-25)
+
+**The belt report is recovered.** The NAQUIM report for the uranium districts
+covers East Singhbhum, Saraikela-Kharsawan and parts of West Singhbhum
+(Phase III, draft, water levels of 2015).
+* The project's copy had been a 404 page. CGWB has since removed the report,
+  and its current Publications Warehouse lists 48 Jharkhand items with none
+  for these districts.
+* The Internet Archive kept the file (2022-07-25). It is now
+  `Datasets/naquim_reference/cgwb_naquim_e_singhbhum_saraikela_w_singhbhum_parts.pdf`.
+* The Saraikela-Kharsawan booklet (2013) was recovered the same way. Much of
+  its text is copied from Godda's booklet (coordinates, geology), so only its
+  summary table is used, and cautiously.
+* The ten NAQUIM PDFs the owner supplied on the same day were word-for-word
+  duplicates of reports already held.
+
+**What was extracted.** CGWB's exploratory boreholes of the belt are in
+`Datasets/cgwb_exploratory_wells_singhbhum.csv` (48 holes, 43 placed) and
+`..._zones.csv`, served by `data_prep/cgwb_boreholes.py`. Sources:
+* the recovered report's Annexure III and Tables 11, 15 and 17;
+* the East Singhbhum booklet's Table 2 (wells as on March 2003).
+
+Rules of the transcription:
+* Values were read from the page images, because the text layer drops blank
+  cells.
+* Blanks stay blank. A value that sits between columns is noted, not used.
+* Five positions are left out: one plainly misprinted (AMD campus, about
+  150 km off) and four tests printed without a position.
+* Every disagreement between the sources is written into the row.
+
+**Three things they show.**
+1. **The shear-zone permeability the engine serves at the mines (D5) is not
+   from the mines.** `SHEAR_ZONE_T_M2DAY = 370` rests on 207–570 m²/day.
+   * CGWB's own pumping-test table (Table 11) labels those three wells
+     (Kalapathar, Baharagora, Manusmuria) **Tertiary sediments**. They are
+     51–58 km east of Jaduguda, outside the model's belt.
+   * The same tables give 2–101 m²/day for hard rock. The one test near a
+     deposit is Kudada, 3 km from Turamdih, at 19 m²/day. Hesel (Potka) gives
+     4–6 m²/day.
+   * Fidelity row 1.1 and the submitted report say the 207–570 values come
+     from "exactly where the mines are". That statement is superseded here.
+   * ~~The served value is unchanged, pending the owner's decision.~~ **Decided
+     and changed on 2026-09-26: the baseline is now the measured maximum,
+     Kudada's 19 m²/day. See §1k.**
+2. **The deep aquifer can push upward.** Kudada is recorded as an
+   **auto-flowing well** (Table 17), meaning its deep fractures (105–139 m)
+   carried water to the surface. The pumping test lists a static level of
+   2.42 m bgl, and both are printed.
+   * The West Singhbhum NAQUIM tables (2022) give three close
+     borehole/dug-well pairs over the same ground. Tantnagar (EW 8.0 vs DW
+     5.37/2.95 m bgl) and JNV Jhinkpani (EW 14.2 vs Jorapokhari 6.50/2.85 m)
+     push down. Dumirta (EW 2.49 vs DW 7.60/2.40 m) pushes up in the dry
+     season.
+   * These natural gradients are 0.03–0.23, against the scenario's 0.005
+     (`VERTICAL.upward_gradient`), and the sign depends on the site.
+   * They are one-time readings from open boreholes, drilled for water
+     supply. They bound the question; they do not measure it at a wellfield.
+3. **Deep water near Turamdih is low in the excursion indicators.** Kudada's
+   deep-fracture sample reads EC 721 µS/cm, Cl 7 and SO₄ 5 mg/L (Table 15).
+   A lixiviant would stand out there even more than against the shallow
+   baselines of §1h. It is one sample.
+
+The layer depths the engine serves for East Singhbhum (weathered base 20 m,
+fractures to 258 m) sit inside what the report records: weathered mantle
+15–34 m, fractures 30–200 m, and the deepest on file at 230–232 m (Hesel
+EW-2). The `naquim_vertical.csv` source text now cites the recovered report;
+no value changed.
+
+**The 3-D site block** (portal: Console → a site's run → *Open the 3-D site
+block*; `console/SiteBlock3D.tsx`, three.js, loaded only when opened).
+
+What it draws:
+
+| Element | Source | Status |
+|---|---|---|
+| Ground | GLO-30 excerpt | measured |
+| Walls and cut faces | CGWB three-layer convention at the **district's** NAQUIM depths | not measured at the site, and labelled so |
+| Water table | the pin's CGWB-derived depth, as a uniform offset below the ground | measured at points only |
+| Boreholes | CGWB drilling, from the published tables | measured |
+| Plume | the raster the map paints, laid on the ore top | model output |
+| Fronts | `vertical.front_series`, one ring per constituent | model output |
+
+The fronts use the same clock as the printed arrival years, so the animation
+cannot disagree with them. A corner is cut away so the ore horizon and the
+climb can be seen. Boreholes are drawn through the ground ("x-ray") and wider
+than life. Vertical exaggeration (×3 by default) is always printed.
+
+Most blocks hold no borehole: the nearest to Jaduguda are 8–9 km away
+(Dabanki, Kendadih, Pathargora). The block therefore lists the nearest ones
+with distance and bearing, instead of implying they are at the site.
+
+**What it is not.** It is not a three-dimensional transport model. The plume
+is the engine's two-dimensional answer laid on the ore horizon, and the
+vertical fronts come from the one-dimensional column screening (§1f). The
+block shows those answers in place; it adds no physics of its own.
+
+## 1k. The grounding pass (2026-09-26) — a measured baseline, a labelled hypothetical, local backgrounds
+
+**The owner's framework.** Every run now gives two answers.
+1. **The measured-maximum baseline** is the served answer: every metric, the
+   vertical screening, the excursion panel and every alert. In the Singhbhum
+   shear zone it uses the largest transmissivity measured in the belt's own
+   host rock near the deposits, capped at 20 m²/day.
+2. **The ISR-feasibility hypothetical** is the same run with only the ore-zone
+   K raised to the IAEA's working level for in-situ leaching. It is returned
+   under `hypotheticals`, labelled "Not a prediction", and never read by
+   anything that alerts (backend test `test_hypotheticals_passthrough.py`).
+
+**The threshold is the IAEA's.**
+* IAEA NF-T-1.4 (2016), p. 10: "permeability of the order of 1 m/d (1.2
+  darcy) or higher is advantageous. Usually, ISL becomes unfeasible at values
+  of the order of about 0.1 m/d and less."
+* IAEA-TECDOC-1239 (2001), p. 56 classes "clayey schists and solid rocks" as
+  practically impermeable, 0–0.1 m/day.
+* UCIL's own note on in-situ leaching lists "good permeability" of the host
+  rock as a precondition.
+* The hypothetical uses 1 m/day, the "advantageous" level (registered as a
+  modelling policy). Every run also reports whether its measured ore-zone K
+  is below the 0.1 m/day floor.
+* At the deposits' ore-depth seeds:
+  * five of the seven are below the floor: Jaduguda 0.034, Narwapahar 0.052,
+    Turamdih 0.060, Mohuldih 0.032 and Bagjata 0.045 m/day;
+  * the two shallow ones sit between the floor and the working level:
+    Bhatin 0.12 m/day at 90 m, Banduhurang 0.18 m/day at 60 m;
+  * none reaches 1 m/day.
+
+**D5 changed: 370 → 19 m²/day** (`P.SHEAR_ZONE_T_SOURCE`).
+* **Source.** Kudada EW (CGWB), metasediments, 3 km NE of Turamdih: T = 19,
+  open hole 15.6–145.4 m.
+* **Conversion.** K_ref is chosen so the engine's own K(z) law, integrated
+  over the tested interval, returns the measured T: 0.228 m/day at the 45 m
+  reference (`resolve.shear_zone_reference`). Plain T/b would decay the tested
+  interval twice, about 1.5× too low at ore depth. The thickness is now the
+  tested interval, 130 m; 150 m was a choice.
+* **Disclosed, not served.** AMD Jamshedpur EW, also metasediments, tested
+  101 m²/day, but no position is published. Granite wells across the belt
+  districts read 2–39 m²/day.
+
+**The mines bound it** (`validation/mine_inflow_transmissivity.py`). A
+dewatered mine is a pumping test at km² scale. UCIL's 2017 pre-feasibility
+reports give Narwapahar 2,700 m³/day (developed to 380 m) and Turamdih at
+least 3,170 m³/day (to 260 m). Thiem, swept over every plausible geometry,
+gives these bulk T values. All are upper bounds, because the pumped water
+includes backfill, drilling and rain water.
+
+| Check | Turamdih | Narwapahar |
+|---|---|---|
+| Bulk T the discharge allows | ≤ 9.1 m²/day | ≤ 5.3 m²/day |
+| The engine's served K(z) column, integrated over the drained depth | 24.6 m²/day (2.7×) | 26.0 m²/day (4.9×) |
+
+At Turamdih, in the most generous geometry (only the 60 m level drained),
+each candidate T would force this discharge:
+
+| T (m²/day) | Forced discharge |
+|---|---|
+| 19 | about 0.9× the reported 3,170 m³/day |
+| 101 | about 4.8× |
+| 370 | about 17.5× |
+
+The baseline therefore sits on the conservative side of the mine data, and
+the retired value is ruled out by it.
+
+**What changes at the deposits** (20 yr, default operation, the deposit's
+ore-depth seed; `metrics.analytical` against `hypotheticals.isr_feasibility`).
+The baseline's ore-zone K is 0.034–0.060 m/day; the hypothetical's is
+1 m/day.
+
+| Site | Constituent | Baseline reach | P(exceed) | Hypothetical reach | P(exceed) |
+|---|---|---|---|---|---|
+| Jaduguda | TDS | 30 m | 0 | 535 m | 1.00 |
+| Jaduguda | sulfate | 11 m | 0 | 156 m | 0.56 |
+| Jaduguda | uranium | 4 m | 0 | 38 m | 0.06 |
+| Turamdih | TDS | 20 m | 0 | 386 m | 0.92 |
+| Turamdih | sulfate | 11 m | 0 | 127 m | 0.42 |
+| Turamdih | uranium | 5 m | 0 | 36 m | 0.06 |
+| Bagjata | TDS | 8 m | 0 | 100 m | 0.50 |
+| Bagjata | uranium | 2 m | 0 | 14 m | 0 |
+
+* The first vertical arrival (TDS) is 140 yr at Jaduguda, 48 yr at Turamdih
+  and 109 yr at Bagjata, in both answers. The rock above the ore keeps its
+  measured K in the hypothetical, because the IAEA criterion concerns the ore
+  horizon. The engine computes this rather than assuming it, and would show a
+  difference if the two ever became coupled.
+* The 2026-09-25 comparison at T = 370 put Jaduguda's TDS reach at 173 m and
+  its vertical arrival at 10.5 yr. Both came from the Tertiary value.
+
+**How the hypothetical relates to the Monte-Carlo band.** They answer
+different questions, and neither replaces the other.
+* **The Monte Carlo is parameter uncertainty within the measured rock.** It
+  covers local K heterogeneity, Kd, β, gradient, dispersivity, aperture and
+  bleed drift. Its 48 draws vary K by only 0.37–2.46× around the served
+  value, so at Jaduguda they span 0.013–0.084 m/day. They never reach the
+  IAEA's 1 m/day: nothing measured near the mines supports that.
+* **The hypothetical is a different rock class.** It changes K by about 30×,
+  and it carries its own Monte-Carlo band inside it.
+* **The two bands do not overlap** (20 yr, reach P10–P50–P90, the same 48
+  draws):
+
+  | Site | Constituent | Measured rock | P(exceed) | ISR-grade rock | P(exceed) |
+  |---|---|---|---|---|---|
+  | Jaduguda | TDS | 18–31–59 m | 0 | 215–555–1,395 m | 1.0 |
+  | Turamdih | TDS | 10–20–46 m | 0 | 143–378–1,087 m | 0.92 |
+  | Jaduguda | uranium | 2–3–7 m | 0 | 15–35–71 m | 0.06 |
+
+* **They must not be merged.** Folding the hypothetical into the Monte Carlo
+  would need a probability that the rock is ISR-grade. No data supplies one,
+  and the IAEA criterion says the measured rock is not. A merged band would
+  print a probability that was really just the weight chosen.
+
+**Backgrounds are local now** (`Datasets/singhbhum_groundwater_radionuclide_baselines.csv`,
+7 studies and 16 rows; `data_prep/groundwater_baselines.py`).
+* **Radium** was one statewide constant, 23 mBq/L (Jaduguda's regional
+  average). A pin now takes the inverse-distance-squared blend (R = 5 km, a
+  registered policy) of these mining-area surveys with a regional anchor:
+
+  | Area | Served radium | Source |
+  |---|---|---|
+  | Jaduguda | 23 mBq/L | Tripathi 2008 |
+  | Narwapahar | 13.7 mBq/L (mean) | Rana 2010 |
+  | Turamdih complex | 19.8 mBq/L (GM) | Kumar 2015 |
+  | Bagjata | 12.4 mBq/L (GM) | Giri 2011 |
+  | Regional anchor | 10 mBq/L (GM, 108 wells) | Molla 2025 |
+
+  Outside East Singhbhum and Saraikela-Kharsawan the anchor is borrowed, and
+  the provenance says so.
+* **Uranium.** The CGWB well nearest every one of the seven deposits has no
+  uranium measurement, so every deposit pin served an unsourced 1.0 µg/L.
+  Now:
+  * Jaduguda 1.1 µg/L (median, Jha 2014);
+  * Narwapahar 0.87 µg/L (mean);
+  * the Turamdih complex 0.99 µg/L (GM, Kumar 2015);
+  * Bagjata 3.22 µg/L (GM, Giri 2011);
+  * far from the mines, the nearest CGWB well, or the CGWB statewide median
+    of 0.775 µg/L (342 wells), which replaces the 1.0 default.
+* **Disagreements are kept.** Two BARC surveys of the Turamdih ground give
+  radium GMs of 19.8 (Kumar 2015, about 153 samples over four years) and 9.1
+  (Giri 2011, about 40). The larger survey is served and both are recorded.
+* **Leverage is small.** Backgrounds sit 1–3 orders of magnitude below their
+  limits (U 30 µg/L, Ra 1,000 mBq/L). What changed is that the value is
+  measured where it is served.
+* **Not acted on.** The regional survey reads ORP +28 to +138 mV in all 108
+  wells, which is oxic. That matters for the uranium redox-trapping
+  assumption, but field ORP probes are unreliable, so it is recorded only.
+
+**The radium Kd upper end is local.** Maity, Sahu & Pandit (2015) measured
+Turamdih soils in site groundwater: 580–1,835 L/kg at the top and
+796–2,285 L/kg at 1 m.
+* The immobile end member is now 2,285 L/kg. It replaces Thibault's 9,100
+  (porous) and an unsourced 2,000 (fractured).
+* The mode stays at 13.2. Every local value is for soil with 4–7 % organic
+  matter at ambient ionic strength, so the served mode sits 44–173× on the
+  mobile side of anything measured here.
+* Uranium soil Kd at Turamdih (69–5,524 L/kg, Maity 2013, abstract only) is
+  recorded but not served, because an alkaline lixiviant suppresses uranium
+  sorption.
+
+**Ore-depth ranges are documented**
+(`ore_loader.DEPOSIT_ORE_DEPTH_RANGE_M`; copies in `Datasets/ucil_reference/`):
+
+| Deposit | Documented ore depth | Seed |
+|---|---|---|
+| Jaduguda | 0–900 m | 180 m (unchanged) |
+| Bhatin | 0–135 m | 90 m (was 150, below the ore) |
+| Narwapahar | 100–380 m (oxidised above 100 m) | 150 m (unchanged) |
+| Turamdih | 50–200 m (economic grade) | 140 m (unchanged) |
+| Banduhurang | 0–164 m (pit) | 60 m (unchanged) |
+| Bagjata | 0–270 m (reserves; lode to 600 m) | 160 m (unchanged) |
+| Mohuldih | 0–250 m (secondary source) | 150 m (was 250, the bottom of the ore) |
+
+The portal prefills a deposit site's ore depth from its seed and prints the
+documented range.
+
+**Surrogate v6.** The baseline's ore-zone K spans 0.01–0.2 m/day across the
+deposits and depths (0.011 at 600 m). The old surrogate was trained only down
+to 0.044, so most deposit runs flagged their ML bands as extrapolating.
+* The v6 bake applies the serve path's K(z) law to half the scenarios, at a
+  sampled ore depth.
+* It draws radium backgrounds over their served range.
+* It records the per-species concentration support in the model card.
+* The support now reaches fractured K 0.0021–9.8 m/day (was 0.044–10.6), so
+  deposit runs no longer flag their K as extrapolated. Jaduguda's TDS
+  background (1,779 mg/L) is still outside it; see "Still open".
+* v5 → v6, same folds, R²(log):
+
+  | Target | v5 | v6 |
+  |---|---|---|
+  | area | 0.893 | 0.892 |
+  | migration | 0.925 | 0.930 |
+  | ring concentration | 0.947 | 0.968 |
+  | uranium ring concentration | 0.847 | 0.909 |
+
+* Excursion-probability MAE went from 0.049 to 0.033. Radium's ring head
+  rose from 0.235 to 0.746; §1 explains why that is a serving gain, not a
+  transport one.
+* Full metrics are in ARCHITECTURE §6.5 (generated).
+
+**Sensitivity re-run** (`ml/artifacts/sensitivity.json`, same design as §1e).
+With the rock this tight, what carries the answer at Jaduguda has shifted.
+* R17 found β second only to K. Now uranium's reach is led by the matrix
+  terms: total-order ω 0.48, β 0.22, Kd 0.14. Sulfate's is led by β 0.35,
+  Kd 0.24, K 0.17.
+* The fracture-matrix constants with no Singhbhum measurement (fidelity row
+  3.4) therefore matter *more* now, not less. A tracer test in the belt
+  remains the single most valuable missing measurement.
+
+**Fixed while here.** The portal's "No uranium ore here" banner read
+`in_ore`, which `/api/pin` never sent. It now does.
+
+**Regression tests re-pointed, not loosened.** Three engine guards had numbers
+captured under T = 370 while testing something else: the vertical-path
+switches, chloride inertness, and a display change.
+* They now run under a `retired_shear_zone` fixture that restores the old
+  hydrogeology.
+* All three reproduce their old numbers exactly, so D5 is the only thing that
+  moved them.
+* The 3-D front-animation check moved to a 120 m ore depth, where salinity
+  (TDS) arrives inside its 50 yr series.
+* Radium's source-zone crossing moved 44.126 → 44.085 yr, because the local
+  background changed.
+* Two backend tests needed a *declared* indicator excursion within 20 yr.
+  They now use a belt site 2 km from Narwapahar, because at the Jaduguda site
+  the measured rock no longer brings the reagents to the ring in that time.
+
+**Still open.**
+* **Porosity.** Banerjee et al. (2011) measured it on 16 Singhbhum rocks, but
+  the full text was not obtained. `TOTAL_POROSITY` and `GRAIN_DENSITY` remain
+  literature values, now registered.
+* **Jaduguda's TDS background** (1,779 mg/L) comes from one CGWB well about
+  8 km away and lies outside trained support. Not revisited here.
+* **No pumping test at a deposit itself.** BARC's Turamdih and Jaduguda
+  FEFLOW models are INIS metadata-only records: qq2fm-gyc05, tfqne-zyg88,
+  7b64j-d8t37 and y21qt-00v59.
+* **The submitted report** quotes T = 370 and the results built on it. It is
+  not edited; this section supersedes it.
 
 ---
 

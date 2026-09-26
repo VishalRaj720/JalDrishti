@@ -22,7 +22,9 @@ from ml_pipeline.data_prep.jharkhand_loader import (
     aquifer_at_point, baseline_at_point,
 )
 from ml_pipeline.data_prep.texas_loader import texas_source_signature
-from ml_pipeline.data_prep.ore_loader import ore_zone_at, deposit_ore_depth
+from ml_pipeline.data_prep.ore_loader import (ore_zone_at, deposit_ore_depth,
+                                              deposit_ore_depth_range)
+from ml_pipeline.data_prep.groundwater_baselines import background_for
 from ml_pipeline.data_prep.flow_field import flow_at
 from ml_pipeline.data_prep.strike_field import strike_at, anisotropy_from_variance
 from ml_pipeline.ml.dataset import ARTIFACT_DIR
@@ -222,6 +224,38 @@ def _belt_c0(base_c0: float, ore_zone: dict, env: tuple,
     return float(belt_flat + (ceiling - belt_flat) * (1.0 - frac))
 
 
+@functools.lru_cache(maxsize=1)
+def shear_zone_reference() -> dict:
+    """The shear zone's reference-depth K implied by its measured pumping test.
+
+    WHY NOT T / b (2026-09-26). The test (Kudada EW) measured T = 19 m2/day over
+    its OPEN HOLE, 15.6-145.4 m. The engine does not hold K uniform over that
+    interval: it serves K_ref down to 45 m and decays it below (the K(z) law,
+    P.depth_decay_factor). Dividing T by the 130 m interval and then decaying
+    that from 45 m would apply the decay twice over the tested depths -- K at ore
+    depth came out ~1.5x too low, on the non-conservative side. Instead K_ref is
+    chosen so the engine's OWN profile, integrated over the interval the test
+    measured, reproduces the measured T exactly:
+        K_ref = T / integral_{casing}^{depth} f(z) dz
+    with f evaluated at the fracture base where the test was made. One K_ref for
+    the whole shear zone; each pin then decays it with its own fracture base.
+    """
+    from ml_pipeline.data_prep.cgwb_boreholes import load_boreholes
+    from ml_pipeline.data_prep.naquim_vertical import fracture_base_at
+    wid = P.SHEAR_ZONE_T_SOURCE["well_id"]
+    well = next(w for w in load_boreholes() if w["well_id"] == wid)
+    top, bottom = float(well["casing_m"]), float(well["depth_m"])
+    fb = float(fracture_base_at(float(well["lon"]), float(well["lat"]))["fracture_base_m"])
+    zs = np.linspace(top, bottom, 1201)
+    fz = np.array([P.depth_decay_factor(z, fb) for z in zs])
+    integral = float(np.sum(0.5 * (fz[1:] + fz[:-1]) * np.diff(zs)))
+    return {"well_id": wid, "T_m2day": float(P.SHEAR_ZONE_T_M2DAY),
+            "tested_interval_m": [round(top, 2), round(bottom, 2)],
+            "fracture_base_at_test_m": round(fb, 1),
+            "profile_integral_m": round(integral, 2),
+            "K_reference_m_day": float(P.SHEAR_ZONE_T_M2DAY) / integral}
+
+
 def _deposit_ore_depth_at(lon: float, lat: float) -> float | None:
     """Representative ore-depth (m) if the pin is inside a surveyed deposit, else None."""
     oz = ore_zone_at(lon, lat)
@@ -233,6 +267,26 @@ def pin_info(lon: float, lat: float) -> dict:
     aq, wq, _ = _assets()
     h = aquifer_at_point(lon, lat, aq)
     b = baseline_at_point(lon, lat, wq)
+    oz = ore_zone_at(lon, lat)
+    deposit = oz.get("deposit_name") if oz.get("zone") == "deposit" else None
+    _dd = b.get("dist_deg")
+    _near_km = float(_dd) * _DEG_TO_KM if _dd is not None and _dd == _dd else None
+    backgrounds = {}
+    for sp in ("uranium_ppb", "radium_226_mbq_l"):
+        v, prov = background_for(sp, lon, lat, nearest_value=b.get(sp),
+                                 nearest_km=_near_km, district=b.get("district"))
+        backgrounds[sp] = {"value": round(float(v), 3),
+                           "dominant": prov.get("dominant"),
+                           "anchor": prov.get("anchor")}
+    shear = None
+    if h["regime"] == "fractured" and oz.get("zone") in ("deposit", "belt"):
+        szr = shear_zone_reference()
+        shear = {"T_m2day": szr["T_m2day"], "source_well": szr["well_id"],
+                 "K_reference_m_day": round(szr["K_reference_m_day"], 4),
+                 "citation": P.SHEAR_ZONE_T_SOURCE["citation"],
+                 "note": ("Measured-maximum baseline. At a run this K is tapered "
+                          "toward the polygon K across the belt and decayed to "
+                          "the ore depth.")}
     return {
         "lon": lon, "lat": lat,
         "lithology": h["lithology"], "lithology_detail": h["lithology_detail"],
@@ -251,6 +305,21 @@ def pin_info(lon: float, lat: float) -> dict:
         "flow": flow_at(lon, lat),
         # Polish #2: representative ore-depth for a deposit pin (seeds the slider)
         "ore_depth_suggestion_m": _deposit_ore_depth_at(lon, lat),
+        # 2026-09-26: what the operator's documents say about this deposit's ore
+        # depth (the grounded range the seed sits in), or None off a deposit
+        "ore_depth_range": deposit_ore_depth_range(deposit) if deposit else None,
+        # 2026-09-26: the uranium / radium background a run here would serve,
+        # and which survey it came from
+        "backgrounds": backgrounds,
+        # 2026-09-26: the measured shear-zone test behind the belt K (or None)
+        "shear_zone": shear,
+        # 2026-09-26: the portal's "No uranium ore here" banner and species
+        # dimming read `in_ore` / `ore_name`, which this endpoint never sent, so
+        # neither ever showed. `in_ore` is False exactly where the engine refuses
+        # a uranium / radium source term (zone "none").
+        "ore_zone": oz.get("zone"),
+        "in_ore": oz.get("zone") in ("deposit", "belt"),
+        "ore_name": oz.get("nearest_deposit"),
     }
 
 
@@ -261,7 +330,41 @@ def _override(payload: dict, key: str, fallback: float) -> float:
     return float(v) if v is not None else float(fallback)
 
 
+#: Per-request memo for `resolve_inputs` (2026-09-25). One /api/predict resolves
+#: the same pin for several species -- the run's own, the three excursion-panel
+#: indicators and the same three again for the vertical indicator arrivals --
+#: and each resolve costs ~0.15 s of spatial queries. Scoped to a single request
+#: on purpose: nothing outlives it, so a dataset sync can never be answered from
+#: a stale cache, and every caller receives its own deep copy to mutate.
+import contextvars as _cv
+import copy as _copy
+_REQUEST_MEMO: "_cv.ContextVar[dict | None]" = _cv.ContextVar("resolve_memo", default=None)
+
+
+class request_memo:
+    """`with request_memo(): ...` -- identical payloads resolve once inside."""
+
+    def __enter__(self):
+        self._token = _REQUEST_MEMO.set({})
+        return self
+
+    def __exit__(self, *exc):
+        _REQUEST_MEMO.reset(self._token)
+        return False
+
+
 def resolve_inputs(payload: dict) -> tuple[dict, dict]:
+    memo = _REQUEST_MEMO.get()
+    if memo is None:
+        return _resolve_inputs(payload)
+    key = json.dumps(payload, sort_keys=True, default=str)
+    if key not in memo:
+        memo[key] = _resolve_inputs(payload)
+    inputs, hydro = memo[key]
+    return _copy.deepcopy(inputs), _copy.deepcopy(hydro)
+
+
+def _resolve_inputs(payload: dict) -> tuple[dict, dict]:
     """(predict_inputs, hydro_display). Slider values override pin defaults."""
     aq, wq, source_sig = _assets()
     lon, lat = float(payload["lon"]), float(payload["lat"])
@@ -325,18 +428,23 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
     else:
         beta, beta_basis = 0.0, "not_applicable_porous"
 
-    # source signature (Texas-derived) midpoint; background from nearest well.
-    # Radium has no Texas ISR series to transfer from and no radium column in
-    # the CGWB water-quality file, so BOTH ends come from the measured Jaduguda
-    # / BARC values instead (see parameters.py section 4b for citations).
+    # source signature (Texas-derived) midpoint. Radium has no Texas ISR series
+    # to transfer from, so its source is the measured Jaduguda mine water (see
+    # parameters.py section 4b for citations).
     if species == "radium_226_mbq_l":
         c0 = float(P.RADIUM_SOURCE_MBQ_L[P.RADIUM_SOURCE_STATISTIC])
-        cb = float(P.RADIUM_BACKGROUND_MBQ_L)
     else:
         c0 = float(np.mean(source_sig[species]))
-        cb = b.get(species)
-        if cb is None or cb != cb:
-            cb = P.background_default_for(species)
+    # BACKGROUND (2026-09-26, LIMITATIONS 1k): one rule, shared with the training
+    # generator. Uranium and radium blend the BARC mining-area surveys with a
+    # far-field anchor (nearest CGWB well / statewide median for uranium, the
+    # regional survey for radium); the other species take the nearest CGWB well
+    # as before. The provenance travels with the value.
+    _dd = b.get("dist_deg")
+    cb, background_provenance = background_for(
+        species, lon, lat, nearest_value=b.get(species),
+        nearest_km=(float(_dd) * _DEG_TO_KM if _dd is not None and _dd == _dd else None),
+        district=b.get("district"))
 
     # Module 2: ore-body mask. ISR leaches uranium only where uranium ore exists.
     # Clamp the URANIUM source term by zone; sulfate/TDS (lixiviant reagents)
@@ -372,11 +480,13 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
             c0 = float(cb)          # background only -- zero incremental source
             u_suppressed = True
 
-    # D5: Singhbhum shear-zone transmissivity. At a fractured deposit/belt pin the
-    # aquifer is far more transmissive than the generic schist polygon (NAQUIM T
-    # 207-570 vs ~42) -> replace the served K + thickness with the measured
-    # shear-zone values (T and b together so seepage velocity stays physical).
-    # Explicit K override wins. K is a trained feature, so no retrain needed.
+    # D5: Singhbhum shear-zone transmissivity -- the MEASURED-MAXIMUM baseline
+    # (2026-09-26, P.SHEAR_ZONE_T_SOURCE). At a fractured deposit/belt pin the
+    # generic schist polygon K is replaced by the shear zone's own pumping test
+    # (Kudada EW, T = 19 m2/day), converted to the reference-depth K the K(z) law
+    # needs (shear_zone_reference) and served with the tested thickness. The old
+    # 370 m2/day came from Tertiary sediments 51-58 km away (LIMITATIONS 1j).
+    # Explicit K override wins.
     k_default = float(h["K_m_day"])
     thickness_default = float(h["thickness_m"])
     shear_zone = None
@@ -394,7 +504,8 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         # The shear zone is a real physical feature that grades out, so ramp the
         # correction to zero over ORE_TAPER_KM measured from the nearest deposit,
         # using the same ramp shape as the C0 taper in _belt_c0.
-        k_shear = P.SHEAR_ZONE_T_M2DAY / P.SHEAR_ZONE_THICKNESS_M
+        szr = shear_zone_reference()
+        k_shear = szr["K_reference_m_day"]
         d_km = ore_zone.get("nearest_deposit_km")
         taper = float(P.ORE_TAPER_KM)
         w = 1.0
@@ -408,11 +519,23 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         thickness_default = w * P.SHEAR_ZONE_THICKNESS_M + (1.0 - w) * b_polygon
         shear_zone = {"T_m2day": P.SHEAR_ZONE_T_M2DAY,
                       "thickness_m": round(thickness_default, 1),
-                      "K_m_day": round(k_default, 3),
+                      # reference-depth K after the taper blend (decayed below)
+                      "K_m_day": round(k_default, 4),
                       "polygon_K_m_day": round(k_polygon, 3),
                       "taper_weight": round(w, 4),
                       "nearest_deposit_km": d_km,
-                      "full_strength_K_m_day": round(k_shear, 3)}
+                      "full_strength_K_m_day": round(k_shear, 4),
+                      # where the number comes from, and why it is this one
+                      "source_well": szr["well_id"],
+                      "tested_interval_m": szr["tested_interval_m"],
+                      "conversion": ("K_ref = T / integral of the engine's K(z) "
+                                     "law over the tested open hole "
+                                     f"({szr['profile_integral_m']} m)"),
+                      "framework": P.SHEAR_ZONE_T_SOURCE["framework"],
+                      "citation": P.SHEAR_ZONE_T_SOURCE["citation"],
+                      "disclosed_not_served": P.SHEAR_ZONE_T_SOURCE["disclosed_not_served"],
+                      "mine_discharge_bulk_T_m2day":
+                          P.SHEAR_ZONE_T_SOURCE["mine_discharge_bulk_T_m2day"]}
 
     # Phase-1 fix 3.3: DEPTH-DEPENDENT K. The resolved K above characterises the
     # shallow drinking-water aquifer; the ISR target sits far below it, where
@@ -477,6 +600,33 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
             "trained_min_K_m_day": (None if k_lo is None else round(float(k_lo), 4)),
             "strength": P.K_DEPTH_DECAY_STRENGTH,
         }
+
+    # ISR-FEASIBILITY (2026-09-26, P.ISR_FEASIBILITY). Every run states whether
+    # the ore-zone K it resolved is below the IAEA's "ISL usually unfeasible"
+    # floor. When the caller asks for the hypothetical (`hydro_scenario =
+    # "isr_feasibility"`), the ORE-ZONE K is raised -- never lowered -- to the
+    # IAEA working level. Nothing else moves: thickness, porosities, source,
+    # operation, and the k_depth record (whose shallow K drives the confining
+    # column) all stay the measured baseline's. An explicit user K is a
+    # statement about the ore zone and wins over both.
+    _isr = P.ISR_FEASIBILITY
+    k_ore_measured = _override(payload, "K_m_day", k_default)
+    scenario = payload.get("hydro_scenario")
+    if scenario not in (None, "baseline", "isr_feasibility"):
+        raise ValueError(f"unknown hydro_scenario {scenario!r}")
+    isr_applied = bool(scenario == "isr_feasibility" and payload.get("K_m_day") is None
+                       and k_default < float(_isr["K_scenario_m_day"]))
+    if isr_applied:
+        k_default = float(_isr["K_scenario_m_day"])
+    isr_feasibility = {
+        "K_ore_measured_m_day": round(float(k_ore_measured), 4),
+        "K_unfeasible_below_m_day": _isr["K_unfeasible_below_m_day"],
+        "K_scenario_m_day": _isr["K_scenario_m_day"],
+        "below_unfeasible_floor": bool(k_ore_measured < _isr["K_unfeasible_below_m_day"]),
+        "scenario": scenario or "baseline",
+        "applied": isr_applied,
+        "citation": _isr["citation"],
+    }
 
     inputs = dict(
         regime=regime,
@@ -592,6 +742,11 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
         "strike": strike,
         # D5: Singhbhum shear-zone transmissivity correction applied (or None).
         "shear_zone": shear_zone,
+        # 2026-09-26: the IAEA ISR-feasibility check on this run's ore-zone K,
+        # and whether this run IS the hypothetical (never the served default).
+        "isr_feasibility": isr_feasibility,
+        # 2026-09-26: which survey (or well) the background came from.
+        "background_provenance": background_provenance,
         # Phase-1 fix 3.3: depth-decay of K from the shallow tested zone to the
         # ore depth (None when the user supplied an explicit K, or if disabled).
         "k_depth": k_depth,
@@ -622,7 +777,10 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
             "served_C0_mbq_l": round(c0, 1),
             "statistic_used": P.RADIUM_SOURCE_STATISTIC,
             "measured_source_mbq_l": P.RADIUM_SOURCE_MBQ_L,
-            "background_mbq_l": P.RADIUM_BACKGROUND_MBQ_L,
+            # the background THIS pin serves (2026-09-26: survey blend, not the
+            # old statewide 23) and the regional anchor it falls back to
+            "background_mbq_l": round(float(cb), 2),
+            "background_regional_anchor_mbq_l": P.RADIUM_BACKGROUND_MBQ_L,
             "who_guidance_mbq_l": P.EXCURSION_THRESHOLDS["radium_226_mbq_l"],
             "note": ("Source term is MEASURED Jaduguda mine water, not an ISR "
                      "lixiviant (no ISR radium data exists for this ore). The "
@@ -646,9 +804,14 @@ def resolve_inputs(payload: dict) -> tuple[dict, dict]:
                 "pH 6/7/8/9), with the pH 8-9 value halved for high ionic "
                 "strength (ibid. p.95: sorption in the high-ionic-strength "
                 "groundwater experiment was <50% of the low-ionic-strength "
-                "case). The Thibault et al. (1990) SOIL compilation "
-                "(Table 5.28) is retained ONLY as the immobile upper end "
-                "member of the sampled band, not as the anchor."),
+                "case). The immobile upper end member of the sampled band is "
+                "the largest Kd measured at a Singhbhum mine -- 2,285 L/kg, "
+                "Turamdih soil at 1 m (Maity, Sahu & Pandit 2015, "
+                "Radioprotection 50(2):129, doi:10.1051/radiopro/2014040; "
+                "local range 580-2,285) -- kept as an end member, not as the "
+                "anchor: it is soil in ambient water, not rock under a "
+                "lixiviant. The Thibault et al. (1990) soil compilation is no "
+                "longer used."),
         } if species == "radium_226_mbq_l" else None),
     }
     return inputs, hydro
