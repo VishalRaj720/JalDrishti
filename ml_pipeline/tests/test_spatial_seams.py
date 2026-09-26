@@ -86,13 +86,15 @@ def test_shear_zone_override_tapers_instead_of_toggling():
 
 
 def test_shear_zone_reaches_full_strength_on_the_deposit():
-    """The taper must not weaken the correction where it is actually evidenced --
-    NAQUIM measured T = 207-570 m2/day on the ore belt itself."""
+    """The taper must not weaken the correction where it is actually evidenced.
+    2026-09-26: the evidence is Kudada EW's pumping test (T = 19 m2/day); the
+    207-570 once cited here were Tertiary wells 51-58 km away (LIMITATIONS 1j)."""
+    from ml_pipeline.dashboard.resolve import shear_zone_reference
     _, h = resolve_inputs({"lon": 86.347, "lat": 22.652, "species": "sulfate_mg_l"})
     sz = h["shear_zone"]
     assert sz is not None and sz["taper_weight"] == pytest.approx(1.0)
-    assert sz["K_m_day"] == pytest.approx(          # reported rounded to 3 dp
-        P.SHEAR_ZONE_T_M2DAY / P.SHEAR_ZONE_THICKNESS_M, abs=5e-4)
+    assert sz["K_m_day"] == pytest.approx(          # reported rounded to 4 dp
+        shear_zone_reference()["K_reference_m_day"], abs=5e-5)
     assert sz["thickness_m"] == pytest.approx(P.SHEAR_ZONE_THICKNESS_M)
 
 

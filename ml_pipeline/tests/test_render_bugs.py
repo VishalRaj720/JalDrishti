@@ -59,12 +59,14 @@ def test_a_contours_exclude_the_disc_so_no_welded_polygon():
     assert j["metrics"]["analytical"]["area_ha"] > 0
 
 
-def test_a_metrics_are_untouched_by_the_display_change():
+def test_a_metrics_are_untouched_by_the_display_change(retired_shear_zone):
     """The contour swap must not move a single reported number.
 
     R17: the pinned numbers were captured with beta served at the v3 literature
     mean (10); the serve path now derives beta from the porosities. The legacy
-    value is passed explicitly so this stays a test of the DISPLAY change."""
+    value is passed explicitly so this stays a test of the DISPLAY change.
+    2026-09-26: they were also captured on the retired shear-zone hydrogeology,
+    which the `retired_shear_zone` fixture restores for the same reason."""
     legacy_beta = sum(P.DUAL_POROSITY["beta_legacy_range"]) / 3.0
     j = _predict(species="tds_mg_l", operation_years=1.0, beta=legacy_beta)
     m = j["metrics"]["analytical"]
@@ -161,7 +163,11 @@ def test_c_crossing_time_is_reported_before_and_after_the_step():
                      time_years=t, start_date="2026-01-01")
         cr = j["plume"]["source_zone"]["crossing"]
         assert cr["crosses"] is True
-        assert cr["crossing_years"] == pytest.approx(44.126, abs=0.02)
+        # 44.126 -> 44.085 on 2026-09-26: the crossing is against 1,000 mBq/L
+        # MINUS the local background, which is Jaduguda's own survey value now
+        # (22.08, the BARC blend) instead of the statewide 23 -- a real,
+        # small data change; the closed-form test below re-derives it.
+        assert cr["crossing_years"] == pytest.approx(44.085, abs=0.02)
         assert cr["crossing_date"].startswith("2070-02")
 
 

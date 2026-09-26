@@ -406,7 +406,12 @@ def train_all():
         # restored/passively-flushed source-zone reading is floored at each
         # scenario's own background, so a high-background species (TDS) no
         # longer trains on labels reading below its own background.
-        "version": 5,
+        # v6 = grounding pass (2026-09-26, LIMITATIONS.md 1k): depth-decayed K
+        # in half the scenarios (support reaches the Kudada-based shear-zone
+        # baseline), survey-blended uranium / radium backgrounds, and the
+        # per-species concentration support now RECORDED here (it used to live
+        # only in P.TRAINED_SPECIES_SUPPORT, hand-copied after each bake).
+        "version": 6,
         "e1_geometry": True,
         "reproducibility": reproducibility,
         "features": MODEL_FEATURES,
@@ -423,6 +428,12 @@ def train_all():
                            f"to contain the true MC band at {int((1-ALPHA)*100)}%"),
         "training_envelope": {k: list(v) for k, v in P.OPERATIONAL_RANGES.items()},
         "hydro_support": hydro_support,
+        # per-species (C0, Cb) box actually trained on -- the serve-side guard
+        # (resolve._species_support) prefers this over the config fallback
+        "species_support": {
+            sp: {key: [float(g[key].min()), float(g[key].max())]
+                 for key in ("source_conc_C0", "background_conc_Cb")}
+            for sp, g in df.groupby("species")},
         "compliance_buffer_m": P.COMPLIANCE_BUFFER_M,
     }, indent=2))
     (ARTIFACT_DIR / "metrics.json").write_text(json.dumps(metrics, indent=2))

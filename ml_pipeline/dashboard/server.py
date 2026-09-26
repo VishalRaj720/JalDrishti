@@ -34,6 +34,7 @@ import json
 import math
 import os
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -229,6 +230,13 @@ class PredictRequest(BaseModel):
     # None -> literature mode (0.20) for uranium, 0 for sulfate/TDS. Values
     # above the trained max (0.70) are served analytically + flagged.
     u_attenuation_k_per_yr: float | None = Field(None, ge=0, le=2.0)
+    # 2026-09-26: which hydrogeology to run. None / "baseline" is the MEASURED
+    # baseline and is what every stored run and every alert uses.
+    # "isr_feasibility" runs the SECONDARY hypothetical (ore-zone K raised to the
+    # IAEA ISR level, P.ISR_FEASIBILITY) as the main answer -- for callers that
+    # want its geometry; the response labels it as such. Ordinary runs get the
+    # hypothetical's headline numbers alongside, under `hypotheticals`.
+    hydro_scenario: Literal["baseline", "isr_feasibility"] | None = None
 
 
 def _bands(d: dict) -> dict:
@@ -538,6 +546,89 @@ def api_site_block(lon: float = Query(...), lat: float = Query(...),
         raise HTTPException(422, _OUTSIDE_JH)
     from ml_pipeline.dashboard.site_block import site_block
     return site_block(lon, lat, half_km)
+
+
+def _isr_feasibility_scenario(*, req, payload: dict, hydro: dict, base: dict,
+                              base_eta: float, base_vertical: dict, vparams: dict,
+                              flow: dict, timeline: dict | None) -> dict:
+    """The SECONDARY, HYPOTHETICAL answer beside a baseline run.
+
+    Same pin, species, operation and horizon; only the ore-zone K is raised to
+    the IAEA ISR working level (P.ISR_FEASIBILITY). Analytical engine only --
+    it is a sensitivity readout, like `beta_override`, not a second product.
+    """
+    from ml_pipeline.ml.predict import features_from_inputs
+    from ml_pipeline.dashboard.vertical_path import screening_geometry, screen_species
+    isr = hydro.get("isr_feasibility") or {}
+    cfg = P.ISR_FEASIBILITY
+    block = {
+        "hypothetical": True,
+        "label": cfg["label"],
+        "citation": cfg["citation"],
+        "K_scenario_m_day": cfg["K_scenario_m_day"],
+        "K_unfeasible_below_m_day": cfg["K_unfeasible_below_m_day"],
+        "K_ore_measured_m_day": isr.get("K_ore_measured_m_day"),
+        "baseline_below_unfeasible_floor": isr.get("below_unfeasible_floor"),
+        "note": ("Not a prediction. The measured rock is the baseline above; this "
+                 "shows how far the same operation would spread IF the ore horizon "
+                 "were permeable enough for in-situ leaching to work (IAEA: ~1 "
+                 "m/day advantageous, <~0.1 m/day usually unfeasible). Never used "
+                 "for alerts."),
+    }
+    if payload.get("K_m_day") is not None:
+        block.update(applies=False, reason=(
+            "an explicit K was supplied; it is a statement about the ore zone and "
+            "the hypothetical does not overrule it"))
+        return block
+    if (isr.get("K_ore_measured_m_day") or 0.0) >= cfg["K_scenario_m_day"]:
+        block.update(applies=False, reason=(
+            "the measured ore-zone K already meets the IAEA ISR level, so the "
+            "hypothetical is the baseline"))
+        return block
+
+    s_payload = dict(payload)
+    s_payload["hydro_scenario"] = "isr_feasibility"
+    s_inputs, s_hydro = resolve_inputs(s_payload)
+    s = predict_analytical(compliance_x=float(req.monitor_ring_m), **s_inputs)
+    s.pop("_field", None)
+    s_eta = features_from_inputs(**s_inputs)[1]["_eta_eff"]
+
+    # The confining column keeps its measured K (the IAEA criterion is about
+    # the ore horizon), so the vertical clock should not move -- computed, not
+    # assumed, so a future change that couples them shows up here.
+    L_disp = max(s["Xc_m"], s_inputs["wellfield_width_m"], 1.0)
+    geometry = screening_geometry(req=req, inputs=s_inputs, hydro=s_hydro,
+                                  vparams=vparams, flow=flow, timeline=timeline)
+    sv = screen_species(s_payload, s_inputs["species"], geometry, inputs=s_inputs,
+                        Xc_m=s["Xc_m"],
+                        alpha_L=P.longitudinal_dispersivity(L_disp))["screening"]
+
+    def _m(r):
+        return {"area_ha": round(r["area_ha"]["p50"], 3),
+                "migration_m": round(r["migration_m"]["p50"], 1),
+                "compliance_conc": round(r["compliance_conc"]["p50"], 3),
+                "excursion_probability": round(r["excursion_probability"], 3)}
+
+    block.update(
+        applies=True,
+        K_ore_m_day=round(float(s_inputs["K_m_day"]), 4),
+        thickness_m=round(float(s_inputs["thickness_m"]), 1),
+        metrics=_m(s),
+        baseline_metrics=_m(base),
+        containment_eta=round(float(s_eta), 4),
+        baseline_containment_eta=round(float(base_eta), 4),
+        vertical={
+            "years_to_vertical_breakthrough": sv.get("years_to_vertical_breakthrough"),
+            "baseline_years_to_vertical_breakthrough":
+                (base_vertical or {}).get("years_to_vertical_breakthrough"),
+            "note": ("The confining rock above the ore keeps its measured K in "
+                     "this hypothetical, so the vertical pathway does not change."),
+        },
+        # K = 1 m/day sits inside the surrogate's trained support; reported in
+        # case a future config moves it out
+        extrapolation=envelope_violations(s_inputs, s_hydro),
+    )
+    return block
 
 
 @app.post("/api/predict")
@@ -880,6 +971,25 @@ def _api_predict(req: PredictRequest):
         except Exception as e:
             beta_override = {"status": f"unavailable: {type(e).__name__} ({e})"}
 
+    # TWO ANSWERS (2026-09-26, owner's framework). Everything above is the
+    # MEASURED-MAXIMUM BASELINE. Beside it, the SECONDARY HYPOTHETICAL: the same
+    # run with the ore-zone K raised to the IAEA ISR working level -- "how far
+    # would it spread if this rock were permeable enough for ISR to work". It is
+    # returned under `hypotheticals`, labelled, and read by nothing that alerts.
+    # Skipped for metrics-only callers (display_extras False), like the other
+    # display layers.
+    hypotheticals = None
+    if req.display_extras and req.hydro_scenario in (None, "baseline"):
+        try:
+            hypotheticals = {"isr_feasibility": _isr_feasibility_scenario(
+                req=req, payload=payload, hydro=hydro, base=a, base_eta=_feat_eta,
+                base_vertical=vertical, vparams=vparams, flow=flow,
+                timeline=timeline)}
+        except Exception as e:                   # never break the main answer
+            hypotheticals = {"isr_feasibility": {
+                "status": f"unavailable: {type(e).__name__} ({e})",
+                "hypothetical": True}}
+
     return {
         "pin": {"lon": req.lon, "lat": req.lat},
         "hydro": hydro,
@@ -912,6 +1022,12 @@ def _api_predict(req: PredictRequest):
         "isr_excursion": isr_excursion,
         # V-7: default-beta comparison when the user overrode beta
         "beta_override": beta_override,
+        # 2026-09-26: the secondary, hypothetical ISR-feasibility answer (None
+        # for metrics-only calls and for a run that already IS the scenario)
+        "hypotheticals": hypotheticals,
+        # which hydrogeology THIS response is: the measured baseline unless the
+        # caller explicitly asked for the hypothetical
+        "hydro_scenario": req.hydro_scenario or "baseline",
         # wellfield_width_m is a well-PATTERN FOOTPRINT DIAMETER; the old label
         # invited reading it as a borehole width or a well spacing.
         "wellfield_geometry": {

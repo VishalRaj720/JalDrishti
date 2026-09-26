@@ -118,4 +118,9 @@ async def preview_run(
         "ml_envelope_skipped": result.get("ml_envelope_skipped"),
         "disagreement": result.get("disagreement"),
         "beta_override": result.get("beta_override"),
+        # 2026-09-26: the engine's SECONDARY, hypothetical answer (ore-zone K at
+        # the IAEA ISR level) beside the measured baseline. Labelled by the
+        # engine; nothing that alerts reads it.
+        "hypotheticals": result.get("hypotheticals"),
+        "hydro_scenario": result.get("hydro_scenario"),
     }

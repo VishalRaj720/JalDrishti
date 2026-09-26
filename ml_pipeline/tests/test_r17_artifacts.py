@@ -1,12 +1,12 @@
-"""R17 -- the v4/v5 artifacts carry baselines, provenance and a sensitivity
+"""R17 -- the v4/v5/v6 artifacts carry baselines, provenance and a sensitivity
 record.
 
   * metrics.json: every band target reports the three reference models on
     the same folds, and the surrogate beats all of them in log space;
-  * model_card.json: version 5 (post-freeze background-floor retrain,
-    LIMITATIONS.md 4h-ii; v4 was the beta retrain), the beta prior, and a
-    reproducibility block whose training-CSV SHA-256 matches the file on
-    disk when it is present;
+  * model_card.json: version 6 (the 2026-09-26 grounding-pass retrain,
+    LIMITATIONS.md 1k; v5 was the post-freeze background-floor retrain, v4
+    the beta retrain), the beta prior, and a reproducibility block whose
+    training-CSV SHA-256 matches the file on disk when it is present;
   * the sensitivity script produces the documented schema on a tiny design
     and restores every config constant it patched;
   * the audit's radium gate is still reported as failing -- it must not have
@@ -44,15 +44,17 @@ def test_baselines_are_reported_and_beaten():
         assert bl["surrogate_p50"]["r2_log"] == pytest.approx(b["r2_log"])
 
 
-def test_model_card_is_v5_with_the_beta_prior_and_provenance():
+def test_model_card_is_v6_with_the_beta_prior_and_provenance():
+    """v6 = the 2026-09-26 grounding-pass retrain (LIMITATIONS.md 1k): depth-
+    decayed K coverage, survey-blended backgrounds, species support recorded."""
     c = _card()
-    assert c["version"] == 5
+    assert c["version"] == 6
     r = c["reproducibility"]
     assert r["beta_prior"] == list(P.DUAL_POROSITY["beta_prior"])
     assert r["beta_mc_factor"] == P.DUAL_POROSITY["beta_mc_factor"]
     assert r["training_rows"] == 18000 and r["training_scenarios"] == 900
     assert len(r["training_csv_sha256"]) == 64
-    assert r["bake_meta"] is None or r["bake_meta"]["version"] == 5
+    assert r["bake_meta"] is None or r["bake_meta"]["version"] == 6
     assert r["regenerate"][0].startswith("python -m ml_pipeline.synthetic.generate")
     csv = OUT / r["training_csv"]
     if csv.exists():
@@ -77,12 +79,20 @@ def test_hydro_support_covers_the_porosity_derived_beta():
 
 def test_radium_gate_is_still_reported_as_failing():
     """The register says radium misses the project's own R2(log) >= 0.60 gate
-    and explains why (point-mass labels). It must be reported, not removed."""
+    and explains why (point-mass labels). It must be reported, not removed.
+
+    v6 (2026-09-26): the COMPLIANCE head now clears the bar (0.746) because the
+    background it is pinned to varies across scenarios and is a feature;
+    LIMITATIONS.md 1 says so and why it is not a transport gain. MIGRATION is
+    still ~86 % exact zeros and still misses -- that is the gate now pinned."""
     m = _metrics()
-    ra = m["bands"]["compliance_conc"]["r2_log_by_species"]["radium_226_mbq_l"]
-    assert ra < 0.60          # if this ever passes, update LIMITATIONS.md 1
-    cov = m["bands"]["compliance_conc"]["coverage"]["per_cell_rows"]
-    assert cov["fractured|radium_226_mbq_l"] >= 0.80   # the band still covers
+    mig = m["bands"]["max_migration_distance_m"]["r2_log_by_species"]["radium_226_mbq_l"]
+    assert mig < 0.60         # if this ever passes, update LIMITATIONS.md 1
+    comp = m["bands"]["compliance_conc"]["r2_log_by_species"]["radium_226_mbq_l"]
+    assert comp >= 0.60       # the v6 change LIMITATIONS.md 1 explains
+    for t in ("compliance_conc", "max_migration_distance_m"):
+        cov = m["bands"][t]["coverage"]["per_cell_rows"]
+        assert cov["fractured|radium_226_mbq_l"] >= 0.80   # the band still covers
 
 
 def test_sensitivity_script_contract_and_config_restoration():
@@ -101,7 +111,13 @@ def test_sensitivity_script_contract_and_config_restoration():
     for k in S.OUTPUTS:
         idx = r["sobol"]["indices"][k]
         assert set(idx["ST"]) == names and set(idx["S1"]) == names
-        assert all(0.0 <= v <= 1.5 for v in idx["ST"].values())
+        if idx.get("degenerate"):
+            # 2026-09-26: with the measured shear-zone K, uranium never reaches
+            # the Jaduguda ring (the output sits at background), so its indices
+            # are undefined and the script says so instead of printing numbers
+            assert all(v is None for v in idx["ST"].values()), k
+        else:
+            assert all(0.0 <= v <= 1.5 for v in idx["ST"].values())
         assert k in r["oat"]["inputs"]["beta (capacity ratio)"]
     assert r["sobol"]["evaluations"] == 4 * (len(names) + 2)
     assert r["beta_basis"] == "porosity_derived"

@@ -40,11 +40,12 @@ not quantify structural model error, and nothing in this product can.
 | Item | Status | Why |
 |---|---|---|
 | ~~**Plume extent rests on β, an unmeasured matrix-storage ratio; the band samples inside the assumption**~~ | ✅ **Closed (R17, 2026-09-20) — see §1d** | β is now derived from the run's own porosities (3.0 at Jaduguda, 1–4 across the lithology table), the training prior is log-uniform on [0.3, 20] and the Monte-Carlo band spans a factor of 4 either side. The v4 retrain passes every gate. β is still not a *measurement* — §2 stands |
-| **Per-species R²(log) ≥ 0.60 — radium migration (0.515), compliance (0.227)** | 🔴 **Fails the project's own Gate-4 bar** | Not a tuning failure, a label-shape property. Radium's migration label is **81.8 % exact zeros**, compliance **95.8 % pinned at the 23 mBq/L background**. A squared-error regressor on `log1p` cannot fit a point mass, and R² divides by a near-zero SST. The v4 retrain (R17) left migration unchanged (0.516→0.515) and **worsened compliance (0.431→0.227)** — the wider β prior moved a few more radium scenarios off the background pin, and a point mass with a thin tail is exactly what this learner cannot fit. The remedy is a **zero-inflated / two-stage head** — a new ML approach, not authorised; the conformal band on those cells still covers (0.92–0.95 per cell, 0.879 field-resampled) |
+| **Per-species R²(log) ≥ 0.60 — radium migration (0.412, v6)** | 🔴 **Fails the project's own Gate-4 bar** | Not a tuning failure, a label-shape property. Radium's migration label is **86.3 % exact zeros** (v6). A squared-error regressor on `log1p` cannot fit a point mass, and R² divides by a near-zero SST. The remedy is a **zero-inflated / two-stage head** — a new ML approach, not authorised; the conformal band on those cells still covers (0.91 fractured, 0.95 porous). **Radium compliance now clears the bar (0.235 → 0.746, v6 retrain 2026-09-26), but read why:** its label is still 96.8 % pinned at the scenario's own background, and v6 varies that background (10–23 mBq/L, the BARC survey blend) instead of fixing it at 23 — so the head learns "ring = background" from a feature. The gain is real for serving and says nothing new about radium transport |
 
 **Why this does not invalidate the product:** the analytical engine serves the
-authoritative central value for radium, and the conformal bands on those cells cover
-0.891–0.986 field-resampled — all above the 0.80 gate. The product shows both, and labels
+authoritative central value for radium. The conformal bands on those cells cover
+0.951–0.963 field-resampled (v6, 2026-09-26; every target passes at 0.90–0.92
+scenario coverage), all above the 0.80 gate. The product shows both, and labels
 which engine produced which. **If you consider that gate binding for release, the
 pipeline is not ready** until the two-stage head is built.
 
@@ -558,9 +559,9 @@ Rules of the transcription:
      4–6 m²/day.
    * Fidelity row 1.1 and the submitted report say the 207–570 values come
      from "exactly where the mines are". That statement is superseded here.
-   * The served value is **unchanged, pending the owner's decision** between
-     reverting to the lithology value and sampling the district's measured
-     range.
+   * ~~The served value is unchanged, pending the owner's decision.~~ **Decided
+     and changed on 2026-09-26: the baseline is now the measured maximum,
+     Kudada's 19 m²/day. See §1k.**
 2. **The deep aquifer can push upward.** Kudada is recorded as an
    **auto-flowing well** (Table 17), meaning its deep fractures (105–139 m)
    carried water to the surface. The pumping test lists a static level of
@@ -612,6 +613,245 @@ with distance and bearing, instead of implying they are at the site.
 is the engine's two-dimensional answer laid on the ore horizon, and the
 vertical fronts come from the one-dimensional column screening (§1f). The
 block shows those answers in place; it adds no physics of its own.
+
+## 1k. The grounding pass (2026-09-26) — a measured baseline, a labelled hypothetical, local backgrounds
+
+**The owner's framework.** Every run now gives two answers.
+1. **The measured-maximum baseline** is the served answer: every metric, the
+   vertical screening, the excursion panel and every alert. In the Singhbhum
+   shear zone it uses the largest transmissivity measured in the belt's own
+   host rock near the deposits, capped at 20 m²/day.
+2. **The ISR-feasibility hypothetical** is the same run with only the ore-zone
+   K raised to the IAEA's working level for in-situ leaching. It is returned
+   under `hypotheticals`, labelled "Not a prediction", and never read by
+   anything that alerts (backend test `test_hypotheticals_passthrough.py`).
+
+**The threshold is the IAEA's.**
+* IAEA NF-T-1.4 (2016), p. 10: "permeability of the order of 1 m/d (1.2
+  darcy) or higher is advantageous. Usually, ISL becomes unfeasible at values
+  of the order of about 0.1 m/d and less."
+* IAEA-TECDOC-1239 (2001), p. 56 classes "clayey schists and solid rocks" as
+  practically impermeable, 0–0.1 m/day.
+* UCIL's own note on in-situ leaching lists "good permeability" of the host
+  rock as a precondition.
+* The hypothetical uses 1 m/day, the "advantageous" level (registered as a
+  modelling policy). Every run also reports whether its measured ore-zone K
+  is below the 0.1 m/day floor.
+* At the deposits' ore-depth seeds:
+  * five of the seven are below the floor: Jaduguda 0.034, Narwapahar 0.052,
+    Turamdih 0.060, Mohuldih 0.032 and Bagjata 0.045 m/day;
+  * the two shallow ones sit between the floor and the working level:
+    Bhatin 0.12 m/day at 90 m, Banduhurang 0.18 m/day at 60 m;
+  * none reaches 1 m/day.
+
+**D5 changed: 370 → 19 m²/day** (`P.SHEAR_ZONE_T_SOURCE`).
+* **Source.** Kudada EW (CGWB), metasediments, 3 km NE of Turamdih: T = 19,
+  open hole 15.6–145.4 m.
+* **Conversion.** K_ref is chosen so the engine's own K(z) law, integrated
+  over the tested interval, returns the measured T: 0.228 m/day at the 45 m
+  reference (`resolve.shear_zone_reference`). Plain T/b would decay the tested
+  interval twice, about 1.5× too low at ore depth. The thickness is now the
+  tested interval, 130 m; 150 m was a choice.
+* **Disclosed, not served.** AMD Jamshedpur EW, also metasediments, tested
+  101 m²/day, but no position is published. Granite wells across the belt
+  districts read 2–39 m²/day.
+
+**The mines bound it** (`validation/mine_inflow_transmissivity.py`). A
+dewatered mine is a pumping test at km² scale. UCIL's 2017 pre-feasibility
+reports give Narwapahar 2,700 m³/day (developed to 380 m) and Turamdih at
+least 3,170 m³/day (to 260 m). Thiem, swept over every plausible geometry,
+gives these bulk T values. All are upper bounds, because the pumped water
+includes backfill, drilling and rain water.
+
+| Check | Turamdih | Narwapahar |
+|---|---|---|
+| Bulk T the discharge allows | ≤ 9.1 m²/day | ≤ 5.3 m²/day |
+| The engine's served K(z) column, integrated over the drained depth | 24.6 m²/day (2.7×) | 26.0 m²/day (4.9×) |
+
+At Turamdih, in the most generous geometry (only the 60 m level drained),
+each candidate T would force this discharge:
+
+| T (m²/day) | Forced discharge |
+|---|---|
+| 19 | about 0.9× the reported 3,170 m³/day |
+| 101 | about 4.8× |
+| 370 | about 17.5× |
+
+The baseline therefore sits on the conservative side of the mine data, and
+the retired value is ruled out by it.
+
+**What changes at the deposits** (20 yr, default operation, the deposit's
+ore-depth seed; `metrics.analytical` against `hypotheticals.isr_feasibility`).
+The baseline's ore-zone K is 0.034–0.060 m/day; the hypothetical's is
+1 m/day.
+
+| Site | Constituent | Baseline reach | P(exceed) | Hypothetical reach | P(exceed) |
+|---|---|---|---|---|---|
+| Jaduguda | TDS | 30 m | 0 | 535 m | 1.00 |
+| Jaduguda | sulfate | 11 m | 0 | 156 m | 0.56 |
+| Jaduguda | uranium | 4 m | 0 | 38 m | 0.06 |
+| Turamdih | TDS | 20 m | 0 | 386 m | 0.92 |
+| Turamdih | sulfate | 11 m | 0 | 127 m | 0.42 |
+| Turamdih | uranium | 5 m | 0 | 36 m | 0.06 |
+| Bagjata | TDS | 8 m | 0 | 100 m | 0.50 |
+| Bagjata | uranium | 2 m | 0 | 14 m | 0 |
+
+* The first vertical arrival (TDS) is 140 yr at Jaduguda, 48 yr at Turamdih
+  and 109 yr at Bagjata, in both answers. The rock above the ore keeps its
+  measured K in the hypothetical, because the IAEA criterion concerns the ore
+  horizon. The engine computes this rather than assuming it, and would show a
+  difference if the two ever became coupled.
+* The 2026-09-25 comparison at T = 370 put Jaduguda's TDS reach at 173 m and
+  its vertical arrival at 10.5 yr. Both came from the Tertiary value.
+
+**How the hypothetical relates to the Monte-Carlo band.** They answer
+different questions, and neither replaces the other.
+* **The Monte Carlo is parameter uncertainty within the measured rock.** It
+  covers local K heterogeneity, Kd, β, gradient, dispersivity, aperture and
+  bleed drift. Its 48 draws vary K by only 0.37–2.46× around the served
+  value, so at Jaduguda they span 0.013–0.084 m/day. They never reach the
+  IAEA's 1 m/day: nothing measured near the mines supports that.
+* **The hypothetical is a different rock class.** It changes K by about 30×,
+  and it carries its own Monte-Carlo band inside it.
+* **The two bands do not overlap** (20 yr, reach P10–P50–P90, the same 48
+  draws):
+
+  | Site | Constituent | Measured rock | P(exceed) | ISR-grade rock | P(exceed) |
+  |---|---|---|---|---|---|
+  | Jaduguda | TDS | 18–31–59 m | 0 | 215–555–1,395 m | 1.0 |
+  | Turamdih | TDS | 10–20–46 m | 0 | 143–378–1,087 m | 0.92 |
+  | Jaduguda | uranium | 2–3–7 m | 0 | 15–35–71 m | 0.06 |
+
+* **They must not be merged.** Folding the hypothetical into the Monte Carlo
+  would need a probability that the rock is ISR-grade. No data supplies one,
+  and the IAEA criterion says the measured rock is not. A merged band would
+  print a probability that was really just the weight chosen.
+
+**Backgrounds are local now** (`Datasets/singhbhum_groundwater_radionuclide_baselines.csv`,
+7 studies and 16 rows; `data_prep/groundwater_baselines.py`).
+* **Radium** was one statewide constant, 23 mBq/L (Jaduguda's regional
+  average). A pin now takes the inverse-distance-squared blend (R = 5 km, a
+  registered policy) of these mining-area surveys with a regional anchor:
+
+  | Area | Served radium | Source |
+  |---|---|---|
+  | Jaduguda | 23 mBq/L | Tripathi 2008 |
+  | Narwapahar | 13.7 mBq/L (mean) | Rana 2010 |
+  | Turamdih complex | 19.8 mBq/L (GM) | Kumar 2015 |
+  | Bagjata | 12.4 mBq/L (GM) | Giri 2011 |
+  | Regional anchor | 10 mBq/L (GM, 108 wells) | Molla 2025 |
+
+  Outside East Singhbhum and Saraikela-Kharsawan the anchor is borrowed, and
+  the provenance says so.
+* **Uranium.** The CGWB well nearest every one of the seven deposits has no
+  uranium measurement, so every deposit pin served an unsourced 1.0 µg/L.
+  Now:
+  * Jaduguda 1.1 µg/L (median, Jha 2014);
+  * Narwapahar 0.87 µg/L (mean);
+  * the Turamdih complex 0.99 µg/L (GM, Kumar 2015);
+  * Bagjata 3.22 µg/L (GM, Giri 2011);
+  * far from the mines, the nearest CGWB well, or the CGWB statewide median
+    of 0.775 µg/L (342 wells), which replaces the 1.0 default.
+* **Disagreements are kept.** Two BARC surveys of the Turamdih ground give
+  radium GMs of 19.8 (Kumar 2015, about 153 samples over four years) and 9.1
+  (Giri 2011, about 40). The larger survey is served and both are recorded.
+* **Leverage is small.** Backgrounds sit 1–3 orders of magnitude below their
+  limits (U 30 µg/L, Ra 1,000 mBq/L). What changed is that the value is
+  measured where it is served.
+* **Not acted on.** The regional survey reads ORP +28 to +138 mV in all 108
+  wells, which is oxic. That matters for the uranium redox-trapping
+  assumption, but field ORP probes are unreliable, so it is recorded only.
+
+**The radium Kd upper end is local.** Maity, Sahu & Pandit (2015) measured
+Turamdih soils in site groundwater: 580–1,835 L/kg at the top and
+796–2,285 L/kg at 1 m.
+* The immobile end member is now 2,285 L/kg. It replaces Thibault's 9,100
+  (porous) and an unsourced 2,000 (fractured).
+* The mode stays at 13.2. Every local value is for soil with 4–7 % organic
+  matter at ambient ionic strength, so the served mode sits 44–173× on the
+  mobile side of anything measured here.
+* Uranium soil Kd at Turamdih (69–5,524 L/kg, Maity 2013, abstract only) is
+  recorded but not served, because an alkaline lixiviant suppresses uranium
+  sorption.
+
+**Ore-depth ranges are documented**
+(`ore_loader.DEPOSIT_ORE_DEPTH_RANGE_M`; copies in `Datasets/ucil_reference/`):
+
+| Deposit | Documented ore depth | Seed |
+|---|---|---|
+| Jaduguda | 0–900 m | 180 m (unchanged) |
+| Bhatin | 0–135 m | 90 m (was 150, below the ore) |
+| Narwapahar | 100–380 m (oxidised above 100 m) | 150 m (unchanged) |
+| Turamdih | 50–200 m (economic grade) | 140 m (unchanged) |
+| Banduhurang | 0–164 m (pit) | 60 m (unchanged) |
+| Bagjata | 0–270 m (reserves; lode to 600 m) | 160 m (unchanged) |
+| Mohuldih | 0–250 m (secondary source) | 150 m (was 250, the bottom of the ore) |
+
+The portal prefills a deposit site's ore depth from its seed and prints the
+documented range.
+
+**Surrogate v6.** The baseline's ore-zone K spans 0.01–0.2 m/day across the
+deposits and depths (0.011 at 600 m). The old surrogate was trained only down
+to 0.044, so most deposit runs flagged their ML bands as extrapolating.
+* The v6 bake applies the serve path's K(z) law to half the scenarios, at a
+  sampled ore depth.
+* It draws radium backgrounds over their served range.
+* It records the per-species concentration support in the model card.
+* The support now reaches fractured K 0.0021–9.8 m/day (was 0.044–10.6), so
+  deposit runs no longer flag their K as extrapolated. Jaduguda's TDS
+  background (1,779 mg/L) is still outside it; see "Still open".
+* v5 → v6, same folds, R²(log):
+
+  | Target | v5 | v6 |
+  |---|---|---|
+  | area | 0.893 | 0.892 |
+  | migration | 0.925 | 0.930 |
+  | ring concentration | 0.947 | 0.968 |
+  | uranium ring concentration | 0.847 | 0.909 |
+
+* Excursion-probability MAE went from 0.049 to 0.033. Radium's ring head
+  rose from 0.235 to 0.746; §1 explains why that is a serving gain, not a
+  transport one.
+* Full metrics are in ARCHITECTURE §6.5 (generated).
+
+**Sensitivity re-run** (`ml/artifacts/sensitivity.json`, same design as §1e).
+With the rock this tight, what carries the answer at Jaduguda has shifted.
+* R17 found β second only to K. Now uranium's reach is led by the matrix
+  terms: total-order ω 0.48, β 0.22, Kd 0.14. Sulfate's is led by β 0.35,
+  Kd 0.24, K 0.17.
+* The fracture-matrix constants with no Singhbhum measurement (fidelity row
+  3.4) therefore matter *more* now, not less. A tracer test in the belt
+  remains the single most valuable missing measurement.
+
+**Fixed while here.** The portal's "No uranium ore here" banner read
+`in_ore`, which `/api/pin` never sent. It now does.
+
+**Regression tests re-pointed, not loosened.** Three engine guards had numbers
+captured under T = 370 while testing something else: the vertical-path
+switches, chloride inertness, and a display change.
+* They now run under a `retired_shear_zone` fixture that restores the old
+  hydrogeology.
+* All three reproduce their old numbers exactly, so D5 is the only thing that
+  moved them.
+* The 3-D front-animation check moved to a 120 m ore depth, where salinity
+  (TDS) arrives inside its 50 yr series.
+* Radium's source-zone crossing moved 44.126 → 44.085 yr, because the local
+  background changed.
+* Two backend tests needed a *declared* indicator excursion within 20 yr.
+  They now use a belt site 2 km from Narwapahar, because at the Jaduguda site
+  the measured rock no longer brings the reagents to the ring in that time.
+
+**Still open.**
+* **Porosity.** Banerjee et al. (2011) measured it on 16 Singhbhum rocks, but
+  the full text was not obtained. `TOTAL_POROSITY` and `GRAIN_DENSITY` remain
+  literature values, now registered.
+* **Jaduguda's TDS background** (1,779 mg/L) comes from one CGWB well about
+  8 km away and lies outside trained support. Not revisited here.
+* **No pumping test at a deposit itself.** BARC's Turamdih and Jaduguda
+  FEFLOW models are INIS metadata-only records: qq2fm-gyc05, tfqne-zyg88,
+  7b64j-d8t37 and y21qt-00v59.
+* **The submitted report** quotes T = 370 and the results built on it. It is
+  not edited; this section supersedes it.
 
 ---
 

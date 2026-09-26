@@ -731,35 +731,35 @@ artifacts by discipline; it has to be mechanical.
 
 **These numbers are GENERATED from `ml/artifacts/metrics.json` by `python -m ml_pipeline.tools.sync_docs`. Do not hand-edit this block — edit the model, retrain, and re-run the generator.**
 
-Model card version 5 · 40 features · 3 band targets · species: radium_226_mbq_l, sulfate_mg_l, tds_mg_l, uranium_ppb
+Model card version 6 · 40 features · 3 band targets · species: radium_226_mbq_l, sulfate_mg_l, tds_mg_l, uranium_ppb
 
 | target | R² (P50, back-transformed) | R² (log) | scenario coverage | rows coverage |
 |---|---|---|---|---|
-| `affected_area_ha` | 0.7825 | 0.8926 | 0.8633 | 0.9553 |
-| `max_migration_distance_m` | 0.5043 | 0.9255 | 0.8783 | 0.9517 |
-| `compliance_conc` | -4.4826 | 0.9467 | 0.8656 | 0.9483 |
-| `excursion_probability` | 0.9146 | — | — | — |
+| `affected_area_ha` | 0.7522 | 0.8922 | 0.8687 | 0.9577 |
+| `max_migration_distance_m` | 0.3774 | 0.9298 | 0.8653 | 0.9471 |
+| `compliance_conc` | -0.2674 | 0.9684 | 0.8572 | 0.9346 |
+| `excursion_probability` | 0.9134 | — | — | — |
 
 **Per-species R² (log space).** The pooled back-transformed figure mixes ppb, mg/L and mBq/L, so its denominator depends on the species *mix* rather than on model quality — judge on these.
 
 | target | radium_226_mbq_l | sulfate_mg_l | tds_mg_l | uranium_ppb |
 |---|---|---|---|---|
-| `affected_area_ha` | 0.892 | 0.789 | 0.820 | 0.943 |
-| `max_migration_distance_m` | **0.500** | 0.878 | 0.884 | 0.930 |
-| `compliance_conc` | **0.235** | 0.917 | 0.962 | 0.847 |
+| `affected_area_ha` | 0.890 | 0.797 | 0.814 | 0.957 |
+| `max_migration_distance_m` | **0.412** | 0.907 | 0.898 | 0.945 |
+| `compliance_conc` | 0.746 | 0.909 | 0.972 | 0.909 |
 
 **Acceptance gates.** Per-species R²(log) ≥ 0.60; scenario coverage ≥ 0.80.
 
 - Coverage: all targets pass.
-- Per-species R²(log): **FAILS on 2 cell(s)** — `max_migration_distance_m` / radium_226_mbq_l = 0.500; `compliance_conc` / radium_226_mbq_l = 0.235. Reported as a miss, not reframed. The conformal bands on those cells still cover (see the coverage columns), and the ANALYTICAL engine serves the authoritative central value, so the failure is in the surrogate's point estimate, not in the uncertainty guarantee.
+- Per-species R²(log): **FAILS on 1 cell(s)** — `max_migration_distance_m` / radium_226_mbq_l = 0.412. Reported as a miss, not reframed. The conformal bands on those cells still cover (see the coverage columns), and the ANALYTICAL engine serves the authoritative central value, so the failure is in the surrogate's point estimate, not in the uncertainty guarantee.
 
 **Field-resampled coverage** (the serving-distribution gate mandated by `E1_geometry_design.md` §6 gate 5): 120 scenarios pinned to the real flow/strike field, held out from training.
 
 | target | scenario coverage | rows | verdict |
 |---|---|---|---|
-| `affected_area_ha` | 0.8852 | 0.9651 | PASS |
-| `max_migration_distance_m` | 0.8747 | 0.9491 | PASS |
-| `compliance_conc` | 0.8812 | 0.9496 | PASS |
+| `affected_area_ha` | 0.9000 | 0.9729 | PASS |
+| `max_migration_distance_m` | 0.9208 | 0.9749 | PASS |
+| `compliance_conc` | 0.9021 | 0.9629 | PASS |
 
 <!-- END GENERATED: metrics -->
 
@@ -909,19 +909,25 @@ What happens when you drop a pin at Jaduguda and press *Run*:
 2. **Boundary gate**: outside Jharkhand → 422 (predictions elsewhere would be
    fabricated — the datasets end at the border).
 3. **`resolve_inputs`**: pin → aquifer polygon (K, φ, thickness, regime) →
-   nearest water-quality well (backgrounds) → ore-zone mask (uranium C0 exists
-   only on deposits/belt; grade-scaled by UDEPO; suppressed elsewhere) →
-   Singhbhum shear-zone K override (fractured deposit pins are far more
-   transmissive than the generic schist polygon) → flow field (default azimuth
-   + gradient) → strike field (anisotropy) → Kd defaults from the same ranges
-   training sampled.
+   backgrounds (nearest CGWB well; uranium and radium blended from the BARC
+   mining-area surveys, `data_prep/groundwater_baselines.py`, the same function
+   the generator calls) → ore-zone mask (uranium C0 exists only on
+   deposits/belt; grade-scaled by UDEPO; suppressed elsewhere) → Singhbhum
+   shear-zone K (the **measured-maximum baseline**: Kudada's 19 m²/day,
+   converted so the K(z) law returns it over the tested interval — tighter than
+   the generic schist polygon, LIMITATIONS §1k) → K(z) decay to the ore depth →
+   the IAEA ISR-feasibility check on that K (`hydro.isr_feasibility`) → flow
+   field (default azimuth + gradient) → strike field (anisotropy) → Kd defaults
+   from the same ranges training sampled.
 4. **`envelope_violations`**: every input checked against the trained support —
    anything outside is listed in `extrapolation` (the ML bands are unvalidated
    there; the analytical engine still serves). Three sources, because the
    deployed model card does not cover all of them:
    the operational sliders from the card's `training_envelope`; the resolved
    hydrogeology from its per-regime `hydro_support`; and `source_conc_C0` /
-   `background_conc_Cb` per species from `P.TRAINED_SPECIES_SUPPORT`.
+   `background_conc_Cb` per species from the card's `species_support` (recorded
+   by the trainer since v6, 2026-09-26), falling back to
+   `P.TRAINED_SPECIES_SUPPORT`.
    Those last two had **no card entry at all**, so until 2026-08-12 the lookup
    fell through to `(-inf, inf)` and they were never checked — a baseline
    outside trained support extrapolated with the 80 % band still printed. The
@@ -935,6 +941,12 @@ What happens when you drop a pin at Jaduguda and press *Run*:
 7. **Context blocks**: vertical screening (per-district NAQUIM), river
    crossing (`plume_river_discharge` on the BIS contour), far-field note,
    restoration diagnostic (elapsed-credited), λ radial flag, drift record.
+7b. **The second answer** (2026-09-26): `hypotheticals.isr_feasibility` — the
+   same run, analytical engine only, with the ore-zone K raised to the IAEA's
+   ~1 m/day ISR working level (`P.ISR_FEASIBILITY`). Labelled hypothetical,
+   skipped for metrics-only callers, never read by anything that alerts. The
+   confining column keeps its measured K, so the vertical answer is unchanged
+   and the block shows it computed, not assumed.
 8. **Frontend renders**: contour polygons + compliance ring + ML envelope on
    the map; metric cards; depth schematic with the district fracture band.
 
@@ -947,7 +959,8 @@ What happens when you drop a pin at Jaduguda and press *Run*:
 | `test_physics_laws.py` | The monotone sign table against the *labels* (raw operating-point sweeps): K↑⇒bigger, bleed↑⇒smaller, Q_in law at fixed Q_net, front phases, retarded clock, Tang, restoration reduces impact. |
 | `test_restoration_continuity.py` | The QA F-1/F-2 fixes: elapsed-credit law, no step at rest = t−op, monotone non-increase, rest→0⁺ continuity, mid-sweep credit, causality (planned future irrelevant), realized-fraction feature. |
 | `test_polish.py` | Plume×river crossing (incl. invalid-ring healing), per-deposit ore depths, disc-flush half-life law. |
-| `test_shear_transmissivity.py` | D5 shear-zone K override on/off. |
+| `test_shear_transmissivity.py` | D5 shear-zone K override on/off; the reference K returns the measured T over the tested interval. |
+| `test_grounded_baselines.py` | The 2026-09-26 grounding pass: survey backgrounds (one served row per area, continuity, generator = serve), the measured-maximum T (it is the placed host-rock maximum; the mine discharge bounds it), the ISR-feasibility hypothetical (moves only the ore-zone K, never alerts, labelled), and every deposit's ore-depth seed inside its documented range. |
 | `test_strike_field.py` | Axial statistics, anisotropy-from-V anchoring. |
 | `test_flow_field.py` | D1 gradients/azimuths sane, divide handling. |
 | `test_ore_mask.py` / `test_ore_grades.py` | Deposit/belt/none C0 ordering, grade clipping. |

@@ -32,6 +32,13 @@ from tests.test_p2_site_is_the_operation import FULL_SITE, _tok
 
 JADUGUDA_SITE = (86.36, 22.65)     # the registered site: "belt", 0.35 km off the deposit
 RANCHI = (85.33, 23.36)            # "none": no ore, source term refused
+# 2026-09-26: a belt pin between Jaduguda and Narwapahar (2.2 km from the latter).
+# With the MEASURED shear-zone K (Kudada, 19 m2/day; LIMITATIONS.md 1k) the
+# reagents at the registered Jaduguda site no longer reach its 100 m ring inside
+# 20 yr, so the two tests that need a DECLARED excursion run here, where the
+# shear-zone correction tapers toward the schist polygon and chloride + TDS
+# arrive. Same operation, same ore mask tier ("belt").
+BELT_SITE = (86.29, 22.69)
 
 
 async def _site_at(client, token, lon, lat, name):
@@ -75,11 +82,11 @@ async def test_non_ore_pin_is_a_suppression_not_a_notice(client, admin_token):
 
 @pytest.mark.asyncio
 async def test_excursion_names_the_indicators_not_the_species(client, admin_token):
-    """At the registered Jaduguda site, 20 yr, no restoration: uranium moves
-    ~26 m and never reaches the 100 m ring (background there), while chloride
-    and TDS have arrived and the 2-of-3 panel declares. The point must say
-    which substances declared, and it must not be uranium."""
-    site = await _site_at(client, admin_token, *JADUGUDA_SITE, "Chip")
+    """At a belt site, 20 yr, no restoration: uranium never reaches the 100 m
+    ring (background there), while chloride and TDS have arrived and the 2-of-3
+    panel declares. The point must say which substances declared, and it must
+    not be uranium. (Was the Jaduguda site until 2026-09-26 -- see BELT_SITE.)"""
+    site = await _site_at(client, admin_token, *BELT_SITE, "Chip")
     r = await client.post(f"/api/v1/simulations/{site['id']}/sweep",
                           headers=_tok(admin_token),
                           json={"axis": "restoration", "species": "uranium_ppb",
@@ -88,7 +95,8 @@ async def test_excursion_names_the_indicators_not_the_species(client, admin_toke
     pts = [p for p in r.json()["points"] if p["error"] is None]
     p0 = next(p for p in pts if p["value"] == 0)
     assert p0["excursion_declared"] is True
-    assert p0["compliance_conc"] == pytest.approx(1.0, abs=0.05), (
+    # uranium background there is the BARC survey blend (~0.90 ug/L, Narwapahar)
+    assert p0["compliance_conc"] == pytest.approx(0.90, abs=0.05), (
         "uranium should sit at background at the ring while the reagents declare")
     assert "uranium_ppb" not in p0["excursion_indicators"]
     assert {"chloride_mg_l", "tds_mg_l"} <= set(p0["excursion_indicators"])
@@ -100,14 +108,14 @@ async def test_excursion_names_the_indicators_not_the_species(client, admin_toke
 
 @pytest.mark.asyncio
 async def test_lifecycle_points_carry_the_indicators_too(client, admin_token):
-    site = await _site_at(client, admin_token, *JADUGUDA_SITE, "LC")
+    site = await _site_at(client, admin_token, *BELT_SITE, "LC")
     r = await client.post(f"/api/v1/simulations/{site['id']}/lifecycle",
                           headers=_tok(admin_token),
                           json={"species": ["uranium_ppb"], "time_years": 20, "points": 5})
     assert r.status_code == 200, r.text
     pts = [p for p in r.json()["series"][0]["points"] if p["error"] is None]
     declared = [p for p in pts if p["excursion_declared"]]
-    assert declared, "the 20-yr Jaduguda trace should declare an excursion late on"
+    assert declared, "the 20-yr belt-site trace should declare an excursion late on"
     # the 2-of-3 rule, point by point: declared <=> at least two indicators
     # over their control limit. One indicator over (chloride, the least
     # retarded, arrives first) is the honest in-between state and is listed

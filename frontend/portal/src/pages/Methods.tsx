@@ -82,6 +82,16 @@ const PLAIN: Array<{ q: string; a: string }> = [
      + "all, and the register below names them.",
   },
   {
+    q: "Why do some results show two answers?",
+    a: "Because the rock at the Singhbhum mines is tighter than an in-situ leaching "
+     + "mine would need. The main answer uses the most permeable rock actually "
+     + "measured near the mines — a Central Ground Water Board pumping test, checked "
+     + "against the water UCIL's own mines pump out. The second answer, always "
+     + "labelled hypothetical, shows how far contamination could spread if the rock "
+     + "were as permeable as in-situ leaching requires by the IAEA's rule of thumb. "
+     + "Only the first answer is ever used for alerts.",
+  },
+  {
     q: "Why blocks and not my village?",
     a: "Because there is no village-level groundwater dataset to draw on. A block is "
      + "the finest area the available data honestly supports. Offering a village "
@@ -177,7 +187,29 @@ export default function Methods() {
               </tr>
               <tr>
                 <td>Contaminant behaviour in rock and water</td>
-                <td className="muted">US EPA, IAEA and SKB published partition-coefficient studies</td>
+                <td className="muted">US EPA, IAEA and SKB published partition-coefficient studies;
+                  radium sorption measured in Turamdih soils (BARC)</td>
+              </tr>
+              <tr>
+                <td>Uranium and radium already in the groundwater near the mines</td>
+                <td className="muted">BARC surveys of village wells around Jaduguda, Narwapahar,
+                  Turamdih and Bagjata, and a 108-well survey of East Singhbhum and
+                  Saraikela-Kharsawan</td>
+              </tr>
+              <tr>
+                <td>How easily water moves through the rock at the mines</td>
+                <td className="muted">CGWB pumping tests in the Singhbhum belt (the largest
+                  near the deposits is used), checked against UCIL&apos;s own mine-dewatering
+                  records</td>
+              </tr>
+              <tr>
+                <td>How deep the ore is</td>
+                <td className="muted">UCIL technical notes and 2017 pre-feasibility reports</td>
+              </tr>
+              <tr>
+                <td>When in-situ leaching would even be possible (a hypothetical only)</td>
+                <td className="muted">IAEA, “In Situ Leach Uranium Mining: An Overview of
+                  Operations” (2016) and TECDOC-1239 (2001)</td>
               </tr>
               <tr>
                 <td>Excursion screening rule</td>

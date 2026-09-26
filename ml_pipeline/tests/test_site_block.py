@@ -74,9 +74,15 @@ def test_site_block_refuses_outside_jharkhand():
 
 
 def test_the_animated_fronts_arrive_when_the_headline_says():
+    """The fronts the 3-D block animates must reach the shallow aquifer exactly
+    when the printed arrival years say. 2026-09-26: with the measured shear-zone
+    K (LIMITATIONS 1k) TDS at the default 150 m ore depth arrives at ~73 yr,
+    past the 50 yr series, so the check runs at 120 m, where water (~10 yr) and
+    TDS (~33 yr) both arrive inside the series."""
     from ml_pipeline.dashboard.server import api_predict, PredictRequest
     r = api_predict(PredictRequest(lon=JADUGUDA[0], lat=JADUGUDA[1], mode="analytical",
-                                   time_years=20, species="uranium_ppb"))
+                                   time_years=20, species="uranium_ppb",
+                                   ore_depth_m=120.0))
     v = r["vertical"]
     fs = v["front_series"]
     years = np.array(fs["years"])

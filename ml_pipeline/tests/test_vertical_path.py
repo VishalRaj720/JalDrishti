@@ -209,11 +209,16 @@ def test_no_index_is_invented_for_a_species_without_a_limit():
 # ── reversibility ───────────────────────────────────────────────────────
 
 
-def test_switching_the_corrections_off_restores_the_old_answer(monkeypatch):
+def test_switching_the_corrections_off_restores_the_old_answer(monkeypatch,
+                                                               retired_shear_zone):
     """All three changes off -> the pre-2026-09-25 served answer, identical for
     every species. Pinned against the previous code at this exact pin (main
     d2bb215, 20-yr run, default operation): 17.5 yr, seasonal band [6.4, 31.1]
-    for uranium AND for TDS -- the symptom itself."""
+    for uranium AND for TDS -- the symptom itself.
+
+    2026-09-26: that answer was computed on the RETIRED shear-zone hydrogeology
+    (T = 370 m2/day over 150 m), so the `retired_shear_zone` fixture restores it
+    -- the test is about the three switches, not about D5."""
     monkeypatch.setitem(P.VERTICAL_PATH, "matrix_retention", False)
     monkeypatch.setitem(P.VERTICAL_PATH, "depth_resolved_K", False)
     monkeypatch.setitem(P.VERTICAL["Kv_Kh_by_regime"], "fractured", 0.03)

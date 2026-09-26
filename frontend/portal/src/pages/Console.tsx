@@ -59,6 +59,23 @@ import LifecycleChart, { LifecycleNarrative } from "../console/LifecycleChart";
 
 const CENTRE: [number, number] = [23.6, 85.3];
 
+/** Where a pin's uranium / radium background came from, in a few words: the
+ *  mining-area survey that dominates the blend, or the far-field anchor. */
+function backgroundSource(b: any): string {
+  const d = b?.dominant;
+  if (!d) return "–";
+  if (d.area === "anchor") {
+    const src = String(d.citation ?? "");
+    if (b?.anchor?.borrowed_outside_survey_districts) return "regional survey, borrowed here";
+    if (src.startsWith("nearest CGWB")) return "nearest CGWB well";
+    if (src.startsWith("CGWB statewide")) return "CGWB statewide median";
+    return "regional survey";
+  }
+  const m = /^([^,(&]+?)\s*[,(&].*?\((\d{4})\)/.exec(String(d.citation ?? ""));
+  const who = m ? `${m[1].trim()} et al. ${m[2]}` : "BARC";
+  return `${String(d.area).replace(/_/g, " ")} survey, ${who}`;
+}
+
 export default function Console() {
   const { me } = useAuth();
   const qc = useQueryClient();
@@ -974,6 +991,35 @@ export default function Console() {
                 <dt>Flow azimuth</dt><dd>{fmt(pinInfo.data.flow?.azimuth_deg, 1)}°</dd>
                 <dt>Gradient</dt><dd>{fmt(pinInfo.data.flow?.gradient_i, 5)}</dd>
                 <dt>Nearest well</dt><dd>{fmt(pinInfo.data.data_confidence?.nearest_well_km, 1)} km</dd>
+                {/* 2026-09-26: the grounded numbers a run here rests on */}
+                {pinInfo.data.shear_zone && (
+                  <><dt>Shear-zone T</dt>
+                    <dd title={pinInfo.data.shear_zone.citation}>
+                      {fmt(pinInfo.data.shear_zone.T_m2day, 0)} m²/day
+                      <span className="muted small"> · Kudada pumping test, the measured maximum</span>
+                    </dd></>
+                )}
+                {pinInfo.data.ore_depth_range && (
+                  <><dt>Ore depth</dt>
+                    <dd title={pinInfo.data.ore_depth_range.source}>
+                      {fmt(pinInfo.data.ore_depth_range.top_m, 0)}–{fmt(pinInfo.data.ore_depth_range.bottom_m, 0)} m
+                      <span className="muted small"> documented
+                        {pinInfo.data.ore_depth_range.confidence === "secondary" ? " (secondary source)" : " (UCIL)"}
+                      </span>
+                    </dd></>
+                )}
+                {pinInfo.data.backgrounds && (
+                  <><dt>Background U</dt>
+                    <dd title={pinInfo.data.backgrounds.uranium_ppb?.dominant?.citation}>
+                      {fmt(pinInfo.data.backgrounds.uranium_ppb?.value, 2)} µg/L
+                      <span className="muted small"> · {backgroundSource(pinInfo.data.backgrounds.uranium_ppb)}</span>
+                    </dd>
+                    <dt>Background Ra-226</dt>
+                    <dd title={pinInfo.data.backgrounds.radium_226_mbq_l?.dominant?.citation}>
+                      {fmt(pinInfo.data.backgrounds.radium_226_mbq_l?.value, 1)} mBq/L
+                      <span className="muted small"> · {backgroundSource(pinInfo.data.backgrounds.radium_226_mbq_l)}</span>
+                    </dd></>
+                )}
               </dl>
               <div className="muted small">
                 Resolved by the engine from its own datasets — not from this portal's
@@ -1049,6 +1095,7 @@ export default function Console() {
 
           {pinInfo.data && (
             <RegisterForm lon={pin.lon} lat={pin.lat}
+                          oreDepth={pinInfo.data.ore_depth_range ?? null}
                           onRegistered={(s) => openSite(s)} />
           )}
         </aside>

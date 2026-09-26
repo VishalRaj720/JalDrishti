@@ -86,6 +86,16 @@ MC_K_CLIP = (1.0 / 3.0, 3.0)
 FIELD_MIX_FRAC = 0.60
 V_SAMPLE_RANGE = (0.35, 0.80)    # observed field circular-variance span
 
+# v6 (2026-09-26): DEPTH-DECAYED K COVERAGE. The serve path decays K from the
+# shallow tested zone to the ore depth (P.depth_decay_factor), and the grounded
+# shear-zone baseline (Kudada T = 19 m2/day) starts from K_ref ~0.23 m/day -- so
+# deposit pins serve K ~0.01-0.2 m/day, and a deep non-belt pin as little as
+# ~0.002. The polygon ranges alone never went below ~0.044, which put every
+# deposit pin's ML band outside trained support. This share of scenarios applies
+# the SAME law the serve path does, at an ore depth drawn over the served slider
+# range, with the scenario pin's own fracture base (train == serve).
+DEPTH_DECAY_SHARE = 0.5
+
 
 def _git_sha() -> str | None:
     """Commit the bake ran from, for the reproducibility record. None outside a
@@ -158,6 +168,13 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
     thickness = float(arow["thickness_m"])
 
     lon, lat = _jittered_point(arow.geometry, rng)
+
+    # v6: the serve path's K(z) law at a sampled ore depth (DEPTH_DECAY_SHARE).
+    ore_depth = None
+    if rng.uniform() < DEPTH_DECAY_SHARE:
+        from ml_pipeline.data_prep.naquim_vertical import fracture_base_at
+        ore_depth = float(rng.uniform(*P.VERTICAL["ore_depth_range_m"]))
+        K *= P.depth_decay_factor(ore_depth, fracture_base_at(lon, lat)["fracture_base_m"])
     polygon_id = arow.get("objectid")
     polygon_id = int(polygon_id) if polygon_id == polygon_id else aq_idx
 
@@ -233,13 +250,29 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
           for sp in SPECIES}
     d2 = (wq["longitude"] - lon) ** 2 + (wq["latitude"] - lat) ** 2
     base = wq.loc[d2.idxmin()]
-    # Backgrounds via the shared registry so the generator and the serve path
-    # (resolve.resolve_inputs) cannot disagree about what "no measurement here"
-    # means -- these were two independent literal tables until 2026-08-05.
-    # Radium has no CGWB column at all, so it always takes its registry value.
-    Cb = {sp: (float(base[sp]) if sp in base.index and pd.notna(base[sp])
-               else P.background_default_for(sp))
+    # Backgrounds via THE SAME FUNCTION the serve path calls (2026-09-26,
+    # data_prep.groundwater_baselines.background_for): nearest CGWB well for
+    # sulfate/TDS; uranium and radium blended from the BARC mining-area surveys
+    # with their far-field anchors. Train == serve, as for every other input.
+    from ml_pipeline.data_prep.groundwater_baselines import (background_for,
+                                                             served_surveys)
+    near_km = math.sqrt(float(d2.min())) * 111.0
+    Cb = {sp: background_for(
+              sp, lon, lat,
+              nearest_value=(float(base[sp]) if sp in base.index and pd.notna(base[sp])
+                             else None),
+              nearest_km=near_km,
+              district=(base["district"] if "district" in base.index else None))[0]
           for sp in SPECIES}
+    # Radium: scenario pins are spread over the whole state, so almost none land
+    # near a mining area and the pin-derived value would train only ~10 mBq/L --
+    # leaving every deposit pin (up to 23) outside support. So, exactly like its
+    # C0 above, radium's background is drawn uniformly over the FULL range the
+    # serve path can produce: the regional anchor up to the largest survey value.
+    # (Its leverage on the labels is negligible: Cb is <3% of the 1,000 mBq/L
+    # guidance level and of the source.)
+    _ra_hi = max(a["value"] for a in served_surveys()["radium_226_mbq_l"])
+    Cb["radium_226_mbq_l"] = float(rng.uniform(P.RADIUM_BACKGROUND_MBQ_L, _ra_hi))
 
     # Kd per species sampled from its regime range (low..high). Routed through
     # the shared kd_range_for() helper (not P.KD_RANGES directly) so this site
@@ -263,7 +296,7 @@ def sample_scenario(rng: np.random.Generator, aquifers, wq, source_sig,
                                         math.log10(a_mode), math.log10(a_hi)))
 
     return dict(lithology=litho, regime=regime, polygon_id=polygon_id,
-                K=K, phi_mobile=phi_mobile,
+                K=K, ore_depth=ore_depth, phi_mobile=phi_mobile,
                 n_total=n_total, grain_density=grain_density, thickness=thickness,
                 lon=lon, lat=lat, Q_in=Q_in, Q_net=Q_net, bleed=bleed,
                 op_years=op_years, gradient=gradient, width=width, beta=beta,
@@ -560,6 +593,10 @@ def label_row(scn: dict, t_years: float, species: str,
         "polygon_id": scn["polygon_id"],
         "lithology": scn["lithology"], "regime": scn["regime"],
         "lon": scn["lon"], "lat": scn["lat"],
+        # v6 audit column: the ore depth the K(z) law was applied at, or NaN
+        # when this scenario kept the polygon's shallow K (not a feature)
+        "ore_depth_sampled_m": (np.nan if scn.get("ore_depth") is None
+                                else scn["ore_depth"]),
         "species": species, "time_years": t_years,
         "is_post_closure": int(t_days > op_days),
         # analytic front positions (recomputable at inference)
@@ -626,7 +663,14 @@ def generate(n_scenarios: int = 900, times_years=DEFAULT_TIMES_YEARS,
         # scenario's own background (was unfloored, so a high-background
         # species like TDS could train on labels reading below its own
         # background). Every label depends on it, so the version moves.
-        "version": 5, "n_scenarios": n_scenarios, "n_rows": len(df), "n_mc": n_mc,
+        # v6 = grounding pass (2026-09-26, LIMITATIONS.md 1k): half the
+        # scenarios carry the K(z) law at a sampled ore depth (DEPTH_DECAY_SHARE)
+        # so the support reaches the grounded shear-zone baseline; uranium and
+        # radium backgrounds come from the BARC survey blend (background_for);
+        # radium C0 floor is the 10 mBq/L regional anchor; radium Kd upper end
+        # is the local Turamdih maximum.
+        "version": 6, "n_scenarios": n_scenarios, "n_rows": len(df), "n_mc": n_mc,
+        "depth_decay_share": DEPTH_DECAY_SHARE,
         "seed": int(seed), "mc_seed": int(seed + 1),
         "generator": "ml_pipeline.synthetic.generate",
         "git_sha": _git_sha(),

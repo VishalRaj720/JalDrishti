@@ -24,6 +24,27 @@ from app.models.user import User
 from app.services import audit, ml_pipeline_adapter as mlp
 
 
+def _hydro_with_extras(result: dict[str, Any]) -> Any:
+    """The engine's `hydro` block plus the top-level blocks a stored run keeps
+    inside it (it is a JSON column, so no migration is needed).
+
+      vertical       R11: the shallow-aquifer screening, returned at the top
+                     level, which assigning `hydro` alone used to drop.
+      hypotheticals  2026-09-26: the SECONDARY ISR-feasibility answer beside the
+                     measured baseline. Stored so a saved run shows what the
+                     live one did; it is labelled hypothetical by the engine and
+                     nothing that alerts reads it.
+
+    Runs stored before either carry no key, and readers must treat absence as
+    "not recorded", never as "no pathway" or "no hypothetical".
+    """
+    hydro = result.get("hydro")
+    if not isinstance(hydro, dict):
+        return hydro
+    extras = {k: result[k] for k in ("vertical", "hypotheticals") if result.get(k)}
+    return {**hydro, **extras} if extras else hydro
+
+
 def _plume_geometry(result: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Extract the drawable geometry from an engine response (migration 0016).
 
@@ -229,7 +250,6 @@ class SimulationRunService:
             run.metrics = result.get("metrics")
             run.excursion = result.get("isr_excursion")
             run.extrapolation = list(result.get("extrapolation") or [])
-            run.hydro = result.get("hydro")
 
             # R11: the shallow-aquifer screening was computed on every run and
             # then thrown away. It is returned at the top level of the engine
@@ -237,14 +257,10 @@ class SimulationRunService:
             # — and the breakthrough time a user reads on screen came from the
             # live preview and existed nowhere afterwards. A published advisory
             # that says a pathway to the drinking-water aquifer exists has to be
-            # able to point at the run that said so.
-            #
-            # `hydro` is a JSON column, so this needs no migration. Runs stored
-            # before this carry no `vertical` key, and readers must treat its
-            # absence as "not recorded" rather than "no pathway".
-            vertical = result.get("vertical")
-            if vertical and isinstance(run.hydro, dict):
-                run.hydro = {**run.hydro, "vertical": vertical}
+            # able to point at the run that said so. The ISR-feasibility
+            # hypothetical (2026-09-26) is kept the same way; see
+            # `_hydro_with_extras`.
+            run.hydro = _hydro_with_extras(result)
             run.plume = _plume_geometry(result)
 
             # R17: timeline frames -- the engine evaluated at a fixed set of
