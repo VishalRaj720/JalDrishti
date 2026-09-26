@@ -72,6 +72,7 @@ TABLE: Machine learning and scientific libraries
 |joblib|Saving and loading trained models|
 |Matplotlib|Charts for flow field, fracture field, SHAP and sensitivity results|
 |openpyxl|Reading the Texas ISR Excel data and the IAEA UDEPO sheet|
+|pdfplumber, pypdfium2|Reading the CGWB national PDF tables (water quality 2024, water levels 1994–2026): pypdfium2 finds the Jharkhand pages, pdfplumber reads the table cells and word positions|
 
 ### XGBoost
 
@@ -87,6 +88,7 @@ TABLE: Frontend technologies
 |Leaflet 1.9|Interactive maps: districts, blocks, wells, plumes and alerts [@leaflet]|
 |TanStack Query 5|Fetching and caching data from the API|
 |React Router 6|Page navigation for the 22 screens|
+|three.js 0.186|The 3-D site block: terrain, aquifer layers, boreholes, plume and vertical fronts; loaded only when opened [@threejs]|
 |html2pdf.js|Downloading the ISR site report as a PDF|
 |OpenStreetMap and Esri tiles|Background maps (street and satellite views)|
 
@@ -101,9 +103,9 @@ TABLE: Deployment and hosting services
 |Render|Hosting of the FastAPI backend, the physics engine and the trained models|
 |Cloudflare Workers|Hosting of the portal and forwarding of API calls to the backend|
 |Brevo (SMTP relay)|Sending alert emails to residents|
-|GitHub|Source code hosting and version control (173 commits)|
+|GitHub|Source code hosting and version control (191 commits)|
 
-The deployed system is available at jaldrishti.letsmailvishal111.workers.dev (portal) and jaldrishti-api.onrender.com (API).
+The deployed system is available at jaldrishti.letsmailvishal111.workers.dev (portal) and jaldrishti-api.onrender.com (API). The online deployment runs the build described in this report: the engine with the measured-rock baseline and the ISR-feasibility hypothetical, surrogate version 6, and a database migrated to 0026 (alert tiers). It was redeployed in September 2026 after the build had been tested locally.
 
 ## 5.7 Data Sources
 
@@ -112,16 +114,21 @@ TABLE: Datasets used in the project
 |Dataset|Source|Used for|
 |Groundwater quality 2023 (397 wells, 24 districts)|CGWB [@cgwb_gwq]|IS 10500 assessment, health bands, measured alerts, background chemistry|
 |Groundwater quality 2000–2021 (1,632 analyses, 366 stations)|CGWB via NWDP [@nwdp]|Station baselines and chemistry trends|
-|Groundwater levels 2013–2021 (9,583 readings, 398 stations)|CGWB / India-WRIS [@cgwb_levels]|Flow field, seasonal change, level trends|
+|Groundwater quality 2024 (288 samples, 24 districts)|CGWB national table [@cgwb_gwq2024]|Natural variability of TDS, sulphate and chloride|
+|Groundwater levels 2013–2021 (9,583 readings, 398 stations)|CGWB / India-WRIS [@cgwb_levels]|Flow field, seasonal change, level trends in the portal|
+|Groundwater levels 1994 – January 2026 (26,009 readings, about 700 wells)|CGWB national tables [@cgwb_wl_national]|Check of the flow direction, 32-year level trends|
 |Aquifer polygons (24)|CGWB|Rock type, K, porosity, thickness|
 |NAQUIM reports (22)|CGWB [@naquim]|Aquifer layer depths per district|
+|NAQUIM Phase-III report for the uranium belt; 48 exploratory boreholes|CGWB, recovered from the Internet Archive [@naquim_belt]|Shear-zone permeability, boreholes in the 3-D block|
 |Lineaments (1,889 features)|GSI and NRSC, Bhuvan [@lineaments]|Fracture directions|
 |Uranium deposits (7 outlines + belt) and grades|Project-digitised outlines; IAEA UDEPO [@udepo]|Ore zones and source strength|
-|Elevation model (GLO-30, 30 m)|ESA Copernicus via OpenTopography [@dem]|Water-table height and flow direction|
+|Elevation model (GLO-30, 30 m)|ESA Copernicus via OpenTopography [@dem]|Water-table height, flow direction, terrain of the 3-D block|
 |Perennial rivers (4,577 reaches)|HydroRIVERS [@hydrorivers]|Distance to rivers|
 |District and block boundaries|Government of India|Block-level results and alerts|
 |Texas ISR water quality and operations|USGS [@usgs_tx; @usgs_ops]|Source strength, restoration results and duration|
-|Jaduguda mine-water and radium studies|BARC [@sethy2013; @tripathi2008]|Radium source and background|
+|Jaduguda mine-water and radium studies|BARC [@sethy2013; @tripathi2008]|Radium source term|
+|Groundwater uranium and radium surveys near the mines (16 rows, 7 studies)|BARC and others [@jha2014; @rana2010; @kumar2015; @giri2011; @molla2025]|Local uranium and radium backgrounds|
+|Mine documents (pre-feasibility reports, technical notes)|UCIL [@ucil_pfr_narwapahar; @ucil_pfr_turamdih; @gupta2004]|Ore-depth ranges, mine discharge check|
 
 ## 5.8 Development and Testing Tools
 
@@ -130,7 +137,7 @@ TABLE: Development and testing tools
 |Tool|Purpose|
 |Git and GitHub|Version control, pull requests and code history|
 |Visual Studio Code|Code editor|
-|pytest, pytest-asyncio, httpx|Automated tests for the engine (373) and the backend (522)|
+|pytest, pytest-asyncio, httpx|Automated tests for the engine (463) and the backend (533)|
 |Swagger UI (FastAPI)|Testing API endpoints in the browser|
 |Docker|Local database and service setup in the early months|
 |Browser developer tools|Checking the portal screens, network calls and console errors|
@@ -139,6 +146,6 @@ TABLE: Development and testing tools
 
 All the tools above work together as one system. The overall technology workflow can be shown as:
 
-FLOW: Open Datasets (CGWB, GSI–NRSC, IAEA, USGS, Copernicus) >> Python Data Preparation (pandas, GeoPandas, NumPy) >> Physics Engine (NumPy, SciPy) >> ML Surrogate (XGBoost, scikit-learn, SHAP) >> FastAPI Backend + PostgreSQL / PostGIS >> React + Leaflet Portal >> Residents and Officials (web portal and email alerts)
+FLOW: Open Datasets (CGWB, GSI–NRSC, IAEA, USGS, Copernicus, BARC, UCIL) >> Python Data Preparation (pandas, GeoPandas, NumPy) >> Physics Engine (NumPy, SciPy) >> ML Surrogate (XGBoost, scikit-learn, SHAP) >> FastAPI Backend + PostgreSQL / PostGIS >> React + Leaflet + three.js Portal >> Residents and Officials (web portal and email alerts)
 
 The selected tools gave a low-cost, flexible and maintainable platform for building a groundwater contamination screening system that can be used anywhere in Jharkhand.

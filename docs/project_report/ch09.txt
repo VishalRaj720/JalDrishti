@@ -44,11 +44,11 @@ Most ISR and contaminant models are made for sandstone. Jharkhand’s uranium li
 - Added dual-porosity slowing and matrix diffusion from the published fractured-rock literature [@goltz1986; @tang1981].
 - Reduced permeability with depth using district-wise NAQUIM evidence.
 - Calculated β from the local porosities instead of using a fixed literature value.
-- Listed all 12 unmeasured constants in an assumption register and ran a sensitivity analysis to show which ones matter.
+- Listed all unmeasured constants and modelling choices (20 in total) in an assumption register and ran a sensitivity analysis to show which ones matter.
 
 ## 9.5 Errors Found in the Transport Model
 
-Several errors were found in the engine during the review rounds. The most serious ones were: the travel distance was being measured to the corner of a calculation box instead of along the plume (422.8 m instead of 35.9 m at Jaduguda); the plume in fractured rock moved at the same speed for all chemicals; a term of the Ogata–Banks formula was missing, which made concentrations 17% to 42% too low; and restoration was credited before it had actually happened.
+Several errors were found in the engine during the review rounds. The most serious ones were: the travel distance was being measured to the corner of a calculation box instead of along the plume (422.8 m instead of 35.9 m at Jaduguda); the plume in fractured rock moved at the same speed for all chemicals; a term of the Ogata–Banks formula was missing, which made concentrations 17% to 42% too low; restoration was credited before it had actually happened; and the vertical screening moved a parcel of water instead of the dissolved chemical, so every chemical reached the shallow aquifer at the same time and the matrix storage that holds uranium back sideways had no effect upward.
 
 ### Mitigation Measures
 
@@ -57,18 +57,30 @@ Several errors were found in the engine during the review rounds. The most serio
 - Fixed every confirmed error and pinned it with an automated test.
 - Retrained the ML model after each fix that changed the training data.
 
-## 9.6 Poor ML Accuracy for Radium
+## 9.6 A Borrowed Permeability Value
 
-Radium hardly moves in the rock, so most of its training values are exactly zero or equal to the background. The ML model could not learn this well, and two radium results stayed below the project’s own accuracy target of 0.60.
+The permeability of the shear zone at the mines decides how far every plume in the belt can travel. For most of the project a transmissivity of 370 m²/day was used there, described as coming from where the mines are. When the belt’s own NAQUIM report was recovered in September 2026, its pumping-test table showed that the three wells behind that value (Kalapathar, Baharagora and Manusmuria, 207 to 570 m²/day) are in Tertiary sediments 51 to 58 km east of Jaduguda, outside the belt. The belt’s host rock near the deposits tests at only 2 to 101 m²/day. The mines gave a second, independent check: at Turamdih a transmissivity of 370 m²/day would force the mine to pump about 17.5 times the water that UCIL reports. The number had passed every review because it looked reasonable and its source had never been traced back to the well.
+
+### Mitigation Measures
+
+- Traced the value to the individual wells in the CGWB table and read their rock type.
+- Replaced it with the largest value measured in the belt’s own rock near the deposits (Kudada, 19 m²/day), converted to K with the engine’s own depth law.
+- Checked the result against UCIL’s mine discharges, which bound the bulk value at single digits of m²/day.
+- Added the ISR-feasibility hypothetical as a separate, labelled answer, so that the question “what if the rock were more permeable?” is still answered without mixing it into the measured baseline.
+- Re-pointed the engine tests that had used the old value to a fixture that keeps it, so that they still test what they were written for.
+
+## 9.7 Poor ML Accuracy for Radium
+
+Radium hardly moves in the rock, so most of its training values are exactly zero or equal to the background. The ML model could not learn this well, and the radium travel-distance result stays below the project’s own accuracy target of 0.60.
 
 ### Mitigation Measures
 
 - Reported the result openly instead of lowering the target.
 - Kept the physics engine as the authority for all radium values.
-- Checked that the radium uncertainty bands still cover more than 92% of cases.
+- Checked that the radium uncertainty bands still cover at least 90% of cases.
 - Listed a two-stage model (first “does it move?”, then “how far?”) as future work.
 
-## 9.7 Data Quality Problems in Source Files
+## 9.8 Data Quality Problems in Source Files
 
 Several problems were found in the data files. The district and block boundaries had been stored with latitude and longitude swapped for months. Aquifer values were stored as text ranges such as “26 - 176” or “2-3%”. The Texas file had units rows, footnotes and one data-entry error (a pH of 795). The 2023 chemistry file balanced perfectly because sodium had been calculated from the other ions. A test record added during field-observation testing was later found in the deposit data.
 
@@ -80,7 +92,7 @@ Several problems were found in the data files. The district and block boundaries
 - Added a hydrochemical quality check and reported its limits honestly.
 - Removed the test record through the dataset manager and checked the live database.
 
-## 9.8 Silent Database Security Failures
+## 9.9 Silent Database Security Failures
 
 The database uses row-level security, which depends on a setting that lasts only until the end of a database transaction. Code that saved data and then continued writing lost this setting and became “anonymous”, so the database quietly returned nothing instead of an error. Because of this, publishing a screening never raised any alerts, and one run endpoint never worked. The automated tests could not catch this, because the test database did not have the security policies.
 
@@ -91,7 +103,7 @@ The database uses row-level security, which depends on a setting that lasts only
 - Added the missing update permission needed for alert updates.
 - Added source-level tests and clear comments explaining the rule.
 
-## 9.9 Security Controls That Did Nothing
+## 9.10 Security Controls That Did Nothing
 
 Some security controls looked correct but were not working. The rate limit was set in the configuration, but the component that enforces it had never been installed, so it limited nothing. The measured-exceedance scan checked only uranium above 30 ppb, which never happens, so it matched zero wells. Earlier, the signup page accepted a role chosen by the user, and admin login details were found built into the portal code.
 
@@ -102,7 +114,7 @@ Some security controls looked correct but were not working. The rate limit was s
 - Closed the signup hole and moved to five roles with database enforcement.
 - Added a build guard that fails if any secret reaches the portal code.
 
-## 9.10 Email Alert Delivery on Free Hosting
+## 9.11 Email Alert Delivery on Free Hosting
 
 Setting up email delivery on the deployed system took several attempts. The hosting service silently blocked the usual email port (587), so connections timed out. The email relay needed a special login name, not the account email address. The relay’s IP allow-list rejected the hosting server, whose address changes. Also, a failed email was marked as failed forever and never retried.
 
@@ -113,9 +125,9 @@ Setting up email delivery on the deployed system took several attempts. The host
 - Removed the IP restriction, since the host has no fixed address.
 - Changed the delivery code so that failed emails are retried, and added a test for it.
 
-## 9.11 Limits of Free Cloud Hosting
+## 9.12 Limits of Free Cloud Hosting
 
-The backend runs on a free hosting tier. The service sleeps when idle and takes about 53 seconds to wake. A single engine run takes about 4 seconds there, compared with 0.2 seconds locally. One long request (a lifecycle with 48 evaluations) was cut off by the hosting gateway.
+The backend runs on a free hosting tier. The service sleeps when idle and takes about 53 seconds to wake. A single engine run takes about 4 seconds there, compared with about 0.3 seconds locally. One long request (a lifecycle with 48 evaluations) was cut off by the hosting gateway.
 
 ### Mitigation Measures
 
@@ -123,7 +135,7 @@ The backend runs on a free hosting tier. The service sleeps when idle and takes 
 - Fixed the chart sections that did not render on the slow free tier, after walking every screen on the deployed system.
 - Kept the design simple (engine inside the backend, no extra services) to fit the free tier.
 
-## 9.12 Learning a New Subject
+## 9.13 Learning a New Subject
 
 The project needed knowledge of hydrogeology, groundwater chemistry, contaminant transport and mining regulation, none of which is part of the Information Technology course.
 
@@ -134,7 +146,7 @@ The project needed knowledge of hydrogeology, groundwater chemistry, contaminant
 - Wrote down every assumption and its source in the code and documents.
 - Discussed the direction of the work with the mentor.
 
-## 9.13 Lessons Learned
+## 9.14 Lessons Learned
 
 The challenges of this fellowship gave practical experience in data engineering, scientific modelling, machine learning, database security and deployment. The most important lessons were:
 
@@ -142,5 +154,6 @@ The challenges of this fellowship gave practical experience in data engineering,
 - A control that looks correct in the code may still do nothing; it must be measured.
 - Missing data should be shown as missing, never as safe.
 - Every assumption should be written down with its source, so that it can be checked and replaced later.
+- A value that looks reasonable should still be traced back to the well or sample it came from.
 
 The experience gained will be useful for future work on environmental monitoring systems and data-driven tools for the mining sector.

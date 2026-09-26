@@ -290,7 +290,7 @@ visible in the vertical as well as the horizontal answer.
   (217 → 304 ms median at Jaduguda), paid again on each stored timeline frame.
 
 **Records that now read differently.** The submitted technical report
-(`docs/report/parts/06_results.md` §6.6, appendix row 22) quotes the registered
+(§6.6, appendix row 22; its sources were removed from the repository on 2026-09-27 and remain in git history) quotes the registered
 site's uranium run at 18.7 yr / index 0.62 / *high* — a water-parcel time,
 species-blind, like every vertical figure before this change. Under this
 change a uranium run near that site reports uranium arriving in centuries

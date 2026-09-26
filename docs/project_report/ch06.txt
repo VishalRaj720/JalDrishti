@@ -145,27 +145,40 @@ All the determinands in the 397-well CGWB record were assessed against IS 10500:
 
 ## 6.11 September 2026: Final Improvements and Report
 
-After the fellowship period, a final round of improvements was made before freezing the project. The dual-porosity ratio β was changed from a fixed literature value of 10 to a value calculated from the porosities at each location, and the surrogate was retrained. Alert tiers (notice, warning, alert and critical) with a seven-field explanation were added. Map timelines, a hydrochemical quality check, a global sensitivity analysis and the CGWB 2000–2021 chemistry record were added. A floor was added so that the restored source can never read cleaner than the natural background, and the model was retrained again (version 5). Email delivery was configured on the deployed system, and a defect where failed emails were never retried was found and fixed. Finally, a demo record left in the deposit data from testing was removed, and the references were checked.
+After the fellowship period, a final round of improvements was made before freezing the project. The dual-porosity ratio β was changed from a fixed literature value of 10 to a value calculated from the porosities at each location, and the surrogate was retrained. Alert tiers (notice, warning, alert and critical) with a seven-field explanation were added. Map timelines, a hydrochemical quality check, a global sensitivity analysis and the CGWB 2000–2021 chemistry record were added. A floor was added so that the restored source can never read cleaner than the natural background, and the model was retrained again (version 5). Email delivery was configured on the deployed system, and a defect where failed emails were never retried was found and fixed. A demo record left in the deposit data from testing was removed, and the references were checked.
+
+The last week of September was spent checking the model inputs for the uranium belt against data from the belt itself. A review of why the plume “barely moves” found that the vertical screening moved a parcel of water, not the dissolved chemical: every chemical reached the shallow aquifer at Jaduguda in the same 17.5 years, and the matrix storage that holds uranium back sideways had no effect upward. The vertical path was rebuilt to carry the solute on the same matrix-storage clock, with a harmonic-mean K for the column and a measured vertical-to-horizontal ratio of 0.12 in place of the chosen 0.03 (Section 4.6). The plume map was changed from flat contour fills to a continuous raster, and a chance-over-limit map was added, fanned by the flow-direction uncertainty, which was measured for the first time.
+
+Three new CGWB records were extracted from PDF files: the 2024 water-quality table, which gave the first measure of natural variability; water levels from 1994 to January 2026, which confirmed the flow direction; and the exploratory boreholes of the belt from the NAQUIM Phase-III report, which was recovered from the Internet Archive after CGWB removed it (Section 4.3). The boreholes, together with the terrain and the model output, were used to build the 3-D site block in the portal.
+
+The boreholes also showed a problem with the shear-zone permeability. The transmissivity used until then, 370 m²/day, had been described as coming from where the mines are, but the three wells behind it (Kalapathar, Baharagora and Manusmuria) are in Tertiary sediments 51 to 58 km east of Jaduguda, outside the belt. The belt’s own host rock near the deposits tests at 2 to 101 m²/day, and UCIL’s mine records rule the old value out, because it would force Turamdih to pump about 17.5 times the water it reports. The value was corrected to the measured maximum, 19 m²/day at Kudada, and every run was given two answers: the measured rock as the baseline and the ISR-feasibility hypothetical beside it (Sections 4.4 and 4.5). In the same pass, uranium and radium backgrounds were taken from BARC surveys near each mine, the upper end of the radium Kd was taken from Turamdih soils, the ore-depth defaults were checked against UCIL documents (Bhatin moved from 150 m to 90 m and Mohuldih from 250 m to 150 m), and the portal’s “No uranium ore here” banner, which had never appeared, was fixed. The surrogate was retrained as version 6, with half the training scenarios on the tight rock of the deposits; its radium ring-concentration R² went from 0.235 to 0.746, for the reason given in Section 7.3.
 
 ### Activities Performed
 
 - β calculated from local porosities; surrogate retrained
 - Alert tiers with seven-field explanations
 - Timelines, hydrochemical QA, sensitivity analysis and 2000–2021 chemistry record
-- Background floor on the source and final retrain (version 5)
+- Background floor on the source and retrain (version 5)
 - Email delivery configured on the live system; retry defect fixed
 - Data clean-up and project freeze
+- Vertical pathway rebuilt to carry the dissolved chemical; measured Kv/Kh
+- Continuous plume raster, chance-over-limit map and measured direction uncertainty
+- CGWB 2024 water quality, water levels 1994–2026 and belt boreholes extracted
+- 3-D site block in the portal
+- Shear-zone permeability corrected to the measured Kudada value; two answers per run
+- Local uranium and radium backgrounds, radium Kd and ore depths from local sources
+- Surrogate version 6 and sensitivity analysis re-run
 
 ## 6.12 Final Integrated System
 
 The final outcome of the fellowship is a working, deployed system consisting of:
 
-- A physics-based groundwater contamination engine covering the whole of Jharkhand
-- A trained ML surrogate with calibrated 80% uncertainty bands
+- A physics-based groundwater contamination engine covering the whole of Jharkhand, which gives a measured-rock answer and a labelled ISR-feasibility hypothetical for every run
+- A trained ML surrogate with calibrated 80% uncertainty bands (version 6)
 - An IS 10500 assessment of the measured groundwater record
 - An alert system with four tiers and email delivery
 - An observation-based monitoring-gap ranking of all 264 blocks
-- A five-role web portal with 22 screens, protected by row-level security
-- 373 engine tests and 522 backend tests
+- A five-role web portal with 22 screens, protected by row-level security, including plume maps with a chance-over-limit view and a 3-D site block
+- 463 engine tests and 533 backend tests
 
 The completed system shows that a groundwater contamination screening tool for hard-rock India can be built from open data, standard physics and machine learning, and deployed at low cost, while being honest about what the data can and cannot support.

@@ -117,3 +117,7 @@ Datasets/.backups/
 backups/
 Datasets.before-restore-*/
 ml_pipeline/ml/artifacts_pre_r17/
+
+# Built report: regenerate with `python docs/project_report/build.py --pages`
+docs/project_report/*.docx
+docs/project_report/*.pdf

@@ -1,8 +1,9 @@
 """Build the TEXMiN UDAAN fellowship project report (.docx) from the text sources.
 
     python docs/project_report/build.py            # build once
-    python docs/project_report/build.py --pages    # build, render with Word, fill the
-                                                   # contents page numbers, build again
+    python docs/project_report/build.py --pages    # build, render with Word (or
+                                                           # LibreOffice off Windows), fill the
+                                                           # contents page numbers, build again
 
 Source files: front.json (cover, certificate, declaration, acknowledgement, abstract,
 contents), ch*.txt (chapters, references, annexures), back.json (remarks, approval,
@@ -159,6 +160,9 @@ def add_table(doc, rows, widths_cm=None, header=True, grid=True, size=11, center
         lens = [max(len(re.sub(r"\*", "", r[c])) for r in rows) for c in range(ncol)]
         lens = [min(max(l, 6), 60) for l in lens]
         widths_cm = [total * l / sum(lens) for l in lens]
+    # LibreOffice sizes columns from the grid, Word from the cell widths; set both
+    for gc, w in zip(t._tbl.tblGrid.findall(qn("w:gridCol")), widths_cm):
+        gc.set(qn("w:w"), str(int(w * 567)))
     for i, r in enumerate(rows):
         row = t.rows[i]
         for c in range(ncol):
@@ -584,6 +588,10 @@ def build(pages):
 
 def render_pdf():
     pdf = OUT.with_suffix(".pdf")
+    if sys.platform != "win32":
+        subprocess.run(["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(OUT.parent), str(OUT)],
+                       check=True, capture_output=True)
+        return pdf
     ps = (f"$w = New-Object -ComObject Word.Application; $w.Visible = $false; "
           f"$d = $w.Documents.Open('{OUT}'); $d.Fields.Update() | Out-Null; "
           f"$d.SaveAs2('{pdf}', 17); $d.Close(0); $w.Quit()")

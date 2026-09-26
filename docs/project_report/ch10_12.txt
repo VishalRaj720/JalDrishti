@@ -30,20 +30,20 @@ The amounts for July and August 2026 were not filled in the MPRs and are to be c
 
 The aim of this fellowship project was to build a system that can screen how groundwater contamination from a hypothetical ISR uranium operation would behave in Jharkhand, check what the existing groundwater record says, find where monitoring is weakest, and inform the people concerned. The project achieved this through JalDrishti, a web-based decision-support system that is deployed and working.
 
-The most important step of the project was a change of method. The first five months followed the proposal and trained machine learning models on measured and synthetic water-quality data. In June 2026 a careful check showed that these models were not learning how contamination spreads, because the measured data had no information about distance or time. The prediction core was rebuilt as a physics-based contaminant transport engine, using the Domenico and Ogata–Banks solutions adapted for fractured hard rock, with dual-porosity slowing, matrix diffusion, a leach zone, restoration based on Texas ISR records, uranium attenuation and the NUREG-1569 2-of-3 excursion test. The engine uses real Jharkhand data: aquifer maps, a groundwater flow field from 398 CGWB stations, a fracture field from GSI lineaments, NAQUIM layers and uranium deposit grades. An XGBoost surrogate trained on 18,000 engine scenarios gives fast answers with calibrated 80% uncertainty bands.
+The most important step of the project was a change of method. The first five months followed the proposal and trained machine learning models on measured and synthetic water-quality data. In June 2026 a careful check showed that these models were not learning how contamination spreads, because the measured data had no information about distance or time. The prediction core was rebuilt as a physics-based contaminant transport engine, using the Domenico and Ogata–Banks solutions adapted for fractured hard rock, with dual-porosity slowing, matrix diffusion, a leach zone, restoration based on Texas ISR records, uranium attenuation and the NUREG-1569 2-of-3 excursion test. The engine uses real Jharkhand data: aquifer maps, a groundwater flow field from 398 CGWB stations (confirmed by a 32-year record), a fracture field from GSI lineaments, NAQUIM layers, uranium deposit grades and ore depths, and, in the uranium belt, the permeability measured in the belt’s own rock, checked against the water pumped out of the mines, with local uranium and radium backgrounds from BARC surveys. Every run gives two answers: one for the rock as measured, and one, labelled hypothetical, for rock permeable enough for ISR. An XGBoost surrogate trained on 18,000 engine scenarios gives fast answers with calibrated 80% uncertainty bands.
 
 The main results are:
 
-- The ML surrogate reproduces the physics engine with an R² (log scale) of 0.89 to 0.95, performs better than all baseline models, and keeps its 80% coverage on real-location test cases. The radium results do not meet the target and are reported openly.
-- The engine matches an exact numerical solution after a missing formula term was found and restored.
+- The ML surrogate (version 6) reproduces the physics engine with an R² (log scale) of 0.89 to 0.97, performs better than all baseline models, and keeps its 80% coverage on real-location test cases. The radium travel-distance result does not meet the target and is reported openly.
+- The engine matches an exact numerical solution after a missing formula term was found and restored, and its permeability in the belt lies on the cautious side of the mines’ own discharge records.
 - In the measured record, uranium is within its limit at every tested well, while nitrate (22 wells) and fluoride (32 wells) are the real health concerns, in 14 of 24 districts. Iron, arsenic and manganese have never been tested.
-- At the hypothetical Jaduguda site, uranium spreads about 20 m in 20 years, sulphate 73 m and TDS 254 m. The chemical indicators, not uranium, give the first warning.
-- The shallow-aquifer screening gives a high index (0.62) with a breakthrough time of about 18.7 years at the registered site.
+- At the hypothetical Jaduguda site, in the rock as measured, uranium spreads about 4 m beyond the wellfield in 20 years, sulphate 11 m and TDS 30 m, and no excursion is declared. If the rock were permeable enough for ISR, TDS would spread about 535 m. At a more permeable belt site near Narwapahar, chloride and TDS declare an excursion in year 19 while uranium is still at background at the ring, so the chemical indicators, not uranium, give the first warning.
+- The shallow-aquifer screening at Jaduguda gives a low index (0.05); the first constituent to reach the shallow aquifer is TDS, after about 140 years, while uranium would take thousands of years. At the more permeable belt site near Narwapahar the result is different: TDS would reach the shallow aquifer in about 16 years, with a high index (0.65). Between the deposits, where the model falls back towards the more permeable aquifer-map value, the shallow drinking-water layer is therefore the most exposed.
 - The 25 most poorly monitored blocks all lie in the uranium belt.
 - The alert system raises 53 tiered alerts from the measured data and delivers them to residents by email.
-- The system is supported by 373 engine tests and 522 backend tests and runs online with five secure user roles.
+- The system is supported by 463 engine tests and 533 backend tests and runs online with five secure user roles.
 
-The project also has clear limits. No real ISR plume exists in Jharkhand, so the model cannot be validated against a measured plume, and its uncertainty bands cover only the uncertainty of the input values, not errors in the model itself. The two inputs that control the plume extent most, hydraulic conductivity and the matrix storage ratio β, are not measured at ore depth in the shear zone. Trend forecasting of health-related water quality was not possible, because no repeated measurements exist. The system works on the manual monitoring network; it is a decision-support tool ready for sensors, not a live sensor network.
+The project also has clear limits. No real ISR plume exists in Jharkhand, so the model cannot be validated against a measured plume, and its uncertainty bands cover only the uncertainty of the input values, not errors in the model itself. With the permeability now taken from the belt’s own rock, the inputs that control the plume extent most are the fracture–matrix exchange terms, the transfer rate ω and the storage ratio β, and neither has been measured anywhere in the shear zone. No pumping test has been made at a deposit itself. Trend forecasting of health-related water quality was not possible, because no repeated measurements exist. The system works on the manual monitoring network; it is a decision-support tool ready for sensors, not a live sensor network.
 
 In conclusion, JalDrishti shows that a useful and honest groundwater contamination screening tool can be built for hard-rock India from open data, standard groundwater physics and machine learning, and deployed at low cost. Its main strength is not only the model but the discipline around it: every modelled number comes with its uncertainty and its source, measured and modelled results are kept apart, missing data is never shown as safe, and the places where more monitoring is needed are clearly identified.
 
@@ -53,11 +53,14 @@ JalDrishti provides a base for more advanced groundwater monitoring and screenin
 
 ## 12.1 Field Measurements in the Uranium Belt
 
-The sensitivity analysis showed that the plume extent depends mostly on hydraulic conductivity and the matrix storage ratio β, which are not measured at ore depth in the Singhbhum shear zone.
+The sensitivity analysis showed that, in the tight rock measured in the belt, the plume extent depends mostly on the fracture–matrix exchange terms (the transfer rate ω and the storage ratio β), which have never been measured in the Singhbhum shear zone. The permeability itself comes from a test 3 km from Turamdih, not from a deposit.
 
 Possible work includes:
 
-- A tracer test or packer test in the shear zone to measure β, fracture opening and matrix diffusion.
+- A tracer test in the belt to measure ω and β; this is the single most valuable missing measurement.
+- A pumping test at a deposit itself, to replace the nearest measured value.
+- A packer test in the shear zone to measure fracture opening and matrix diffusion.
+- Rock porosity for the Singhbhum schists: a published study measured it on 16 rocks from the shear zone, but its full text could not be obtained, so the model still uses literature values.
 - Deep piezometers under the belt to measure the upward head difference that controls the shallow-aquifer screening.
 - Updating the model inputs and retraining the surrogate with the new values.
 
@@ -71,6 +74,7 @@ Recommended steps include:
 - Adding iron, manganese and arsenic to the statewide testing panel.
 - Repeating sampling at the same wells every year, so that trends and rate-of-change alerts become possible.
 - Recording well depth and screen depth with every sample.
+- Loading the 1994–2026 water-level record into the portal, and checking the 2024 nitrate values against CGWB’s own report before they are used for alerts.
 - Adding wells in the 53 blocks with no well and level stations in the 83 blocks with none, starting from the priority ranking.
 
 ## 12.3 Integration of Real-Time Sensors

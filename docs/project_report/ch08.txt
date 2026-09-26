@@ -6,13 +6,13 @@ The developed prototype, JalDrishti, is a web-based groundwater contamination sc
 
 The prototype consists of the following major subsystems:
 
-- Physics-based contamination engine (plume, restoration, excursion test, shallow-aquifer screening)
+- Physics-based contamination engine (plume, restoration, excursion test, shallow-aquifer screening), with a measured-rock answer and an ISR-feasibility hypothetical
 - ML surrogate with calibrated uncertainty bands
 - Spatial database (PostgreSQL + PostGIS) with row-level security
-- Backend API (FastAPI) with 152 endpoints
+- Backend API (FastAPI) with 143 endpoints
 - Water-quality assessment, monitoring-gap and trend modules
 - Alert module with tiers, explanations and email delivery
-- Web portal with 22 screens for five user roles
+- Web portal with 22 screens for five user roles, including a 3-D site block
 
 ## 8.2 Overall System Architecture
 
@@ -50,25 +50,33 @@ TABLE: Portal screens
 |Residents|My Area, citizen map, alerts|
 |Administration|Datasets, ingest, audit log, administration panel|
 
-![The deployed front page. The four figures on the right (districts assessed, wells checked, districts with a health exceedance and published screenings) are read live from the database.](docs/report/figures/fig_front_page.png){w=15}
+![The deployed front page. The four figures on the right (districts assessed, wells checked, districts with a health exceedance and published screenings) are read live from the database.](figures/fig_front_page.png){w=15}
 
 ## 8.5 Console and Site Report
 
 ### Console
 
-The console is the main working screen for analysts. The user clicks anywhere in Jharkhand, or chooses a registered hypothetical site. The system shows the local rock type, K, flow direction and ore zone, and the user sets the operating values: injection rate, bleed, wellfield width, years of operation, years of restoration and time since start. The engine then draws the plume on the map, shows the footprint, travel distance, ring concentration and excursion probability with their ML bands, and shows the 2-of-3 excursion panel and the shallow-aquifer screening. A timeline slider replays the plume over the years.
+The console is the main working screen for analysts. The user clicks anywhere in Jharkhand, or chooses a registered hypothetical site. The system shows the local rock type, K, flow direction and ore zone, and the user sets the operating values: injection rate, bleed, wellfield width, years of operation, years of restoration and time since start. The engine then draws the plume on the map, shows the footprint, travel distance, ring concentration and excursion probability with their ML bands, and shows the 2-of-3 excursion panel and the shallow-aquifer screening. Below the result, a note states the measured permeability used and whether it is below the IAEA floor for in-situ leaching, and a table compares the measured-rock answer with the ISR-feasibility hypothetical, which is always labelled as hypothetical (Figure 7.3). The plume layer can be shown as a continuous concentration field, as the chance of exceeding the limit, or as contours. A timeline slider replays the plume over the years.
+
+![The plume at the belt site near Narwapahar (TDS, 20 years; local build, September 2026, drawn without the background map tiles): (a) the concentration field and (b) the chance over the limit, fanned by the measured flow-direction uncertainty. The pink disc is the leach zone, the dotted circle is the monitoring ring and the thin outline is the ML P90 envelope.](figures/console_plume_views.png){w=16}
 
 ![The engine view with a modelled plume on the map (June 2026 build). The coloured contours show concentration levels around the hypothetical wellfield; the left panel holds the operating settings.](assets/jun_engine_dark.png){w=15}
 
+### 3-D site block
+
+From a run’s result, the user can open a 3-D view of the site, built with three.js [@threejs] and loaded only when it is opened. It shows a block of ground 3 or 6 km wide: the terrain from the GLO-30 elevation model, the weathered and fractured layers at the district’s NAQUIM depths, the water table, the nearest CGWB exploratory boreholes, the run’s plume laid on the ore horizon, and one ring for each constituent climbing from the ore towards the drinking-water layer. The rings use the same clock as the printed arrival times, so the animation cannot disagree with them. A corner is cut away so that the ore horizon can be seen, and the vertical exaggeration (×3 by default) is always printed. Most blocks contain no borehole; near Jaduguda the nearest ones are 8 to 9 km away, so the view lists them with their distance and direction instead of drawing them at the site. The block is a picture of the model’s 2-D and 1-D answers, not a 3-D transport model.
+
+![The 3-D site block for the Jaduguda deposit site (local build, September 2026): terrain, aquifer layers, the ore zone at 170–190 m and the vertical fronts at 20 years, with the arrival table and the nearest CGWB boreholes on the right.](figures/site_block_3d.png){w=16}
+
 ### ISR site report
 
-For every published screening, a site report can be downloaded as a PDF. It states clearly at the top that no ISR mine operates in Jharkhand and that the document describes a modelled scenario. It gives a plain-language summary (for example: “uranium contamination would cover 8.2 hectares, with the furthest edge about 12 m from the wellfield”), the shallow-aquifer result, and a note that the physics engine is the authority and the ML model only adds uncertainty bands.
+For every published screening, a site report can be downloaded as a PDF. It states clearly at the top that no ISR mine operates in Jharkhand and that the document describes a modelled scenario. It gives a plain-language summary (for example: “uranium contamination would cover 9.4 hectares, with the furthest edge about 4 m from the wellfield”), the shallow-aquifer result, and a note that the physics engine is the authority and the ML model only adds uncertainty bands. For a uranium screening, the shallow-aquifer result also names what the injected solution carries that would arrive first, because the salts reach the shallow aquifer centuries before uranium.
 
-![The ISR site report for the published Jaduguda screening, as a resident or officer downloads it (August 2026).](docs/report/figures/fig_site_report.png){w=12}
+![The ISR site report for the published Jaduguda screening, as a resident or officer downloads it (August 2026).](figures/fig_site_report.png){w=12}
 
 ## 8.6 Backend and API Design
 
-The backend is a FastAPI application with 25 routers and 152 endpoints under /api/v1. The main groups are:
+The backend is a FastAPI application with 23 routers and 143 endpoints under /api/v1. The main groups are:
 
 TABLE: Main API groups
 |{w=5,11}|
@@ -119,7 +127,7 @@ TABLE: Deployment setup
 |Database|Neon PostgreSQL 16 + PostGIS, with separate owner and application roles|
 |Email|Brevo SMTP relay (port 2525)|
 
-Secret values such as database passwords, the JWT secret and the SMTP key are kept in the hosting settings, never in the code.
+Secret values such as database passwords, the JWT secret and the SMTP key are kept in the hosting settings, never in the code. The online services run the build described in this report (Section 5.6).
 
 ## 8.11 Prototype Features
 
@@ -127,9 +135,11 @@ The final prototype provides the following capabilities:
 
 - Contamination screening at any location in Jharkhand
 - Four chemicals: uranium, sulphate, TDS and radium-226, plus chloride as an excursion indicator
-- Plume maps with P10–P90 uncertainty bands and timelines
+- Plume maps with P10–P90 uncertainty bands, a chance-over-limit view and timelines
+- Two answers for every run: the measured rock and a labelled ISR-feasibility hypothetical
+- A 3-D site block showing the ground, the layers, boreholes, the plume and the vertical fronts
 - Restoration and lifecycle analysis
-- Shallow-aquifer (vertical) screening
+- Shallow-aquifer (vertical) screening that follows the dissolved chemicals
 - IS 10500 assessment of 397 wells with “not tested” shown in grey
 - Water-level and chemistry trends
 - Monitoring-gap ranking and suggested well sites
