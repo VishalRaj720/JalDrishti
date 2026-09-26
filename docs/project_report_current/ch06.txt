@@ -1,0 +1,184 @@
+# 6. WORK CARRIED OUT DURING FELLOWSHIP
+
+The fellowship work was carried out over ten months, from November 2025 to August 2026, followed by a short finishing phase in September 2026. The work began with literature study and building the software platform, moved through three rounds of machine learning on measured and synthetic data, and then changed direction in June 2026 to a physics-based model with an ML surrogate. The last months were spent on review rounds, building the full portal, the alert system and deployment. The activities of each month are summarised below, based on the monthly progress reports (MPRs) and the project’s code history.
+
+## 6.1 November 2025: Literature Study and Project Setup
+
+The fellowship began with a study of groundwater monitoring network design [@mda2011], aquifer vulnerability methods and the ways in which ISR uranium mining can contaminate groundwater [@saunders2016]. This helped in understanding what a useful monitoring tool should do and what data it would need.
+
+On the development side, the overall system architecture was designed as separate services (frontend, backend API, ML service, database and cache). A local development environment was set up with Node.js, PostgreSQL, Redis, a Python environment and Docker. The project code was started on GitHub, and a first admin panel was built in React and TypeScript with JWT-based login and three roles.
+
+### Activities Performed
+
+- Study of monitoring network design and aquifer vulnerability frameworks
+- Study of ISR contamination pathways
+- Design of the overall system architecture
+- Setting up the development environment (Node.js, PostgreSQL, Redis, Python, Docker)
+- Development of the first admin panel with JWT login
+
+## 6.2 December 2025: Move to FastAPI and Spatial Database
+
+In December the backend was moved from Node.js to FastAPI (Python), organised into API, service and repository layers. A full database schema with spatial (PostGIS) columns was designed, with SQLAlchemy models and Alembic migrations. REST APIs were built for users, districts, blocks and aquifers, with input checking using Pydantic and role-based access. A simulation workflow was set up with a placeholder output, to be replaced by a real model later. The required groundwater parameters (porosity, depth to water, hydraulic conductivity and transmissivity) were identified from CGWB and aquifer datasets, and data collection plans were discussed with the mentor.
+
+### Activities Performed
+
+- Migration of the backend from Node.js to FastAPI
+- Design of the PostgreSQL + PostGIS database schema (13 tables)
+- REST APIs for users, districts, blocks and aquifers
+- Role-based access control and JWT authentication
+- Study of PostGIS and of how physics and ML could be combined for plume modelling
+
+## 6.3 January 2026: First Real CGWB Data
+
+In January, published CGWB datasets on groundwater levels and quality were studied, and the Dhanbad groundwater-level data was loaded into the database. The aquifer model was extended with fields such as transmissivity, hydraulic conductivity, fractures encountered and yield range, to match the CGWB data structure. An ISR points API (create, read, update, delete) was built with coordinates stored in PostGIS. A data ingestion API was built for district boundary GeoJSON files and CGWB aquifer Excel files. The React frontend was connected to the backend, and a Leaflet map was added to show districts and aquifers.
+
+### Activities Performed
+
+- Study and mapping of CGWB dataset columns to the database
+- Loading of Dhanbad groundwater-level data
+- ISR points API with spatial coordinates
+- Data ingestion API for GeoJSON and Excel files
+- Map view of districts and aquifers using Leaflet
+
+## 6.4 February 2026: Complete Data Layer
+
+February was spent building a complete and reliable data layer. A new migration added tables for monitoring wells, water samples and data sources, with columns that record where each value came from. Five data ingestion pipelines were written for GeoJSON, JSON and CSV files. They handle range values such as “26 - 176” and “2-3%”, fill missing values from the literature [@freeze1979], and use SHA-256 checksums so that the same file is never loaded twice. A seeding script loaded all five Jharkhand datasets in one go and produced a data-quality report. Eleven new REST endpoints were added. The final counts were 25 districts, 275 blocks, 24 aquifer polygons, 397 monitoring wells and 397 water samples. The data-quality report gave the first data-gap finding: iron and arsenic were missing from every sample.
+
+### Activities Performed
+
+- Database migration for wells, samples and data provenance
+- Five ingestion pipelines with range parsing and duplicate protection
+- One-step seeding script with a data-quality report
+- Eleven new REST endpoints
+- First data-gap finding: iron and arsenic never tested
+
+![The admin dashboard of the early platform (February 2026).](assets/feb_admin_dashboard.png){w=15}
+
+![Automatically generated API documentation (Swagger UI) for the ISR points, simulation and data ingestion endpoints (February 2026).](assets/feb_api_docs.png){w=14}
+
+## 6.5 March 2026: First Machine Learning Pipeline
+
+In March the first machine learning pipeline was built. A 16-feature schema was designed, covering aquifer properties, distance to the nearest ISR point, time and a simple vulnerability value, and the features were extracted with a single PostGIS query. The real data had very few unsafe samples, so a synthetic data generator was written using a Gaussian copula (with NumPy and SciPy) to add more unsafe and marginal samples. A TDS regression model (Random Forest and Ridge) and a contamination classifier (Random Forest and Logistic Regression) were trained with 5-fold cross-validation, and SHAP was used to explain them. A prediction service in the backend loaded the trained models and returned a risk score for each simulation.
+
+### Activities Performed
+
+- 16-feature schema with PostGIS feature extraction
+- Gaussian-copula synthetic data generator
+- TDS regressor and contamination classifier with cross-validation
+- SHAP explanation of both models
+- Prediction service connected to the simulation API
+
+![SHAP feature importance of the March 2026 contamination classifier. This pipeline was later replaced (Section 6.8).](assets/mar_shap_classifier.png){w=13}
+
+## 6.6 April 2026: International ISR Data
+
+Since ISR is not carried out in India, the mentor advised looking for internationally published ISR data. USGS, EPA and CGWB datasets were compared, and the USGS Texas ISR dataset [@usgs_tx] was chosen because it covers three stages of mining: before mining, at the end of mining and after restoration. The Excel file was cleaned, handling values such as “<.001” (below detection limit) and “1044±5”, which gave 186 usable rows. A synthetic dataset of 5,186 rows was generated with contamination falling with distance from the ISR site and seasonal effects. A Random Forest classifier trained on this data reached 91.1% test accuracy and 0.90 macro-F1.
+
+### Activities Performed
+
+- Survey of global ISR groundwater datasets
+- Selection and cleaning of the USGS Texas ISR dataset (186 usable rows)
+- Synthetic dataset of 5,186 rows with physical rules
+- Random Forest risk classifier (91.1% accuracy)
+
+![Training output of the April 2026 Random Forest risk model.](assets/apr_rf_output.png){w=12}
+
+## 6.7 May 2026: Uranium as the Prediction Target
+
+In the earlier work, uranium values were being dropped, and the model only predicted a general risk label. In May a single unified pipeline was built with uranium as the real target. It combined 342 real Jharkhand rows, 131 real Texas rows and 3,000 synthetic rows, and trained five models: regressors for uranium, TDS, sulphate and pH, and a safe/marginal/unsafe classifier. Every row was tagged as real, transferred (Texas) or synthetic. The uranium model reported an R² of 0.69 (log scale) on real rows. The backend was also simplified: unused parts such as Celery and Redis were removed, and the database setup was reduced to two commands.
+
+### Activities Performed
+
+- Unified ML pipeline with uranium as the target
+- Five trained models with real/synthetic tagging of every row
+- Simplification of the backend
+- Two-command, repeat-safe database setup
+
+## 6.8 June 2026: Audit and Rebuild with a Physics Engine
+
+June was the turning point of the project. When the May pipeline was checked in detail, it was found that the real data rows had no distance from any mine and no time since injection. These fields had been filled with one median value. Distance made up about 70% of the model’s decisions, so the R² of 0.69 was really measuring how well the model predicted natural background uranium, not contamination spread. The relationship between uranium and distance existed only in the synthetic data. It was decided to replace the pipeline instead of patching it.
+
+A 2-D contaminant transport engine was built on the Domenico solution [@domenico1987], with scale-dependent dispersion [@xu1995], matrix diffusion for fractured rock [@tang1981], dual-porosity slowing [@goltz1986] and containment by the bleed. It modelled the full mine life (operation, restoration and after closure) and uranium re-trapping by reducing rock [@reimus2019]. Nine hundred scenarios placed on real Jharkhand aquifer polygons were evaluated with this engine to create 13,500 training rows, and ten XGBoost models with monotone constraints and conformal uncertainty bands were trained on them. The engine was then grounded in real Jharkhand data: the groundwater flow field from CGWB levels, fracture directions from GSI lineaments, NAQUIM layers, uranium deposit grades, shear-zone transmissivity and rivers. An interactive dashboard showed the plume on the map. A test sweep of about 1,100 cases at nine locations found and fixed four defects.
+
+### Activities Performed
+
+- Audit of the earlier ML approach and decision to rebuild
+- Development of the physics-based transport engine
+- Generation of 13,500 physics-labelled training rows
+- Training of ten XGBoost surrogate models with calibrated bands
+- Grounding in real Jharkhand flow, fracture, layer and deposit data
+- Interactive dashboard and a 1,100-case quality sweep
+
+![The June 2026 engine dashboard: a hypothetical ISR site on the Jharkhand map with its modelled plume, the operating settings on the left and the map layers on the right.](assets/jun_engine_dashboard.png){w=15}
+
+## 6.9 July 2026: Review Rounds and Backend Rebuild
+
+In July the engine was improved and reviewed. Rock permeability was made to fall with depth, calibrated for each district from the NAQUIM reports. The uranium re-trapping rate was set by ore-zone mineralogy. Values were smoothed across aquifer boundaries. Radium-226 was added as a fourth chemical, which raised the training set to 18,000 rows. The engine went through three review rounds; each finding was either fixed and pinned with a test, or disproved with evidence. An exact-solution check showed that one suspected error was not real, but found a different one: a missing term in the transport formula, which was restored. The surrogate was retrained four times, and the travel-distance R² rose from 0.72 to 0.90. A chloride indicator was added for the excursion test.
+
+The backend was also rebuilt on the real engine. The old placeholder simulation (random flow direction and a fixed area) was deleted. A security hole was found and closed: the signup route accepted a role chosen by the user. The three roles were replaced by five roles (admin, regulator, analyst, field officer and resident), enforced both by the API and by database row-level security, with an audit log. A field-observation workflow was added (submit, review, sync into the data). It was also found that the district and block boundaries had been stored with latitude and longitude swapped since February, and this was fixed. A new React and TypeScript portal replaced the old frontend.
+
+### Activities Performed
+
+- Depth-dependent permeability, mineralogy-based attenuation and boundary smoothing
+- Radium-226 added (18,000 training rows)
+- Three review rounds and an exact-solution check
+- Placeholder simulation removed; backend wired to the real engine
+- Five roles with row-level security and an audit log
+- Field-observation workflow; swapped coordinates fixed
+- New role-based React portal
+
+## 6.10 August 2026: Complete Product and Deployment
+
+In August the portal was completed: the Console (click anywhere in Jharkhand, run the engine and see the plume), one-step publication of a screening, the resident’s “My Area” and alerts pages, a site report with PDF export, site comparison, saved scenarios, the dataset manager, the monitoring-network plan and a public front page with light and dark themes.
+
+All the determinands in the 397-well CGWB record were assessed against IS 10500:2012. Nitrate was found above its limit at 22 wells and fluoride at 32, while uranium was within its limit everywhere it was tested. Nine years of water levels were analysed with the Theil–Sen and Mann–Kendall methods, and the observation-based monitoring ranking was built. Three security controls were found that had been configured but were not working: the rate limiter, the alert write under row-level security, and the exceedance scan. Each was fixed and pinned with a test that measures it. Alerts were connected to email delivery with a delivery log and a daily scheduler, and residents now choose their home block at registration. The system was deployed on Neon, Render and Cloudflare, with a restricted database role so that row-level security works in production. The final presentation was given to the TEXMiN–BIT Sindri review panel.
+
+### Activities Performed
+
+- Completion of the 22-screen portal
+- IS 10500 assessment of the measured record
+- Water-level trend analysis and monitoring-gap ranking
+- Fixing of three inactive security controls
+- Email alert delivery with a daily scheduler
+- Deployment on Neon, Render and Cloudflare Workers
+- Final presentation to the review panel
+
+## 6.11 September 2026: Final Improvements and Report
+
+After the fellowship period, a final round of improvements was made before freezing the project. The dual-porosity ratio β was changed from a fixed literature value of 10 to a value calculated from the porosities at each location, and the surrogate was retrained. Alert tiers (notice, warning, alert and critical) with a seven-field explanation were added. Map timelines, a hydrochemical quality check, a global sensitivity analysis and the CGWB 2000–2021 chemistry record were added. A floor was added so that the restored source can never read cleaner than the natural background, and the model was retrained again (version 5). Email delivery was configured on the deployed system, and a defect where failed emails were never retried was found and fixed. A demo record left in the deposit data from testing was removed, and the references were checked.
+
+The last week of September was spent checking the model inputs for the uranium belt against data from the belt itself. A review of why the plume “barely moves” found that the vertical screening moved a parcel of water, not the dissolved chemical: every chemical reached the shallow aquifer at Jaduguda in the same 17.5 years, and the matrix storage that holds uranium back sideways had no effect upward. The vertical path was rebuilt to carry the solute on the same matrix-storage clock, with a harmonic-mean K for the column and a measured vertical-to-horizontal ratio of 0.12 in place of the chosen 0.03 (Section 4.6). The plume map was changed from flat contour fills to a continuous raster, and a chance-over-limit map was added, fanned by the flow-direction uncertainty, which was measured for the first time.
+
+Three new CGWB records were extracted from PDF files: the 2024 water-quality table, which gave the first measure of natural variability; water levels from 1994 to January 2026, which confirmed the flow direction; and the exploratory boreholes of the belt from the NAQUIM Phase-III report, which was recovered from the Internet Archive after CGWB removed it (Section 4.3). The boreholes, together with the terrain and the model output, were used to build the 3-D site block in the portal.
+
+The boreholes also showed a problem with the shear-zone permeability. The transmissivity used until then, 370 m²/day, had been described as coming from where the mines are, but the three wells behind it (Kalapathar, Baharagora and Manusmuria) are in Tertiary sediments 51 to 58 km east of Jaduguda, outside the belt. The belt’s own host rock near the deposits tests at 2 to 101 m²/day, and UCIL’s mine records rule the old value out, because it would force Turamdih to pump about 17.5 times the water it reports. The value was corrected to the measured maximum, 19 m²/day at Kudada, and every run was given two answers: the measured rock as the baseline and the ISR-feasibility hypothetical beside it (Sections 4.4 and 4.5). In the same pass, uranium and radium backgrounds were taken from BARC surveys near each mine, the upper end of the radium Kd was taken from Turamdih soils, the ore-depth defaults were checked against UCIL documents (Bhatin moved from 150 m to 90 m and Mohuldih from 250 m to 150 m), and the portal’s “No uranium ore here” banner, which had never appeared, was fixed. The surrogate was retrained as version 6, with half the training scenarios on the tight rock of the deposits; its radium ring-concentration R² went from 0.235 to 0.746, for the reason given in Section 7.3.
+
+### Activities Performed
+
+- β calculated from local porosities; surrogate retrained
+- Alert tiers with seven-field explanations
+- Timelines, hydrochemical QA, sensitivity analysis and 2000–2021 chemistry record
+- Background floor on the source and retrain (version 5)
+- Email delivery configured on the live system; retry defect fixed
+- Data clean-up and project freeze
+- Vertical pathway rebuilt to carry the dissolved chemical; measured Kv/Kh
+- Continuous plume raster, chance-over-limit map and measured direction uncertainty
+- CGWB 2024 water quality, water levels 1994–2026 and belt boreholes extracted
+- 3-D site block in the portal
+- Shear-zone permeability corrected to the measured Kudada value; two answers per run
+- Local uranium and radium backgrounds, radium Kd and ore depths from local sources
+- Surrogate version 6 and sensitivity analysis re-run
+
+## 6.12 Final Integrated System
+
+The final outcome of the fellowship is a working, deployed system consisting of:
+
+- A physics-based groundwater contamination engine covering the whole of Jharkhand, which gives a measured-rock answer and a labelled ISR-feasibility hypothetical for every run
+- A trained ML surrogate with calibrated 80% uncertainty bands (version 6)
+- An IS 10500 assessment of the measured groundwater record
+- An alert system with four tiers and email delivery
+- An observation-based monitoring-gap ranking of all 264 blocks
+- A five-role web portal with 22 screens, protected by row-level security, including plume maps with a chance-over-limit view and a 3-D site block
+- 463 engine tests and 533 backend tests
+
+The completed system shows that a groundwater contamination screening tool for hard-rock India can be built from open data, standard physics and machine learning, and deployed at low cost, while being honest about what the data can and cannot support.

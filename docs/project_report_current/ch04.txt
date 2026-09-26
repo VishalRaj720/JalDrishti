@@ -1,0 +1,325 @@
+# 4. METHODOLOGY / APPROACH
+
+The development of JalDrishti was carried out through a structured method: requirement analysis, data collection and preparation, building a physics-based contamination model, training a machine learning model on that physics model, building the assessment, alert and monitoring-gap modules, and finally building, testing and deploying the web portal.
+
+One principle guided the order of the work. The physics model is the authority, and the machine learning model is trained on its output. The ML model therefore never claims to “predict reality” better than the physics it learned from. It is used to give fast answers with uncertainty bands, and to warn when something has changed. Measured laboratory results are always kept separate from modelled results, and a place with no data is never shown as safe.
+
+## 4.1 Requirement Analysis
+
+The first stage was to understand the problem and the users. Groundwater monitoring guidance, aquifer vulnerability methods and ISR contamination pathways were studied [@mda2011; @saunders2016], along with the US regulatory rules for ISR excursion monitoring [@nureg1569]. The users were identified as five groups: an administrator who manages the system and publishes screenings, a regulator who reviews field submissions, analysts who run the model, field officers who submit field observations, and residents who want to know about their own area.
+
+Based on this analysis, the following requirements were identified:
+
+- Use real Jharkhand data (water quality, water levels, aquifers, geology, deposits) wherever it exists.
+- Estimate how far and how fast contamination would spread from any point in the state, not only at one site.
+- Give an uncertainty band with every modelled number, and say clearly when a result is outside the range the model was trained on.
+- Assess the measured water quality against IS 10500:2012 and show which substances were never tested.
+- Send alerts to the people concerned, with a clear reason and a recommended action.
+- Rank the blocks of the state by how poorly they are monitored.
+- Provide role-based access, so that residents never see exact coordinates of hypothetical mine sites or model internals.
+- Keep every action traceable through an audit log.
+- Run on low-cost hosting and be easy to maintain.
+
+## 4.2 System Architecture
+
+The system is organised in five layers. Data flows from the data layer through the physics model and the ML model to the decision layer, and then through the web portal to the users.
+
+FLOW: Data Layer (CGWB chemistry, levels and boreholes, aquifers, NAQUIM, lineaments, deposits, rivers, DEM, BARC surveys, UCIL mine records, Texas ISR records) >> Data Preparation (parsing, block assignment, flow field, fracture field, local backgrounds) >> Physics Transport Engine (measured-rock answer and ISR-feasibility hypothetical: plume footprint, travel distance, ring concentration, excursion test) >> ML Surrogate (XGBoost P10 / P50 / P90 with conformal bands) >> Decision Layer (IS 10500 assessment, alerts, monitoring-gap ranking) >> API and Web Portal (FastAPI, five roles, security) >> Action (publish screening, alert, email, acknowledgement)
+
+The deployed system has the following structure. The browser loads the portal from a Cloudflare Worker, which also forwards API calls to the backend. The backend runs on Render and contains the physics engine and the trained ML model in the same process. The database is PostgreSQL with PostGIS, hosted on Neon. Alert emails are sent through an SMTP relay (Brevo).
+
+FLOW: User’s Browser >> Cloudflare Worker (portal + API forwarding) >> Render Web Service (FastAPI + physics engine + ML model + scheduler) >> Neon PostgreSQL / PostGIS (with row-level security) >> Brevo SMTP relay (alert emails)
+
+## 4.3 Data Collection and Preparation
+
+All the data used is open data from government and international sources. The full list is given in Section 5.7 and Annexure A. The main preparation steps were:
+
+### Water quality (2023)
+
+The CGWB water-quality table for Jharkhand (397 wells, 24 districts) [@cgwb_gwq] was loaded into the database. Blank values written as “-” were treated as missing, not as zero. TDS was calculated from electrical conductivity where it was missing, using TDS = 0.64 × EC, a standard factor for mixed groundwater [@hem1985]. Each well was placed in its block using a point-in-polygon test, with the nearest block used for wells on a boundary. Each file was loaded only once, checked by its SHA-256 checksum.
+
+### Water quality (2024) and natural variability
+
+The CGWB national water-quality table for 2024 [@cgwb_gwq2024] was extracted from its PDF pages: 288 Jharkhand samples (138 pre-monsoon and 150 post-monsoon) in all 24 districts. The extractor refuses any page whose header does not have the expected 36 columns, and the serial numbers run without a gap, so no row was lost. The table has no uranium, arsenic, iron, manganese or other metals for Jharkhand, so the 2023 table stays the only source of measured uranium.
+
+What the 2024 table does give is the first measurement of how much clean groundwater changes by itself. 127 stations were sampled in both 2024 seasons, and most of the rows lie within 500 m of a 2023 well, so TDS, sulphate and chloride now have up to three samples per site. The natural 95th-percentile change between seasons is 2.5 times for TDS, 4.4 times for chloride and 5.7 times for sulphate. If the excursion rule (Section 4.5, Step 7) used a control limit of 1.2 times the baseline on these shallow wells, 33% of clean station pairs would raise a false alarm (20% at 1.5 times, 12% at 2 times and 3.5% at 3 times). The control limit used by the engine was not changed, because the monitoring ring samples the deeper ore-zone aquifer, where seasonal swings are expected to be smaller; this remains an open decision. Nitrate is above 45 mg/L in 116 of the 288 samples, against 22 of 393 in 2023. The table cannot show whether this is a real rise, a different set of wells or a change in reporting, so it is recorded but not yet used for alerts.
+
+### Water levels and the groundwater flow field
+
+The CGWB water-level record (9,583 readings at 398 stations, 2013 to 2021) [@cgwb_levels] was used to find the direction and slope of groundwater flow. Each reading was turned into a water-table height: the ground height from the elevation model [@dem] minus the depth to water. Readings were grouped into the four CGWB seasons (Dec–Feb, Mar–May, Jun–Aug, Sep–Nov) and averaged. On a 5 km grid over the state, a sloping plane was fitted through the nearby stations (within 25 km, at least five stations) for each cell. The slope of this plane gives the hydraulic gradient, and its downhill direction gives the flow direction. Of the 3,247 grid cells inside the state, 2,416 were fitted from stations. The other 831 cells had too few stations, so their flow direction was taken from a smoothed version of the ground surface and they were marked as lower confidence. The change of the gradient between seasons was also stored, because it is used later to widen the uncertainty.
+
+How well the flow direction is known was also measured on the same grid. The standard error of each fitted plane, turned into an angle, has a median of 17° over the station cells; at Jaduguda it is 22° (one standard deviation). This is used to fan the plume on the map (Section 4.5, Step 7).
+
+A longer record was then extracted from CGWB’s national depth-to-water tables [@cgwb_wl_national]: 26,009 readings at about 700 wells from 1994 to January 2026. Station by station it agrees with the 2013–2021 file: 298 of 300 shared stations match within 0.1 m. The long-term flow direction fitted from this record agrees with the direction used by the engine to a median of 3.3° (90th percentile 17°), and lies inside the served uncertainty in 90% of cells. The flow field was therefore kept as it is, because the longer record confirms it. The long record is not yet loaded into the backend database, so the portal’s water-level screens still show the 2013–2021 stations.
+
+![The groundwater flow field used by the model: arrows point down-gradient on a 5 km grid; blue cells are fitted from CGWB stations and red cells use the terrain fallback. Data: CGWB levels [@cgwb_levels] and GLO-30 DEM [@dem].](docs/report/figures/fig_flow_field.png){w=12}
+
+### Fracture directions from lineaments
+
+In hard rock, water moves mostly along fractures, so the direction of the fractures matters. The Geological Survey of India and NRSC lineament map for Jharkhand [@lineaments] was downloaded (1,889 features), and 1,826 structural lineaments (joints, fractures, dykes, shear zones, faults and fold axes) were used. For each 5 km cell, the average fracture direction and how well the fractures are aligned were calculated using standard directional statistics for undirected lines [@mardia2000]. Well-aligned fractures make a narrow plume; scattered fractures make a wider one.
+
+![The fracture-direction field: each tick shows the average fracture direction in a 5 km cell; the colour shows how scattered the fractures are. Data: GSI–NRSC lineaments [@lineaments].](docs/report/figures/fig_strike_field.png){w=12}
+
+### Aquifer layers from NAQUIM reports
+
+Twenty-two CGWB aquifer-mapping (NAQUIM) reports were downloaded [@naquim]. A keyword search collected 410 text snippets about layer depths, and a table of 24 districts was built from them by hand: the base of the weathered layer (13–22 m), the depth range of water-bearing fractures (down to 90–258 m), and whether the deeper aquifer is confined. East Singhbhum came from the CGWB district booklet [@cgwb_booklet], and three districts with no report used estimates from neighbouring districts.
+
+The NAQUIM report that covers the uranium belt itself (East Singhbhum, Saraikela-Kharsawan and parts of West Singhbhum) had been removed from the CGWB website. A copy was recovered from the Internet Archive [@naquim_belt]. Its tables give CGWB’s exploratory boreholes in the belt, and these were transcribed from the page images into a table of 48 holes (43 with a position), together with their water-bearing zones. Blank cells were left blank, and every disagreement between sources was written into the row. Three findings from this report are used later. First, its pumping tests give the permeability of the belt’s own rock (Section 4.4). Second, the Kudada well near Turamdih is recorded as auto-flowing: its deep fractures at 105–139 m pushed water up to the surface. Third, Kudada’s deep water is low in the excursion indicators (EC 721 µS/cm, chloride 7 mg/L and sulphate 5 mg/L), so a lixiviant would stand out clearly there. The layer depths used for East Singhbhum (weathered base 20 m, fractures to 258 m) lie inside what the report records.
+
+### Uranium and radium backgrounds near the mines
+
+The CGWB well nearest to each of the seven deposits was never tested for uranium, and CGWB does not measure radium. Published surveys by the Bhabha Atomic Research Centre (BARC) around the mines were therefore collected into one table of 16 rows from 7 studies. A location takes a blend of these surveys, weighted by inverse distance squared, together with a regional value that counts as one survey at 5 km. Near a mine the survey dominates; far from all mines the regional value takes over. The same function is used to build the training data and to serve a run.
+
+TABLE: Uranium and radium backgrounds used near the mines
+|{w=3.6,6.2,6.2}|
+|Area|Radium-226 (mBq/L)|Uranium (µg/L)|
+|Jaduguda|23, regional average [@tripathi2008]|1.1, median [@jha2014]|
+|Narwapahar|13.7, mean [@rana2010]|0.87, mean [@rana2010]|
+|Turamdih, Banduhurang, Mohuldih|19.8, geometric mean [@kumar2015]|0.99, geometric mean [@kumar2015]|
+|Bagjata|12.4, geometric mean [@giri2011]|3.22, geometric mean [@giri2011]|
+|Regional value|10, geometric mean of 108 wells [@molla2025]|0.775, median of 342 CGWB wells [@cgwb_gwq]|
+
+Where two surveys disagree, both are kept. For the Turamdih area, a smaller survey gives a radium geometric mean of 9.1 mBq/L [@giri2011] against 19.8 from the larger one; the larger survey is used and the smaller one is recorded. Near Jaduguda, potable wells range from below 3.5 to 208 mBq/L [@tripathi2012]. All these backgrounds are one to three orders of magnitude below the drinking-water limits, so their effect on the results is small. What matters is that each value is now measured where it is used.
+
+### UCIL mine records
+
+Public documents of the Uranium Corporation of India Ltd. (UCIL) were used for two things. The first is the depth of the ore at each deposit. Each deposit has a documented depth range and one default depth (the *seed*) inside it, which the portal fills in and prints with its range.
+
+TABLE: Ore depth at the seven deposits
+|{w=3.2,4.4,2.4,6.0}|
+|Deposit|Documented ore depth|Seed|Source|
+|Jaduguda|0–900 m|180 m|[@sarangi_jaduguda; @gupta2004]|
+|Bhatin|0–135 m|90 m|[@gupta2004]|
+|Narwapahar|100–380 m|150 m|[@ucil_pfr_narwapahar]|
+|Turamdih|50–200 m|140 m|[@sarangi_turamdih]|
+|Banduhurang|0–164 m|60 m|[@gupta2004]|
+|Bagjata|0–270 m|160 m|[@sarangi_bagjata]|
+|Mohuldih|0–250 m|150 m|secondary source; no UCIL document gives a depth|
+
+The second is the water pumped out of the mines. UCIL’s 2017 pre-feasibility reports give 2,700 m³/day from Narwapahar, developed to 380 m [@ucil_pfr_narwapahar], and at least 3,170 m³/day from Turamdih, worked to 260 m [@ucil_pfr_turamdih]. A dewatered mine behaves like a very large pumping test, so these figures are used to check the rock permeability (Section 7.4).
+
+### Texas ISR records
+
+Because no ISR data exists for India, the USGS records of groundwater quality at ISR mines in Texas were used [@usgs_tx; @usgs_ops]. From the end-of-mining samples at 7 mines, the source strength was taken: uranium 9,027 to 41,595 ppb, and sulphate and TDS in proportion. From samples taken after restoration at the same mines, the fraction left after cleaning was found: 6.0% for uranium, 13.8% for sulphate, 33.7% for TDS and 53.1% for chloride. The median restoration period across 13 production areas was 5.0 years. The Texas data was used only for the chemistry of the source and for restoration behaviour. All the hydrogeology (rock type, flow, fractures, layers, background chemistry) comes from Jharkhand.
+
+### Other data
+
+District and block boundaries, the 24 CGWB aquifer polygons, the outlines of seven uranium deposits and a regional belt envelope, uranium ore grades from the IAEA UDEPO database [@udepo], and perennial rivers from HydroRIVERS [@hydrorivers] were also loaded.
+
+## 4.4 Hydrogeological Framework
+
+Each of the 12 rock types in the aquifer map was classed as **fractured** (schist, gneiss, granite, quartzite, charnockite, Basement Gneissic Complex, basalt, intrusive rocks) or **porous** (limestone, sandstone, laterite, alluvium). This choice decides which equations are used for a location.
+
+**Hydraulic conductivity (K)** tells how easily water moves through rock. It was taken from the aquifer polygon. Where a value was missing, a typical value for that rock type from the literature was used [@freeze1979]. Since CGWB values describe the shallow aquifer, but ISR ore lies deeper, K was reduced with depth using a law fitted for each district from the NAQUIM fracture depths. In East Singhbhum this law leaves about 15% of the reference K at an ore depth of 180 m.
+
+In the Singhbhum shear zone, where the deposits lie, K is taken from pumping tests in the belt’s own rock. The largest transmissivity (T) measured in the host rock near the deposits is **19 m²/day**, at the Kudada exploratory well in metasediments about 3 km north-east of Turamdih, tested as an open hole from 15.6 to 145.4 m [@naquim_belt]. This measured maximum is used as the baseline, with a cap of 20 m²/day. The thickness is the tested interval, 130 m. The reference K is then solved so that the engine’s own depth law, integrated over the tested interval, gives back the measured T. This gives K = 0.228 m/day at the 45 m reference depth and 0.034 m/day at Jaduguda’s ore depth of 180 m. Dividing T by the thickness directly would apply the depth decay twice. Other tests were looked at but not used: granite wells in the belt districts read 2 to 39 m²/day; a test at AMD Jamshedpur in the same metasediments read 101 m²/day, but its position is not published; and the values of 207 to 570 m²/day in the same CGWB table come from Tertiary sediments 51 to 58 km east of Jaduguda, outside the belt. The baseline was also checked against the water pumped out of UCIL’s mines (Section 7.4). The shear-zone value applies fully at the deposits and fades into the aquifer-map value with distance from them. Values were blended smoothly across aquifer boundaries so that the results do not jump suddenly between two nearby points.
+
+**Ore zones.** A uranium source can exist only where uranium ore exists. Each location is classed as *deposit* (inside a deposit outline or within 500 m of it), *belt* (inside the Singhbhum envelope, with a reduced source) or *none* (no uranium plume is drawn). Sulphate and TDS are not limited this way, because the lixiviant carries them wherever it is injected.
+
+**Sorption and retardation.** Some chemicals stick to rock and move slower than the water. This is measured by the distribution coefficient Kd [@epa_kd]. In porous rock, the retardation factor is:
+
+EQ: R = 1 + (ρb × Kd) / n
+
+where ρb is the bulk density of the rock and n is the porosity. The chemical then moves at v / R, where v is the water velocity. Uranium has a low Kd under alkaline conditions, while radium has a very high Kd and hardly moves at all. The upper end of the radium Kd range, 2,285 L/kg, is the largest value measured in soils around the Turamdih mine [@maity2015]. The most likely value is kept at 13.2 L/kg, much lower, because the local measurements are for organic-rich soil and not for fractured rock at ore depth.
+
+**Background chemistry.** Each location takes its natural background from the nearest CGWB well. Uranium and radium are blended from the BARC surveys described in Section 4.3. Away from the mines, uranium falls back to the nearest CGWB well, or to the statewide median of 0.775 µg/L where that well was not tested for uranium; radium falls back to the regional survey value of 10 mBq/L.
+
+## 4.5 Contaminant Transport Model
+
+The transport engine calculates the concentration of a chemical around a hypothetical ISR wellfield on a map grid, for a chosen time after injection begins. One run, including the second answer described in Step 9, takes about 0.3 seconds when run locally. The main steps are explained below in simple terms.
+
+### Step 1: Groundwater velocity
+
+The water velocity comes from Darcy’s law:
+
+EQ: v = (K × i) / φ
+
+where K is the hydraulic conductivity, i is the hydraulic gradient from the flow field, and φ is the porosity through which water actually flows. In fractured rock φ is less than 1%, which is why water can move quickly through fractures even when K is small.
+
+### Step 2: Containment by the bleed
+
+While the mine is operating, the extra water pumped out (the bleed) pulls groundwater back towards the wellfield. Using capture-zone theory [@javandel1986], the fraction of flow that is captured is:
+
+EQ: η = min (1, Qnet / (q × b × W))
+
+where Qnet is the net extraction, q = K × i is the regional water flux, b is the aquifer thickness and W is the wellfield width. If η = 1, the wellfield holds everything in. Pump downtime reduces η.
+
+### Step 3: Three phases of the plume
+
+The front of the plume moves differently in three phases: during operation it moves slowly because of containment; during restoration it is held in place; and after closure it drifts freely with the groundwater.
+
+### Step 4: Slowing down in fractured rock
+
+In fractured rock, chemicals move in the fractures but also soak into the solid rock between them (the matrix), which slows the plume. This is described by a dual-porosity model [@goltz1986]. Late in time, the plume moves slower than the water by a factor:
+
+EQ: R_eff = 1 + β × R_m,    β = (n_total − φ_mobile) / φ_mobile
+
+Here β is the ratio of water stored in the rock matrix to water in the fractures, and R_m is the sorption in the matrix. β is calculated from the porosities of each location. At Jaduguda, β = 3.0, which gives R_eff ≈ 271 for uranium, but only 4 for TDS, which does not sorb. This is why uranium stays close to the mine while the other chemicals travel much further.
+
+### Step 5: The shape of the plume
+
+The concentration map is calculated with the standard Domenico solution [@domenico1987], using the full Ogata–Banks form along the flow direction [@ogata1961]. It describes how a chemical released from a source of width W spreads along and across the flow direction. The amount of spreading (dispersivity) grows with the distance travelled, following the Xu and Eckstein formula [@xu1995], and the sideways spreading is set from the fracture alignment in each cell [@gelhar1992]. For fractured rock, a second solution for flow along a single fracture with diffusion into the rock (Tang, Frind and Sudicky [@tang1981]) is also calculated, and the larger of the two is used, so that fast early arrival is not missed.
+
+### Step 6: The leach zone, restoration and attenuation
+
+The wellfield area itself is contaminated by design, so it is drawn as a circular “leach zone”. After mining, restoration lowers the source concentration step by step, calibrated so that a 5-year restoration reaches the measured Texas end result. After restoration, the source does not fall below the measured Texas level, because some contamination comes back after cleaning (rebound) [@gallegos2015]. The source also never falls below the natural background chemistry of the site. Down-gradient of the mine, dissolved uranium meets reducing rock and turns into a solid form, so a first-order decay factor exp(−k × age) is applied to uranium only [@newell2002]. The rate k is between 0.05 and 0.70 per year, based on a field test at a Wyoming ISR site [@reimus2019], and it is set higher inside the sulphide-rich ore zone.
+
+### Step 7: Outputs and the excursion test
+
+For every run, the engine reports:
+
+- **Footprint area** (hectares) where the concentration is above the drinking-water limit (only the part caused by the mine is counted, not the natural background).
+- **Maximum travel distance** of the plume beyond the wellfield, measured along the flow centreline.
+- **Concentration at the monitoring ring**, placed 100 m beyond the wellfield edge.
+- **Excursion test**, following the US rule [@nureg1569]: an excursion is declared when at least two of the three indicators (chloride, TDS and sulphate) are above their control limits at the ring. Uranium is not used as an indicator.
+- **Map rasters.** The concentration field is returned as a map image in which each pixel is the analytical value at that pixel’s own centre, not an interpolation. A second image, the *chance over limit*, shows for each pixel the share of the Monte Carlo draws (Step 8) in which the drinking-water limit is exceeded there. Without any change of direction, this image gives exactly the excursion probability at the monitoring ring. On the map, each draw is also turned through 15 flow directions spread by the measured direction uncertainty (Section 4.3), which fans the image sideways.
+
+Drawn continuously, the plume is a straight-sided band about as wide as the wellfield. This is what a wide source gives in steady regional flow when sideways spreading is small, and field tracer tests show that sideways spreading is small: at Cape Cod the transverse dispersivity was measured in centimetres against about a metre along the flow [@garabedian1991]. A fracture network model, which would give a more irregular plume, was not built. Within 10 km of Jaduguda the lineament map holds only three structural fractures, and no fracture spacing or aperture has been published for the mines, so such a network would be almost entirely assumed.
+
+### Step 8: Monte Carlo uncertainty
+
+Many input values are not known exactly. For each scenario, 48 random versions (draws) are run with different values of K, Kd, β, fracture opening, gradient (widened by the measured seasonal change), dispersivity, bleed and attenuation rate. The 10th, 50th and 90th percentiles (P10, P50, P90) of the results give a range. The share of draws in which the ring concentration crosses the limit gives the **excursion probability**. The draws vary K by a factor of 0.37 to 2.46 around its served value, which at Jaduguda is 0.013 to 0.084 m/day. The Monte Carlo therefore describes uncertainty within the rock as measured, not the possibility that the rock is of a different kind.
+
+### Step 9: Two answers for every run
+
+In-situ leaching works only in rock that lets the solution flow through the ore. The IAEA gives a rule of thumb: a permeability of the order of 1 m/day or more is advantageous, and ISR usually becomes unfeasible at about 0.1 m/day and less [@iaea2016]. An earlier IAEA manual places clayey schists and solid rocks at 0 to 0.1 m/day [@iaea2001], and UCIL’s own note on in-situ leaching lists good host-rock permeability as a condition [@sarangi2000]. The measured K at ore depth in the Singhbhum deposits is well below the working level:
+
+TABLE: Measured ore-zone K at the default ore depth of each deposit
+|{w=6,5}|
+|Deposit|Ore-zone K (m/day)|
+|Jaduguda (180 m)|0.034|
+|Narwapahar (150 m)|0.052|
+|Turamdih (140 m)|0.060|
+|Mohuldih (150 m)|0.032|
+|Bagjata (160 m)|0.045|
+|Bhatin (90 m)|0.12|
+|Banduhurang (60 m)|0.18|
+
+Five of the seven deposits are below the 0.1 m/day floor, the two shallow ones lie between the floor and the working level, and none reaches 1 m/day. Every run therefore returns two answers:
+
+1. **The measured-rock answer (baseline).** This uses the measured K described in Section 4.4. It gives every number on the screen, the vertical screening, the excursion panel and every alert.
+2. **The ISR-feasibility hypothetical.** This is the same run with only the ore-zone K raised to 1 m/day, the IAEA’s advantageous level. It answers the question “how far would it spread if this rock were permeable enough for ISR to work at all?”. It is labelled “Not a prediction”, it carries its own Monte Carlo band, and it is never read by the alert system; a backend test checks this. The rock above the ore keeps its measured K, because the IAEA criterion is about the ore horizon, so the vertical arrival times are the same in both answers.
+
+The two answers are shown side by side and are not merged into one band. Merging them would need a probability that the rock at the site is of ISR grade. No data gives such a probability, and the measured K says that it is not, so a merged band would only show the weight that was chosen for it.
+
+The engine was checked against an exact numerical solution on 240 test cases. This check found that an earlier simplified version under-estimated concentrations by 17–42%, and the full formula was restored (Section 7.4).
+
+## 4.6 Vertical (Shallow Aquifer) Screening
+
+The plan-view model above describes the ore layer. People, however, drink from the shallow layer. A separate screening estimates whether contamination at ore depth could reach the shallow aquifer through three routes:
+
+1. **Dispersion** upward from the ore layer.
+2. **Leakage** upward through the fractured rock, driven by the upward head difference.
+3. **Old wells** (boreholes) acting as short-cuts, with a small base probability of 5%.
+
+On the leakage route, what moves is the dissolved chemical, not just the water. The chemical front climbs on the same matrix-storage clock as the horizontal front [@goltz1986], with β taken from the porosities of the rock it passes through. So a sorbing chemical such as uranium climbs far more slowly than the water, while TDS and chloride are held back only a little. The old-well route is not slowed in this way, because an open borehole has no rock matrix. The K of the column is the harmonic mean of the depth law between the top of the ore and the base of the shallow aquifer, which is the correct average for flow across layers [@freeze1979]. The ratio of vertical to horizontal K is 0.12, the geometric mean of five pumping-test interpretations in the Maheshwaram granite near Hyderabad [@marechal2004]; the measured range of 0.034 to 0.61 is evaluated on every run and shown beside the result. This is not a Singhbhum measurement, and it may understate vertical flow in the folded schists of the belt.
+
+The salts carried by the lixiviant (chloride, TDS and sulphate) are screened on the same column. The result names the *first arrival*: the earliest constituent whose source concentration is above its drinking-water limit. The aquifer alerts (Section 4.9) use this first arrival, so a uranium screening also reports that the salts would arrive much earlier.
+
+The three routes are combined into one screening index between 0 and 1, which is shown as *high*, *moderate*, *low* or *contained*, together with the main route and an estimated breakthrough time. The upward push of water changes with the monsoon, so the breakthrough time is calculated for both the dry-season and the wet-season case, and for the yearly average of the upward push. The upward head difference itself is still an assumption (a gradient of 0.005). Close pairs of deep and shallow wells in the belt show natural vertical gradients of 0.03 to 0.23, pointing up at some sites and down at others [@naquim; @naquim_belt], so the assumption can be neither confirmed nor ruled out.
+
+A full 3-D transport model was not built. The chemistry wells have no recorded depth, and there is no deep water-level data in the belt. A 3-D model built on this data would look precise but would not be backed by measurements. The system therefore stays “2.5-D” and says so. To help users see the answers in place, the portal draws a **3-D site block** (Section 8.5): the ground from the GLO-30 elevation model [@dem], the aquifer layers at the district’s NAQUIM depths, the water table, the nearest CGWB boreholes, the plume on the ore horizon, and the vertical fronts climbing year by year. The block is a picture of the 2-D and 1-D answers above; it adds no physics of its own.
+
+## 4.7 Machine Learning Surrogate Model
+
+### Why a surrogate
+
+The proposal planned ML models trained on measured groundwater data. The first pipelines (March–May 2026) did this. However, an audit in June 2026 found that these models were not learning contamination spread at all. The measured records have no distance from any mine and no time since injection, so those fields had been filled with a constant value, and the model was really predicting the natural background uranium. The spread with distance existed only in the synthetic data the project had generated itself (Section 9.3). The ML approach was therefore changed: the physics engine produces the labels, and the ML model learns to copy the engine quickly and give calibrated uncertainty bands. Such a model is called a *surrogate*.
+
+### Training data
+
+The training set was produced by the physics engine: 900 scenarios placed on real Jharkhand aquifer polygons, each evaluated at 5 times (2, 5, 8, 12 and 20 years) for 4 chemicals (uranium, sulphate, TDS and radium-226), giving 18,000 rows. Each scenario used 48 Monte Carlo draws to produce its P10, P50 and P90 values. Of the scenarios, 60% took their gradient and fracture values from the real Jharkhand fields at their location, and 40% from wider operating ranges. Half of the scenarios apply the engine’s depth law for K at a randomly chosen ore depth, so that the training data also covers the tight rock of the deposits: in fractured rock it reaches K values from 0.0021 to 9.8 m/day. Radium backgrounds are drawn over their served range of 10 to 23 mBq/L. The data can be regenerated exactly from a fixed random seed.
+
+### Features
+
+Each row has 40 features, grouped as: rock type; K, gradient, porosity and velocity; Kd and retardation; dispersivity; dimensionless groups (such as pore volumes injected); operating settings (injection rate, bleed, containment, operating years, wellfield width); source and background concentration; restoration and attenuation; the plume front position calculated by the engine; and the chemical type. No map coordinates are used as features. This stops the model from inventing patterns tied to location instead of to physics.
+
+### Model and training
+
+For each of three targets (footprint area, travel distance and ring concentration), three XGBoost models [@chen2016] were trained for the 10th, 50th and 90th percentiles, using the quantile (pinball) loss [@koenker1978]. A fourth model predicts the excursion probability. This gives ten models in total. The settings were fixed: 450 trees, depth 5, learning rate 0.05. Physical rules were built into the models using monotone constraints. For example, a higher K can only increase the spread, and a higher bleed can only reduce it. Each of these rules was checked against the engine’s own results.
+
+### Calibrated uncertainty (conformal prediction)
+
+Raw quantile models often give bands that are too narrow. Conformal prediction [@romano2019; @vovk2005] was used to fix this. On a separate calibration set, the model’s errors are measured, and the bands are widened just enough that at least 80% of new cases fall inside them. The widening is done separately for each rock type and chemical (a “Mondrian” scheme), so that one chemical’s errors do not affect another. The 80% target is checked at the scenario level, which is stricter than checking individual rows.
+
+### Validation
+
+- **GroupKFold (5 folds) by scenario:** all rows from one scenario stay in the same fold, so the model is never tested on a scenario it has already seen.
+- **Leave-aquifer-out:** whole aquifer polygons (23 groups) are held out to test the model on geology it has never seen.
+- **Baselines:** a mean predictor, a ridge regression and a single-split tree are tested on the same folds for comparison.
+- **Field-location test:** a separate batch of 120 scenarios, all placed on real flow and fracture values, must also reach 80% coverage.
+
+SHAP values [@lundberg2017] were used to see which features the model relies on. In the live system, every request compares the ML answer with the engine’s answer, and a drift warning is raised if they start to disagree.
+
+## 4.8 Water Quality Assessment
+
+The measured water quality is assessed against IS 10500:2012 [@is10500], which gives an *acceptable limit* and a *permissible limit* (used when no other source is available) for each substance. For uranium, the limit of 30 µg/L is used [@who2017].
+
+Every map and page for residents uses one shared rule to give each block a **health band**, based on the highest measured value of uranium, nitrate and fluoride in its wells:
+
+- **High concern:** any of them is above its permissible (or “no relaxation”) limit.
+- **Moderate concern:** any of them is above its acceptable limit.
+- **Low concern:** all tested values are within limits.
+- **Not tested (grey, never green):** wells exist but none was tested for these substances.
+- **No data:** the block has no sampled well.
+
+Hardness, calcium, magnesium and TDS are not used for the health band, because they exceed their limits in about two-thirds of the state’s wells due to natural hard-rock chemistry, not pollution. They are still shown on the water-quality page. Every band also shows which substance decided it, and which health-related substances (such as arsenic and iron) were never tested. A water quality index (WQI) [@brown1970] is shown only as a secondary figure, together with the substance that dominates it.
+
+Two further checks were added. A **charge-balance check** compares the positive and negative ions in each sample, which is a standard way of checking a laboratory analysis [@hem1985]. **Trend tests** use the Theil–Sen slope [@theil1950; @sen1968] and the Mann–Kendall test [@mann1945] on the water-level records and on the older 2000–2021 chemistry record [@nwdp]. These methods suit short and uneven records. A station with too few readings is reported as “not enough record”, never as “stable”.
+
+## 4.9 Alert Generation and Delivery
+
+The alert system has five kinds of alert:
+
+1. **Measured exceedance:** a laboratory value in a block’s well is above an IS 10500 limit.
+2. **Published screening:** a hypothetical screening was published and its central (P50) footprint touches the block.
+3. **Possible reach:** the block is inside the wider P90 spread but outside the central footprint.
+4. **Aquifer pathway:** the block shares the shallow aquifer that a modelled vertical route would reach, within a distance groundwater could actually travel.
+5. **Breakthrough due:** the modelled breakthrough time of a published site has passed since its injection start date.
+
+Both vertical alerts (4 and 5) use the first arrival from the vertical screening (Section 4.6). All modelled alerts are raised from the measured-rock answer only; the ISR-feasibility hypothetical never raises an alert.
+
+Each alert has a tier, based on the IS 10500 limits:
+
+TABLE: Alert tiers
+|{w=3.2,12.8}|
+|Tier|When it is used|
+|Notice|A published modelled screening touches the block.|
+|Warning|A measured value is above the acceptable limit but within the permissible limit; or a modelled possible reach, aquifer pathway or breakthrough-due alert.|
+|Alert|A measured value is above the permissible or “no relaxation” limit; or a modelled screening with excursion probability of 0.5 or more.|
+|Critical|A measured value is at least twice the limit, or two or more health substances exceed their limits at the same well (a project-defined rule). A modelled result can never be critical.|
+
+Every alert carries seven fields: the basis (measured or modelled), the driver (substance, value, limit and times-limit), where it is (block, district, well), the tier, the confidence (for example, the laboratory date or the model band), the next action (for example, “re-sample; boiling does not remove nitrate”), and one plain sentence saying what happened.
+
+Residents choose their home block when they register and are subscribed to it. A scheduler runs once every 24 hours. It scans the measured data and sends each new alert by email to every subscriber of that block. Every delivery is recorded (sent, failed or skipped), so the same email is never sent twice, and failed deliveries are retried.
+
+## 4.10 Monitoring Gap Analysis and Sensitivity
+
+Every block is given a monitoring-priority score from 0 to 100. The score shows how poorly the block is observed, not how risky the model thinks it is. The weights are shown on screen, so that anyone can see and question them.
+
+TABLE: Monitoring priority weights
+|{w=10,6}|
+|Factor|Weight (points)|
+|Block has never been sampled|30|
+|Wells sampled but never tested for uranium|30|
+|Low number of wells per 100 km²|20|
+|Far from the nearest uranium-tested well (up to 25 km)|15|
+|Close to a registered hypothetical site|5|
+
+The ranking is based on observation on purpose. The model is least reliable where there is no data, so ranking by predicted risk would send field teams to places the model is already confident about. Along with the ranking, a gap table (block × substance × tested or not) and suggested new well sites are provided.
+
+A **global sensitivity analysis** was also carried out to find which inputs control the model results. Thirteen inputs were varied at three reference sites, and Sobol indices were calculated [@sobol1993; @saltelli2010]. All the constants that could not be backed by a local measurement, or that are a modelling choice rather than a measurement (20 in total), were listed in an **assumption register**, which is shown inside the portal together with what measurement would be needed to replace each one.
+
+## 4.11 Testing and Validation
+
+Testing was carried out at every level:
+
+- **Engine tests (463):** physical rules (for example, more bleed never increases the spread), the exact-solution check, restoration behaviour, the extracted CGWB records, the local backgrounds, the vertical pathway and fixes found in review rounds.
+- **Backend tests (533):** run against a real PostGIS database; they cover role access for all 143 endpoints, database security, alert tiers, email delivery and retry, the water-quality module, and a check that no alert ever reads the ISR-feasibility hypothetical.
+- **Review rounds:** from July 2026, the system went through several numbered review rounds. Each finding was either fixed and pinned with a test, or shown to be wrong with evidence.
+- **Browser testing:** every screen was checked for every role by hand.
+- **Deployment checks:** the deployed system was checked for speed, security settings and correct operation.
+
+## 4.12 Methodology Summary
+
+The method combined real local data, standard groundwater physics and machine learning in a way where each part does what it is good at. The physics engine gives answers that can be explained and checked against exact solutions. In the uranium belt it uses the permeability measured in the belt’s own rock, and it shows beside it, clearly labelled, what would happen if the rock were permeable enough for ISR. The ML surrogate gives fast answers with honest uncertainty bands. The assessment, alert and ranking modules turn these results into information that officials and residents can act on. The result is a screening tool that can be used anywhere in Jharkhand, while being clear about which of its numbers are measured, which are modelled, and which could not be checked because no data exists.

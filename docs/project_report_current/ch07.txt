@@ -1,0 +1,264 @@
+# 7. RESULTS & ACHIEVEMENTS
+
+JalDrishti was successfully developed, tested and deployed during the fellowship. The project met its three main objectives: a physics-based prediction model with a calibrated ML surrogate (O1), a data-gap analysis with monitoring recommendations (O2), and a working decision-support prototype (O3). The results fall into three kinds, and they are kept separate throughout this chapter:
+
+- **Measured results:** laboratory values and water-level readings compared with published limits. Nothing is modelled.
+- **Modelled results:** outputs of the engine or the surrogate for a hypothetical ISR operation. These are “what if” estimates, never forecasts of real contamination.
+- **Validation results:** checks of the surrogate against the engine, or of the engine against an exact solution.
+
+## 7.1 Measured Groundwater Quality (IS 10500:2012)
+
+The 2023 CGWB record of 397 wells [@cgwb_gwq] was checked against IS 10500:2012 [@is10500]. The main findings for the health-related substances are shown below.
+
+TABLE: Health-related results in the 2023 CGWB record (397 wells)
+|{w=2.6,2.2,3.0,2.8,5.4}|
+|Substance|Wells tested|Maximum|Limit|Wells above limit|
+|Uranium|342|28.5 ppb|30 ppb|**0**|
+|Nitrate|393|121 mg/L|45 mg/L (no relaxation)|**22**|
+|Fluoride|397|1.91 mg/L|1.0 / 1.5 mg/L|**32** above acceptable, **11** above permissible|
+|Chloride|397|430 mg/L|250 / 1,000 mg/L|9 above acceptable, 0 above permissible|
+|Sulphate|393|234 mg/L|200 / 400 mg/L|2 above acceptable, 0 above permissible|
+|Iron|**0**|–|1.0 mg/L|never tested|
+|Arsenic|**0**|–|10 / 50 ppb|never tested|
+
+Uranium is within its 30 ppb limit at every one of the 342 wells where it was tested (maximum 28.5 ppb at Sukurhutu, Ranchi). The health problems in Jharkhand’s groundwater today are nitrate and fluoride. Nitrate reaches 121 mg/L at Biru (Simdega), 2.7 times the limit, and 99 mg/L at Lowadih (Ranchi). Fluoride reaches 1.91 mg/L at Baresad (Latehar). In total, **32 wells** have a health exceedance, and **14 of 24 districts** have at least one such well. Hardness, calcium and magnesium are above their acceptable limits at a third to two-thirds of wells, but this is natural hard-rock chemistry and is reported separately.
+
+The record also shows important gaps. Iron and arsenic were tested at none of the 397 wells, and manganese has no column. In the three Singhbhum districts (the uranium belt), 55 wells were sampled but never tested for uranium: 28 in East Singhbhum, 11 in Saraikela-Kharsawan and 16 in West Singhbhum. A published study near two Singhbhum deposits found iron up to 5.3 mg/L and manganese up to 1.3 mg/L, above the drinking-water limits [@giri2012], so these untested metals are a real concern in the belt.
+
+A hydrochemical check showed that all 393 complete analyses in the 2023 file balance within ±3.2%. This is better than any normal laboratory batch, and it is explained by sodium having been calculated from the other ions. So the file’s charge balance cannot be used as proof of laboratory quality. In the older 2000–2021 record, the check is meaningful: 127 of 753 analyses were flagged as suspect.
+
+### Key achievements include:
+
+- The full measured record was assessed against IS 10500 for the first time in the system.
+- Nitrate and fluoride were identified as the real health issues, with 32 wells and 14 districts affected.
+- “Not tested” was made a separate grey class, so that missing data is never shown as safe.
+- The public map shows each district by its worst measured health substance.
+
+![The public map: districts coloured by the worst measured health substance (uranium, nitrate or fluoride) against IS 10500:2012; 14 of 24 districts are High concern. Basemap © OpenStreetMap contributors (Open Database Licence).](docs/report/figures/fig_public_map.png){w=15}
+
+## 7.2 Groundwater Level Trends
+
+The water-level records held in the portal (2013 to 2021) were tested with the Theil–Sen slope and the Mann–Kendall test. Of 415 stations in the database, 331 had enough data for a trend test and 84 did not (fewer than 8 readings or less than 3 years).
+
+TABLE: Groundwater level trends, 2013–2021
+|{w=8,4}|
+|Result|Number of stations|
+|Declining (water table falling)|5|
+|Recovering (water table rising)|20|
+|Stable (no significant trend)|306|
+|Not enough record to test|84|
+
+The fastest decline was 0.785 m per year at Chapodia (Dumka). The median seasonal swing of the water table is 2.38 m. There is no statewide groundwater-level crisis in this record, and stations with short records are reported as such, never as stable. In the 2000–2021 chemistry record, electrical conductivity is rising at 13 wells and falling at 6.
+
+The longer CGWB record, from 1994 to January 2026 [@cgwb_wl_national], was tested in the same way, using only wells with at least 15 years of readings spread over at least 20 years.
+
+TABLE: Water-table trends, 1994 – January 2026 (a positive trend means the water table gets deeper each year)
+|{w=5.4,1.6,3.0,3.0,3.0}|
+|Group|Wells|Median trend (m/yr)|Significant deepening|Significant rising|
+|Statewide, pre-monsoon|177|+0.011|29|20|
+|Statewide, post-monsoon|173|+0.008|23|18|
+|Uranium-belt districts, pre-monsoon|24|+0.003|5|5|
+|Uranium-belt districts, post-monsoon|23|−0.025|1|6|
+
+Over 32 years the network shows no net fall of the water table. The steepest decline is one West Singhbhum well at 0.31 m per year. This supports the use of the 2013–2021 water tables in the vertical screening. It is a statement about the monitoring network, not a guarantee for any single well, and it covers only the shallow unconfined aquifer, not the fractured rock below.
+
+## 7.3 Machine Learning Model Performance
+
+The final surrogate (version 6) was tested with 5-fold cross-validation grouped by scenario, on 18,000 rows from 900 scenarios.
+
+TABLE: Surrogate model performance (P50 model, cross-validation)
+|{w=4.2,2.4,2.8,3.0,3.6}|
+|Target|R² (log scale)|Scenario coverage (target ≥ 0.80)|Ridge baseline R² (log)|Average error (MAE)|
+|Footprint area|**0.892**|0.869|0.561|6.18 ha|
+|Travel distance|**0.930**|0.865|0.721|48.0 m|
+|Ring concentration|**0.968**|0.857|0.761|mixed units|
+|Excursion probability|0.913 (R²)|–|–|0.033|
+
+The surrogate is better than all the baseline models on every target. When whole aquifer polygons were held out (leave-aquifer-out), the R² values were 0.891, 0.925 and 0.966, almost the same, which shows that the model works on geology it has not seen. On a separate test batch of 120 scenarios placed on real Jharkhand flow and fracture values, the 80% bands covered 0.900, 0.921 and 0.902 of scenarios for the three targets, so all three passed.
+
+TABLE: R² (log scale) of the P50 model for each chemical (target ≥ 0.60)
+|{w=4.4,2.9,2.9,2.9,2.9}|
+|Target|Uranium|Sulphate|TDS|Radium-226|
+|Footprint area|0.957|0.797|0.814|0.890|
+|Travel distance|0.945|0.907|0.898|**0.412 (below target)**|
+|Ring concentration|0.909|0.909|0.972|0.746|
+
+For radium, the travel distance is below the project’s own target of 0.60. This is because radium hardly moves: 86.3% of its travel-distance values are exactly zero, and a regression model cannot learn such data well. The result is reported openly instead of lowering the target. The radium ring concentration passes (0.746), but this should be read with care. In 96.8% of cases the radium value at the ring equals the scenario’s own background, and the background is a feature that varies between scenarios (10 to 23 mBq/L), so the model learns “ring equals background” from that feature. This helps the tool serve the right number, but it says nothing new about how radium moves. The radium uncertainty bands still cover at least 90% of cases in cross-validation and at least 95% in the real-location test, and the physics engine always gives the main radium value, so users are not misled.
+
+SHAP analysis showed that the model relies on the right physical quantities. The plume front position calculated by the engine is the strongest feature for travel distance and excursion probability. The source concentration, the dispersivity and the wellfield width are the strongest for the footprint area, because most of the footprint is the leach zone itself. No map coordinate can appear, because none is a feature.
+
+![SHAP feature importance for the excursion-probability model (version 6): the plume front position calculated by the engine (Xc_m) dominates.](figures/shap_excursion_probability.png){w=13}
+
+### Key achievements include:
+
+- Surrogate R² (log) of 0.89 to 0.97, better than all baselines.
+- 80% coverage achieved on real-location test scenarios for all three targets (0.90 to 0.92).
+- Training data that covers the tight rock of the deposits, down to K = 0.0021 m/day.
+- Physical rules built into the model and checked against the engine.
+- The radium travel-distance weakness reported openly, with the engine used as the authority.
+
+## 7.4 Validation of the Transport Engine
+
+In the second review round, a reviewer suggested that the Domenico approximation could cause errors of up to 80% [@west2007]. To test this, the engine was compared with an exact numerical solution on 240 parameter sets drawn from the training data. The result disproved the concern but found a different problem.
+
+TABLE: Error of the engine along the plume centreline compared with the exact solution
+|{w=5.5,5.2,5.3}|
+|Position along the plume|Domenico approximation only|Version then in use (missing term)|
+|Half-way to the front|0.00%|−16.9% (typical)|
+|At the front|0.00%|−22.4% (typical)|
+|Beyond the front|−0.10% to 0.00%|−24.3% (typical)|
+
+The Domenico approximation itself caused no error in this project’s range of parameters. However, the version then in use had dropped the second term of the Ogata–Banks formula [@ogata1961], which made every concentration 17% to 42% too low. This was the opposite of the safe (conservative) side the tool aims for. The full term was restored and the surrogate was retrained on the exact formula. The end-to-end audit of the final version passes 43 of 44 checks; the only failure is the radium target described above.
+
+### Checking the shear-zone permeability against the mines
+
+The permeability used at the deposits (Section 4.4) was also checked against the water that UCIL pumps out of its mines. A mine that is kept dry by pumping behaves like a pumping test over several square kilometres. The Thiem equation was applied to the reported discharges [@ucil_pfr_narwapahar; @ucil_pfr_turamdih], over every plausible radius of influence and drawdown. All the results are upper bounds, because the pumped water also includes water from backfill, drilling and rain.
+
+TABLE: Bulk transmissivity allowed by the mine discharge
+|{w=5.6,5.2,5.2}|
+|Check|Turamdih|Narwapahar|
+|Reported discharge|at least 3,170 m³/day, worked to 260 m|2,700 m³/day, developed to 380 m|
+|Largest bulk T the discharge allows|9.1 m²/day|5.3 m²/day|
+|The engine’s K column, integrated over the drained depth|24.6 m²/day (2.7 times the bound)|26.0 m²/day (4.9 times the bound)|
+
+At Turamdih, in the most generous geometry, the measured baseline of 19 m²/day would force about 0.9 times the reported discharge, while the AMD Jamshedpur value of 101 m²/day would force about 4.8 times. The engine therefore sits on the cautious side of the mine data: it lets water, and so contamination, move somewhat faster than the mines suggest.
+
+## 7.5 Case Study: Hypothetical ISR Site at Jaduguda
+
+The engine was run for a hypothetical ISR operation inside the Jaduguda deposit (86.347 E, 22.652 N), with the ore at 180 m (the seed depth), 8 years of operation, an injection rate of 2,500 m³/day, 2% bleed, a 300 m wide wellfield, no restoration and a monitoring ring 100 m from the wellfield. The location resolves to fractured schist in the shear zone, with a gradient of 0.00205, K of 0.034 m/day at ore depth and β of 3.0. The effective retardation is about 271 for uranium, 17.3 for sulphate, 4.0 for TDS and 3,525 for radium.
+
+TABLE: Modelled results at the Jaduguda deposit after 20 years: measured-rock answer with ML band, and the ISR-feasibility hypothetical
+|{w=2.0,2.1,2.3,1.5,1.7,1.9,2.2,2.3}|
+|Chemical|Source|Natural level|Area (ha)|Reach (m)|Chance at ring|ML reach, P10–P90 (m)|ISR-grade reach (m), chance at ring|
+|Uranium|15,180 ppb|1.08 ppb|9.37|**3.9**|0.00|0.1 – 13.4|38.4, 0.06|
+|Sulphate|1,624.5 mg/L|227 mg/L|9.47|**10.6**|0.00|0.2 – 36.5|156.0, 0.56|
+|TDS|3,655.5 mg/L|1,778.6 mg/L|10.09|**30.4**|0.00|1.7 – 198.7|534.6, 1.00|
+|Radium-226|1,706 mBq/L|22.1 mBq/L|9.37|0.0|0.00|0.0 – 0.3|1.1, 0.00|
+
+The chance at the ring is the excursion probability. In the measured rock the plume barely leaves the wellfield in 20 years. TDS reaches about 30 m beyond the wellfield edge, sulphate 11 m and uranium 4 m, and most of the 9 to 10 ha footprint is the leach zone itself. No indicator reaches its control limit at the 100 m ring, so no excursion is declared. The order of spread (uranium far behind sulphate, which is behind TDS) comes from how strongly each chemical is held back by the rock. This is the same reason the US rules do not use uranium as an excursion indicator [@nureg1569], and the engine reproduces it without being told. At a location with no uranium ore (Ranchi), no uranium plume is drawn, while sulphate and TDS still spread, because the lixiviant carries them wherever it is injected.
+
+The sulphate and TDS runs report that their background lies outside the range the surrogate was trained on, so their ML bands are shown with a warning. Jaduguda’s TDS background (1,779 mg/L) comes from a single CGWB well about 8 km away.
+
+If the ore at Jaduguda were permeable enough for ISR (ore-zone K of 1 m/day), the same operation would send TDS about 535 m, over the limit at the ring in every draw, sulphate about 156 m (probability 0.56) and uranium about 38 m (0.06). This is the hypothetical answer, not a prediction.
+
+![The console result for TDS at the Jaduguda deposit, 20 years (local build, September 2026): the engine values with their ML bands and the measured-baseline note (left), and the ISR-feasibility comparison, labelled hypothetical (right).](figures/console_isr_comparison.png){w=16}
+
+The two answers describe different rock, and their ranges do not overlap. The table below uses the same 48 Monte Carlo draws for both; Turamdih is run at the centre of the deposit at its seed depth of 140 m.
+
+TABLE: Travel distance at 20 years (P10 – P50 – P90) in the measured rock and in ISR-grade rock
+|{w=3.6,3.4,2.0,4.4,2.6}|
+|Site and chemical|Measured rock|Chance at ring|ISR-grade rock|Chance at ring|
+|Jaduguda, TDS|18 – 31 – 59 m|0|215 – 555 – 1,395 m|1.0|
+|Turamdih, TDS|10 – 20 – 47 m|0|144 – 381 – 1,094 m|0.92|
+|Jaduguda, uranium|2 – 3 – 7 m|0|15 – 35 – 71 m|0.06|
+
+The other deposits behave in the same way. With the default operation at the centre of each deposit and its seed depth, the measured-rock excursion probability is 0 at every deposit.
+
+TABLE: Reach at two other deposits after 20 years
+|{w=3.0,3.0,4.2,5.8}|
+|Site|Chemical|Measured-rock reach|ISR-grade reach (excursion probability)|
+|Turamdih|TDS|20 m|389 m (0.92)|
+|Turamdih|Sulphate|11 m|128 m (0.44)|
+|Turamdih|Uranium|5 m|36 m (0.06)|
+|Bagjata|TDS|8 m|98 m (0.50)|
+|Bagjata|Uranium|2 m|14 m (0)|
+
+**Shallow aquifer screening.** At the Jaduguda deposit, the top of the ore is at 170 m and the base of the shallow layer at 20 m, a separation of 150 m. Water itself would climb this distance in about 38 years on the yearly-average basis, but the dissolved chemicals are slower. The first constituent to arrive is TDS, after about 140 years (index 0.148, low); sulphate would take about 600 years and uranium about 9,400 years. The old-well route dominates the combined index, which is 0.052 (low). These arrival times are the same in both answers, because the hypothetical changes only the ore zone. TDS arrives first after about 48 years at Turamdih and about 109 years at Bagjata. This is a screening of whether a pathway exists, not a prediction of concentration in drinking water.
+
+**The registered site.** For the hypothetical site registered on the deployed system (86.36 E, 22.65 N, 0.35 km outside the Jaduguda deposit outline, injection 1,500 m³/day, ore at 150 m), the engine was run over 50 years with no restoration. Because the site lies just outside the outline, it is classed as belt and its uranium source is reduced.
+
+TABLE: Lifecycle of the registered Jaduguda site (no restoration; engine values)
+|{w=1.6,3.0,2.8,3.2,5.4}|
+|Year|Phase|Footprint (ha)|Uranium reach (m)|Excursion declared|
+|4|operation|7.83|0.3|no|
+|8|closure|8.59|0.4|no|
+|12|after closure|8.70|3.2|no|
+|20|after closure|8.70|5.4|no|
+|30|after closure|8.81|6.8|no|
+|50|after closure|8.81|8.6|no (only chloride over its control limit)|
+
+Uranium never reaches the 100 m ring in 50 years. In this tight rock the salts do not trip the 2-of-3 rule either: by year 50 only chloride is over its control limit. The vertical index stays low (0.053 to 0.059), and TDS is the first to reach the shallow aquifer, after about 58.5 years. With a 6-year restoration sweep, the 20-year uranium reach is 0 m.
+
+**Early warning by the indicators.** The early-warning role of the indicators is clearer at a belt site 2 km from Narwapahar (86.29 E, 22.69 N; same operation), where the shear-zone value fades towards the schist aquifer value and K at ore depth is 0.196 m/day. There, chloride crosses its control limit at the ring in year 17 and TDS in year 19, so an excursion is declared in year 19. At that time uranium is still at its background of 0.90 µg/L at the ring and has moved only about 11 m. The chemical indicators give the warning long before uranium, exactly as intended. At this more permeable site the salts would also reach the shallow aquifer much sooner: TDS first, after about 16 years, with a high screening index (0.65).
+
+## 7.6 Monitoring Gap Results
+
+The gap analysis of all 264 blocks found:
+
+- **53 blocks** with no monitoring well
+- **83 blocks** with no water-level station
+- **55 wells** never tested for uranium
+- **397 of 397 wells** with only a single sample (2023)
+
+TABLE: Top 10 blocks by monitoring priority (out of 264)
+|{w=1.3,3.2,3.8,1.8,1.6,4.3}|
+|Rank|Block|District|Score|Wells|Distance to nearest uranium-tested well (km)|
+|1|Ghatshila|East Singhbhum|65.2|1|77.7|
+|2|Manoharpur|West Singhbhum|65.0|0|46.1|
+|3|Tonto|West Singhbhum|65.0|0|68.2|
+|4|Goilkera|West Singhbhum|65.0|0|45.5|
+|5|Manjhari|West Singhbhum|65.0|0|74.4|
+|6|Dumaria|East Singhbhum|65.0|0|86.0|
+|7|Anandpur|West Singhbhum|65.0|0|28.8|
+|8|Kumardungi|West Singhbhum|65.0|0|90.2|
+|9|Majhgaon|West Singhbhum|65.0|0|103.4|
+|10|Boram|East Singhbhum|65.0|0|46.5|
+
+The most important finding is the location of these blocks: **all top 25 blocks lie in East Singhbhum, West Singhbhum, Saraikela-Kharsawan or neighbouring Khunti**, which is the uranium belt itself. Sixteen of the 25 have no well at all, and the other nine have wells that were sampled but never tested for uranium. The cheapest improvement is to test those existing samples for uranium.
+
+## 7.7 Sensitivity Analysis Results
+
+The Sobol sensitivity analysis showed which of the thirteen inputs control the results at the three reference sites (20 years, 8 years of operation and 3 years of restoration). The leading inputs by total-order index are:
+
+TABLE: Leading inputs by total-order Sobol index
+|{w=4.4,3.6,8.0}|
+|Site and chemical|Output|Leading inputs (total-order index)|
+|Jaduguda, uranium|travel distance|matrix transfer rate ω 0.48, β 0.22, Kd 0.14|
+|Jaduguda, sulphate|travel distance|β 0.35, Kd 0.24, K 0.17|
+|Belt point, uranium|travel distance|β 0.39, ω 0.24, K 0.15|
+|Belt point, sulphate|ring concentration|K 0.68, β 0.60, Kd 0.44|
+
+The footprint area depends mostly on the two leach-zone growth constants, which are project assumptions. At Ranchi, where there is no ore, the uranium outputs do not change at all, because the uranium source is suppressed there. The fracture opening and the matrix diffusion coefficient have almost no effect at 20 years.
+
+This is an important result for future work. With K set by the tight rock measured in the belt, the travel distance is carried less by K itself and more by the fracture–matrix exchange terms: the matrix transfer rate ω and the storage ratio β. Neither has been measured anywhere in the Singhbhum shear zone; ω is a literature value and β comes from typical porosities. A tracer test in the belt would reduce this uncertainty more than any other measurement.
+
+![Sobol total-order and first-order sensitivity indices for uranium at the Jaduguda deposit location, for travel distance, footprint area and ring concentration (the ring concentration stays at background, so its indices are undefined).](figures/sensitivity_jaduguda_deposit_uranium.png){w=16}
+
+## 7.8 Alert System Results
+
+On the local database, the measured-exceedance scan raised **53 alerts** from the 2023 record:
+
+- **3 critical:** Biru (Simdega, nitrate 121 mg/L, 2.7 times the limit), Lowadih (Ranchi, nitrate 99 mg/L) and Gidhaur (Chatra, above both the nitrate and fluoride limits)
+- **29 alert:** other wells above a permissible or “no relaxation” limit
+- **21 warning:** fluoride between 1.0 and 1.5 mg/L
+
+Before these fixes, the same scan had matched zero rows every time, because it only checked uranium above 30 ppb, which never happens in this record. On the deployed system (21 September 2026), 55 alerts had been raised, 4 residents were following 7 blocks, and email delivery through the Brevo relay was working.
+
+## 7.9 Software and Deployment Results
+
+TABLE: Final software figures
+|{w=8,8}|
+|Item|Value|
+|Engine automated tests|463 (all passing)|
+|Backend automated tests (real PostGIS database)|533 (all passing)|
+|End-to-end audit|43 of 44 checks pass (the radium travel-distance target fails)|
+|API endpoints|143, across 23 routers|
+|Portal screens|22|
+|Database migrations|26|
+|User roles|5 (admin, regulator, analyst, field officer, resident)|
+|Code commits|187|
+|One engine run with 48 Monte Carlo draws, both answers|about 0.3 s locally|
+|One engine run on the free cloud tier (deployed build)|about 4 s|
+|Surrogate training time|about 200 seconds|
+|Full data bake (900 scenarios)|about 1.5 to 2 hours|
+
+The online deployment runs an earlier build of the engine; the build described in this report was tested locally and is the next deployment (Section 5.6).
+
+### Key achievements include:
+
+- A working, deployed system available online.
+- All 143 endpoints covered by a generated role-access matrix and tests.
+- Database row-level security verified on the live connection.
+- A complete alert loop, from measured data to email delivery.
+- A monitoring recommendation that points to the uranium belt as the weakest-monitored region.
+- Model inputs in the uranium belt taken from the belt’s own measurements and checked against the mines.
