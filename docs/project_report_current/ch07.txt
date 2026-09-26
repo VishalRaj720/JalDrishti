@@ -246,13 +246,13 @@ TABLE: Final software figures
 |Portal screens|22|
 |Database migrations|26|
 |User roles|5 (admin, regulator, analyst, field officer, resident)|
-|Code commits|189|
+|Code commits|191|
 |One engine run with 48 Monte Carlo draws, both answers|about 0.3 s locally|
-|One engine run on the free cloud tier (deployed build)|about 4 s|
+|One engine run on the free cloud tier|about 4 s (timed before the September 2026 redeployment)|
 |Surrogate training time|about 200 seconds|
 |Full data bake (900 scenarios)|about 1.5 to 2 hours|
 
-The online deployment runs an earlier build of the engine; the build described in this report was tested locally and is the next deployment (Section 5.6).
+The online deployment runs the build described in this report, including surrogate version 6 and migration 0026 (Section 5.6).
 
 ### Key achievements include:
 

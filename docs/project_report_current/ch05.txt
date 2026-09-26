@@ -103,9 +103,9 @@ TABLE: Deployment and hosting services
 |Render|Hosting of the FastAPI backend, the physics engine and the trained models|
 |Cloudflare Workers|Hosting of the portal and forwarding of API calls to the backend|
 |Brevo (SMTP relay)|Sending alert emails to residents|
-|GitHub|Source code hosting and version control (189 commits)|
+|GitHub|Source code hosting and version control (191 commits)|
 
-The deployed system is available at jaldrishti.letsmailvishal111.workers.dev (portal) and jaldrishti-api.onrender.com (API). At the time of writing, the online deployment runs an earlier build of the engine, and its database does not yet carry migration 0026 (alert tiers). The engine, the measured-rock baseline and surrogate version 6 described in this report were built and tested locally in September 2026 and are the next deployment.
+The deployed system is available at jaldrishti.letsmailvishal111.workers.dev (portal) and jaldrishti-api.onrender.com (API). The online deployment runs the build described in this report: the engine with the measured-rock baseline and the ISR-feasibility hypothetical, surrogate version 6, and a database migrated to 0026 (alert tiers). It was redeployed in September 2026 after the build had been tested locally.
 
 ## 5.7 Data Sources
 

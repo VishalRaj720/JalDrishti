@@ -127,7 +127,7 @@ Setting up email delivery on the deployed system took several attempts. The host
 
 ## 9.12 Limits of Free Cloud Hosting
 
-The backend runs on a free hosting tier. The service sleeps when idle and takes about 53 seconds to wake. A single engine run takes about 4 seconds there, compared with 0.2 seconds locally. One long request (a lifecycle with 48 evaluations) was cut off by the hosting gateway.
+The backend runs on a free hosting tier. The service sleeps when idle and takes about 53 seconds to wake. A single engine run takes about 4 seconds there, compared with about 0.3 seconds locally. One long request (a lifecycle with 48 evaluations) was cut off by the hosting gateway.
 
 ### Mitigation Measures
 

@@ -127,7 +127,7 @@ TABLE: Deployment setup
 |Database|Neon PostgreSQL 16 + PostGIS, with separate owner and application roles|
 |Email|Brevo SMTP relay (port 2525)|
 
-Secret values such as database passwords, the JWT secret and the SMTP key are kept in the hosting settings, never in the code. The online services run an earlier build of the engine; the build described in this report is the next deployment (Section 5.6).
+Secret values such as database passwords, the JWT secret and the SMTP key are kept in the hosting settings, never in the code. The online services run the build described in this report (Section 5.6).
 
 ## 8.11 Prototype Features
 
