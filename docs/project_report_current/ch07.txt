@@ -143,7 +143,7 @@ If the ore at Jaduguda were permeable enough for ISR (ore-zone K of 1 m/day), th
 
 ![The console result for TDS at the Jaduguda deposit, 20 years (local build, September 2026): the engine values with their ML bands and the measured-baseline note (left), and the ISR-feasibility comparison, labelled hypothetical (right).](figures/console_isr_comparison.png){w=16}
 
-The two answers describe different rock, and their ranges do not overlap. The table below uses the same 48 Monte Carlo draws for both; Turamdih is run at the centre of the deposit at its seed depth of 140 m.
+The two answers describe different rock, and their ranges do not overlap. The table below uses the same 48 Monte Carlo draws for both; Turamdih is run at the centre of the deposit at its seed depth of 140 m. The P50 of the draws is not exactly the engine’s single central value used in the other tables (for example 381 m against 389 m for Turamdih TDS in ISR-grade rock), because the draws also vary the other inputs.
 
 TABLE: Travel distance at 20 years (P10 – P50 – P90) in the measured rock and in ISR-grade rock
 |{w=3.6,3.4,2.0,4.4,2.6}|
@@ -246,7 +246,7 @@ TABLE: Final software figures
 |Portal screens|22|
 |Database migrations|26|
 |User roles|5 (admin, regulator, analyst, field officer, resident)|
-|Code commits|187|
+|Code commits|189|
 |One engine run with 48 Monte Carlo draws, both answers|about 0.3 s locally|
 |One engine run on the free cloud tier (deployed build)|about 4 s|
 |Surrogate training time|about 200 seconds|

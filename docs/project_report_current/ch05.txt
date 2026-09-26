@@ -72,7 +72,7 @@ TABLE: Machine learning and scientific libraries
 |joblib|Saving and loading trained models|
 |Matplotlib|Charts for flow field, fracture field, SHAP and sensitivity results|
 |openpyxl|Reading the Texas ISR Excel data and the IAEA UDEPO sheet|
-|pypdfium2|Reading the text layer of the CGWB national PDF tables (water quality 2024, water levels 1994–2026)|
+|pdfplumber, pypdfium2|Reading the CGWB national PDF tables (water quality 2024, water levels 1994–2026): pypdfium2 finds the Jharkhand pages, pdfplumber reads the table cells and word positions|
 
 ### XGBoost
 
@@ -103,7 +103,7 @@ TABLE: Deployment and hosting services
 |Render|Hosting of the FastAPI backend, the physics engine and the trained models|
 |Cloudflare Workers|Hosting of the portal and forwarding of API calls to the backend|
 |Brevo (SMTP relay)|Sending alert emails to residents|
-|GitHub|Source code hosting and version control (187 commits)|
+|GitHub|Source code hosting and version control (189 commits)|
 
 The deployed system is available at jaldrishti.letsmailvishal111.workers.dev (portal) and jaldrishti-api.onrender.com (API). At the time of writing, the online deployment runs an earlier build of the engine, and its database does not yet carry migration 0026 (alert tiers). The engine, the measured-rock baseline and surrogate version 6 described in this report were built and tested locally in September 2026 and are the next deployment.
 
