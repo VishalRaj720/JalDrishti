@@ -372,7 +372,10 @@ def _draw_params(scn: dict, species: str, t_days: float, op_days: float,
     the scenario's seasonal amplitude widening the gradient range and pump
     downtime degrading effective containment."""
     fractured = scn["regime"] == "fractured"
-    lo, mid, hi = P.kd_range_for(species, scn["regime"])
+    # `kd_range` is set ONLY by the serve path's labelled Kd scenarios
+    # (P.KD_SCENARIO_HIGH_ALKALINITY); the training loop never sets it, so no
+    # label can move through this key.
+    lo, mid, hi = scn.get("kd_range") or P.kd_range_for(species, scn["regime"])
     kd = _kd_sample(float(draws["u_kd"][i]), lo, mid, hi)
     K = scn["K"] * float(np.clip(math.exp(MC_LNK_SIGMA * draws["z_K"][i]), *MC_K_CLIP))
     # R17: log-uniform factor-of-4 band around the scenario's central beta (was a

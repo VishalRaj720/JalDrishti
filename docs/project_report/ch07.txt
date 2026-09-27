@@ -152,7 +152,7 @@ TABLE: Travel distance at 20 years (P10 – P50 – P90) in the measured rock an
 |Turamdih, TDS|10 – 20 – 47 m|0|144 – 381 – 1,094 m|0.92|
 |Jaduguda, uranium|2 – 3 – 7 m|0|15 – 35 – 71 m|0.06|
 
-The other deposits behave in the same way. With the default operation at the centre of each deposit and its seed depth, the measured-rock excursion probability is 0 at every deposit.
+The other deposits behave in the same way. With the default operation at the centre of each deposit and its seed depth, the continuum (bulk) excursion probability in the measured rock is 0 at every deposit. Section 7.5b shows what the preferential pathway adds.
 
 TABLE: Reach at two other deposits after 20 years
 |{w=3.0,3.0,4.2,5.8}|
@@ -180,6 +180,25 @@ TABLE: Lifecycle of the registered Jaduguda site (no restoration; engine values)
 Uranium never reaches the 100 m ring in 50 years. In this tight rock the salts do not trip the 2-of-3 rule either: by year 50 only chloride is over its control limit. The vertical index stays low (0.053 to 0.059), and TDS is the first to reach the shallow aquifer, after about 58.5 years. With a 6-year restoration sweep, the 20-year uranium reach is 0 m.
 
 **Early warning by the indicators.** The early-warning role of the indicators is clearer at a belt site 2 km from Narwapahar (86.29 E, 22.69 N; same operation), where the shear-zone value fades towards the schist aquifer value and K at ore depth is 0.196 m/day. There, chloride crosses its control limit at the ring in year 17 and TDS in year 19, so an excursion is declared in year 19. At that time uranium is still at its background of 0.90 µg/L at the ring and has moved only about 11 m. The chemical indicators give the warning long before uranium, exactly as intended. At this more permeable site the salts would also reach the shallow aquifer much sooner: TDS first, after about 16 years, with a high screening index (0.65).
+
+## 7.5b Preferential Pathways and the Measured Upward Gradient (27 September 2026)
+
+An external review of this report was checked point by point against the code, and three changes were adopted (Sections 4.4, 4.5 Step 10 and 4.6). Their effect on the default run at each deposit (8 years of operation, 20-year horizon, seed depth) is shown below. The continuum numbers in Section 7.5 are unchanged and remain the bulk plume. What changes is what alerts read.
+
+TABLE: TDS at each deposit after 20 years: bulk plume, preferential pathway, alert tier and first arrival in the shallow aquifer
+|{w=2.6,2.0,3.6,2.8,5.0}|
+|Deposit|Bulk reach|Pathway reach, P10–P50–P90|Alert tier, before → after|First shallow arrival, before → after (P10–P90)|
+|Jaduguda|30 m|3.1–6.0–12.0 km|notice → alert|140 → 10.6 yr (3.5–27)|
+|Turamdih|20 m|1.6–3.3–7.6 km|notice → alert|48 → 4.3 yr (1.3–13)|
+|Narwapahar|23 m|2.0–4.0–9.3 km|notice → alert|67 → 5.5 yr (1.7–16)|
+|Bagjata|8 m|0.4–0.9–2.2 km|notice → alert|109 → 7.0 yr (2.2–19)|
+|Mohuldih|10 m|0.6–1.3–3.0 km|notice → alert|79 → 7.8 yr (2.4–21)|
+|Bhatin|76 m|11–15–15 km (limit of the grid)|notice → alert|11 → 1.0 yr (0.4–3.3)|
+|Banduhurang|51 m|4.4–9.2–15 km|notice → alert|1.1 → 0.3 yr|
+
+With the preferential pathway, the excursion test is declared at every deposit, and 25 of 27 deposit-and-chemical runs move from a *notice* to an *alert* tier. At Jaduguda, uranium's bulk reach stays at 4 m, while its pathway reach is about 1.1 km. The shallow aquifer is reached sooner at every deposit because the upward gradient is now taken from the belt's own well pairs (0.083 at the middle of the range) instead of the assumed 0.005.
+
+These are precautionary, upper-bound readings, and they should be read as such. The pathway answer assumes that the fracture zones logged in the boreholes stay connected for kilometres. The vertical answer assumes that the gradient points upward, which is true at two of the four sites where it has been measured. Neither assumption has been tested at a deposit. The high-alkalinity uranium scenario changes much less: at Jaduguda the bulk uranium reach rises from 3.9 m to 8.5 m, because redox trapping in the ore still removes uranium. The injection check finds the default 2,500 m³/day *marginal* at every deposit in the measured rock: near the pressure that would fracture the rock. A cross-hole tracer test and a pair of deep piezometers in the belt would settle all of these questions with measurements.
 
 ## 7.6 Monitoring Gap Results
 

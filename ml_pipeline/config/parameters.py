@@ -2025,6 +2025,146 @@ def water_table_at_month(month: int, wet_m: float, dry_m: float) -> float:
 #
 # `leverage`  what moves if the number is wrong.
 # `grounding` what evidence would retire it from this list.
+# ---------------------------------------------------------------------------
+# 9. THE GEMINI-REVIEW BUILD (2026-09-27). docs/GEMINI_REVIEW_ASSESSMENT.md
+#    checked an external review against this code; the owner then took three
+#    decisions (recorded in docs/LIMITATIONS.md section 1l). Everything below is
+#    served ANALYTICALLY: no trained feature or label changes, so no re-bake.
+# ---------------------------------------------------------------------------
+
+# 9a. PREFERENTIAL PATHWAY (FAST-TRACK CHANNEL) BRANCH -- physics/channel.py.
+#
+# WHY. The continuum answer runs water at v = K*i/phi_mobile with phi_mobile
+# the aquifer polygon's SPECIFIC YIELD (0.0075 at Jaduguda), served undecayed
+# at ore depth. The cubic law applied to the engine's OWN served K and its own
+# 100-500 um aperture range allows a flowing porosity of only 2e-6 to 5e-5 --
+# 150-3,900x smaller -- and so fracture velocities of 1.5-36 m/day against the
+# continuum's 0.009 m/day. The existing Tang "early-arrival" envelope could not
+# show this: it was driven by the continuum water front.
+#
+# WHAT IS GROUNDED. The conductive fractures come from the belt's own logs:
+# the water-bearing zones (depth interval + yield) of the CGWB exploratory
+# boreholes (Datasets/cgwb_exploratory_wells_singhbhum_zones.csv, transcribed
+# from the recovered NAQUIM Phase-III report). Each well's served T is split
+# over its logged fractured zones in proportion to their yields; a zone's
+# HYDRAULIC aperture follows from the cubic law, 2b = (12 mu T_i / rho g)^(1/3).
+# At Kudada -- the well that sets the served shear-zone T -- the 137-139 m zone
+# carries 92% of the yield (Ulda 78%, AMD Jamshedpur 82%): the belt's own
+# record says the flow is channelled.
+#
+# WHAT IS NOT. (1) The TRANSPORT aperture: tracer (mass-balance) apertures are
+# never smaller than the hydraulic aperture and are often several times larger
+# (Tsang 1992, WRR 28(5):1451), and v = q/(transport aperture). Sampled as a
+# factor c on the hydraulic aperture, log-uniform over the range below. (2)
+# Lateral persistence: each logged zone is treated as a planar fracture that
+# stays connected down-gradient. No persistence data exist for the SSZ, so the
+# channel answer is an UPPER-BOUND pathway, labelled as such.
+CHANNEL = {
+    "enabled": True,
+    # OWNER DECISION (2026-09-27): risk alerts and the excursion read-out use
+    # max(continuum, channel). Both answers are displayed, labelled. Setting this
+    # False keeps the channel on screen but returns alerting to the continuum.
+    "drives_alerts": True,
+    "zones_csv": "cgwb_exploratory_wells_singhbhum_zones.csv",
+    "wells_csv": "cgwb_exploratory_wells_singhbhum.csv",
+    # the well whose pumping test sets the served shear-zone T (SHEAR_ZONE_T_SOURCE)
+    "central_well": "kudada_ew",
+    # fractured-rock zones only ("W" = weathered, "G" = granular), and not the
+    # Tertiary sediments 51-58 km east of the belt (same exclusion as D5)
+    "zone_kinds": ("F",),
+    "exclude_formations": ("Tertiary",),
+    # transport-aperture factor c on the cubic-law hydraulic aperture
+    "transport_aperture_factor_range": (1.0, 10.0),     # MC: log-uniform
+    "transport_aperture_factor_central": 3.16,          # geometric midpoint
+    "water_density_kg_m3": 1000.0,
+    "water_viscosity_pa_s": 1.0e-3,                     # ~20 C
+    "gravity_m_s2": 9.81,
+    "label": ("Preferential pathway reach (fast-track channel) -- upper bound: "
+              "assumes the logged fracture zones stay connected down-gradient"),
+    "citation": ("CGWB NAQUIM Phase-III (recovered) Annex-III and ESP Table 2 "
+                 "water-bearing zones; cubic law (Snow 1969; Witherspoon et al. "
+                 "1980); Tang, Frind & Sudicky 1981; Tsang 1992 WRR 28(5):1451"),
+}
+
+# 9b. HIGH-ALKALINITY URANIUM SCENARIO -- a labelled hypothetical, never alerting.
+#
+# OWNER DECISION (2026-09-27): the served uranium Kd stays KD_RANGES (0.3-3.0
+# L/kg fractured) until batch/column tests on Singhbhum core confirm otherwise;
+# a lower-Kd case is offered beside it. Evidence for the low end: Smith Ranch-
+# Highland ISR columns at alkalinity 540 mg/L gave uranium retardation of only
+# 1.47-1.69 relative to a tracer (Dangelmayr et al. 2017, Appl. Geochem. 80:1),
+# i.e. Kd ~0.1 L/kg for sandstone; in-situ Kd falls with alkalinity (Davis et
+# al. 2004, Naturita 0.5-10.6 mL/g); Ca-UO2-CO3 complexes suppress sorption
+# further (Fox, Davis & Zachara 2006). The Texas lixiviant this engine uses
+# carries 625 mg/L HCO3 (section 1b table). Centre 0.1 L/kg as decided; the
+# Monte Carlo draws log-triangular over the range below.
+KD_SCENARIO_HIGH_ALKALINITY = {
+    "species": ("uranium_ppb",),
+    "kd_range_L_kg": (0.03, 0.10, 0.30),       # (lo, central, hi)
+    "label": ("Hypothetical -- high-alkalinity breakthrough: uranium Kd lowered to "
+              "the value measured at lixiviant-strength alkalinity"),
+    "citation": ("Dangelmayr et al. 2017 Appl. Geochem. 80:1-13; Davis et al. 2004 "
+                 "Appl. Geochem. 19:1319; Fox, Davis & Zachara 2006 GCA 70:1379"),
+}
+
+# 9c. UPWARD HEAD GRADIENT AS A MEASURED BAND (vertical screening).
+#
+# OWNER DECISION (2026-09-27): the fixed 0.005 is replaced in the screening that
+# drives the aquifer alerts by draws over the MEASURED magnitude range 0.03-0.23
+# (close borehole / dug-well pairs in the belt, LIMITATIONS section 1j).
+# The SIGN is not measured at any wellfield: of the four belt observations two
+# push down (Tantnagar, JNV Jhinkpani), one pushes up in the dry season
+# (Dumirta) and one is artesian (Kudada). The band computes the UPWARD case --
+# the precautionary reading -- and every response states the sign record. The
+# alerting statistic is the P50 of the draws; P10-P90 is shown beside it.
+VERTICAL_GRADIENT_BAND = {
+    "enabled": True,
+    "magnitude_range": (0.03, 0.23),           # log-uniform draws
+    "n_draws": 48,
+    "alert_statistic": "p50",
+    "sign_record": {
+        "upward": ["Kudada EW (artesian, deep fractures 105-139 m)",
+                   "Dumirta EW/DW (dry season)"],
+        "downward": ["Tantnagar EW/DW", "JNV Jhinkpani EW / Jorapokhari DW"],
+    },
+    "citation": ("CGWB NAQUIM Phase-III (recovered) Table 17; West Singhbhum "
+                 "NAQUIM (2022) Annex-II well pairs"),
+}
+
+# 9d. FOLIATION DIP -> DIP-ROTATED VERTICAL CONDUCTIVITY (displayed band).
+# The SSZ fabric dips moderately. With along-foliation K_par and across-foliation
+# K_perp, a foliation dipping theta gives Kzz = K_par sin^2 + K_perp cos^2 and a
+# cross term Kxz = (K_par - K_perp) sin cos (horizontal gradient -> vertical
+# flux). The anisotropy a = K_perp/K_par has no hydraulic measurement anywhere
+# in the SSZ, so it is swept, and the result is DISPLAYED as a band beside the
+# served Kv/Kh; it does not move the served screening.
+FOLIATION_DIP = {
+    "deposit_dip_deg": {
+        "Jaduguda": (40.0, "Bhasin (UCIL), IAEA ETDE XA0103130 p.3: "
+                           "'a moderate dip of about 40 deg'"),
+        "Turamdih": (35.0, "UCIL feature article on Turamdih p.5: "
+                           "'about 35 deg towards northeast'"),
+    },
+    "default_dip_range_deg": (30.0, 60.0),      # other pins -- flagged
+    "anisotropy_range": (0.01, 1.0),            # a = K_perp / K_par, swept
+}
+
+# 9e. INJECTIVITY CHECK (display only, never alerts).
+# Muskat's repeated five-spot: head rise at an injector
+#     dh = Q_w / (pi K b) * [ln(d / r_w) - 0.619]
+# against the headroom before the injection pressure reaches the minimum
+# principal stress (fracture initiation), sigma_min = k * sigma_v with k in the
+# range below -- the stress regime is not measured at any deposit. US Class III
+# rules forbid injection that initiates or propagates fractures (40 CFR 146.33).
+INJECTIVITY = {
+    "pattern_spacing_m": (15.0, 30.0),          # injector-producer distance d
+    "well_radius_m": 0.075,
+    "rock_density_kg_m3": 2700.0,
+    "sigma_min_over_sigma_v": (0.5, 1.0),       # unmeasured stress regime
+    "citation": ("Muskat 1937 (five-spot); 40 CFR 146.33(a)(1) Class III "
+                 "injection-pressure limit"),
+}
+
 UNGROUNDED_PARAMETERS = {
     "SOURCE_BV_GAIN": {
         "value": SOURCE_BV_GAIN, "kind": "scenario_assumption",
@@ -2180,6 +2320,45 @@ UNGROUNDED_PARAMETERS = {
         "leverage": ("plume width where no fracture-strike dispersion is mapped "
                      "(fractured pins use the V-derived ratio instead)"),
         "grounding": "a tracer test in the belt (fidelity row 3.4 -- none published)",
+    },
+    # 2026-09-27 (section 9, the Gemini-review build)
+    "CHANNEL.transport_aperture_factor_range": {
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": ("channel velocity scales as 1/c: the preferential-pathway "
+                     "reach, and through max() the alerting reach"),
+        "grounding": ("a cross-hole tracer test in the belt, which measures the "
+                      "mass-balance aperture directly (Tsang 1992)"),
+    },
+    "CHANNEL (lateral persistence of logged zones)": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": ("the channel answer treats each logged water-bearing zone as "
+                     "connected down-gradient -- an upper bound on the pathway"),
+        "grounding": ("borehole televiewer / cross-hole tests showing fracture "
+                      "persistence and connectivity at a deposit"),
+    },
+    "KD_SCENARIO_HIGH_ALKALINITY": {
+        "value": None, "kind": "foreign_analogue_literature",
+        "leverage": ("uranium mobility in the labelled high-alkalinity hypothetical "
+                     "only; never alerts"),
+        "grounding": ("batch and column tests on Singhbhum drill core with a "
+                      "synthetic carbonate lixiviant (Dangelmayr et al. 2017 design)"),
+    },
+    "VERTICAL_GRADIENT_BAND.sign": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": ("the band computes the UPWARD case at every site although 2 of "
+                     "4 measured belt pairs point downward; drives the aquifer alerts"),
+        "grounding": "deep confined-aquifer piezometry at the site (unpublished)",
+    },
+    "FOLIATION_DIP.anisotropy_range": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": "the displayed dip-rotated vertical-conductivity band",
+        "grounding": ("oriented packer or cross-hole tests along and across the SSZ "
+                      "foliation (none published)"),
+    },
+    "INJECTIVITY.sigma_min_over_sigma_v": {
+        "value": None, "kind": "scenario_assumption",
+        "leverage": "the injectivity verdict (display only)",
+        "grounding": "a minifrac / hydraulic-fracturing stress test at a deposit",
     },
 }
 

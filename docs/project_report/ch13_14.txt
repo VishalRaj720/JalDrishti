@@ -139,7 +139,7 @@ TABLE: Sample alerts (measured and modelled)
 
 ### D.2 Assumption register (constants with no local measurement, and modelling choices)
 
-TABLE: The 20 entries of the assumption register
+TABLE: The entries of the assumption register
 |{w=4.6,3.4,8.0}|
 |Constant|Value used|What would replace it with a measurement|
 |Leach-zone growth gain|0.40|Field data on how far lixiviant spreads beyond the well pattern|
@@ -151,7 +151,12 @@ TABLE: The 20 entries of the assumption register
 |Fracture opening|0.1 to 0.5 mm|A packer test in the shear zone|
 |Matrix diffusion coefficient|5 × 10⁻⁶ m²/day|No defensible range exists yet|
 |Vertical to horizontal permeability ratio|0.12 fractured (measured range 0.034–0.61, Maheshwaram granite); 0.008 porous|A packer or pumping test with an observation well in the shear zone below 70 m|
-|Upward hydraulic gradient|0.005|Deep piezometers in the belt|
+|Upward hydraulic gradient|0.03–0.23 (middle 0.083), upward case; the direction is not measured|Deep piezometers in the belt|
+|Transport opening of a fracture (channel answer)|1 to 10 times the pumping-test opening|A cross-hole tracer test in the belt|
+|Fracture zones stay connected down-gradient (channel answer)|assumed; upper bound|Borehole imaging and cross-hole tests at a deposit|
+|Permeability across ÷ along the foliation|0.01 to 1 (displayed band only)|Oriented packer tests in the shear zone|
+|Stress that would fracture the rock (injection check)|0.5 to 1.0 of the rock's weight|A stress test in a borehole at a deposit|
+|Uranium Kd, high-alkalinity scenario|0.03 to 0.3 L/kg (central 0.1)|Column tests on Singhbhum core with a carbonate solution|
 |Old-well failure probability|0.05|Failure statistics of ISR wells|
 |Pump downtime and drift ranges|operating ranges|Records of real excursions and downtime|
 |Shear-zone transmissivity (choice of the measured maximum)|19 m²/day (Kudada), capped at 20|A pumping test at a deposit|

@@ -218,7 +218,12 @@ def test_switching_the_corrections_off_restores_the_old_answer(monkeypatch,
 
     2026-09-26: that answer was computed on the RETIRED shear-zone hydrogeology
     (T = 370 m2/day over 150 m), so the `retired_shear_zone` fixture restores it
-    -- the test is about the three switches, not about D5."""
+    -- the test is about the three switches, not about D5.
+
+    2026-09-27: the fourth switch, the measured upward-gradient band
+    (P.VERTICAL_GRADIENT_BAND), is turned off too -- with it off the screening
+    runs on the fixed 0.005 exactly as before."""
+    monkeypatch.setitem(P.VERTICAL_GRADIENT_BAND, "enabled", False)
     monkeypatch.setitem(P.VERTICAL_PATH, "matrix_retention", False)
     monkeypatch.setitem(P.VERTICAL_PATH, "depth_resolved_K", False)
     monkeypatch.setitem(P.VERTICAL["Kv_Kh_by_regime"], "fractured", 0.03)

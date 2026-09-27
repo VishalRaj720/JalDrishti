@@ -117,6 +117,55 @@ def path_conductivity(inputs: dict, hydro: dict, *, ore_depth_m: float,
             "basis": "harmonic mean of K(z) over the column (series flow)"}
 
 
+def upward_gradient_setting() -> dict:
+    """The upward head gradient the screening runs on, and its band.
+
+    2026-09-27 (owner decision, P.VERTICAL_GRADIENT_BAND): the fixed 0.005 is
+    replaced by draws over the MEASURED belt magnitude range, log-uniform. The
+    headline (and so every aquifer alert) takes the draws' P50; the P10 and P90
+    are evaluated beside it. The sign record travels with the number, because
+    the band computes the UPWARD case at a site whose sign is unmeasured."""
+    cfg = P.VERTICAL_GRADIENT_BAND
+    if not cfg.get("enabled", False):
+        return {"served": float(P.VERTICAL["upward_gradient"]), "band": None,
+                "basis": "fixed scenario value (VERTICAL.upward_gradient)"}
+    lo, hi = (float(v) for v in cfg["magnitude_range"])
+    q = lambda f: lo * (hi / lo) ** f                          # noqa: E731
+    up, down = cfg["sign_record"]["upward"], cfg["sign_record"]["downward"]
+    return {
+        "served": q(0.5), "band": (q(0.1), q(0.9)),
+        "magnitude_range": [lo, hi],
+        "basis": (f"P50 of log-uniform draws over the measured belt range "
+                  f"{lo:g}-{hi:g} (P10-P90 shown beside it)"),
+        "alert_statistic": cfg["alert_statistic"],
+        "direction": "upward case (precautionary)",
+        "sign_record": {"upward": list(up), "downward": list(down)},
+        "sign_note": (f"The direction is not measured at this site. In the belt the "
+                      f"deep-to-shallow gradient points upward at {len(up)} of "
+                      f"{len(up) + len(down)} measured sites and downward at "
+                      f"{len(down)}; this screening computes the upward case."),
+        "citation": cfg["citation"],
+    }
+
+
+def dip_setting(inputs: dict, hydro: dict) -> dict | None:
+    """Foliation dip for the dip-rotated Kv/Kh band (fractured pins only):
+    the documented dip at a deposit that has one, else the belt range, flagged."""
+    if inputs.get("regime") != "fractured":
+        return None
+    cfg = P.FOLIATION_DIP
+    ore = hydro.get("ore_zone") or {}
+    name = ore.get("nearest_deposit") if ore.get("zone") == "deposit" else None
+    if name in cfg["deposit_dip_deg"]:
+        dip, src = cfg["deposit_dip_deg"][name]
+        return {"dip_range_deg": [float(dip), float(dip)], "source": src,
+                "documented": True, "deposit": name}
+    lo, hi = cfg["default_dip_range_deg"]
+    return {"dip_range_deg": [float(lo), float(hi)], "documented": False,
+            "source": ("no documented dip for this pin; the Singhbhum Shear Zone "
+                       "fabric range is used")}
+
+
 def screening_geometry(*, req, inputs: dict, hydro: dict, vparams: dict,
                        flow: dict, timeline: dict | None) -> dict:
     """The species-independent arguments to `shallow_impact_screening`.
@@ -128,6 +177,23 @@ def screening_geometry(*, req, inputs: dict, hydro: dict, vparams: dict,
     path = path_conductivity(inputs, hydro, ore_depth_m=req.ore_depth_m,
                              ore_thickness_m=req.ore_thickness_m,
                              layer1_base_m=vparams["layer1_base_m"])
+    grad = upward_gradient_setting()
+    dip = dip_setting(inputs, hydro)
+    dip_band = None
+    if dip is not None:
+        from ml_pipeline.physics.transport import dip_kv_kh_band
+        band = dip_kv_kh_band(
+            tuple(dip["dip_range_deg"]), P.FOLIATION_DIP["anisotropy_range"],
+            horizontal_over_vertical_gradient=(float(inputs["gradient_i"])
+                                               / max(grad["served"], 1e-9)))
+        dip = {**dip, "anisotropy_range": list(P.FOLIATION_DIP["anisotropy_range"]),
+               "Kv_Kh_band": [round(band["Kv_Kh_low"], 4), round(band["Kv_Kh_high"], 4)],
+               "cross_term_at_high": round(band["cross_term_at_high"], 5),
+               "note": ("Kv/Kh the dipping foliation allows when its along- vs "
+                        "across-foliation ratio is swept (no SSZ measurement "
+                        "exists). Displayed beside the served value; it does not "
+                        "move the headline.")}
+        dip_band = (band["Kv_Kh_low"], band["Kv_Kh_high"])
     wet_default = P.VERTICAL_SEASONAL["water_table_wet_m"]
     dry_default = P.VERTICAL_SEASONAL["water_table_dry_m"]
     kwargs = dict(
@@ -138,7 +204,9 @@ def screening_geometry(*, req, inputs: dict, hydro: dict, vparams: dict,
         phi_confining=P.VERTICAL["phi_confining"],
         Kv_Kh_ratio=P.VERTICAL["Kv_Kh_by_regime"].get(regime, 0.01),
         Kv_Kh_band=P.VERTICAL["Kv_Kh_band_by_regime"].get(regime),
-        upward_gradient=P.VERTICAL["upward_gradient"],
+        upward_gradient=grad["served"],
+        gradient_band=grad["band"],
+        dip_Kv_Kh_band=dip_band,
         t_days=req.time_years * 365.0,
         wellbore_failure_prob=P.VERTICAL["wellbore_failure_prob"],
         # D1: real post-monsoon (shallowest) water table as receptor context
@@ -157,7 +225,7 @@ def screening_geometry(*, req, inputs: dict, hydro: dict, vparams: dict,
                 flow.get("depth_to_water_shallow_m", wet_default) or wet_default,
                 flow.get("depth_to_water_deep_m", dry_default) or dry_default)
             if timeline else None))
-    return {"kwargs": kwargs, "path": path}
+    return {"kwargs": kwargs, "path": path, "gradient": grad, "dip": dip}
 
 
 def _species_front(payload: dict, species: str) -> tuple[dict, float, float]:

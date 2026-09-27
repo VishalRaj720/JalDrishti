@@ -302,6 +302,39 @@ export function VerticalNumbers({ v }: { v: VerticalScreening | null | undefined
         </div>
       )}
 
+      {/* 2026-09-27 (owner decision): the upward gradient is the P50 of the
+          MEASURED belt range, not a fixed 0.005 -- and its direction is not
+          measured at any site, which is said beside it. */}
+      {v.gradient_band?.years_to_breakthrough_range && (
+        <div className="banner warn" style={{ marginTop: 10 }}>
+          <strong>Upward push measured in the belt.</strong> This screening
+          uses a deep-to-shallow gradient of{" "}
+          <b>{fmt(v.gradient_band.gradient_p50, 3)}</b> (the middle of the range
+          measured at close well pairs, {fmt(v.gradient_band.gradient_p10, 3)}–
+          {fmt(v.gradient_band.gradient_p90, 3)} across the band): breakthrough{" "}
+          {rangeText(v.gradient_band.years_to_breakthrough_range)}.
+          {v.upward_gradient_setting?.sign_note && (
+            <div className="muted small" style={{ marginTop: 4 }}>
+              {v.upward_gradient_setting.sign_note}
+            </div>
+          )}
+        </div>
+      )}
+
+      {v.dip_band?.years_to_breakthrough_range && (
+        <div className="muted small" style={{ marginTop: 10, lineHeight: "var(--lh-base)" }}>
+          <b>If the dipping foliation carries the flow</b> (dip{" "}
+          {v.foliation_dip?.dip_range_deg?.[0] === v.foliation_dip?.dip_range_deg?.[1]
+            ? `${fmt(v.foliation_dip?.dip_range_deg?.[0], 0)}°`
+            : `${fmt(v.foliation_dip?.dip_range_deg?.[0], 0)}–${fmt(v.foliation_dip?.dip_range_deg?.[1], 0)}°`}
+          {v.foliation_dip?.documented ? ", documented" : ", belt range — not documented here"};
+          vertical ÷ horizontal permeability {fmt(v.dip_band.Kv_Kh_low, 2)}–
+          {fmt(v.dip_band.Kv_Kh_high, 2)}): {rangeText(v.dip_band.years_to_breakthrough_range)}.
+          Shown for comparison; the along- vs across-foliation ratio has never
+          been measured in the shear zone, so it does not move the headline.
+        </div>
+      )}
+
       {(v.indicators?.length ?? 0) > 0 && (
         <>
           <div className="muted small" style={{ margin: "12px 0 4px" }}>

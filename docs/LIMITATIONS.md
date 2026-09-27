@@ -855,6 +855,128 @@ switches, chloride inertness, and a display change.
 
 ---
 
+## 1l. The Gemini-review build (2026-09-27) — a preferential pathway, a Kd scenario, a measured gradient band
+
+**Where it came from.** An external review (Gemini) of the project report was
+checked point by point against the code (`docs/GEMINI_REVIEW_ASSESSMENT.md`).
+The owner then took three decisions, and this build implements them together
+with the smaller fixes the assessment found. Everything is served
+analytically. No trained feature or label changed, so there is no re-bake and
+no retrain.
+
+**Owner decisions.**
+1. **Fracture channel.** Show two answers, the bulk continuum and the
+   preferential pathway. Alerts and the excursion test read
+   max(continuum, channel). The switch is `P.CHANNEL["drives_alerts"]`.
+2. **Uranium Kd.** The served range stays at 0.3–3.0 L/kg (fractured) until
+   tests on Singhbhum core confirm otherwise. A labelled high-alkalinity
+   hypothetical at 0.1 L/kg sits beside it and never alerts.
+3. **Upward gradient.** The fixed 0.005 is replaced, in the screening that
+   drives aquifer alerts, by draws over the measured belt range 0.03–0.23. The
+   assessment amended this decision so that the direction is stated rather than
+   asserted (below).
+
+### What was built
+
+* **Preferential pathway** (`physics/channel.py`, `P.CHANNEL`).
+  * The continuum's flowing porosity is the aquifer's specific yield, 0.0075 at
+    Jaduguda, served undecayed at ore depth. For the served K and the engine's
+    own 100–500 µm apertures, the cubic law allows only 2e-6 to 5e-5, which is
+    **150–3,900× smaller**. Each run now returns this check as
+    `continuum_consistency`.
+  * The channel takes the served T and splits it over the water-bearing zones
+    logged in the belt's own CGWB boreholes, in proportion to their yields. At
+    Kudada, the well that sets T, the 137–139 m zone carries **92%** of the
+    flow (Ulda 78%, AMD Jamshedpur 82%).
+  * Each zone's hydraulic aperture follows the cubic law. The transport
+    aperture is c × hydraulic, with c sampled over 1–10 (Tsang 1992).
+  * The rest reuses the engine: `tang_attenuation` and `matrix_sigma` for matrix
+    diffusion, the same three-phase containment kinematics, and restoration by
+    superposition.
+  * The monitoring-well reading is the **flux-weighted mix** over the zones.
+  * It is an **upper bound**: each logged zone is assumed to stay connected
+    down-gradient, and no persistence data exist.
+* **What alerts read** (`metrics.alerting`, `plume.alert_envelope`).
+  * The published-screening tier reads the alerting excursion probability.
+  * The possible-reach alert draws the largest *valid* P90: the ML P90 only
+    inside trained support, the engine's own Monte-Carlo P90, and the channel
+    P90.
+  * The NUREG indicator panel judges each indicator on max(continuum, channel)
+    and says which answer set it.
+  * Runs stored earlier carry none of these fields and are read exactly as
+    before.
+* **Surrogate out of support.**
+  * Kd is now checked against its training prior in every regime (`kd:Kd_L_kg`).
+    In fractured rock `retardation_Rd` is 1 + β, so the old box never saw Kd.
+  * Out of support, the band shown is the engine's own 48-draw Monte Carlo
+    (`metrics.engine_mc`, `band_source`), not the surrogate's flat extrapolation.
+* **High-alkalinity hypothetical** (`hypotheticals.high_alkalinity`).
+  * Uranium only, Kd 0.03–0.10–0.30 L/kg, with its own Monte-Carlo range and
+    an engine band.
+  * Evidence: Smith Ranch–Highland columns at 540 mg/L alkalinity gave
+    retardation 1.47–1.69 (Dangelmayr et al. 2017).
+  * Redox trapping still acts, so at Jaduguda the bulk uranium reach moves only
+    from 3.9 m to 8.5 m.
+* **Vertical screening** (`P.VERTICAL_GRADIENT_BAND`, `P.FOLIATION_DIP`).
+  * The headline runs at the P50 of log-uniform draws over 0.03–0.23 (0.083),
+    with the P10 and P90 beside it. Time and index are monotone in the
+    gradient, so these are exact quantiles.
+  * **The sign is not measured anywhere near a wellfield.** Two of the four
+    belt observations point up (Kudada artesian; Dumirta, dry season) and two
+    point down (Tantnagar; JNV Jhinkpani). The band computes the upward case,
+    and every response and aquifer alert says so.
+  * A dip-rotated foliation tensor (Jaduguda 40°, Turamdih 35°, otherwise
+    30–60°; K⊥/K∥ swept over 0.01–1) is displayed as a Kv/Kh band. It does
+    not move the headline.
+* **Injectivity** (`physics/injectivity.py`, display only). It compares the
+  Muskat five-spot head rise against the fracture-initiation headroom, with
+  σ_min between 0.5 and 1.0 of σ_v because the stress regime is unmeasured.
+  At every deposit seed the default 2,500 m³/day is **marginal**.
+
+### Before and after
+
+Default operation, 20 years, each deposit's centre at its seed depth.
+"Tier" is the published-screening alert tier.
+
+| Site (TDS) | Continuum reach | Channel reach P10–P50–P90 | Tier, before → after | First vertical arrival, before → after (P10–P90) |
+|---|---|---|---|---|
+| Jaduguda | 30 m | 3.1–6.0–12.0 km | notice → alert | 140 → 10.6 yr (3.5–27) |
+| Turamdih | 20 m | 1.6–3.3–7.6 km | notice → alert | 48 → 4.3 yr (1.3–13) |
+| Narwapahar | 23 m | 2.0–4.0–9.3 km | notice → alert | 67 → 5.5 yr (1.7–16) |
+| Bagjata | 8 m | 0.4–0.9–2.2 km | notice → alert | 109 → 7.0 yr (2.2–19) |
+| Mohuldih | 10 m | 0.6–1.3–3.0 km | notice → alert | 79 → 7.8 yr (2.4–21) |
+| Bhatin | 76 m | 11–15–15 km (grid cap) | notice → alert | 11 → 1.0 yr (0.4–3.3) |
+| Banduhurang | 51 m | 4.4–9.2–15 km | notice → alert | 1.1 → 0.3 yr |
+
+* Over the 27 site × species runs checked, the tier moves notice → alert in
+  25, and the excursion test is declared at every deposit.
+* The continuum answers are **unchanged**, as intended: they remain the bulk
+  plume.
+
+### What this means, stated plainly
+
+The alerting answer is now set by the preferential pathway almost everywhere
+in the belt. It rests on two things nobody has measured:
+* that the logged fracture zones stay connected for kilometres;
+* the transport-aperture factor.
+
+The vertical answer is set by a gradient whose direction is unknown at every
+site. Both follow the owner's precautionary decisions. **Both are upper-bound
+readings, and the alert explanations say so.** One cross-hole tracer test and
+one pair of deep piezometers in the belt would replace all three assumptions
+with measurements.
+
+To return alerting to the continuum, set `P.CHANNEL["drives_alerts"] = False`;
+the channel stays on screen.
+
+**Tests.**
+* `ml_pipeline/tests/test_gemini_review_build.py` (22).
+* `backend/tests/test_gemini_review_alerts.py` (6).
+* `test_vertical_path.py`'s switch-off test now also switches the gradient band
+  off.
+
+---
+
 ## 1b. Closed (2026-08-20) — the vertical breakthrough headline was too slow
 
 **Reported by the project owner from the UI, then reproduced arithmetically, then

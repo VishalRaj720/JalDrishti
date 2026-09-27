@@ -263,7 +263,8 @@ def explain_modelled(*, kind: str, tier: str, rule: str, block: str,
                      breakthrough_probability: Optional[float] = None,
                      injection_start: Any = None, elapsed_years: Optional[float] = None,
                      reach_km: Optional[float] = None,
-                     what_it_means: Optional[str] = None) -> dict[str, Any]:
+                     what_it_means: Optional[str] = None,
+                     upward_gradient: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
     """The seven fields for a modelled (screening) alert.
 
     `metrics` is the stored run's `metrics` column: {"analytical": {...},
@@ -282,7 +283,9 @@ def explain_modelled(*, kind: str, tier: str, rule: str, block: str,
             return {k: round(float(v[k]), 3) for k in ("p10", "p50", "p90") if k in v}
         return None
 
-    p_ex = an.get("excursion_probability", ml.get("excursion_probability"))
+    alerting = m.get("alerting") or {}
+    p_ex = alerting.get("excursion_probability",
+                        an.get("excursion_probability", ml.get("excursion_probability")))
     what = {
         "published_screening": (
             f"A regulator published a modelled screening of a HYPOTHETICAL "
@@ -342,6 +345,10 @@ def explain_modelled(*, kind: str, tier: str, rule: str, block: str,
         "in_trained_support": not bool(extrapolation),
         "data_confidence": dict(data_confidence) if data_confidence else None,
         "beta_band": beta_band,
+        # 2026-09-27: which answer set the alerting numbers -- the bulk
+        # continuum or the preferential-pathway channel (upper bound)
+        "alerting_rule": alerting.get("rule"),
+        "alerting_basis": alerting.get("basis"),
         "note": ("The P10-P90 band is parameter uncertainty inside the model's "
                  "assumptions; it does not cover structural error, and no "
                  "modelled plume has ever been validated against a real one "
@@ -350,6 +357,16 @@ def explain_modelled(*, kind: str, tier: str, rule: str, block: str,
     if kind in ("aquifer_pathway", "aquifer_breach_due"):
         conf["breakthrough_years"] = years_to_breakthrough
         conf["breakthrough_probability"] = breakthrough_probability
+        # 2026-09-27 (owner decision): the vertical screening runs on the P50 of
+        # the MEASURED gradient range; its sign is not measured at the site,
+        # and the alert says so.
+        if upward_gradient:
+            conf["upward_gradient"] = {
+                "value": upward_gradient.get("served"),
+                "range": upward_gradient.get("magnitude_range"),
+                "basis": upward_gradient.get("basis"),
+                "sign_note": upward_gradient.get("sign_note"),
+            }
     if reach_km is not None:
         conf["reach_km"] = reach_km
 

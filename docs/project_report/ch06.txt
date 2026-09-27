@@ -168,6 +168,7 @@ The boreholes also showed a problem with the shear-zone permeability. The transm
 - Shear-zone permeability corrected to the measured Kudada value; two answers per run
 - Local uranium and radium backgrounds, radium Kd and ore depths from local sources
 - Surrogate version 6 and sensitivity analysis re-run
+- External review checked against the code; preferential-pathway answer, high-alkalinity uranium scenario, measured upward-gradient band, injection check (27 September)
 
 ## 6.12 Final Integrated System
 

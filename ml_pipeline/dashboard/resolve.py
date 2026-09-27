@@ -185,6 +185,19 @@ def envelope_violations(inputs: dict, hydro: dict | None = None) -> list[str]:
                 span = max(hi - lo, 1e-9)
                 if val < lo - 0.02 * span or val > hi + 0.02 * span:
                     out.append(f"hydro:{key}")
+
+    # Kd AGAINST ITS TRAINING PRIOR (2026-09-27, GEMINI_REVIEW_ASSESSMENT final
+    # question, gap G2). In fractured rock `retardation_Rd` is 1 + beta and
+    # carries no Kd, so the box above could not see a Kd slider value -- the
+    # high-alkalinity 0.1 L/kg, say -- leave the 0.3-3.0 L/kg the surrogate was
+    # trained on. The generator draws every species' Kd from exactly this range
+    # (kd_range_for), so the prior IS the support.
+    kd = inputs.get("kd_L_kg")
+    if kd is not None and inputs.get("species") in P.SPECIES:
+        lo, _mid, hi = P.kd_range_for(inputs["species"], inputs["regime"])
+        tol = 1e-9 + 1e-6 * max(abs(lo), abs(hi))
+        if float(kd) < lo - tol or float(kd) > hi + tol:
+            out.append("kd:Kd_L_kg")
     return out
 
 

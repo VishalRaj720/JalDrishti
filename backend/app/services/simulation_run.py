@@ -34,6 +34,9 @@ def _hydro_with_extras(result: dict[str, Any]) -> Any:
                      measured baseline. Stored so a saved run shows what the
                      live one did; it is labelled hypothetical by the engine and
                      nothing that alerts reads it.
+      injectivity, continuum_consistency, band_source
+                     2026-09-27: display read-outs (never alerting) kept so a
+                     saved run shows what the live one did.
 
     Runs stored before either carry no key, and readers must treat absence as
     "not recorded", never as "no pathway" or "no hypothetical".
@@ -41,7 +44,9 @@ def _hydro_with_extras(result: dict[str, Any]) -> Any:
     hydro = result.get("hydro")
     if not isinstance(hydro, dict):
         return hydro
-    extras = {k: result[k] for k in ("vertical", "hypotheticals") if result.get(k)}
+    extras = {k: result[k] for k in ("vertical", "hypotheticals", "injectivity",
+                                     "continuum_consistency", "band_source")
+              if result.get(k)}
     return {**hydro, **extras} if extras else hydro
 
 
@@ -78,6 +83,12 @@ def _plume_geometry(result: dict[str, Any]) -> Optional[dict[str, Any]]:
         "source_zone": source,
         "ml_envelope": envelope,
         "ml_envelope_skipped": result.get("ml_envelope_skipped") or {},
+        # 2026-09-27: the P90 envelope the possible-reach alert draws -- the
+        # largest VALID upper estimate (ML inside its support, the engine's own
+        # Monte Carlo, and the preferential-pathway channel when it drives
+        # alerts). Runs stored before this carry none; readers fall back to
+        # `ml_envelope`, which is exactly what they drew then.
+        "alert_envelope": result.get("alert_envelope"),
         "azimuth_deg": result.get("azimuth_deg"),
         "azimuth_source": result.get("azimuth_source"),
         "peak_conc": plume.get("peak_conc"),

@@ -828,6 +828,27 @@ export interface VerticalScreening {
     years_to_breakthrough_range: [number | null, number | null];
     basis: string;
   } | null;
+  /** 2026-09-27: the gradient the screening ran on (P50 of the measured belt
+   *  range) and the headline at the band's P10 / P90. */
+  upward_gradient?: number | null;
+  gradient_band?: {
+    gradient_p10: number; gradient_p50: number; gradient_p90: number;
+    years_to_breakthrough_range: [number | null, number | null];
+    risk_band_range: [string, string];
+  } | null;
+  upward_gradient_setting?: {
+    served: number; magnitude_range?: [number, number]; basis: string;
+    sign_note?: string; direction?: string;
+  } | null;
+  /** 2026-09-27: Kv/Kh the dipping foliation allows (display only). */
+  dip_band?: {
+    Kv_Kh_low: number; Kv_Kh_high: number; Kv_Kh_served: number;
+    years_to_breakthrough_range: [number | null, number | null];
+  } | null;
+  foliation_dip?: {
+    dip_range_deg: [number, number]; documented: boolean; source: string;
+    Kv_Kh_band?: [number, number]; note?: string;
+  } | null;
   first_arrival?: {
     species: string; years: number;
     shallow_impact_probability: number | null; risk_band: string | null;

@@ -123,4 +123,11 @@ async def preview_run(
         # engine; nothing that alerts reads it.
         "hypotheticals": result.get("hypotheticals"),
         "hydro_scenario": result.get("hydro_scenario"),
+        # 2026-09-27: which band the Console shows (ML inside trained support,
+        # the engine's Monte Carlo outside it), the alerting envelope, the
+        # injectivity read-out and the cubic-law check on the continuum
+        "band_source": result.get("band_source"),
+        "alert_envelope": result.get("alert_envelope"),
+        "injectivity": result.get("injectivity"),
+        "continuum_consistency": result.get("continuum_consistency"),
     }
