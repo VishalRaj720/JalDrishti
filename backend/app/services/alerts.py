@@ -180,8 +180,13 @@ class AlertService:
             return 0
 
         ctx = self._run_context(run)
-        an = (ctx.get("metrics") or {}).get("analytical") or {}
-        p_ex = an.get("excursion_probability")
+        metrics = ctx.get("metrics") or {}
+        an = metrics.get("analytical") or {}
+        # 2026-09-27 (owner decision): the tier reads max(continuum, channel)
+        # where the run recorded it (`metrics.alerting`); older runs carry only
+        # the continuum and are read exactly as before.
+        p_ex = (metrics.get("alerting") or {}).get(
+            "excursion_probability", an.get("excursion_probability"))
         tier, rule = tiers.modelled_tier("published_screening",
                                          excursion_probability=p_ex)
         # wells inside the published footprint -- "what should be monitored next"
@@ -251,7 +256,12 @@ class AlertService:
         never for a block already told by the footprint alert.
         """
         ctx = self._run_context(run)
-        env = (ctx.get("plume") or {}).get("ml_envelope") or {}
+        # 2026-09-27: the ALERTING envelope where the run stored one (the largest
+        # valid P90: ML only inside trained support, the engine's own Monte
+        # Carlo, the channel when it drives alerts); the ML envelope otherwise,
+        # which is what every earlier run drew.
+        plume = ctx.get("plume") or {}
+        env = plume.get("alert_envelope") or plume.get("ml_envelope") or {}
         p90 = env.get("p90") if isinstance(env, dict) else None
         wkt = self._ring_wkt(p90)
         if not wkt:
@@ -752,6 +762,7 @@ class AlertService:
                 data_confidence=(hydro or {}).get("data_confidence"),
                 beta_band=(hydro or {}).get("beta_band"),
                 years_to_breakthrough=float(yrs), breakthrough_probability=prob,
+                upward_gradient=(v or {}).get("upward_gradient_setting"),
                 injection_start=r["injection_start_date"],
                 elapsed_years=round(elapsed, 1), reach_km=round(reach_m / 1000.0, 1))
             res = await self.db.execute(text("""
@@ -1079,7 +1090,8 @@ class AlertService:
                 beta_band=ctx.get("beta_band"),
                 years_to_breakthrough=float(yrs),
                 breakthrough_probability=prob,
-                reach_km=reach_km, what_it_means=advisory.what_it_means)
+                reach_km=reach_km, what_it_means=advisory.what_it_means,
+                upward_gradient=(v or {}).get("upward_gradient_setting"))
             res = await self.db.execute(text("""
                 INSERT INTO alerts (kind, block_id, advisory_id, headline, body,
                                     severity, tier, basis, explanation)
