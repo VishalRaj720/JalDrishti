@@ -628,6 +628,82 @@ def _isr_feasibility_scenario(*, req, payload: dict, hydro: dict, base: dict,
         # case a future config moves it out
         extrapolation=envelope_violations(s_inputs, s_hydro),
     )
+    # 2026-09-27: the same two read-outs the baseline carries, so the answers
+    # stay comparable -- the preferential pathway and the injectivity verdict
+    try:
+        from ml_pipeline.physics.channel import channel_answer
+        from ml_pipeline.physics.injectivity import injectivity_check
+        ch = channel_answer(s_inputs, features_from_inputs(**s_inputs)[1],
+                            threshold=P.EXCURSION_THRESHOLDS[s_inputs["species"]],
+                            ring_x=float(req.monitor_ring_m))
+        block["channel"] = ({"reach_m": ch["reach_m"], "reach_band_m": ch["reach_band_m"],
+                             "excursion_probability": ch["excursion_probability"]}
+                            if ch.get("applies") else None)
+        block["injectivity"] = injectivity_check(
+            K_ore_m_day=s_inputs["K_m_day"], ore_thickness_m=req.ore_thickness_m,
+            Q_in_m3_day=s_inputs["Q_in_m3_day"],
+            wellfield_width_m=s_inputs["wellfield_width_m"],
+            ore_depth_m=req.ore_depth_m,
+            water_table_m=flow.get("depth_to_water_shallow_m"))
+    except Exception as e:
+        block["channel_status"] = f"unavailable: {type(e).__name__} ({e})"
+    return block
+
+
+def _high_alkalinity_scenario(*, req, payload: dict, inputs: dict, base: dict,
+                              base_channel: dict | None, threshold: float,
+                              hydro: dict) -> dict:
+    """The labelled HIGH-ALKALINITY hypothetical (owner decision 2026-09-27,
+    P.KD_SCENARIO_HIGH_ALKALINITY): the same run with the uranium Kd lowered to
+    the value measured at lixiviant-strength alkalinity. Analytical engine
+    only, with the engine's own Monte-Carlo band -- the surrogate never saw a
+    Kd this low. Never read by anything that alerts."""
+    from ml_pipeline.ml.predict import features_from_inputs, engine_mc_bands
+    from ml_pipeline.physics.channel import channel_answer
+    cfg = P.KD_SCENARIO_HIGH_ALKALINITY
+    lo, mid, hi = cfg["kd_range_L_kg"]
+    block = {"hypothetical": True, "label": cfg["label"], "citation": cfg["citation"],
+             "kd_L_kg": mid, "kd_range_L_kg": [lo, mid, hi],
+             "baseline_kd_L_kg": round(float(inputs["kd_L_kg"]), 3),
+             "note": ("Not a prediction and never used for alerts. The served uranium "
+                      "Kd stays at the alkaline-suppressed 0.3-3.0 L/kg until tests "
+                      "on Singhbhum core confirm otherwise; this shows the run if "
+                      "uranium sorbed as weakly as it does at lixiviant-strength "
+                      "alkalinity. Redox trapping still acts, so in tight rock the "
+                      "reach stays short.")}
+    if payload.get("kd_L_kg") is not None:
+        block.update(applies=False, reason="an explicit Kd was supplied")
+        return block
+    if hydro.get("u_suppressed"):
+        block.update(applies=False, reason="no uranium source term at this location")
+        return block
+    s_inputs = dict(inputs, kd_L_kg=float(mid))
+    ring = float(req.monitor_ring_m)
+    s = predict_analytical(compliance_x=ring, kd_range=(lo, mid, hi), **s_inputs)
+    s.pop("_field", None)
+    band = engine_mc_bands(s_inputs, threshold=threshold, compliance_x=ring,
+                           kd_range=(lo, mid, hi))
+    ch = channel_answer(s_inputs, features_from_inputs(**s_inputs)[1],
+                        threshold=threshold, ring_x=ring, kd_range=(lo, mid, hi))
+    block.update(
+        applies=True,
+        metrics={"area_ha": round(s["area_ha"]["p50"], 3),
+                 "migration_m": round(s["migration_m"]["p50"], 1),
+                 "compliance_conc": round(s["compliance_conc"]["p50"], 3),
+                 "excursion_probability": round(s["excursion_probability"], 3)},
+        baseline_metrics={"migration_m": round(base["migration_m"]["p50"], 1),
+                          "excursion_probability": round(base["excursion_probability"], 3)},
+        engine_mc={"migration_m": _bands(band["migration_m"]),
+                   "compliance_conc": _bands(band["compliance_conc"])},
+        channel=({"reach_m": ch["reach_m"], "reach_band_m": ch["reach_band_m"],
+                  "excursion_probability": ch["excursion_probability"]}
+                 if ch.get("applies") else None),
+        baseline_channel=({"reach_m": base_channel["reach_m"],
+                           "excursion_probability": base_channel["excursion_probability"]}
+                          if isinstance(base_channel, dict) and base_channel.get("applies")
+                          else None),
+        extrapolation=envelope_violations(s_inputs, hydro),
+    )
     return block
 
 
@@ -734,12 +810,23 @@ def _api_predict(req: PredictRequest):
             direction_unc = None
     if isinstance(hydro.get("flow"), dict):
         hydro["flow"]["direction_uncertainty"] = direction_unc
-    raster = None
-    if _prm is not None and req.display_extras:
+    # The engine's Monte-Carlo draws, built once: the chance-over-limit raster,
+    # the engine band served when the surrogate is out of support, and the
+    # alerting P90 envelope all score these same draws (2026-09-27). Full runs
+    # only -- the ones displayed and stored; metrics-only loops (lifecycle,
+    # timeline frames) keep their speed.
+    _draws = None
+    if req.display_extras:
         try:
             from ml_pipeline.ml.predict import mc_param_draws
+            _draws = mc_param_draws(inputs)
+        except Exception:
+            _draws = None
+    raster = None
+    if _prm is not None and req.display_extras and _draws is not None:
+        try:
             raster = plume_rasters(
-                _prm, mc_param_draws(inputs),
+                _prm, _draws,
                 x_extent=(float(field.X.min()), float(field.X.max())),
                 y_extent=(float(field.Y.min()), float(field.Y.max())),
                 lon0=req.lon, lat0=req.lat, azimuth_deg=azimuth,
@@ -807,6 +894,79 @@ def _api_predict(req: PredictRequest):
         a, m, extrapolation=extrapolation,
         off_scale=bool(fm.get("off_scale", False)))
 
+    # PREFERENTIAL PATHWAY (2026-09-27, P.CHANNEL): the fast-track channel answer
+    # beside the continuum one, and what alerts read -- max(continuum, channel)
+    # per the owner's decision. Never allowed to break the main answer.
+    from ml_pipeline.physics.channel import (channel_answer, alerting_metrics,
+                                             cubic_law_consistency)
+    try:
+        channel = channel_answer(inputs, _ffi(**inputs)[1], threshold=threshold,
+                                 ring_x=float(req.monitor_ring_m))
+    except Exception as e:
+        channel = {"applies": False, "status": f"unavailable: {type(e).__name__} ({e})"}
+    continuum_headline = {
+        "migration_m": round(a["migration_m"]["p50"], 1),
+        "compliance_conc": round(a["compliance_conc"]["p50"], 3),
+        "excursion_probability": round(a["excursion_probability"], 3)}
+    alerting = alerting_metrics(continuum_headline, channel)
+    continuum_consistency = (cubic_law_consistency(inputs["K_m_day"], inputs["phi_mobile"])
+                             if inputs["regime"] == "fractured" else None)
+
+    # ENGINE MONTE-CARLO BAND (2026-09-27, GEMINI_REVIEW_ASSESSMENT gap G1/G5).
+    # Out of trained support the ML band is extrapolation (flat, with a void
+    # conformal guarantee), so the band shown there is the engine's own.
+    engine_band = None
+    if _draws is not None:
+        try:
+            from ml_pipeline.ml.predict import engine_mc_bands
+            eb = engine_mc_bands(inputs, threshold=threshold,
+                                 compliance_x=float(req.monitor_ring_m), draws=_draws)
+            engine_band = {"migration_m": _bands(eb["migration_m"]),
+                           "compliance_conc": _bands(eb["compliance_conc"]),
+                           "n_draws": eb["n_draws"], "source": eb["source"]}
+        except Exception:
+            engine_band = None
+    band_source = ("engine_mc" if (engine_band is not None
+                                   and (extrapolation or ml_metrics is None))
+                   else ("ml" if ml_metrics is not None else None))
+
+    # ALERTING P90 ENVELOPE: what the possible-reach alert draws. The largest of
+    # the upper estimates that are valid here -- the ML P90 only when the
+    # surrogate is inside its support, the engine's own P90, and (when it drives
+    # alerts) the channel's P90.
+    alert_envelope = None
+    p90_candidates = {}
+    if ml_metrics is not None and not extrapolation:
+        p90_candidates["ml"] = float(m["migration_m"]["p90"])
+    if engine_band is not None:
+        p90_candidates["engine_mc"] = float(engine_band["migration_m"]["p90"])
+    if (P.CHANNEL.get("drives_alerts") and isinstance(channel, dict)
+            and channel.get("applies")):
+        p90_candidates["channel"] = float(channel["reach_band_m"]["p90"])
+    if p90_candidates:
+        _basis = max(p90_candidates, key=p90_candidates.get)
+        _env = ml_envelope_ellipses(
+            req.lon, req.lat, azimuth, {"p90": p90_candidates[_basis]}, aspect,
+            x_offset_m=half_w, halfwidth_m=fm.get("plume_halfwidth_m"))
+        alert_envelope = {"p90": (_env["rings"] or {}).get("p90"),
+                          "p90_m": round(p90_candidates[_basis], 1),
+                          "basis": _basis,
+                          "candidates_m": {k: round(v, 1) for k, v in p90_candidates.items()},
+                          "skipped": _env["skipped"]}
+
+    # INJECTIVITY (2026-09-27, display only): can the requested rate be injected
+    # into THIS rock below fracture pressure?
+    try:
+        from ml_pipeline.physics.injectivity import injectivity_check
+        injectivity = injectivity_check(
+            K_ore_m_day=inputs["K_m_day"], ore_thickness_m=req.ore_thickness_m,
+            Q_in_m3_day=inputs["Q_in_m3_day"],
+            wellfield_width_m=inputs["wellfield_width_m"],
+            ore_depth_m=req.ore_depth_m,
+            water_table_m=flow.get("depth_to_water_shallow_m"))
+    except Exception as e:
+        injectivity = {"status": f"unavailable: {type(e).__name__} ({e})"}
+
     # TIMELINE (3.7b): calendar anchor for the animation. None unless the caller
     # supplied a start date; everything downstream degrades to the un-dated
     # behaviour in that case.
@@ -842,6 +1002,10 @@ def _api_predict(req: PredictRequest):
                            "screening value -- no Indian measurement for this regime"),
         "retention": run_vertical["retention"],
     }
+    # 2026-09-27: the gradient the screening ran on (P50 of the measured band),
+    # with the sign record, and the dip-rotated Kv/Kh band (display only)
+    vertical["upward_gradient_setting"] = geometry.get("gradient")
+    vertical["foliation_dip"] = geometry.get("dip")
     if req.display_extras:
         vertical.update(indicator_arrivals(payload, geometry, run=run_vertical))
     else:
@@ -989,6 +1153,15 @@ def _api_predict(req: PredictRequest):
             hypotheticals = {"isr_feasibility": {
                 "status": f"unavailable: {type(e).__name__} ({e})",
                 "hypothetical": True}}
+        if species in P.KD_SCENARIO_HIGH_ALKALINITY["species"]:
+            try:
+                hypotheticals["high_alkalinity"] = _high_alkalinity_scenario(
+                    req=req, payload=payload, inputs=inputs, base=a,
+                    base_channel=channel, threshold=threshold, hydro=hydro)
+            except Exception as e:               # never break the main answer
+                hypotheticals["high_alkalinity"] = {
+                    "status": f"unavailable: {type(e).__name__} ({e})",
+                    "hypothetical": True}
 
     return {
         "pin": {"lon": req.lon, "lat": req.lat},
@@ -1097,7 +1270,18 @@ def _api_predict(req: PredictRequest):
                 "breach": int(a["breach_probability"]),
             },
             "ml": ml_metrics,
+            # 2026-09-27: the preferential-pathway (fast-track channel) answer,
+            # the engine's own Monte-Carlo band, and what alerts read
+            "channel": channel,
+            "engine_mc": engine_band,
+            "alerting": alerting,
         },
+        # which band the portal shows: the ML band inside trained support, the
+        # engine's Monte-Carlo band outside it
+        "band_source": band_source,
+        "alert_envelope": alert_envelope,
+        "injectivity": injectivity,
+        "continuum_consistency": continuum_consistency,
         "ml_envelope": envelope,
         # bands whose extent is below the minimum drawable size, with the reason
         "ml_envelope_skipped": envelope_skipped,

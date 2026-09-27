@@ -649,6 +649,53 @@ def confining_path_conductivity(K_ref_m_day: float, z_shallow_m: float,
     return K_ref * (z1 - z0) / integral
 
 
+def dip_rotated_kv_kh(dip_deg: float, anisotropy: float) -> dict:
+    """Vertical conductivity of a foliated rock mass whose foliation dips
+    `dip_deg`, relative to its measured HORIZONTAL conductivity.
+
+    Along-foliation K_par, across-foliation K_perp = a*K_par. Rotating the
+    tensor by the dip (x = dip direction, y = strike, z = up):
+        Kxx = K_par (cos^2 + a sin^2),  Kyy = K_par,
+        Kzz = K_par (sin^2 + a cos^2),  Kxz = K_par (1 - a) sin cos.
+    A pumping test measures a horizontal average; the geometric mean
+    Kh = sqrt(Kxx*Kyy) is used. Returns Kzz/Kh (the Kv/Kh this fabric implies)
+    and Kxz/Kh (how strongly a HORIZONTAL gradient in the dip direction drives
+    vertical flux). Limits: dip 0 -> Kzz/Kh = a; dip 90 -> Kzz/Kh = 1/sqrt(a).
+    """
+    th = math.radians(float(dip_deg))
+    a = float(anisotropy)
+    s2, c2 = math.sin(th) ** 2, math.cos(th) ** 2
+    kxx, kzz = c2 + a * s2, s2 + a * c2
+    kxz = (1.0 - a) * math.sin(th) * math.cos(th)
+    kh = math.sqrt(kxx * 1.0)
+    return {"Kzz_over_Kh": kzz / kh, "Kxz_over_Kh": kxz / kh,
+            "Kxx_over_Kpar": kxx, "Kzz_over_Kpar": kzz}
+
+
+def dip_kv_kh_band(dip_range_deg: tuple[float, float],
+                   anisotropy_range: tuple[float, float],
+                   horizontal_over_vertical_gradient: float = 0.0,
+                   n: int = 13) -> dict:
+    """(lo, hi) of the effective Kv/Kh over a dip range and a log-spaced
+    anisotropy sweep. The cross term adds |Kxz/Kh| * (i_h / i_v) at the high
+    end (flow up-dip, the precautionary sign)."""
+    d_lo, d_hi = float(dip_range_deg[0]), float(dip_range_deg[1])
+    a_lo, a_hi = float(anisotropy_range[0]), float(anisotropy_range[1])
+    dips = np.linspace(d_lo, d_hi, n) if d_hi > d_lo else np.array([d_lo])
+    aniso = np.geomspace(a_lo, a_hi, n) if a_hi > a_lo else np.array([a_lo])
+    lo, hi, cross_hi = float("inf"), 0.0, 0.0
+    for d in dips:
+        for a in aniso:
+            r = dip_rotated_kv_kh(float(d), float(a))
+            lo = min(lo, r["Kzz_over_Kh"])
+            eff = r["Kzz_over_Kh"] + abs(r["Kxz_over_Kh"]) * max(
+                float(horizontal_over_vertical_gradient), 0.0)
+            if eff > hi:
+                hi, cross_hi = eff, abs(r["Kxz_over_Kh"]) * max(
+                    float(horizontal_over_vertical_gradient), 0.0)
+    return {"Kv_Kh_low": lo, "Kv_Kh_high": hi, "cross_term_at_high": cross_hi}
+
+
 def vertical_solute_arrival_days(v_up_m_day: float, dz_m: float,
                                  beta_eff: float = 0.0,
                                  omega: float = P.DUAL_POROSITY["mass_transfer_omega"]
@@ -760,7 +807,9 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                              water_table_now_m: float | None = None,
                              layer2_beta_eff: float = 0.0,
                              layer2_omega: float = P.DUAL_POROSITY["mass_transfer_omega"],
-                             Kv_Kh_band: tuple[float, float] | None = None) -> dict:
+                             Kv_Kh_band: tuple[float, float] | None = None,
+                             gradient_band: tuple[float, float] | None = None,
+                             dip_Kv_Kh_band: tuple[float, float] | None = None) -> dict:
     """SCREENING estimate of how much the deep plume could impact the Layer-1
     (shallow drinking-water) aquifer. Three independent pathways OR-combined:
 
@@ -782,6 +831,13 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
     passes `confining_path_conductivity`); Kv = K_m_day * Kv_Kh_ratio.
     `Kv_Kh_band` (lo, hi), when given, reports the headline breakthrough at both
     ends of the measured anisotropy range as `anisotropy_band`.
+    `gradient_band` (lo, hi) -- the P10 and P90 of the upward-gradient draws
+    (P.VERTICAL_GRADIENT_BAND, 2026-09-27) -- reports the headline at both, as
+    `gradient_band`; `upward_gradient` is then the draws' P50. Breakthrough time
+    and index are monotone in the gradient, so these ARE the P90/P10 of the
+    outputs -- no sampling error.
+    `dip_Kv_Kh_band` (lo, hi) -- the Kv/Kh the dip-rotated foliation tensor
+    allows (`dip_rotated_kv_kh`) -- is reported the same way, as `dip_band`.
 
     Returns the combined index AND every component so it stays interpretable.
     This is a transparent screening index, NOT a calibrated probability."""
@@ -973,6 +1029,50 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
                                             at_lo["years_to_breakthrough"]],
             "basis": "same gradient as the headline (duty cycle where present)",
         }
+    # UPWARD-GRADIENT BAND (2026-09-27, owner decision; P.VERTICAL_GRADIENT_BAND).
+    # The headline runs at the P50 of the measured-magnitude draws; the P10/P90
+    # gradients are evaluated on the SAME basis (duty cycle where a seasonal
+    # band exists). Index and time are monotone in the gradient.
+    _amp = None
+    if seasonal and seasonal.get("duty_cycle"):
+        _amp = seasonal["duty_cycle"]["gradient_amplitude"]
+
+    def _at_gradient(g: float) -> dict:
+        i_g = _duty_cycle_gradient(float(g), _amp) if _amp else float(g)
+        lk = _leak(i_g)
+        ps = 1.0 - (1.0 - p_disp) * (1.0 - lk["p_advective"]) * (1.0 - p_well)
+        return {"gradient": round(float(g), 4),
+                "years_to_breakthrough": lk["years_to_breakthrough"],
+                "shallow_impact_probability": round(ps, 3),
+                "risk_band": _vertical_risk_band(ps)}
+
+    gradient_band_out = None
+    if gradient_band is not None:
+        g_lo, g_hi = float(gradient_band[0]), float(gradient_band[1])
+        fast, slow = _at_gradient(g_hi), _at_gradient(g_lo)
+        gradient_band_out = {
+            "gradient_p10": round(g_lo, 4), "gradient_p50": round(float(upward_gradient), 4),
+            "gradient_p90": round(g_hi, 4),
+            # ordered [fast, slow] like every breakthrough range in this block
+            "years_to_breakthrough_range": [fast["years_to_breakthrough"],
+                                            slow["years_to_breakthrough"]],
+            "shallow_impact_probability_range": [slow["shallow_impact_probability"],
+                                                 fast["shallow_impact_probability"]],
+            "risk_band_range": [slow["risk_band"], fast["risk_band"]],
+            "at_p10_gradient": slow, "at_p90_gradient": fast,
+        }
+    dip_band = None
+    if dip_Kv_Kh_band is not None:
+        lo, hi = (float(dip_Kv_Kh_band[0]), float(dip_Kv_Kh_band[1]))
+        at_lo = _leak(head_i, kv=max(K_m_day, 0.0) * lo)
+        at_hi = _leak(head_i, kv=max(K_m_day, 0.0) * hi)
+        dip_band = {
+            "Kv_Kh_low": round(lo, 4), "Kv_Kh_high": round(hi, 4),
+            "Kv_Kh_served": float(Kv_Kh_ratio),
+            "years_to_breakthrough_range": [at_hi["years_to_breakthrough"],
+                                            at_lo["years_to_breakthrough"]],
+            "basis": "same gradient as the headline; displayed, does not move it",
+        }
     return {
         "separation_m": round(dz_adv, 1),   # intact confining rock: ore-top -> shallow base
         "layer1_base_m": round(float(layer1_base_m), 1),
@@ -1001,6 +1101,9 @@ def shallow_impact_screening(*, C0: float, background: float, threshold: float,
         "headline_v_up_m_day": head["v_up_m_day"],
         "layer2_retardation": round(1.0 + _beta, 1),
         "anisotropy_band": anisotropy_band,
+        "gradient_band": gradient_band_out,
+        "dip_band": dip_band,
+        "upward_gradient": round(float(upward_gradient), 5),
         "shallow_impact_probability": round(p_shallow, 3),
         "risk_band": _vertical_risk_band(p_shallow),
         "pathways": {k: round(v, 3) for k, v in pathways.items()},

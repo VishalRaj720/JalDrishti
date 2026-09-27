@@ -165,7 +165,7 @@ def _surrogate() -> MLSurrogate:
 # --------------------------------------------------------------------------- #
 # Analytical engine (same schema; deterministic central + MC bands/excursion)
 # --------------------------------------------------------------------------- #
-def mc_scenario(inputs: dict, feat: dict) -> dict:
+def mc_scenario(inputs: dict, feat: dict, kd_range: tuple | None = None) -> dict:
     """The Monte-Carlo scenario dict for a resolved run -- ONE definition.
 
     Factored out of `predict_analytical` (2026-09-25) so the served excursion
@@ -188,10 +188,14 @@ def mc_scenario(inputs: dict, feat: dict) -> dict:
                 # real-ISR upgrade: the SAME k the feature row used (0 unless U)
                 atten_k=float(feat["u_attenuation_k"]),
                 C0={species: inputs["source_conc_C0"]},
-                Cb={species: inputs["background_conc_Cb"]})
+                Cb={species: inputs["background_conc_Cb"]},
+                # a labelled Kd scenario's own Monte-Carlo range (None = the
+                # served KD_RANGES the surrogate was trained on)
+                kd_range=(tuple(kd_range) if kd_range is not None else None))
 
 
-def mc_param_draws(inputs: dict, *, n_mc: int = 48, seed: int = 0) -> list:
+def mc_param_draws(inputs: dict, *, n_mc: int = 48, seed: int = 0,
+                   kd_range: tuple | None = None) -> list:
     """The TransportParams of each Monte-Carlo draw -- the same draws, in the
     same order, that `predict_analytical` scores for `excursion_probability`
     (same scenario, same common-random-number matrix, same seed)."""
@@ -202,7 +206,7 @@ def mc_param_draws(inputs: dict, *, n_mc: int = 48, seed: int = 0) -> list:
     op_days = inputs["operation_years"] * 365.0
     t_days = inputs["time_years"] * 365.0
     rest_days = float(inputs.get("restoration_years", 0.0) or 0.0) * 365.0
-    scn = mc_scenario(inputs, feat)
+    scn = mc_scenario(inputs, feat, kd_range=kd_range)
     draws = mc_draws(n_mc, seed)
     w_eff = _throughput_width(scn, t_days, op_days)
     return [_draw_params(scn, inputs["species"], t_days, op_days, draws, i, w_eff,
@@ -210,7 +214,8 @@ def mc_param_draws(inputs: dict, *, n_mc: int = 48, seed: int = 0) -> list:
 
 
 def predict_analytical(*, n_mc: int = 48, seed: int = 0,
-                       compliance_x: float | None = None, **inputs) -> dict:
+                       compliance_x: float | None = None,
+                       kd_range: tuple | None = None, **inputs) -> dict:
     """compliance_x: monitor-ring distance from the wellfield EDGE [m].
     None -> P.COMPLIANCE_BUFFER_M, the distance the surrogate's compliance head
     was trained at. The server passes the user's ring (R-2) so the reported
@@ -243,7 +248,7 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0,
 
     # excursion probability via the same parameter-uncertainty MC as Phase 2
     from ml_pipeline.synthetic.generate import excursion_probability, mc_draws
-    scn = mc_scenario(inputs, feat)
+    scn = mc_scenario(inputs, feat, kd_range=kd_range)
     draws = mc_draws(n_mc, seed)
     p_ex = excursion_probability(scn, species, t_days, op_days, draws,
                                  rest_days=rest_years * 365.0,
@@ -310,6 +315,29 @@ def predict_analytical(*, n_mc: int = 48, seed: int = 0,
         "restoration": restoration,
         "_field": res,   # full plume grid for the heatmap
     }
+
+
+def engine_mc_bands(inputs: dict, *, threshold: float, compliance_x: float,
+                    draws: list | None = None, kd_range: tuple | None = None) -> dict:
+    """P10/P50/P90 of the continuum reach and ring concentration over the
+    engine's OWN Monte-Carlo draws -- the same draws the excursion probability
+    and the chance-over-limit map score.
+
+    Served as the band whenever the surrogate is out of trained support (the
+    conformal guarantee is void there, and a tree ensemble extrapolates flat),
+    and used for the alerting P90 envelope. Physics, not a learned model, so it
+    is valid wherever the engine is."""
+    from ml_pipeline.physics.transport import centreline_reach, concentration_point
+    plist = draws if draws is not None else mc_param_draws(inputs, kd_range=kd_range)
+    Cb = float(inputs["background_conc_Cb"])
+    thr_inc = max(threshold - Cb, P.INCREMENTAL_FLOOR * threshold)
+    reach = [centreline_reach(p, thr_inc, n=1024) for p in plist]
+    ring = [concentration_point(float(compliance_x), 0.0, p) + Cb for p in plist]
+    q = lambda a: [float(v) for v in np.quantile(a, (0.10, 0.50, 0.90))]  # noqa: E731
+    r, c = q(reach), q(ring)
+    return {"migration_m": {"p10": r[0], "p50": r[1], "p90": r[2]},
+            "compliance_conc": {"p10": c[0], "p50": c[1], "p90": c[2]},
+            "n_draws": len(plist), "source": "engine Monte Carlo"}
 
 
 def predict(mode: str, **inputs) -> dict:

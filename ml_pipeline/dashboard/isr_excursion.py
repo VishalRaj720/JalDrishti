@@ -72,7 +72,17 @@ def _ring_concentration(payload: dict, species: str, ring_m: float) -> dict:
         floor_source_at_background=True)
     plume = concentration_point(float(ring_m), 0.0, params)
     baseline = float(inputs["background_conc_Cb"])
+    # 2026-09-27 (P.CHANNEL, owner decision): the preferential-pathway reading
+    # at the same ring. When the channel drives alerts, the indicator is judged
+    # on max(continuum, channel) -- see isr_indicator_excursion.
+    from ml_pipeline.physics.channel import central_ring_reading
+    try:
+        channel_conc = central_ring_reading(inputs, feat, float(ring_m))
+    except Exception:                                # never break the panel
+        channel_conc = None
     return {
+        "continuum_ring_conc": float(plume) + baseline,
+        "channel_ring_conc": channel_conc,
         "species": species,
         "unit": P.SPECIES_UNITS[species],
         "baseline": baseline,
@@ -102,6 +112,14 @@ def isr_indicator_excursion(payload: dict,
         except Exception as e:                       # never break the main answer
             indicators.append({"species": sp, "status": f"unavailable: {e}"})
             continue
+        # max(continuum, channel) when the channel drives alerts (P.CHANNEL)
+        r.setdefault("continuum_ring_conc", r["ring_conc"])
+        r["reading_basis"] = "continuum"
+        ch = r.get("channel_ring_conc")
+        if P.CHANNEL.get("drives_alerts") and ch is not None and ch > r["ring_conc"]:
+            r["ring_conc"] = float(ch)
+            r["plume_increment"] = float(ch) - r["baseline"]
+            r["reading_basis"] = "channel"
         ucl = P.isr_upper_control_limit(r["baseline"], r["lixiviant_C0"], inc)
         over = bool(r["ring_conc"] >= ucl) if ucl == ucl and ucl != float("inf") else False
         n_over += int(over)
@@ -113,6 +131,9 @@ def isr_indicator_excursion(payload: dict,
                                          if r["baseline"] > 0 else None),
             "baseline": round(r["baseline"], 3),
             "ring_conc": round(r["ring_conc"], 3),
+            "continuum_ring_conc": round(r["continuum_ring_conc"], 3),
+            "channel_ring_conc": (None if r.get("channel_ring_conc") is None
+                                  else round(r["channel_ring_conc"], 3)),
             "plume_increment": round(r["plume_increment"], 4),
             "lixiviant_C0": round(r["lixiviant_C0"], 1),
         })
