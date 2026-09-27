@@ -27,11 +27,11 @@ import VerticalPanel from "./VerticalPanel";
 
 /** One metric, with its provenance made explicit. */
 function Metric({
-  label, value, unit, mlBand, mlStatus, tone = "",
+  label, value, unit, mlBand, mlStatus, tone = "", bandLabel = "ML band",
 }: {
   label: string; value: ReactNode; unit?: string;
   mlBand?: { p10: number; p90: number } | null;
-  mlStatus?: string | null; tone?: string;
+  mlStatus?: string | null; tone?: string; bandLabel?: string;
 }) {
   return (
     <div className={`metric ${tone}`}>
@@ -49,7 +49,7 @@ function Metric({
         {mlBand ? (
           <>
             <span className="chip info" style={{ fontSize: 9, padding: "1px 6px" }}>
-              ML band
+              {bandLabel}
             </span>{" "}
             {fmt(mlBand.p10)} – {fmt(mlBand.p90)}
           </>
@@ -192,6 +192,129 @@ function IsrHypothetical({ h, unit, compact }: { h: any; unit: string; compact: 
   );
 }
 
+/**
+ * 2026-09-27 — TWO ANSWERS FOR HOW FAR, AND WHICH ONE THE ALERTS READ.
+ *
+ * Owner decision: both are shown, labelled; alerts and the excursion test read
+ * the larger. The continuum is the bulk volumetric plume; the channel is what
+ * the belt's own logged fractures would carry if they stay connected — an
+ * upper bound, said so.
+ */
+function PathwayAnswers({ r, unit, compact }: { r: any; unit: string; compact: boolean }) {
+  const ch = r?.metrics?.channel;
+  const an = r?.metrics?.analytical;
+  const al = r?.metrics?.alerting;
+  if (!ch || !an) return null;
+  if (ch.status) {
+    return <div className="muted small" style={{ marginTop: 8 }}>
+      Preferential-pathway answer: {ch.status}</div>;
+  }
+  if (!ch.applies) {
+    return <div className="muted small" style={{ marginTop: 8 }}>
+      Preferential-pathway answer not computed: {ch.reason}.</div>;
+  }
+  const pct = (v: unknown) => `${fmt(Number(v) * 100, 0)}%`;
+  const reach = (v: unknown) => `${distance(v).text} ${distance(v).unit}`;
+  const cc = r?.continuum_consistency ?? r?.hydro?.continuum_consistency;
+  const fs = ch.fracture_set ?? {};
+  if (compact) {
+    return (
+      <div className="banner warn" style={{ marginTop: 8 }}>
+        <b>Preferential pathway (upper bound):</b> {reach(ch.reach_m)} against
+        {" "}{reach(an.migration_m)} for the bulk plume; chance over the limit at the
+        ring {pct(ch.excursion_probability)}. Alerts read the larger.
+      </div>
+    );
+  }
+  const rows: [string, ReactNode, ReactNode][] = [
+    ["Reach (m)", distance(an.migration_m).text,
+     <>{distance(ch.reach_m).text}<span className="muted small"> ({distance(ch.reach_band_m?.p10).text}–{distance(ch.reach_band_m?.p90).text})</span></>],
+    [`At the ring (${unit})`, fmt(an.compliance_conc, 2), fmt(ch.ring_conc, 2)],
+    ["Chance over the limit at the ring", pct(an.excursion_probability), pct(ch.excursion_probability)],
+  ];
+  return (
+    <>
+      <div className="sec">How far — two answers</div>
+      <table className="grid">
+        <thead>
+          <tr><th></th><th>Bulk matrix migration<br /><span className="muted small">continuum</span></th>
+            <th>Preferential pathway<br /><span className="muted small">fast-track channel</span></th></tr>
+        </thead>
+        <tbody>
+          {rows.map(([label, a, c]) => (
+            <tr key={label}><td>{label}</td><td className="mono">{a}</td><td className="mono">{c}</td></tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="muted small" style={{ marginTop: 6, lineHeight: "var(--lh-base)" }}>
+        The channel answer runs the served transmissivity through the fractures
+        logged in the belt&apos;s own boreholes ({fs.well}: the largest zone carries
+        {" "}{pct(fs.dominant_share)} of the flow), with the cubic law, matrix
+        diffusion from the fracture walls and the same containment. It is an
+        <b> upper bound</b>: it assumes those fractures stay connected
+        down-gradient, which has never been measured here.
+        {cc?.inconsistent && (
+          <> The bulk answer&apos;s flowing porosity ({fmt(cc.continuum_phi_mobile, 4)}) is
+            {" "}{fmt(cc.continuum_over_cubic_law, 0)}× what the cubic law allows for this
+            rock, which is why the two answers differ so much.</>
+        )}
+      </div>
+      {al && (
+        <div className="banner" style={{ marginTop: 6 }}>
+          <strong>What alerts read:</strong> {al.rule === "max(continuum, channel)"
+            ? "the larger of the two answers" : "the bulk answer"} — reach{" "}
+          {reach(al.migration_m)} ({al.basis?.migration_m}), chance over the limit{" "}
+          {pct(al.excursion_probability)} ({al.basis?.excursion_probability}).
+        </div>
+      )}
+    </>
+  );
+}
+
+/** 2026-09-27 — the labelled high-alkalinity Kd scenario (owner decision).
+ *  Never alerting; its band is the engine's own. */
+function HighAlkalinity({ h, compact }: { h: any; compact: boolean }) {
+  if (!h) return null;
+  if (h.status || !h.applies) {
+    return <div className="muted small" style={{ marginTop: 8 }}>
+      High-alkalinity scenario not shown: {h.status ?? h.reason}.</div>;
+  }
+  const m = h.metrics ?? {}, b = h.baseline_metrics ?? {};
+  const reach = (v: unknown) => `${distance(v).text} ${distance(v).unit}`;
+  return (
+    <div className="banner" style={{ marginTop: 8 }}>
+      <span className="chip warn" style={{ fontSize: 9, padding: "1px 6px" }}>hypothetical</span>{" "}
+      <b>If uranium sorbed as weakly as at lixiviant-strength alkalinity</b> (Kd{" "}
+      {fmt(h.kd_L_kg, 2)} L/kg instead of {fmt(h.baseline_kd_L_kg, 2)}), the bulk plume
+      would reach {reach(m.migration_m)} instead of {reach(b.migration_m)}
+      {h.engine_mc?.migration_m && <> (engine band {fmt(h.engine_mc.migration_m.p10, 1)}–
+        {fmt(h.engine_mc.migration_m.p90, 1)} m)</>}
+      {h.channel && <>; the preferential pathway {reach(h.channel.reach_m)}</>}.
+      {!compact && <div className="muted small" style={{ marginTop: 4 }}>{h.note}{" "}
+        <span className="mono">{h.citation}</span></div>}
+    </div>
+  );
+}
+
+/** 2026-09-27 — can the requested rate be injected at all (display only). */
+function Injectivity({ inj }: { inj: any }) {
+  if (!inj || inj.status || !inj.verdict) return null;
+  const tone = inj.verdict === "feasible" ? "ok" : inj.verdict === "marginal" ? "warn" : "danger";
+  return (
+    <div className="muted small" style={{ marginTop: 8, lineHeight: "var(--lh-base)" }}>
+      <span className={`chip ${tone}`} style={{ fontSize: 9, padding: "1px 6px" }}>
+        injectivity: {inj.verdict}</span>{" "}
+      {inj.message}. At K {fmt(inj.K_ore_m_day, 3)} m/day over {fmt(inj.ore_thickness_m, 0)} m
+      of ore, the injectors need {fmt(inj.head_rise_range_m?.[0], 0)}–
+      {fmt(inj.head_rise_range_m?.[1], 0)} m of pressure rise against{" "}
+      {fmt(inj.fracture_headroom_range_m?.[0], 0)}–{fmt(inj.fracture_headroom_range_m?.[1], 0)} m
+      before the rock fractures (stress not measured at any deposit); the most this
+      pattern could take below the low end is about{" "}
+      {fmt(inj.max_rate_below_fracture_m3_day, 0)} m³/day.
+    </div>
+  );
+}
+
 export default function RunResult({
   r, extrapolation = [], compact = false, showVertical = true,
 }: { r: any; extrapolation?: string[]; compact?: boolean; showVertical?: boolean }) {
@@ -201,6 +324,15 @@ export default function RunResult({
   const exc = r?.isr_excursion ?? r?.excursion;
   // live / preview runs carry it at the top level, stored runs inside `hydro`
   const hypo = r?.hypotheticals?.isr_feasibility ?? r?.hydro?.hypotheticals?.isr_feasibility;
+  const alk = r?.hypotheticals?.high_alkalinity ?? r?.hydro?.hypotheticals?.high_alkalinity;
+  // 2026-09-27: outside trained support the band is the engine's own Monte
+  // Carlo, not the surrogate's extrapolation
+  const bandSource = r?.band_source ?? r?.hydro?.band_source;
+  const eng = r?.metrics?.engine_mc;
+  const useEngine = bandSource === "engine_mc" && eng;
+  const bandLabel = useEngine ? "engine band" : "ML band";
+  const bandOf = (k: string) => band(useEngine && eng?.[k] ? eng[k] : ml?.[k]);
+  const injectivity = r?.injectivity ?? r?.hydro?.injectivity;
 
   return (
     <>
@@ -210,7 +342,8 @@ export default function RunResult({
           <strong>Outside trained support:</strong>{" "}
           <span className="mono">{extrapolation.join(", ")}</span>. The analytical
           engine remains valid and is what you are reading; the ML band&apos;s 80%
-          conformal guarantee is <b>void</b> here.
+          conformal guarantee is <b>void</b> here
+          {useEngine ? ", so the band shown is the engine's own Monte Carlo" : ""}.
         </div>
       )}
 
@@ -246,10 +379,10 @@ export default function RunResult({
                 mlBand={band(ml?.area_ha)} mlStatus={r?.ml_status} />
         <Metric label="Max migration"
                 value={distance(an?.migration_m).text} unit={distance(an?.migration_m).unit}
-                mlBand={band(ml?.migration_m)} mlStatus={r?.ml_status} />
+                mlBand={bandOf("migration_m")} mlStatus={r?.ml_status} bandLabel={bandLabel} />
         <Metric label="At the monitoring ring"
                 value={fmt(an?.compliance_conc, 3)} unit={unit}
-                mlBand={band(ml?.compliance_conc)} mlStatus={r?.ml_status} />
+                mlBand={bandOf("compliance_conc")} mlStatus={r?.ml_status} bandLabel={bandLabel} />
       </div>
       <BaselineNote r={r} />
 
@@ -341,7 +474,12 @@ export default function RunResult({
 
       {/* 2026-09-26: the second answer — a labelled hypothetical, after the
           baseline's own caveats and before the vertical screen. */}
+      {/* 2026-09-27: bulk vs preferential pathway, and what alerts read */}
+      <PathwayAnswers r={r} unit={unit} compact={compact} />
+      <Injectivity inj={injectivity} />
+
       <IsrHypothetical h={hypo} unit={unit} compact={compact} />
+      <HighAlkalinity h={alk} compact={compact} />
 
       {/* R2: the shallow-aquifer screening, which the portal never showed.
           R10: `showVertical` exists because the REPORT rendered this twice —
@@ -363,7 +501,7 @@ export default function RunResult({
             <table className="grid">
               <thead>
                 <tr>
-                  <th>Indicator</th><th>At ring</th><th>Baseline</th>
+                  <th>Indicator</th><th>At ring</th><th>From</th><th>Baseline</th>
                   <th>UCL</th><th>Over</th>
                 </tr>
               </thead>
@@ -375,6 +513,7 @@ export default function RunResult({
                       {i.unit && <span className="muted small"> {i.unit}</span>}
                     </td>
                     <td className="mono">{fmt(i.ring_conc, 2)}</td>
+                    <td className="muted small">{i.reading_basis ?? "continuum"}</td>
                     <td className="mono">{fmt(i.baseline, 2)}</td>
                     <td className="mono">{fmt(i.upper_control_limit, 2)}</td>
                     <td>
