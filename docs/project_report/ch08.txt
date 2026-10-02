@@ -40,6 +40,8 @@ TABLE: Portal screens
 
 ![The deployed front page. The four figures on the right (districts assessed, wells checked, districts with a health exceedance and published screenings) are read live from the database.](figures/fig_front_page.png){w=13}
 
+![My area, the resident view of the deployed portal, 2 October 2026: the verdict for a followed block (Angara, Ranchi), the wells and samples behind it, how old the latest test is, and each health substance drawn against its limit. Substances never analysed are named rather than shown as safe.](figures/app_my_area.png){w=10}
+
 ## 8.4 Console and Site Report
 
 ### Console

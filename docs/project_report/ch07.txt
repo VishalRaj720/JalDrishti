@@ -29,6 +29,8 @@ A hydrochemical check showed that all 393 complete analyses in the 2023 file bal
 
 ![The public map: districts coloured by the worst measured health substance (uranium, nitrate or fluoride) against IS 10500:2012; 14 of 24 districts are High concern. Basemap © OpenStreetMap contributors (Open Database Licence).](figures/fig_public_map.png){w=13}
 
+![The Water quality screen of the deployed portal, 2 October 2026: every sampled well counted once by its worst determinand, health-related substances kept apart from hardness and other general ones. Its 53 health exceedances are the 32 wells above a permissible or no-relaxation limit (Table 7.1) plus the 21 wells with fluoride between 1.0 and 1.5 mg/L (Section 7.8).](figures/app_water_quality.png){w=15}
+
 ## 7.2 Groundwater Level Trends
 
 The water-level records held in the portal (2013 to 2021) were tested with the Theil–Sen slope and the Mann–Kendall test. Of 415 stations in the database, 331 had enough data for a trend test and 84 did not (fewer than 8 readings or less than 3 years).
@@ -54,6 +56,8 @@ TABLE: Water-table trends, 1994 – January 2026 (a positive trend means the wat
 |Uranium-belt districts, post-monsoon|23|−0.025|1|6|
 
 Over 32 years the network shows no net fall of the water table. The steepest decline is one West Singhbhum well at 0.31 m per year. This supports the use of the 2013–2021 water tables in the vertical screening. It is a statement about the monitoring network, not a guarantee for any single well, and it covers only the shallow unconfined aquifer, not the fractured rock below.
+
+![The Groundwater levels screen of the deployed portal, 2 October 2026: the Theil–Sen and Mann–Kendall results of Table 7.2 (5 falling, 20 rising, 306 stable, 84 with too short a record), with the station list sorted by the fastest decline.](figures/app_groundwater_levels.png){w=15}
 
 ## 7.3 Machine Learning Model Performance
 
@@ -183,6 +187,8 @@ With the preferential pathway, the excursion test is declared at every deposit, 
 
 These are precautionary, upper-bound readings, and they should be read as such. The pathway answer assumes that the fracture zones logged in the boreholes stay connected for kilometres. The vertical answer assumes that the gradient points upward, which is true at two of the four sites where it has been measured. Neither assumption has been tested at a deposit. The high-alkalinity uranium scenario changes much less: at Jaduguda the bulk uranium reach rises from 3.9 m to 8.5 m, because redox trapping in the ore still removes uranium. The injection check finds the default 2,500 m³/day *marginal* at every deposit in the measured rock: near the pressure that would fracture the rock. A cross-hole tracer test and a pair of deep piezometers in the belt would settle all of these questions with measurements.
 
+![The console on the deployed portal, 2 October 2026, after the September update: the registered Jaduguda site (1,000 m³/day, ore at 150 m, 8 years of operation), TDS at 20 years. The map shows the bulk plume (dashed rings around the wellfield) and the preferential-pathway channel (purple); the panel gives the two answers side by side (bulk reach 43.5 m against a channel reach of about 9.5 km) and states that alerts read the larger one. The registered site differs from the run in Section 7.5 (2,500 m³/day, ore at 180 m), so its numbers differ too.](figures/app_console_two_answers.png){w=15}
+
 ## 7.6 Monitoring Gap Results
 
 The gap analysis of all 264 blocks found:
@@ -207,6 +213,8 @@ TABLE: Top 10 blocks by monitoring priority (out of 264)
 |10|Boram|East Singhbhum|65.0|0|46.5|
 
 **All top 25 blocks lie in the uranium belt** (East and West Singhbhum, Saraikela-Kharsawan and neighbouring Khunti). Sixteen have no well at all, and the other nine have wells never tested for uranium, so the cheapest improvement is to test those existing samples.
+
+![The Proposed monitoring network screen of the deployed portal, 2 October 2026: two suggested wells in each of the ten highest-priority blocks (blue), drawn over the existing wells; the orange rings are wells that were sampled but never analysed for uranium, almost all in the Singhbhum belt.](figures/app_network_plan.png){w=15}
 
 ## 7.7 Sensitivity Analysis Results
 
@@ -235,6 +243,8 @@ On the local database, the measured-exceedance scan raised **53 alerts** from th
 - **21 warning:** fluoride between 1.0 and 1.5 mg/L
 
 Before the fix of Section 9.9 the scan matched zero rows. On the deployed system (21 September 2026), 55 alerts had been raised, 4 residents were following 7 blocks, and email delivery through the Brevo relay was working.
+
+![One alert as a resident sees it on the deployed portal, 2 October 2026: the critical nitrate alert for Biru (Simdega), with the plain-language message followed by the seven-field record (what happened, driven by, where, how serious, basis, confidence, what next).](figures/app_alert_record.png){w=11}
 
 ## 7.9 Software and Deployment Results
 

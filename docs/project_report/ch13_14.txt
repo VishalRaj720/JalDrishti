@@ -2,6 +2,58 @@
 
 {{REFERENCES}}
 
+# ASSUMPTIONS
+
+The problem described in Chapter 3 cannot be answered with measurements alone: no ISR operation exists in Jharkhand, and several properties of the deep fractured rock have never been measured. The work therefore rests on assumptions. They are collected here, after the references they draw on, together with the measurement or decision that would replace each one. The same register is shown inside the portal, so that every modelled number can be traced back to what it assumes.
+
+TABLE: The main assumptions of the study
+|{w=5.4,5.0,5.6}|
+|Assumption|Why it is needed|What would replace it|
+|Every ISR site is hypothetical: a result means “if ISR solution entered the aquifer here”|No ISR mine operates or is planned in Jharkhand|Site data, if ISR were ever proposed|
+|The source chemistry and the restoration results of Texas ISR mines apply here|No ISR has been run on Singhbhum ore|Leach and column tests on Singhbhum ore, or a pilot test|
+|A 2-D analytical plume with a 1-D vertical screening (“2.5-D”) is enough for screening|No well depths and no deep water levels exist for a 3-D model|A numerical model (MODFLOW/MT3D or a fracture network) at one site|
+|Regional flow is steady, with the direction and gradient from the 2013–2021 water levels|Only shallow, seasonal water levels are measured|Deep piezometer records at a deposit|
+|The shear-zone permeability at the deposits equals the largest value measured nearby (Kudada, 19 m²/day, 3 km from Turamdih)|No pumping test exists at a deposit|A pumping test at a deposit|
+|Fracture–matrix exchange (β, ω), fracture opening and matrix diffusion take literature or porosity-based values|Never measured in the shear zone|A cross-hole tracer test and packer tests|
+|The logged fracture zones stay connected down-gradient (preferential-pathway answer, an upper bound)|Fracture continuity is unknown|Borehole imaging and cross-hole tests at a deposit|
+|The vertical gradient points upward (0.03–0.23)|The direction is measured upward at only two of four belt sites|Deep and shallow piezometer pairs in the belt|
+|Vertical-to-horizontal permeability ratio 0.12, from the Maheshwaram granite|No Singhbhum measurement|A packer or pumping test with an observation well below 70 m|
+|Uranium Kd 0.3–3.0 L/kg (alkaline-suppressed); 0.1 L/kg only as a labelled scenario|No sorption test on Singhbhum rock with lixiviant|Column tests on Singhbhum core with a carbonate solution|
+|The nearest CGWB well and the BARC surveys represent the natural background of the ore-zone aquifer|Single shallow samples; no ore-zone baseline|Repeated baseline sampling at ore-zone wells|
+|The excursion rule follows NUREG-1569: ring at 100 m, control limit 1.2 × baseline|No Indian rule for ISR monitoring|A site baseline series and a regulator’s rule|
+|The health-band rule, the critical alert tier and the monitoring-priority weights are project choices|No official equivalent exists|Rules agreed with CGWB and the state regulator|
+
+The constants behind these assumptions are listed below.
+
+TABLE: Constants with no local measurement, and modelling choices (the assumption register)
+|{w=4.6,3.4,8.0}|
+|Constant|Value used|What would replace it with a measurement|
+|Leach-zone growth gain|0.40|Field data on how far lixiviant spreads beyond the well pattern|
+|Leach-zone growth scale|2.0 bulk volumes|Same as above|
+|Attribution floor|10% of the limit|A regulator’s rule on how much of a poor baseline a mine is responsible for|
+|Control-limit increase|20% over baseline|Repeated baseline samples at each ore-zone monitoring well (the shallow wells’ natural swing is now measured, Section 4.3)|
+|Matrix storage ratio β (range)|0.3 to 20; central value from porosities, band a factor of 4 either side|A tracer test in the Singhbhum shear zone|
+|Matrix exchange rate ω|0.001 per day|Same as above|
+|Fracture opening|0.1 to 0.5 mm|A packer test in the shear zone|
+|Matrix diffusion coefficient|5 × 10⁻⁶ m²/day|No defensible range exists yet|
+|Vertical to horizontal permeability ratio|0.12 fractured (measured range 0.034–0.61, Maheshwaram granite); 0.008 porous|A packer or pumping test with an observation well in the shear zone below 70 m|
+|Upward hydraulic gradient|0.03–0.23 (middle 0.083), upward case; the direction is not measured|Deep piezometers in the belt|
+|Transport opening of a fracture (channel answer)|1 to 10 times the pumping-test opening|A cross-hole tracer test in the belt|
+|Fracture zones stay connected down-gradient (channel answer)|assumed; upper bound|Borehole imaging and cross-hole tests at a deposit|
+|Permeability across ÷ along the foliation|0.01 to 1 (displayed band only)|Oriented packer tests in the shear zone|
+|Stress that would fracture the rock (injection check)|0.5 to 1.0 of the rock's weight|A stress test in a borehole at a deposit|
+|Uranium Kd, high-alkalinity scenario|0.03 to 0.3 L/kg (central 0.1)|Column tests on Singhbhum core with a carbonate solution|
+|Old-well failure probability|0.05|Failure statistics of ISR wells|
+|Pump downtime and drift ranges|operating ranges|Records of real excursions and downtime|
+|Shear-zone transmissivity (choice of the measured maximum)|19 m²/day (Kudada), capped at 20|A pumping test at a deposit|
+|ISR-feasibility K (hypothetical answer only)|1 m/day|A modelling choice (the IAEA “advantageous” level); used only for the labelled hypothetical|
+|Background blend distance|5 km|A denser well-by-well radionuclide survey|
+|Ore-depth seed at each deposit|60 to 180 m (Section 4.3)|A site-specific target depth|
+|Total porosity and grain density|schist 0.03 and 2,750 kg/m³ (literature values)|Porosity measured on Singhbhum rocks|
+|K at the base of the fractured zone|5% of the reference K|Deep packer tests in Singhbhum|
+|Uranium source at belt sites between deposits|0.30 of the deposit source|Drill-hole grades for the belt between the mined deposits|
+|Sideways-to-lengthwise dispersivity where no fracture data exists|0.02 fractured, 0.10 porous|A tracer test in the belt|
+
 # 14. ANNEXURES
 
 The following annexures give supporting technical details: the database tables, code excerpts, a sample alert record, and further sensitivity figures.

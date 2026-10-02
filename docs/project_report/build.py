@@ -265,6 +265,8 @@ def chapter_heading(doc, text, first):
     m = re.match(r"(\d+)\.", text)
     if m:
         Counter.chapter, Counter.fig, Counter.tab = int(m.group(1)), 0, 0
+    else:       # an unnumbered chapter (Assumptions): tables become A.1, A.2, ...
+        Counter.chapter, Counter.fig, Counter.tab = text.strip()[0], 0, 0
     p = doc.add_paragraph(style="Heading 1")
     para_fmt(p, align=WD_ALIGN_PARAGRAPH.LEFT, before=0, after=12, spacing=1.15, keep_next=True)
     add_rich(p, text, size=14, bold=True)
