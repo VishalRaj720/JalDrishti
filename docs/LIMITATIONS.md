@@ -690,14 +690,15 @@ The baseline's ore-zone K is 0.034–0.060 m/day; the hypothetical's is
 | Jaduguda | TDS | 30 m | 0 | 535 m | 1.00 |
 | Jaduguda | sulfate | 11 m | 0 | 156 m | 0.56 |
 | Jaduguda | uranium | 4 m | 0 | 38 m | 0.06 |
-| Turamdih | TDS | 20 m | 0 | 386 m | 0.92 |
-| Turamdih | sulfate | 11 m | 0 | 127 m | 0.42 |
+| Turamdih | TDS | 20 m | 0 | 389 m | 0.92 |
+| Turamdih | sulfate | 11 m | 0 | 128 m | 0.44 |
 | Turamdih | uranium | 5 m | 0 | 36 m | 0.06 |
-| Bagjata | TDS | 8 m | 0 | 100 m | 0.50 |
+| Bagjata | TDS | 8 m | 0 | 98 m | 0.50 |
 | Bagjata | uranium | 2 m | 0 | 14 m | 0 |
 
-* The first vertical arrival (TDS) is 140 yr at Jaduguda, 48 yr at Turamdih
-  and 109 yr at Bagjata, in both answers. The rock above the ore keeps its
+* The first vertical arrival (TDS) is 10.6 yr at Jaduguda, 4.3 yr at Turamdih
+  and 7.0 yr at Bagjata, in both answers (measured upward-gradient band, §1l;
+  it was 140, 48 and 109 yr at the old assumed 0.005). The rock above the ore keeps its
   measured K in the hypothetical, because the IAEA criterion concerns the ore
   horizon. The engine computes this rather than assuming it, and would show a
   difference if the two ever became coupled.
@@ -718,9 +719,9 @@ different questions, and neither replaces the other.
 
   | Site | Constituent | Measured rock | P(exceed) | ISR-grade rock | P(exceed) |
   |---|---|---|---|---|---|
-  | Jaduguda | TDS | 18–31–59 m | 0 | 215–555–1,395 m | 1.0 |
-  | Turamdih | TDS | 10–20–46 m | 0 | 143–378–1,087 m | 0.92 |
-  | Jaduguda | uranium | 2–3–7 m | 0 | 15–35–71 m | 0.06 |
+  | Jaduguda | TDS | 17–31–59 m | 0 | 215–553–1,394 m | 1.0 |
+  | Turamdih | TDS | 9–20–46 m | 0 | 143–380–1,092 m | 0.92 |
+  | Jaduguda | uranium | 1.5–3.1–6.4 m | 0 | 14–33–69 m | 0.06 |
 
 * **They must not be merged.** Folding the hypothetical into the Monte Carlo
   would need a probability that the rock is ISR-grade. No data supplies one,

@@ -22,26 +22,24 @@ TABLE: Month-wise utilization of the fellowship grant (as recorded in the MPRs)
 
 ## 10.2 Expenditure Summary
 
-Most of the expenditure was on research resources: books and e-books for learning hydrogeology and contaminant transport, a research tool subscription, and an AI research and system-design subscription used from February onwards. Because the project is entirely software-based, no electronic components or fabrication materials were needed. The backend was hosted on free cloud tiers wherever possible, and the August MPR records spending on cloud hosting and deployment.
-
-The amounts for July and August 2026 were not filled in the MPRs and are to be completed from the corresponding bills. All expenditure was made only for project-related purposes, and the purchase bills and invoices are attached as supporting documents in Annexure F.
+Most of the expenditure was on research resources: books and e-books on hydrogeology and contaminant transport, a research tool subscription, and an AI research and system-design subscription used from February onwards. No electronic components or fabrication materials were needed. The backend was hosted on free cloud tiers wherever possible, and the August MPR records spending on cloud hosting and deployment. The amounts for July and August 2026 were not recorded in the MPRs. All expenditure was made only for project-related purposes.
 
 # 11. CONCLUSION
 
 The aim of this fellowship project was to build a system that can screen how groundwater contamination from a hypothetical ISR uranium operation would behave in Jharkhand, check what the existing groundwater record says, find where monitoring is weakest, and inform the people concerned. The project achieved this through JalDrishti, a web-based decision-support system that is deployed and working.
 
-The most important step of the project was a change of method. The first five months followed the proposal and trained machine learning models on measured and synthetic water-quality data. In June 2026 a careful check showed that these models were not learning how contamination spreads, because the measured data had no information about distance or time. The prediction core was rebuilt as a physics-based contaminant transport engine, using the Domenico and Ogata–Banks solutions adapted for fractured hard rock, with dual-porosity slowing, matrix diffusion, a leach zone, restoration based on Texas ISR records, uranium attenuation and the NUREG-1569 2-of-3 excursion test. The engine uses real Jharkhand data: aquifer maps, a groundwater flow field from 398 CGWB stations (confirmed by a 32-year record), a fracture field from GSI lineaments, NAQUIM layers, uranium deposit grades and ore depths, and, in the uranium belt, the permeability measured in the belt’s own rock, checked against the water pumped out of the mines, with local uranium and radium backgrounds from BARC surveys. Every run gives two answers: one for the rock as measured, and one, labelled hypothetical, for rock permeable enough for ISR. An XGBoost surrogate trained on 18,000 engine scenarios gives fast answers with calibrated 80% uncertainty bands.
+The most important step was a change of method. When the ML models trained on measured data in the first five months proved unable to learn how contamination spreads, the prediction core was rebuilt as a physics-based transport engine for fractured hard rock, fed with real Jharkhand data and, in the uranium belt, with the belt’s own measured permeability. Every run gives two answers, for the rock as measured and, labelled hypothetical, for rock permeable enough for ISR, and an XGBoost surrogate trained on 18,000 engine scenarios adds calibrated 80% uncertainty bands.
 
 The main results are:
 
 - The ML surrogate (version 6) reproduces the physics engine with an R² (log scale) of 0.89 to 0.97, performs better than all baseline models, and keeps its 80% coverage on real-location test cases. The radium travel-distance result does not meet the target and is reported openly.
 - The engine matches an exact numerical solution after a missing formula term was found and restored, and its permeability in the belt lies on the cautious side of the mines’ own discharge records.
 - In the measured record, uranium is within its limit at every tested well, while nitrate (22 wells) and fluoride (32 wells) are the real health concerns, in 14 of 24 districts. Iron, arsenic and manganese have never been tested.
-- At the hypothetical Jaduguda site, in the rock as measured, the bulk plume of uranium spreads about 4 m beyond the wellfield in 20 years, sulphate 11 m and TDS 30 m. The fractures logged in the belt's own boreholes could carry TDS kilometres (an upper bound), and the alerts now read that larger answer, so an excursion is declared at every deposit. If the rock were permeable enough for ISR, TDS would spread about 535 m. At a more permeable belt site near Narwapahar, chloride and TDS declare an excursion in year 19 while uranium is still at background at the ring, so the chemical indicators, not uranium, give the first warning.
-- With the upward gradient taken from the belt's own well pairs, the first constituent to reach the shallow aquifer at Jaduguda is TDS, after about 11 years (3.5 to 27 across the measured range; it was 140 years at the old assumed gradient), while uranium would take centuries. The direction of the gradient has not been measured at any site. At the more permeable belt site near Narwapahar the result is different: TDS would reach the shallow aquifer in about 16 years, with a high index (0.65). Between the deposits, where the model falls back towards the more permeable aquifer-map value, the shallow drinking-water layer is therefore the most exposed.
+- At the hypothetical Jaduguda site, in the rock as measured, the bulk plume of uranium spreads about 4 m beyond the wellfield in 20 years, sulphate 11 m and TDS 30 m. The fractures logged in the belt's own boreholes could carry TDS kilometres (an upper bound), and the alerts now read that larger answer, so an excursion is declared at every deposit. If the rock were permeable enough for ISR, TDS would spread about 535 m. At a more permeable belt site near Narwapahar, the bulk answer has chloride and TDS crossing their limits by year 19 while uranium is still at background at the ring, so in the bulk rock the chemical indicators, not uranium, give the first warning; the preferential pathway brings the declaration forward to year 9.
+- With the upward gradient taken from the belt's own well pairs, the first constituent to reach the shallow aquifer at Jaduguda is TDS, after about 11 years (3.5 to 27 across the measured range; it was 140 years at the old assumed gradient), while uranium would take centuries. The direction of the gradient has not been measured at any site. At the more permeable belt site near Narwapahar the result is different: TDS would reach the shallow aquifer within about a year (0.3 to 2.7 years), with a high index (1.0). Between the deposits, where the model falls back towards the more permeable aquifer-map value, the shallow drinking-water layer is therefore the most exposed.
 - The 25 most poorly monitored blocks all lie in the uranium belt.
 - The alert system raises 53 tiered alerts from the measured data and delivers them to residents by email.
-- The system is supported by 463 engine tests and 533 backend tests and runs online with five secure user roles.
+- The system is supported by 485 engine tests and 539 backend tests and runs online with five secure user roles.
 
 The project also has clear limits. No real ISR plume exists in Jharkhand, so the model cannot be validated against a measured plume, and its uncertainty bands cover only the uncertainty of the input values, not errors in the model itself. With the permeability now taken from the belt’s own rock, the inputs that control the plume extent most are the fracture–matrix exchange terms, the transfer rate ω and the storage ratio β, and neither has been measured anywhere in the shear zone. No pumping test has been made at a deposit itself. Trend forecasting of health-related water quality was not possible, because no repeated measurements exist. The system works on the manual monitoring network; it is a decision-support tool ready for sensors, not a live sensor network.
 
@@ -49,13 +47,11 @@ In conclusion, JalDrishti shows that a useful and honest groundwater contaminati
 
 # 12. FUTURE SCOPE
 
-JalDrishti provides a base for more advanced groundwater monitoring and screening in the mining sector. The current prototype works well within the limits of the available data. Several improvements can make it more accurate and more useful.
+JalDrishti provides a base for more advanced groundwater monitoring and screening in the mining sector. The following improvements would make it more accurate and more useful.
 
 ## 12.1 Field Measurements in the Uranium Belt
 
-The sensitivity analysis showed that, in the tight rock measured in the belt, the plume extent depends mostly on the fracture–matrix exchange terms (the transfer rate ω and the storage ratio β), which have never been measured in the Singhbhum shear zone. The permeability itself comes from a test 3 km from Turamdih, not from a deposit.
-
-Possible work includes:
+The inputs that matter most (Section 7.7) have not been measured in the shear zone. Possible work includes:
 
 - A cross-hole tracer test in the belt to measure ω and β, the fracture velocity and whether the logged fracture zones stay connected; this is the single most valuable missing measurement, because it decides between the bulk and the preferential-pathway answers.
 - A pumping test at a deposit itself, to replace the nearest measured value.
@@ -79,13 +75,7 @@ Recommended steps include:
 
 ## 12.3 Integration of Real-Time Sensors
 
-The data layer of JalDrishti is ready to accept new data. If water-quality or water-level sensors are installed in the belt, the system can become a true cyber-physical system [@lee2008].
-
-Possible applications include:
-
-- Automatic intake of sensor readings through a data interface
-- Live alerts when a sensor value crosses a limit
-- Comparison of sensor trends with the modelled plume
+The data layer of JalDrishti is ready to accept new data. If water-quality or water-level sensors are installed in the belt, the system can become a true cyber-physical system [@lee2008], with automatic intake of sensor readings, live alerts when a reading crosses a limit, and comparison of sensor trends with the modelled plume.
 
 ## 12.4 Water Quality Trend Forecasting
 
@@ -101,16 +91,11 @@ A detailed numerical model (such as MODFLOW with MT3D, or a discrete fracture ne
 
 ## 12.7 More Ways to Reach Residents
 
-Many residents in rural Jharkhand may not use email. Future versions can add:
-
-- SMS alerts
-- Alerts in Hindi and other regional languages
-- A mobile-friendly app for field officers and residents
-- Paid hosting, so that the scheduler never sleeps
+Many residents in rural Jharkhand may not use email. Future versions can add SMS alerts, alerts in Hindi and other regional languages, a mobile-friendly app, and paid hosting so that the scheduler never sleeps.
 
 ## 12.8 Other Mining Contexts
 
-The chemical list in the engine is modular. The system can be extended to other mining problems, such as acid drainage from coal mines (sulphate, iron and manganese), after the model is checked for those conditions.
+The chemical list in the engine is modular, so the system can be extended to other mining problems, such as acid drainage from coal mines (sulphate, iron and manganese), after the model is checked for those conditions.
 
 ### Future Vision
 

@@ -8,17 +8,12 @@ One principle guided the order of the work. The physics model is the authority, 
 
 The first stage was to understand the problem and the users. Groundwater monitoring guidance, aquifer vulnerability methods and ISR contamination pathways were studied [@mda2011; @saunders2016], along with the US regulatory rules for ISR excursion monitoring [@nureg1569]. The users were identified as five groups: an administrator who manages the system and publishes screenings, a regulator who reviews field submissions, analysts who run the model, field officers who submit field observations, and residents who want to know about their own area.
 
-Based on this analysis, the following requirements were identified:
+Beyond the objectives of Chapter 2, the analysis added these requirements:
 
-- Use real Jharkhand data (water quality, water levels, aquifers, geology, deposits) wherever it exists.
-- Estimate how far and how fast contamination would spread from any point in the state, not only at one site.
-- Give an uncertainty band with every modelled number, and say clearly when a result is outside the range the model was trained on.
-- Assess the measured water quality against IS 10500:2012 and show which substances were never tested.
-- Send alerts to the people concerned, with a clear reason and a recommended action.
-- Rank the blocks of the state by how poorly they are monitored.
-- Provide role-based access, so that residents never see exact coordinates of hypothetical mine sites or model internals.
-- Keep every action traceable through an audit log.
-- Run on low-cost hosting and be easy to maintain.
+- Work from any point in the state, not only at one site, using real Jharkhand data wherever it exists.
+- Give an uncertainty band with every modelled number, and say when a result is outside the range the model was trained on.
+- Never show residents exact coordinates of hypothetical mine sites or model internals.
+- Keep every action traceable through an audit log, and run on low-cost hosting.
 
 ## 4.2 System Architecture
 
@@ -26,13 +21,11 @@ The system is organised in five layers. Data flows from the data layer through t
 
 FLOW: Data Layer (CGWB chemistry, levels and boreholes, aquifers, NAQUIM, lineaments, deposits, rivers, DEM, BARC surveys, UCIL mine records, Texas ISR records) >> Data Preparation (parsing, block assignment, flow field, fracture field, local backgrounds) >> Physics Transport Engine (measured-rock answer and ISR-feasibility hypothetical: plume footprint, travel distance, ring concentration, excursion test) >> ML Surrogate (XGBoost P10 / P50 / P90 with conformal bands) >> Decision Layer (IS 10500 assessment, alerts, monitoring-gap ranking) >> API and Web Portal (FastAPI, five roles, security) >> Action (publish screening, alert, email, acknowledgement)
 
-The deployed system has the following structure. The browser loads the portal from a Cloudflare Worker, which also forwards API calls to the backend. The backend runs on Render and contains the physics engine and the trained ML model in the same process. The database is PostgreSQL with PostGIS, hosted on Neon. Alert emails are sent through an SMTP relay (Brevo).
-
-FLOW: User’s Browser >> Cloudflare Worker (portal + API forwarding) >> Render Web Service (FastAPI + physics engine + ML model + scheduler) >> Neon PostgreSQL / PostGIS (with row-level security) >> Brevo SMTP relay (alert emails)
+The physics engine and the ML model run inside the backend process; the deployed services are described in Sections 5.6 and 8.9.
 
 ## 4.3 Data Collection and Preparation
 
-All the data used is open data from government and international sources. The full list is given in Section 5.7 and Annexure A. The main preparation steps were:
+All the data used is open data from government and international sources. The full list is given in Section 5.7. The main preparation steps were:
 
 ### Water quality (2023)
 
@@ -214,8 +207,6 @@ A second answer is therefore computed for every fractured-rock run. The measured
 
 Both answers are shown, labelled *bulk matrix migration* and *preferential pathway reach*. Following the project owner's decision, alerts and the excursion test read the larger of the two, so that a fast pathway cannot be hidden behind a bulk average (Section 7.5b).
 
-The engine was checked against an exact numerical solution on 240 test cases. This check found that an earlier simplified version under-estimated concentrations by 17–42%, and the full formula was restored (Section 7.4).
-
 ## 4.6 Vertical (Shallow Aquifer) Screening
 
 The plan-view model above describes the ore layer. People, however, drink from the shallow layer. A separate screening estimates whether contamination at ore depth could reach the shallow aquifer through three routes:
@@ -230,13 +221,13 @@ The salts carried by the lixiviant (chloride, TDS and sulphate) are screened on 
 
 The three routes are combined into one screening index between 0 and 1, which is shown as *high*, *moderate*, *low* or *contained*, together with the main route and an estimated breakthrough time. The upward push of water changes with the monsoon, so the breakthrough time is calculated for both the dry-season and the wet-season case, and for the yearly average of the upward push. The upward head difference is taken from the belt itself. Close pairs of deep and shallow wells show natural vertical gradients of 0.03 to 0.23 [@naquim; @naquim_belt], and the screening uses the middle of this range (0.083), with the results at its 10th and 90th percentiles shown beside it. It replaces an assumed 0.005. The direction is not measured at any site: two of the four observations point upward (the artesian Kudada well, and Dumirta in the dry season) and two downward. The screening computes the upward case, as a precaution, and every result and alert says so. The dipping foliation of the belt (about 40° at Jaduguda and 35° at Turamdih) is also shown as a band. Rotating the permeability into the dip gives a vertical-to-horizontal ratio of about 0.5 to 1, against the 0.12 used. This band does not change the headline, because the ratio of permeability along and across the foliation has never been measured.
 
-A full 3-D transport model was not built. The chemistry wells have no recorded depth, and there is no deep water-level data in the belt. A 3-D model built on this data would look precise but would not be backed by measurements. The system therefore stays “2.5-D” and says so. To help users see the answers in place, the portal draws a **3-D site block** (Section 8.5): the ground from the GLO-30 elevation model [@dem], the aquifer layers at the district’s NAQUIM depths, the water table, the nearest CGWB boreholes, the plume on the ore horizon, and the vertical fronts climbing year by year. The block is a picture of the 2-D and 1-D answers above; it adds no physics of its own.
+A full 3-D transport model was not built. The chemistry wells have no recorded depth, and there is no deep water-level data in the belt. A 3-D model built on this data would look precise but would not be backed by measurements. The system therefore stays “2.5-D” and says so. To help users see the answers in place, the portal draws a **3-D site block** (Section 8.4): the ground from the GLO-30 elevation model [@dem], the aquifer layers at the district’s NAQUIM depths, the water table, the nearest CGWB boreholes, the plume on the ore horizon, and the vertical fronts climbing year by year. The block is a picture of the 2-D and 1-D answers above; it adds no physics of its own.
 
 ## 4.7 Machine Learning Surrogate Model
 
 ### Why a surrogate
 
-The proposal planned ML models trained on measured groundwater data. The first pipelines (March–May 2026) did this. However, an audit in June 2026 found that these models were not learning contamination spread at all. The measured records have no distance from any mine and no time since injection, so those fields had been filled with a constant value, and the model was really predicting the natural background uranium. The spread with distance existed only in the synthetic data the project had generated itself (Section 9.3). The ML approach was therefore changed: the physics engine produces the labels, and the ML model learns to copy the engine quickly and give calibrated uncertainty bands. Such a model is called a *surrogate*.
+The ML models trained on measured data in March–May 2026 could not learn contamination spread, because the measured records contain no spread (Section 9.3). The physics engine therefore produces the labels, and the ML model learns to copy the engine quickly and give calibrated uncertainty bands. Such a model is called a *surrogate*.
 
 ### Training data
 
@@ -320,18 +311,8 @@ TABLE: Monitoring priority weights
 
 The ranking is based on observation on purpose. The model is least reliable where there is no data, so ranking by predicted risk would send field teams to places the model is already confident about. Along with the ranking, a gap table (block × substance × tested or not) and suggested new well sites are provided.
 
-A **global sensitivity analysis** was also carried out to find which inputs control the model results. Thirteen inputs were varied at three reference sites, and Sobol indices were calculated [@sobol1993; @saltelli2010]. All the constants that could not be backed by a local measurement, or that are a modelling choice rather than a measurement (20 in total), were listed in an **assumption register**, which is shown inside the portal together with what measurement would be needed to replace each one.
+A **global sensitivity analysis** was also carried out to find which inputs control the model results. Thirteen inputs were varied at three reference sites, and Sobol indices were calculated [@sobol1993; @saltelli2010]. All the constants that could not be backed by a local measurement, or that are a modelling choice rather than a measurement, were listed in an **assumption register**, shown inside the portal and on the Assumptions page after Chapter 3, together with the measurement that would replace each one.
 
 ## 4.11 Testing and Validation
 
-Testing was carried out at every level:
-
-- **Engine tests (463):** physical rules (for example, more bleed never increases the spread), the exact-solution check, restoration behaviour, the extracted CGWB records, the local backgrounds, the vertical pathway and fixes found in review rounds.
-- **Backend tests (533):** run against a real PostGIS database; they cover role access for all 143 endpoints, database security, alert tiers, email delivery and retry, the water-quality module, and a check that no alert ever reads the ISR-feasibility hypothetical.
-- **Review rounds:** from July 2026, the system went through several numbered review rounds. Each finding was either fixed and pinned with a test, or shown to be wrong with evidence.
-- **Browser testing:** every screen was checked for every role by hand.
-- **Deployment checks:** the deployed system was checked for speed, security settings and correct operation.
-
-## 4.12 Methodology Summary
-
-The method combined real local data, standard groundwater physics and machine learning in a way where each part does what it is good at. The physics engine gives answers that can be explained and checked against exact solutions. In the uranium belt it uses the permeability measured in the belt’s own rock, and it shows beside it, clearly labelled, what would happen if the rock were permeable enough for ISR. The ML surrogate gives fast answers with honest uncertainty bands. The assessment, alert and ranking modules turn these results into information that officials and residents can act on. The result is a screening tool that can be used anywhere in Jharkhand, while being clear about which of its numbers are measured, which are modelled, and which could not be checked because no data exists.
+The **engine tests (485)** cover physical rules (for example, more bleed never increases the spread), the exact-solution check, restoration, the extracted CGWB records, the local backgrounds, the vertical pathway and every review fix. The **backend tests (539)** run against a real PostGIS database and cover role access for all 143 endpoints, database security, alert tiers, email delivery and retry, and a check that no alert ever reads the ISR-feasibility hypothetical. From July 2026 the system also went through numbered **review rounds**, in which each finding was fixed and pinned with a test or shown to be wrong with evidence. Every screen was checked by hand for every role, on the deployed system as well.

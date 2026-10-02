@@ -118,6 +118,33 @@ def page_break(doc):
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
+def fold_page_breaks(doc):
+    """Turn each break-only paragraph into "page break before" on the next block.
+
+    A paragraph holding only a page break is itself a line of text: when the page
+    before it is already full, it spills onto a new page and the break then starts
+    yet another one, leaving a blank page. Moving the break onto the next
+    paragraph (or the first paragraph of the next table) cannot do that."""
+    body = doc.element.body
+    for p in list(body.iterchildren(qn("w:p"))):
+        brs = p.findall(".//" + qn("w:br"))
+        if not brs or any(b.get(qn("w:type")) != "page" for b in brs):
+            continue
+        if "".join(t.text or "" for t in p.iter(qn("w:t"))).strip():
+            continue
+        nxt = p.getnext()
+        if nxt is not None and nxt.tag == qn("w:tbl"):
+            nxt = next(nxt.iter(qn("w:p")), None)
+        if nxt is None or nxt.tag != qn("w:p"):
+            continue
+        pPr = nxt.get_or_add_pPr()
+        if pPr.find(qn("w:pageBreakBefore")) is None:
+            # schema order: pStyle, keepNext, keepLines, pageBreakBefore, ...
+            lead = [c for c in pPr if c.tag in (qn("w:pStyle"), qn("w:keepNext"), qn("w:keepLines"))]
+            pPr.insert(pPr.index(lead[-1]) + 1 if lead else 0, OxmlElement("w:pageBreakBefore"))
+        body.remove(p)
+
+
 def cell_borders(cell, on=True):
     tcPr = cell._tc.get_or_add_tcPr()
     borders = OxmlElement("w:tcBorders")
@@ -163,6 +190,14 @@ def add_table(doc, rows, widths_cm=None, header=True, grid=True, size=11, center
     # LibreOffice sizes columns from the grid, Word from the cell widths; set both
     for gc, w in zip(t._tbl.tblGrid.findall(qn("w:gridCol")), widths_cm):
         gc.set(qn("w:w"), str(int(w * 567)))
+    # Keep a table on one page only when it is short. A tall table kept whole
+    # jumps to the next page and leaves most of the previous one blank; it may
+    # split instead (the header row repeats), keeping just the caption, header
+    # and first row together. Height is estimated in text lines per row.
+    def lines(text, width):
+        return max(1, -(-len(re.sub(r"\*", "", text.strip())) // max(int(width * 4.6), 1)))
+    est = sum(max(lines(r[c], widths_cm[c]) for c in range(ncol)) for r in rows)
+    keep_rows = len(rows) - 1 if est <= 16 else min(1, len(rows) - 1)
     for i, r in enumerate(rows):
         row = t.rows[i]
         for c in range(ncol):
@@ -177,7 +212,7 @@ def add_table(doc, rows, widths_cm=None, header=True, grid=True, size=11, center
             repeat_header(row)
         trPr = row._tr.get_or_add_trPr()
         cs = OxmlElement("w:cantSplit"); cs.set(qn("w:val"), "true"); trPr.append(cs)
-        if len(rows) <= 18 and i < len(rows) - 1:      # keep short tables on one page
+        if i < keep_rows:
             for cell in row.cells:
                 for para in cell.paragraphs:
                     para.paragraph_format.keep_with_next = True
@@ -507,7 +542,7 @@ def front_matter(doc, F, pages):
     n0 = len(doc.paragraphs)
     render_markup(doc, F["abstract"])
     for p in doc.paragraphs[n0:]:
-        p.paragraph_format.line_spacing = 1.35
+        p.paragraph_format.line_spacing = 1.2
     p = doc.add_paragraph(); para_fmt(p, before=8)
     add_rich(p, "**Keywords:** " + F["keywords"])
     page_break(doc)
@@ -550,6 +585,13 @@ def back_matter(doc, B):
         for c in r.cells:
             for p in c.paragraphs:
                 p.paragraph_format.space_before = Pt(3); p.paragraph_format.space_after = Pt(3)
+    page_break(doc)
+    heading_line(doc, "IMPORTANT LINKS", align=WD_ALIGN_PARAGRAPH.LEFT, underline_rule=False)
+    n0 = len(doc.paragraphs)
+    render_markup(doc, B["links"])
+    for p in doc.paragraphs[n0:]:          # long URLs: left-aligned, not justified
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        p.paragraph_format.line_spacing = 1.15
 
 
 def references(doc):
@@ -581,6 +623,7 @@ def build(pages):
         else:
             render_text(doc, text, first_chapter=first)
     back_matter(doc, B)
+    fold_page_breaks(doc)
     doc.save(OUT)
     unused = sorted(set(REFS) - set(cite_order))
     print(f"built {OUT.name}: {len(cite_order)} references cited" + (f"; unused keys: {unused}" if unused else ""))
@@ -622,7 +665,7 @@ def find_pages(pdf):
         if s is None:
             continue
         later = [b for b in bounds if b > s]
-        e = (later[0] - 1) if later else s
+        e = (later[0] - 1) if later else len(texts)
         pages[k] = str(s) if e <= s else f"{s}-{e}"
     missing = [k for k in keys if k not in starts]
     if missing:

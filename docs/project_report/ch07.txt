@@ -27,14 +27,7 @@ The record also shows important gaps. Iron and arsenic were tested at none of th
 
 A hydrochemical check showed that all 393 complete analyses in the 2023 file balance within ±3.2%. This is better than any normal laboratory batch, and it is explained by sodium having been calculated from the other ions. So the file’s charge balance cannot be used as proof of laboratory quality. In the older 2000–2021 record, the check is meaningful: 127 of 753 analyses were flagged as suspect.
 
-### Key achievements include:
-
-- The full measured record was assessed against IS 10500 for the first time in the system.
-- Nitrate and fluoride were identified as the real health issues, with 32 wells and 14 districts affected.
-- “Not tested” was made a separate grey class, so that missing data is never shown as safe.
-- The public map shows each district by its worst measured health substance.
-
-![The public map: districts coloured by the worst measured health substance (uranium, nitrate or fluoride) against IS 10500:2012; 14 of 24 districts are High concern. Basemap © OpenStreetMap contributors (Open Database Licence).](figures/fig_public_map.png){w=15}
+![The public map: districts coloured by the worst measured health substance (uranium, nitrate or fluoride) against IS 10500:2012; 14 of 24 districts are High concern. Basemap © OpenStreetMap contributors (Open Database Licence).](figures/fig_public_map.png){w=13}
 
 ## 7.2 Groundwater Level Trends
 
@@ -83,19 +76,11 @@ TABLE: R² (log scale) of the P50 model for each chemical (target ≥ 0.60)
 |Travel distance|0.945|0.907|0.898|**0.412 (below target)**|
 |Ring concentration|0.909|0.909|0.972|0.746|
 
-For radium, the travel distance is below the project’s own target of 0.60. This is because radium hardly moves: most of its travel-distance values are exactly zero, and a regression model cannot learn such data well. The result is reported openly instead of lowering the target. The radium ring concentration passes (0.746), but this should be read with care. In almost all cases the radium value at the ring equals the scenario’s own background, and the background is a feature that varies between scenarios (10 to 23 mBq/L), so the model learns “ring equals background” from that feature. This helps the tool serve the right number, but it says nothing new about how radium moves. The radium uncertainty bands still cover at least 90% of cases in cross-validation and at least 95% in the real-location test, and the physics engine always gives the main radium value, so users are not misled.
+For radium, the travel distance is below the project’s own target of 0.60. This is because radium hardly moves: most of its travel-distance values are exactly zero, and a regression model cannot learn such data well. The result is reported openly instead of lowering the target. The radium ring concentration passes (0.746) only because the ring value almost always equals the scenario’s background, which is itself a feature, so it says nothing new about how radium moves. The radium bands still cover at least 90% of cases in cross-validation and 95% in the real-location test, and the engine always gives the main radium value.
 
 SHAP analysis showed that the model relies on the right physical quantities. The plume front position calculated by the engine is the strongest feature for travel distance and excursion probability. The source concentration, the dispersivity and the wellfield width are the strongest for the footprint area, because most of the footprint is the leach zone itself. No map coordinate can appear, because none is a feature.
 
 ![SHAP feature importance for the excursion-probability model (version 6): the plume front position calculated by the engine (Xc_m) dominates.](figures/shap_excursion_probability.png){w=13}
-
-### Key achievements include:
-
-- Surrogate R² (log) of 0.89 to 0.97, better than all baselines.
-- 80% coverage achieved on real-location test scenarios for all three targets (0.90 to 0.92).
-- Training data that covers the tight rock of the deposits, down to K = 0.0021 m/day.
-- Physical rules built into the model and checked against the engine.
-- The radium travel-distance weakness reported openly, with the engine used as the authority.
 
 ## 7.4 Validation of the Transport Engine
 
@@ -135,22 +120,20 @@ TABLE: Modelled results at the Jaduguda deposit after 20 years: measured-rock an
 |TDS|3,655.5 mg/L|1,778.6 mg/L|10.09|**30.4**|0.00|1.7 – 198.7|534.6, 1.00|
 |Radium-226|1,706 mBq/L|22.1 mBq/L|9.37|0.0|0.00|0.0 – 0.3|1.1, 0.00|
 
-The chance at the ring is the excursion probability. In the measured rock the plume barely leaves the wellfield in 20 years. TDS reaches about 30 m beyond the wellfield edge, sulphate 11 m and uranium 4 m, and most of the 9 to 10 ha footprint is the leach zone itself. No indicator reaches its control limit at the 100 m ring, so no excursion is declared. The order of spread (uranium far behind sulphate, which is behind TDS) comes from how strongly each chemical is held back by the rock. This is the same reason the US rules do not use uranium as an excursion indicator [@nureg1569], and the engine reproduces it without being told. At a location with no uranium ore (Ranchi), no uranium plume is drawn, while sulphate and TDS still spread, because the lixiviant carries them wherever it is injected.
+The chance at the ring is the excursion probability. In the measured rock the plume barely leaves the wellfield in 20 years. TDS reaches about 30 m beyond the wellfield edge, sulphate 11 m and uranium 4 m, and most of the 9 to 10 ha footprint is the leach zone itself. In this bulk answer no indicator reaches its control limit at the 100 m ring. The excursion test, however, now reads the larger of the bulk and preferential-pathway answers (Section 7.5b), and on the pathway reading all three indicators are over their limits, so an excursion is declared. The order of spread (uranium far behind sulphate, which is behind TDS) comes from how strongly each chemical is held back by the rock. This is the same reason the US rules do not use uranium as an excursion indicator [@nureg1569], and the engine reproduces it without being told. At a location with no uranium ore (Ranchi), no uranium plume is drawn, while sulphate and TDS still spread, because the lixiviant carries them wherever it is injected.
 
 The sulphate and TDS runs report that their background lies outside the range the surrogate was trained on, so their ML bands are shown with a warning. Jaduguda’s TDS background (1,779 mg/L) comes from a single CGWB well about 8 km away.
 
-If the ore at Jaduguda were permeable enough for ISR (ore-zone K of 1 m/day), the same operation would send TDS about 535 m, over the limit at the ring in every draw, sulphate about 156 m (probability 0.56) and uranium about 38 m (0.06). This is the hypothetical answer, not a prediction.
+![The console result for TDS at the Jaduguda deposit, 20 years (local build, September 2026): the engine values with their ML bands and the measured-baseline note (left), and the ISR-feasibility comparison, labelled hypothetical (right).](figures/console_isr_comparison.png){w=14}
 
-![The console result for TDS at the Jaduguda deposit, 20 years (local build, September 2026): the engine values with their ML bands and the measured-baseline note (left), and the ISR-feasibility comparison, labelled hypothetical (right).](figures/console_isr_comparison.png){w=16}
-
-The two answers describe different rock, and their ranges do not overlap. The table below uses the same 48 Monte Carlo draws for both; Turamdih is run at the centre of the deposit at its seed depth of 140 m. The P50 of the draws is not exactly the engine’s single central value used in the other tables (for example 381 m against 389 m for Turamdih TDS in ISR-grade rock), because the draws also vary the other inputs.
+The two answers describe different rock, and their ranges do not overlap. The table below uses the same 48 Monte Carlo draws for both; Turamdih is run at the centre of the deposit at its seed depth of 140 m. The P50 of the draws is not exactly the engine’s single central value used in the other tables (for example 380 m against 389 m for Turamdih TDS in ISR-grade rock), because the draws also vary the other inputs.
 
 TABLE: Travel distance at 20 years (P10 – P50 – P90) in the measured rock and in ISR-grade rock
 |{w=3.6,3.4,2.0,4.4,2.6}|
 |Site and chemical|Measured rock|Chance at ring|ISR-grade rock|Chance at ring|
-|Jaduguda, TDS|18 – 31 – 59 m|0|215 – 555 – 1,395 m|1.0|
-|Turamdih, TDS|10 – 20 – 47 m|0|144 – 381 – 1,094 m|0.92|
-|Jaduguda, uranium|2 – 3 – 7 m|0|15 – 35 – 71 m|0.06|
+|Jaduguda, TDS|17 – 31 – 59 m|0|215 – 553 – 1,394 m|1.0|
+|Turamdih, TDS|9 – 20 – 46 m|0|143 – 380 – 1,092 m|0.92|
+|Jaduguda, uranium|1.5 – 3.1 – 6.4 m|0|14 – 33 – 69 m|0.06|
 
 The other deposits behave in the same way. With the default operation at the centre of each deposit and its seed depth, the continuum (bulk) excursion probability in the measured rock is 0 at every deposit. Section 7.5b shows what the preferential pathway adds.
 
@@ -163,23 +146,23 @@ TABLE: Reach at two other deposits after 20 years
 |Bagjata|TDS|8 m|98 m (0.50)|
 |Bagjata|Uranium|2 m|14 m (0)|
 
-**Shallow aquifer screening.** At the Jaduguda deposit, the top of the ore is at 170 m and the base of the shallow layer at 20 m, a separation of 150 m. Water itself would climb this distance in about 38 years on the yearly-average basis, but the dissolved chemicals are slower. The first constituent to arrive is TDS, after about 140 years (index 0.148, low); sulphate would take about 600 years and uranium about 9,400 years. The old-well route dominates the combined index, which is 0.052 (low). These arrival times are the same in both answers, because the hypothetical changes only the ore zone. TDS arrives first after about 48 years at Turamdih and about 109 years at Bagjata. This is a screening of whether a pathway exists, not a prediction of concentration in drinking water.
+**Shallow aquifer screening.** At the Jaduguda deposit, the top of the ore is at 170 m and the base of the shallow layer at 20 m, a separation of 150 m. With the upward gradient taken from the belt's own well pairs (0.083 at the middle of the measured range), water itself would climb this distance in about 3.5 years on the yearly-average basis, but the dissolved chemicals are slower. The first constituents to arrive are TDS and chloride, after about 11 years (3.5 to 27 across the measured gradient range; index 1.0, high). Sulphate would take about 49 years (index 0.51, high) and uranium about 860 years (370 to 1,960; index 0.088, low). For TDS and sulphate, upward leakage through the rock dominates the index; for uranium, which is held back strongly, the old-well route dominates. These arrival times are the same in both answers, because the hypothetical changes only the ore zone. TDS arrives first after about 4.3 years at Turamdih and about 7.0 years at Bagjata. This is a screening of whether a pathway exists, not a prediction of concentration in drinking water.
 
 **The registered site.** For the hypothetical site registered on the deployed system (86.36 E, 22.65 N, 0.35 km outside the Jaduguda deposit outline, injection 1,500 m³/day, ore at 150 m), the engine was run over 50 years with no restoration. Because the site lies just outside the outline, it is classed as belt and its uranium source is reduced.
 
 TABLE: Lifecycle of the registered Jaduguda site (no restoration; engine values)
 |{w=1.6,3.0,2.8,3.2,5.4}|
-|Year|Phase|Footprint (ha)|Uranium reach (m)|Excursion declared|
+|Year|Phase|Footprint (ha)|Uranium reach, bulk (m)|Excursion declared|
 |4|operation|7.83|0.3|no|
 |8|closure|8.59|0.4|no|
-|12|after closure|8.70|3.2|no|
-|20|after closure|8.70|5.4|no|
-|30|after closure|8.81|6.8|no|
-|50|after closure|8.81|8.6|no (only chloride over its control limit)|
+|12|after closure|8.70|3.2|yes (pathway)|
+|20|after closure|8.70|5.4|yes (pathway)|
+|30|after closure|8.81|6.8|yes (pathway)|
+|50|after closure|8.81|8.6|yes (pathway; bulk: only chloride over its limit)|
 
-Uranium never reaches the 100 m ring in 50 years. In this tight rock the salts do not trip the 2-of-3 rule either: by year 50 only chloride is over its control limit. The vertical index stays low (0.053 to 0.059), and TDS is the first to reach the shallow aquifer, after about 58.5 years. With a 6-year restoration sweep, the 20-year uranium reach is 0 m.
+In the bulk rock, uranium never reaches the 100 m ring in 50 years, and the salts do not trip the 2-of-3 rule either: by year 50 only chloride is over its control limit. The preferential pathway changes this. While the wellfield runs, the bleed holds the pathway in; after closure, the pathway reading puts all three indicators over their limits from year 12, so the excursion test, which reads the larger answer, declares an excursion. On the same upper-bound reading, uranium travels about 0.7 km by year 12 and 3.3 km by year 50. The vertical index stays low for uranium (0.09 to 0.19), and TDS is the first to reach the shallow aquifer, after about 4 years. With a 6-year restoration sweep, the 20-year bulk uranium reach is 0 m (17 m on the pathway reading).
 
-**Early warning by the indicators.** The early-warning role of the indicators is clearer at a belt site 2 km from Narwapahar (86.29 E, 22.69 N; same operation), where the shear-zone value fades towards the schist aquifer value and K at ore depth is 0.196 m/day. There, chloride crosses its control limit at the ring in year 17 and TDS in year 19, so an excursion is declared in year 19. At that time uranium is still at its background of 0.90 µg/L at the ring and has moved only about 11 m. The chemical indicators give the warning long before uranium, exactly as intended. At this more permeable site the salts would also reach the shallow aquifer much sooner: TDS first, after about 16 years, with a high screening index (0.65).
+**Early warning by the indicators.** The early-warning role of the indicators is clearer at a belt site 2 km from Narwapahar (86.29 E, 22.69 N; same operation), where the shear-zone value fades towards the schist aquifer value and K at ore depth is 0.196 m/day. There, in the bulk answer, chloride crosses its control limit at the ring in year 17 and TDS in year 19, which on its own would declare an excursion in year 19. At that time bulk uranium is still at its background of 0.90 µg/L at the ring and has moved only about 11 m. In the bulk rock the chemical indicators therefore give the warning long before uranium, exactly as intended. The preferential pathway, which the excursion test also reads, brings the declaration forward to year 9, the first year after closure; on that upper-bound reading uranium travels with the salts, which is why the excursion test does not rely on uranium. At this more permeable site the salts would also reach the shallow aquifer much sooner: TDS first, within about a year (0.3 to 2.7 years across the measured gradient range), with a high screening index (1.0).
 
 ## 7.5b Preferential Pathways and the Measured Upward Gradient (27 September 2026)
 
@@ -223,7 +206,7 @@ TABLE: Top 10 blocks by monitoring priority (out of 264)
 |9|Majhgaon|West Singhbhum|65.0|0|103.4|
 |10|Boram|East Singhbhum|65.0|0|46.5|
 
-The most important finding is the location of these blocks: **all top 25 blocks lie in East Singhbhum, West Singhbhum, Saraikela-Kharsawan or neighbouring Khunti**, which is the uranium belt itself. Sixteen of the 25 have no well at all, and the other nine have wells that were sampled but never tested for uranium. The cheapest improvement is to test those existing samples for uranium.
+**All top 25 blocks lie in the uranium belt** (East and West Singhbhum, Saraikela-Kharsawan and neighbouring Khunti). Sixteen have no well at all, and the other nine have wells never tested for uranium, so the cheapest improvement is to test those existing samples.
 
 ## 7.7 Sensitivity Analysis Results
 
@@ -241,7 +224,7 @@ The footprint area depends mostly on the two leach-zone growth constants, which 
 
 This is an important result for future work. With K set by the tight rock measured in the belt, the travel distance is carried less by K itself and more by the fracture–matrix exchange terms: the matrix transfer rate ω and the storage ratio β. Neither has been measured anywhere in the Singhbhum shear zone; ω is a literature value and β comes from typical porosities. A tracer test in the belt would reduce this uncertainty more than any other measurement.
 
-![Sobol total-order and first-order sensitivity indices for uranium at the Jaduguda deposit location, for travel distance, footprint area and ring concentration (the ring concentration stays at background, so its indices are undefined).](figures/sensitivity_jaduguda_deposit_uranium.png){w=16}
+![Sobol total-order and first-order sensitivity indices for uranium at the Jaduguda deposit location, for travel distance, footprint area and ring concentration (the ring concentration stays at background, so its indices are undefined).](figures/sensitivity_jaduguda_deposit_uranium.png){w=14}
 
 ## 7.8 Alert System Results
 
@@ -251,15 +234,15 @@ On the local database, the measured-exceedance scan raised **53 alerts** from th
 - **29 alert:** other wells above a permissible or “no relaxation” limit
 - **21 warning:** fluoride between 1.0 and 1.5 mg/L
 
-Before these fixes, the same scan had matched zero rows every time, because it only checked uranium above 30 ppb, which never happens in this record. On the deployed system (21 September 2026), 55 alerts had been raised, 4 residents were following 7 blocks, and email delivery through the Brevo relay was working.
+Before the fix of Section 9.9 the scan matched zero rows. On the deployed system (21 September 2026), 55 alerts had been raised, 4 residents were following 7 blocks, and email delivery through the Brevo relay was working.
 
 ## 7.9 Software and Deployment Results
 
 TABLE: Final software figures
 |{w=8,8}|
 |Item|Value|
-|Engine automated tests|463 (all passing)|
-|Backend automated tests (real PostGIS database)|533 (all passing)|
+|Engine automated tests|485 (all passing)|
+|Backend automated tests (real PostGIS database)|539 (all passing)|
 |End-to-end audit|43 of 44 checks pass (the radium travel-distance target fails)|
 |API endpoints|143, across 23 routers|
 |Portal screens|22|
@@ -268,16 +251,6 @@ TABLE: Final software figures
 |Code commits|191|
 |One engine run with 48 Monte Carlo draws, both answers|about 0.3 s locally|
 |One engine run on the free cloud tier|about 4 s (timed before the September 2026 redeployment)|
-|Surrogate training time|about 200 seconds|
 |Full data bake (900 scenarios)|about 1.5 to 2 hours|
 
-The online deployment runs the build described in this report, including surrogate version 6 and migration 0026 (Section 5.6).
-
-### Key achievements include:
-
-- A working, deployed system available online.
-- All 143 endpoints covered by a generated role-access matrix and tests.
-- Database row-level security verified on the live connection.
-- A complete alert loop, from measured data to email delivery.
-- A monitoring recommendation that points to the uranium belt as the weakest-monitored region.
-- Model inputs in the uranium belt taken from the belt’s own measurements and checked against the mines.
+All 143 endpoints are covered by a generated role-access matrix and tests, and row-level security was verified on the live database connection.
