@@ -82,9 +82,45 @@ TABLE: R² (log scale) of the P50 model for each chemical (target ≥ 0.60)
 
 For radium, the travel distance is below the project’s own target of 0.60. This is because radium hardly moves: most of its travel-distance values are exactly zero, and a regression model cannot learn such data well. The result is reported openly instead of lowering the target. The radium ring concentration passes (0.746) only because the ring value almost always equals the scenario’s background, which is itself a feature, so it says nothing new about how radium moves. The radium bands still cover at least 90% of cases in cross-validation and 95% in the real-location test, and the engine always gives the main radium value.
 
-SHAP analysis showed that the model relies on the right physical quantities. The plume front position calculated by the engine is the strongest feature for travel distance and excursion probability. The source concentration, the dispersivity and the wellfield width are the strongest for the footprint area, because most of the footprint is the leach zone itself. No map coordinate can appear, because none is a feature.
+### Confusion matrices for the ten models
 
-![SHAP feature importance for the excursion-probability model (version 6): the plume front position calculated by the engine (Xc_m) dominates.](figures/shap_excursion_probability.png){w=13}
+The ten models are regressors, so to show them as confusion matrices each output was sorted into the classes that the product itself uses: the 100 m monitoring ring for travel distance, the IS 10500 limit of each chemical for the ring concentration, and the 0.5 threshold at which a published screening becomes an *alert* (Section 4.9) for the excursion probability. The footprint area has no such threshold, so it is shown in three size classes around the leach zone (about 7–8 ha). Each matrix compares the class of the engine’s answer with the class of the surrogate’s prediction for the same row. The predictions are out-of-fold: the 5-fold cross-validation grouped by scenario was repeated with the trainer’s own settings, so every row was predicted by models that had never seen its scenario. The P10 and P90 models are compared with the engine’s own P10 and P90, before conformal widening. Because most rows fall into one class (most plumes stay inside the ring), the balanced accuracy, the average of the per-class recall, is given beside the plain accuracy.
+
+The version 6 training file itself was not kept, so it was baked again from the same commit with the same random seeds. The new file has the same rows, scenarios and summary statistics, and its cross-validation reproduces the recorded R² (log scale) of the four P50 and probability models within 0.003 (0.894, 0.930, 0.970 and 0.914, against 0.892, 0.930, 0.968 and 0.913). It is not identical byte for byte, because the engine’s floating-point results differ slightly from one computer to another. The matrices and SHAP plots are produced by docs/project_report/figure_scripts/model_figures.py, which stops if either check fails.
+
+TABLE: Accuracy of the ten surrogate models on the classes used by the product (out-of-fold, 5 folds grouped by scenario)
+|{w=4.0,6.0,2.8,3.2}|
+|Model|Classes|Accuracy|Balanced accuracy|
+|Footprint area, P10|< 10 ha / 10–30 ha / ≥ 30 ha|88.1%|86.6%|
+|Footprint area, P50|< 10 ha / 10–30 ha / ≥ 30 ha|87.0%|85.9%|
+|Footprint area, P90|< 10 ha / 10–30 ha / ≥ 30 ha|90.6%|90.0%|
+|Travel distance, P10|inside the 100 m ring / 100–500 m / ≥ 500 m|97.9%|81.0%|
+|Travel distance, P50|inside the 100 m ring / 100–500 m / ≥ 500 m|96.3%|82.8%|
+|Travel distance, P90|inside the 100 m ring / 100–500 m / ≥ 500 m|95.1%|85.3%|
+|Ring concentration, P10|within / above the IS 10500 limit|98.4%|91.9%|
+|Ring concentration, P50|within / above the IS 10500 limit|97.9%|94.5%|
+|Ring concentration, P90|within / above the IS 10500 limit|96.7%|93.4%|
+|Excursion probability|below / at or above 0.5 (the alert tier)|98.0%|94.3%|
+
+![Confusion matrices of the three footprint-area models (P10, P50, P90), out-of-fold, 17,858 rows: rows give the engine’s class and columns the surrogate’s, with the count and the share of the engine’s class in each cell. Almost every error falls into the neighbouring size class.](figures/cm_area.png){w=16}
+
+![Confusion matrices of the three travel-distance models, out-of-fold, 17,858 rows. Plumes that stay inside the 100 m monitoring ring are recognised in 99% of cases; the 100–500 m class is the weak spot, where about a fifth of rows are predicted inside the ring.](figures/cm_migration.png){w=16}
+
+![Confusion matrices of the three ring-concentration models against the IS 10500 limit of each chemical, out-of-fold, 18,000 rows.](figures/cm_ring.png){w=16}
+
+![The excursion-probability model: confusion matrix at the 0.5 threshold of the alert tier (left; out-of-fold, 18,000 rows) and the SHAP values of the served model for every training row (right). Each dot is one row; its colour is the feature’s value, from low (light) to high (dark).](figures/cm_shap_excursion.png){w=16}
+
+The surrogate’s weak spot is the larger plumes. Of the 1,241 rows where the engine’s P50 travel distance is 100–500 m, the P50 model places 248 (20%) inside the ring, so it tends to understate the reach. For the ring concentration, 210 of 2,136 above-limit rows (9.8%) are predicted within the limit, and for the excursion probability 225 of 2,147 alert-tier rows (10.5%) fall below 0.5. This is why the engine, not the surrogate, gives the value the portal shows and the value the alert tier reads (Section 4.9). The surrogate only supplies the uncertainty band beside it, so these misses cannot lower an alert.
+
+### SHAP analysis of each model
+
+SHAP analysis showed that the models rely on the right physical quantities. SHAP values were computed for all ten served models on every training row; the figures below show, for each target, the SHAP values of the P50 model and the mean absolute SHAP value of all three models (P10, P50 and P90). The plume front position calculated by the engine (Xc_m) is the strongest feature for travel distance and excursion probability. The source concentration, the dispersivity (alpha_L) and the wellfield width are the strongest for the footprint area, because most of the footprint is the leach zone itself. For the ring concentration, the scenario’s natural background (background_conc_Cb) comes first and the plume front second: where the plume has not reached the ring, the ring simply reads the background. The three models of each target put the same features at the top, so the band is driven by the same physics as the central value. No map coordinate can appear, because none is a feature.
+
+![SHAP analysis of the footprint-area models: SHAP values of the P50 model for every training row (left; colour is the feature’s value, light = low, dark = high) and the mean absolute SHAP value of the ten most important features in the P10, P50 and P90 models (right).](figures/shap_area.png){w=16}
+
+![SHAP analysis of the travel-distance models (P50 SHAP values, left; mean absolute SHAP value of the P10, P50 and P90 models, right). The plume front position calculated by the engine (Xc_m) dominates all three.](figures/shap_migration.png){w=16}
+
+![SHAP analysis of the ring-concentration models (P50 SHAP values, left; mean absolute SHAP value of the P10, P50 and P90 models, right). The natural background comes first, then the plume front position.](figures/shap_ring.png){w=16}
 
 ## 7.4 Validation of the Transport Engine
 

@@ -43,6 +43,7 @@ REPO = HERE.parents[1]
 OUT = HERE / "JalDrishti_Project_Report.docx"
 PAGES = HERE / "pages.json"
 FONT = "Times New Roman"
+MAX_FIG_HEIGHT_CM = 20.5      # text area is 24.7 cm; leaves room for a three-line caption
 
 REFS = json.loads((HERE / "references.json").read_text(encoding="utf-8"))
 cite_order: list[str] = []
@@ -308,6 +309,10 @@ def figure(doc, caption, path, width_cm):
     src = (HERE / path) if not Path(path).is_absolute() else Path(path)
     if not src.exists():
         src = REPO / path
+    # a figure taller than the text area pushes its caption onto the next page: cap the height
+    from PIL import Image
+    with Image.open(src) as im:
+        width_cm = min(width_cm, MAX_FIG_HEIGHT_CM * im.width / im.height)
     p = doc.add_paragraph()
     para_fmt(p, align=WD_ALIGN_PARAGRAPH.CENTER, before=6, after=2, spacing=1.0, keep_next=True)
     p.add_run().add_picture(str(src), width=Cm(width_cm))
@@ -459,7 +464,7 @@ def cover(doc, F):
     p = doc.add_paragraph(); para_fmt(p, align=WD_ALIGN_PARAGRAPH.CENTER, after=6, spacing=1.0)
     p.add_run().add_picture(str(HERE / "assets/texmin_logo.png"), height=Cm(2.0))
     p.add_run("      ")
-    p.add_run().add_picture(str(HERE / "assets/bit_sindri_crest.png"), height=Cm(2.3))
+    p.add_run().add_picture(str(HERE / "assets/bit_sindri_crest.png"), height=Cm(2.51))
     centred(doc, "TEXMiN-BIT Sindri CPS CoE", 13, bold=True, after=4, before=6)
     centred(doc, "Submitted in Partial Fulfilment of the requirements for", 12, after=4)
     centred(doc, "UDAAN UG Fellowship Programme (2025-26)", 13, bold=True, after=28)

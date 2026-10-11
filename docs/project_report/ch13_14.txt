@@ -60,20 +60,32 @@ The following annexures give supporting technical details: the database tables, 
 
 ## Annexure A: Database Tables and Migrations
 
-The main database tables are:
+The database has 23 tables after the last migration:
 
 - **users, orgs:** accounts (with home block and email opt-in) and organisations
 - **districts, blocks, aquifers:** administrative and aquifer geometry
-- **monitoring_wells, water_samples, monitoring_stations:** measured data, with the source of every row
+- **monitoring_wells, water_samples:** CGWB water-quality wells and their analyses, with the source of every row
+- **monitoring_stations, groundwater_level_readings:** CGWB water-level stations and their readings
 - **data_sources, dataset_versions:** checksums and versions of loaded files
 - **isr_points:** hypothetical sites with operating settings and injection start date
 - **scenarios, simulation_runs:** saved scenarios and runs, with plume geometry, timeline frames, vertical screening and the model version used
+- **simulations:** the run records used by the simulation and ML API routes
 - **advisories:** screenings with their status (draft, published, withdrawn)
-- **alerts, alert_deliveries, block_subscriptions:** alerts with tier and explanation, the email delivery log, and residents’ followed blocks
-- **field_observations:** submissions from field officers and their review
+- **alerts, alert_deliveries, alert_reads, block_subscriptions:** alerts with tier and explanation, the email delivery log, which alerts a user has read, and residents’ followed blocks
+- **field_observations, ore_observations:** submissions from field officers and their review, and the approved ore observations they produce
 - **audit_log:** record of every important action (cannot be edited or deleted)
 
 The schema was built through 26 Alembic migrations, from 0001_initial to 0026_alert_tiers_and_explanation. Important steps included: 0004 (wells and samples), 0007 (organisations, provenance and audit log), 0009 (row-level security), 0011 (fix of swapped district coordinates), 0012 (simulation runs), 0017 (advisories), 0018 (resident alerts), 0022 (single admin and restored regulator role), 0025 (home block and email delivery log) and 0026 (alert tiers and explanations).
+
+The four diagrams below show every column of every table, read from the migrated schema. **PK** marks the primary key and **FK** a foreign key, followed by the table it points to (→). An asterisk (*) marks a column that may not be empty. The relationships between the tables are drawn in the ER diagram of Section 8.6.
+
+![Complete ER diagram, part 1: geography and measured data (9 tables).](figures/er_full_geography.png){w=16}
+
+![Complete ER diagram, part 2: sites, scenarios and model runs (4 tables).](figures/er_full_modelling.png){w=16}
+
+![Complete ER diagram, part 3: screenings for publication and field data (3 tables).](figures/er_full_publication.png){w=16}
+
+![Complete ER diagram, part 4: users, alerts and audit (7 tables).](figures/er_full_people.png){w=16}
 
 ## Annexure B: Source Code Excerpts
 

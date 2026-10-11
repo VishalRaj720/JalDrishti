@@ -84,7 +84,11 @@ There is no separate task queue. Simulations run as background tasks inside the 
 
 ## 8.6 Database Design
 
-The database is PostgreSQL 16 with PostGIS, built through 26 Alembic migrations; its main tables are listed in Annexure A.
+The database is PostgreSQL 16 with PostGIS, built through 26 Alembic migrations. After the last migration it holds 23 tables with 281 columns, linked by 38 foreign keys. The entity–relationship (ER) diagram below shows every table and every relationship; the column-level diagrams of all 23 tables are in Annexure A. Both were drawn by a script (docs/project_report/figure_scripts/er_diagram.py) that reads the live schema of a freshly migrated database, so they show the schema exactly as the migrations build it.
+
+The tables fall into three groups. **Geography and measured data** (blue) holds the district, block and aquifer geometry and the CGWB measurements. **Users, alerts and audit** (orange) holds accounts, organisations, alerts and their delivery, and the audit log. **Modelling, field data and publication** (green) holds the hypothetical sites, saved scenarios and runs, the screenings proposed for publication and the field officers' submissions. Three tables act as hubs: *blocks* (every measurement, alert and resident is tied to a block), *users* (every proposal, decision and run records who made it) and *isr_points* (every scenario, run and screening belongs to a site).
+
+![Entity–relationship diagram of the JalDrishti database after migration 0026: all 23 tables and all 38 foreign keys, in crow's-foot notation. A crow's foot marks the "many" side; two bars mark exactly one, and a bar with a circle marks zero or one (the foreign key may be empty). Header colours: blue, geography and measured data; orange, users, alerts and audit; green, modelling, field data and publication. The column count of each table is shown; the columns themselves are in Annexure A.](figures/er_overview.png){w=16}
 
 Every table that holds sensitive data is protected by row-level security (RLS). For example, residents can never read the coordinates of a hypothetical site, residents can only read published screenings (not drafts), and the audit log has no update or delete permission for any role, so it can only grow. The API connects with a restricted database role that cannot bypass these rules; only database migrations use the owner account.
 

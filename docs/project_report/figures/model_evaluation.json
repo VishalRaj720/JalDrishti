@@ -1,0 +1,340 @@
+{
+  "model_card_version": 6,
+  "training_csv_sha256": "f16d380a6d92896a99109fc383434f93f73984368f54588ed5db4ae5c236590d",
+  "model_card_csv_sha256": "f7add484e6e443f84bd577eaa46c50e839a32844f169e932e9c1cba7afcff7a8",
+  "training_data_identity": "bake metadata + reproduced cross-validation (bytes differ)",
+  "rows": 18000,
+  "folds": 5,
+  "targets": {
+    "affected_area_ha": {
+      "n": 17858,
+      "r2_log_p50_reproduced": 0.8944,
+      "r2_log_p50_model_card": 0.8922,
+      "heads": {
+        "p10": {
+          "labels": [
+            "< 10 ha",
+            "10\u201330 ha",
+            "\u2265 30 ha"
+          ],
+          "matrix": [
+            [
+              7408,
+              204,
+              1
+            ],
+            [
+              740,
+              4345,
+              92
+            ],
+            [
+              96,
+              993,
+              3979
+            ]
+          ],
+          "accuracy": 0.8809,
+          "balanced_accuracy": 0.8658
+        },
+        "p50": {
+          "labels": [
+            "< 10 ha",
+            "10\u201330 ha",
+            "\u2265 30 ha"
+          ],
+          "matrix": [
+            [
+              7064,
+              308,
+              6
+            ],
+            [
+              672,
+              4117,
+              322
+            ],
+            [
+              92,
+              915,
+              4362
+            ]
+          ],
+          "accuracy": 0.8704,
+          "balanced_accuracy": 0.8585
+        },
+        "p90": {
+          "labels": [
+            "< 10 ha",
+            "10\u201330 ha",
+            "\u2265 30 ha"
+          ],
+          "matrix": [
+            [
+              6772,
+              360,
+              10
+            ],
+            [
+              366,
+              4170,
+              372
+            ],
+            [
+              47,
+              517,
+              5244
+            ]
+          ],
+          "accuracy": 0.9064,
+          "balanced_accuracy": 0.9002
+        }
+      },
+      "shap_top5": {
+        "p10": [
+          "source_conc_C0",
+          "wellfield_width_m",
+          "alpha_L",
+          "residual_fraction",
+          "Kd_L_kg"
+        ],
+        "p50": [
+          "source_conc_C0",
+          "alpha_L",
+          "wellfield_width_m",
+          "residual_fraction",
+          "is_tds_mg_l"
+        ],
+        "p90": [
+          "source_conc_C0",
+          "alpha_L",
+          "residual_fraction",
+          "wellfield_width_m",
+          "Kd_L_kg"
+        ]
+      }
+    },
+    "max_migration_distance_m": {
+      "n": 17858,
+      "r2_log_p50_reproduced": 0.9299,
+      "r2_log_p50_model_card": 0.9298,
+      "heads": {
+        "p10": {
+          "labels": [
+            "< 100 m (inside ring)",
+            "100\u2013500 m",
+            "\u2265 500 m"
+          ],
+          "matrix": [
+            [
+              16653,
+              63,
+              3
+            ],
+            [
+              190,
+              610,
+              19
+            ],
+            [
+              10,
+              90,
+              220
+            ]
+          ],
+          "accuracy": 0.979,
+          "balanced_accuracy": 0.8095
+        },
+        "p50": {
+          "labels": [
+            "< 100 m (inside ring)",
+            "100\u2013500 m",
+            "\u2265 500 m"
+          ],
+          "matrix": [
+            [
+              15671,
+              128,
+              3
+            ],
+            [
+              248,
+              896,
+              97
+            ],
+            [
+              33,
+              155,
+              627
+            ]
+          ],
+          "accuracy": 0.9628,
+          "balanced_accuracy": 0.8277
+        },
+        "p90": {
+          "labels": [
+            "< 100 m (inside ring)",
+            "100\u2013500 m",
+            "\u2265 500 m"
+          ],
+          "matrix": [
+            [
+              14486,
+              167,
+              7
+            ],
+            [
+              408,
+              1275,
+              81
+            ],
+            [
+              26,
+              193,
+              1215
+            ]
+          ],
+          "accuracy": 0.9506,
+          "balanced_accuracy": 0.8527
+        }
+      },
+      "shap_top5": {
+        "p10": [
+          "Xc_m",
+          "source_conc_C0",
+          "residual_fraction",
+          "is_radium_226_mbq_l",
+          "Kd_L_kg"
+        ],
+        "p50": [
+          "Xc_m",
+          "source_conc_C0",
+          "residual_fraction",
+          "is_radium_226_mbq_l",
+          "is_tds_mg_l"
+        ],
+        "p90": [
+          "Xc_m",
+          "source_conc_C0",
+          "is_radium_226_mbq_l",
+          "D_T",
+          "residual_fraction"
+        ]
+      }
+    },
+    "compliance_conc": {
+      "n": 18000,
+      "r2_log_p50_reproduced": 0.9704,
+      "r2_log_p50_model_card": 0.9684,
+      "heads": {
+        "p10": {
+          "labels": [
+            "within IS 10500 limit",
+            "above IS 10500 limit"
+          ],
+          "matrix": [
+            [
+              16662,
+              101
+            ],
+            [
+              193,
+              1044
+            ]
+          ],
+          "accuracy": 0.9837,
+          "balanced_accuracy": 0.919
+        },
+        "p50": {
+          "labels": [
+            "within IS 10500 limit",
+            "above IS 10500 limit"
+          ],
+          "matrix": [
+            [
+              15693,
+              171
+            ],
+            [
+              210,
+              1926
+            ]
+          ],
+          "accuracy": 0.9788,
+          "balanced_accuracy": 0.9455
+        },
+        "p90": {
+          "labels": [
+            "within IS 10500 limit",
+            "above IS 10500 limit"
+          ],
+          "matrix": [
+            [
+              14524,
+              204
+            ],
+            [
+              389,
+              2883
+            ]
+          ],
+          "accuracy": 0.9671,
+          "balanced_accuracy": 0.9336
+        }
+      },
+      "shap_top5": {
+        "p10": [
+          "background_conc_Cb",
+          "Xc_m",
+          "is_tds_mg_l",
+          "u_attenuation_k",
+          "containment_eta"
+        ],
+        "p50": [
+          "background_conc_Cb",
+          "Xc_m",
+          "source_conc_C0",
+          "is_tds_mg_l",
+          "u_attenuation_k"
+        ],
+        "p90": [
+          "background_conc_Cb",
+          "Xc_m",
+          "is_tds_mg_l",
+          "D_T",
+          "source_conc_C0"
+        ]
+      }
+    },
+    "excursion_probability": {
+      "n": 18000,
+      "r2_reproduced": 0.9143,
+      "r2_model_card": 0.9134,
+      "labels": [
+        "< 0.5 (notice)",
+        "\u2265 0.5 (alert tier)"
+      ],
+      "matrix": [
+        [
+          15710,
+          143
+        ],
+        [
+          225,
+          1922
+        ]
+      ],
+      "accuracy": 0.9796,
+      "balanced_accuracy": 0.9431,
+      "recall_alert": 0.8952,
+      "precision_alert": 0.9308,
+      "shap_top5": [
+        "Xc_m",
+        "source_conc_C0",
+        "residual_fraction",
+        "D_T",
+        "dimensionless_time_tau"
+      ]
+    }
+  }
+}

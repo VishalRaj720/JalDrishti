@@ -239,7 +239,7 @@ Each row has 40 features, grouped as: rock type; K, gradient, porosity and veloc
 
 ### Model and training
 
-For each of three targets (footprint area, travel distance and ring concentration), three XGBoost models [@chen2016] were trained for the 10th, 50th and 90th percentiles, using the quantile (pinball) loss [@koenker1978]. A fourth model predicts the excursion probability. This gives ten models in total. The settings were fixed: 450 trees, depth 5, learning rate 0.05. Physical rules were built into the models using monotone constraints. For example, a higher K can only increase the spread, and a higher bleed can only reduce it. Each of these rules was checked against the engine’s own results.
+For each of three targets (footprint area, travel distance and ring concentration), three XGBoost models [@chen2016] were trained for the 10th, 50th and 90th percentiles. Each model learns, with a squared-error loss on a log scale, the engine’s own Monte Carlo P10, P50 or P90 value for that row, so the band comes from the spread of the 48 engine draws rather than from a quantile loss. A fourth model predicts the excursion probability. This gives ten models in total. The settings were fixed: 450 trees, depth 5, learning rate 0.05. Physical rules were built into the models using monotone constraints. For example, a higher K can only increase the spread, and a higher bleed can only reduce it. Each of these rules was checked against the engine’s own results.
 
 ### Calibrated uncertainty (conformal prediction)
 
