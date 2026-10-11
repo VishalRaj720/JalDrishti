@@ -1,0 +1,83 @@
+digraph A {
+  graph [rankdir=TB, compound=true, nodesep=0.22, ranksep=0.30, fontname="Helvetica", dpi=220, newrank=true, splines=spline];
+  node  [shape=box, style="rounded,filled", fillcolor="white", color="#7a7a7a", fontname="Helvetica", fontsize=13, margin="0.10,0.05", penwidth=1.0, width=2.55];
+  edge  [color="#3c3c3c", penwidth=1.8, arrowsize=0.9];
+
+  subgraph cluster_data { label=<<B>1  DATA SOURCES</B>  <FONT POINT-SIZE="11">open public data</FONT>>; labeljust=l; fontsize=14; style="rounded,filled"; fillcolor="#e8f1fb"; color="#9ec5f4";
+    d1 [label=<<B>CGWB</B><BR/>water quality, water levels>];
+    d2 [label=<<B>Aquifers + NAQUIM</B><BR/>layers, 48 belt boreholes>];
+    d3 [label=<<B>GSI–NRSC</B><BR/>fracture lineaments>];
+    d4 [label=<<B>Deposits, UDEPO</B><BR/>DEM, rivers>];
+    d5 [label=<<B>BARC, UCIL</B><BR/>U/Ra surveys, mine data>];
+    d6 [label=<<B>USGS Texas ISR</B><BR/>source chemistry only>];
+  }
+  subgraph cluster_prep { label=<<B>2  DATA PREPARATION</B>>; labeljust=l; fontsize=14; style="rounded,filled"; fillcolor="#eef3f8"; color="#b9c8d8";
+    p1 [label=<<B>Ingestion</B><BR/>checksums, provenance>];
+    p2 [label=<<B>Flow field</B><BR/>gradient, direction ± σ>];
+    p3 [label=<<B>Fracture field</B><BR/>strike, alignment>];
+    p4 [label=<<B>K with depth</B><BR/>belt T = 19 m²/day>];
+    p5 [label=<<B>Local backgrounds</B><BR/>blend of BARC surveys>];
+    p6 [label=<<B>PostGIS database</B><BR/>23 tables, RLS>, fillcolor="#fff7e8", color="#e0a24a"];
+  }
+  res [label=<<B>Location resolver</B>: any point in Jharkhand → rock type, K at ore depth,<BR/>gradient and flow direction, fracture strike, layers, ore zone, background>, width=8.4, fillcolor="#fafafa", color="#555555", penwidth=1.5];
+
+  subgraph cluster_engine { label=<<B>3  PHYSICS TRANSPORT ENGINE</B>  <FONT POINT-SIZE="11">authority for every value</FONT>>; labeljust=l; fontsize=14; style="rounded,filled"; fillcolor="#e9f6ec"; color="#9fd3ad";
+    e1 [label=<Darcy velocity<BR/>v = K·i / φ>];
+    e2 [label=<Bleed containment<BR/>η = Qnet / (q·b·W)>];
+    e3 [label=<Dual porosity<BR/>R_eff = 1 + β·R_m>];
+    e4 [label=<Domenico / Ogata–Banks<BR/>+ fracture diffusion>];
+    e5 [label=<Restoration, rebound,<BR/>U attenuation>];
+    e6 [label=<Monte Carlo<BR/>48 draws, P10/P50/P90>];
+    o1 [label=<<B>Measured rock</B><BR/>plume, reach, 2-of-3 test>, fillcolor="#d4eedb", width=1.9];
+    o2 [label=<<B>Fracture pathway</B><BR/>upper bound>, fillcolor="#d4eedb", width=1.9];
+    o3 [label=<<B>Vertical screen</B><BR/>shallow aquifer>, fillcolor="#d4eedb", width=1.9];
+    o4 [label=<<B>ISR-feasibility</B><BR/>hypothetical only>, fillcolor="#f2f2f2", style="rounded,filled,dashed", width=1.9];
+  }
+  subgraph cluster_ml { label=<<B>4  ML SURROGATE</B>>; labeljust=l; fontsize=14; style="rounded,filled"; fillcolor="#f3eefa"; color="#c9b6e6";
+    m1 [label=<<B>10 XGBoost models</B><BR/>P10/P50/P90 × 3 + p(exc.)>];
+    m2 [label=<<B>Conformal bands</B><BR/>80 % coverage>];
+    m3 [label=<<B>Guards</B><BR/>drift, extrapolation>];
+  }
+  subgraph cluster_dec { label=<<B>5  DECISION LAYER</B>>; labeljust=l; fontsize=14; style="rounded,filled"; fillcolor="#fdf1e6"; color="#f0bf8f";
+    c1 [label=<<B>IS 10500 assessment</B><BR/>health bands>];
+    c2 [label=<<B>Alerts</B><BR/>5 kinds, 4 tiers>];
+    c3 [label=<<B>Monitoring gaps</B><BR/>264 blocks ranked>];
+  }
+  subgraph cluster_plat { label=<<B>6  PLATFORM</B>>; labeljust=l; fontsize=14; style="rounded,filled"; fillcolor="#f4f4f4"; color="#bdbdbd";
+    a1 [label=<<B>FastAPI</B><BR/>143 endpoints>, width=1.9];
+    a2 [label=<<B>React portal</B><BR/>22 screens>, width=1.9];
+    a3 [label=<<B>Scheduler</B><BR/>daily email>, width=1.9];
+    a4 [label=<<B>Cloud hosting</B><BR/>4 free tiers>, width=1.9];
+  }
+  subgraph cluster_users { label=<<B>USERS</B>>; labeljust=l; fontsize=14; style="rounded"; color="#bdbdbd";
+    node [style="rounded", width=1.45];
+    u1 [label="Admin"]; u2 [label="Regulator"]; u3 [label="Analyst"]; u4 [label="Field officer"]; u5 [label="Resident"];
+  }
+
+  // rows, fixed left-to-right order
+  edge [style=invis];
+  {rank=same; d1 -> d2 -> d3} {rank=same; d4 -> d5 -> d6} d1 -> d4; d2 -> d5; d3 -> d6;
+  {rank=same; p1 -> p2 -> p3} {rank=same; p4 -> p5 -> p6} p1 -> p4; p2 -> p5; p3 -> p6;
+  {rank=same; o1 -> o2 -> o3 -> o4}
+  {rank=same; m1 -> m2 -> m3}
+  {rank=same; c1 -> c2 -> c3}
+  {rank=same; a1 -> a2 -> a3 -> a4}
+  {rank=same; u1 -> u2 -> u3 -> u4 -> u5}
+  e1 -> e4; e2 -> e5; e3 -> e6; e4 -> o1; e5 -> o2; e6 -> o3;
+  o1 -> m1; o2 -> m2; o3 -> m3; m1 -> c1; m2 -> c2; m3 -> c3; c1 -> a1; c2 -> a2; c3 -> a3; a1 -> u1; a2 -> u3; a3 -> u4;
+
+  // visible flow inside the engine
+  edge [style=solid, penwidth=1.1, arrowsize=0.6];
+  {rank=same; e1 -> e2 -> e3} {rank=same; e4 -> e5 -> e6}
+  e3 -> e4 [constraint=false];
+
+  // layer-to-layer flow
+  edge [penwidth=1.8, arrowsize=0.9, fontname="Helvetica", fontsize=12];
+  d5 -> p2 [ltail=cluster_data, lhead=cluster_prep];
+  p5 -> res [ltail=cluster_prep];
+  res -> e2 [lhead=cluster_engine];
+  o1 -> m1 [ltail=cluster_engine, lhead=cluster_ml, style=dashed, color="#7b5ea7", fontcolor="#5d4585", label=<  18,000 engine runs<BR/>  train the surrogate>];
+  m2 -> c2 [ltail=cluster_ml, lhead=cluster_dec, label=<  engine value + ML band;<BR/>  alerts read the engine>];
+  c2 -> a2 [ltail=cluster_dec, lhead=cluster_plat];
+  a2 -> u3 [ltail=cluster_plat, lhead=cluster_users, dir=both, label=<  5 roles, row-level security>];
+}

@@ -1,0 +1,21 @@
+digraph F {
+  graph [rankdir=LR, nodesep=0.35, ranksep=0.42, fontname="Helvetica", dpi=220, newrank=true];
+  node  [shape=box, style="rounded,filled", fillcolor="white", color="#7a7a7a", fontname="Helvetica", fontsize=13, margin="0.12,0.07", width=2.6, height=0.95, penwidth=1.0];
+  edge  [color="#3c3c3c", penwidth=1.7, arrowsize=0.9];
+  s1 [label=<<B>1  Pick a point</B><BR/>analyst clicks in the<BR/>console or opens a site>, fillcolor="#f4f4f4"];
+  s2 [label=<<B>2  Check access</B><BR/>JWT, role read from<BR/>the database>, fillcolor="#f4f4f4"];
+  s3 [label=<<B>3  Resolve location</B><BR/>K, gradient, fractures,<BR/>layers, ore zone>, fillcolor="#eef3f8"];
+  s4 [label=<<B>4  Run the engine</B><BR/>plume, reach, ring,<BR/>excursion, vertical>, fillcolor="#e9f6ec"];
+  s8 [label=<<B>8  Notify residents</B><BR/>daily scan, email,<BR/>delivery log>, fillcolor="#fdf1e6"];
+  s7 [label=<<B>7  Raise alerts</B><BR/>blocks the footprint<BR/>touches, tiered>, fillcolor="#fdf1e6"];
+  s6 [label=<<B>6  Propose, publish</B><BR/>analyst proposes,<BR/>admin decides>, fillcolor="#f4f4f4"];
+  s5 [label=<<B>5  Add ML bands</B><BR/>P10–P90, drift and<BR/>extrapolation check>, fillcolor="#f3eefa"];
+  {rank=same; s1; s8}
+  {rank=same; s2; s7}
+  {rank=same; s3; s6}
+  {rank=same; s4; s5}
+  s1 -> s2 -> s3 -> s4;
+  s4 -> s5 [constraint=false];
+  s8 -> s7 -> s6 -> s5 [style=invis];          // column order of the bottom row
+  s5 -> s6 [constraint=false]; s6 -> s7 [constraint=false]; s7 -> s8 [constraint=false];
+}

@@ -17,9 +17,9 @@ Beyond the objectives of Chapter 2, the analysis added these requirements:
 
 ## 4.2 System Architecture
 
-The system is organised in five layers. Data flows from the data layer through the physics model and the ML model to the decision layer, and then through the web portal to the users.
+The system is organised in six layers, shown in the flowchart below. Open data is prepared into fields and a spatial database; a location resolver turns any point in the state into its hydrogeology; the physics engine computes the measured-rock answer, the preferential-pathway answer, the ISR-feasibility hypothetical and the vertical screening; an ML surrogate trained on the engine adds uncertainty bands; the decision layer turns results into assessments, alerts and monitoring priorities; and the platform delivers them to five kinds of user.
 
-FLOW: Data Layer (CGWB chemistry, levels and boreholes, aquifers, NAQUIM, lineaments, deposits, rivers, DEM, BARC surveys, UCIL mine records, Texas ISR records) >> Data Preparation (parsing, block assignment, flow field, fracture field, local backgrounds) >> Physics Transport Engine (measured-rock answer and ISR-feasibility hypothetical: plume footprint, travel distance, ring concentration, excursion test) >> ML Surrogate (XGBoost P10 / P50 / P90 with conformal bands) >> Decision Layer (IS 10500 assessment, alerts, monitoring-gap ranking) >> API and Web Portal (FastAPI, five roles, security) >> Action (publish screening, alert, email, acknowledgement)
+![System architecture of JalDrishti. Solid arrows show how data and results move between layers; the dashed arrow shows that the surrogate is trained on 18,000 engine runs. The engine’s measured-rock and fracture-pathway answers drive every value and alert; the ISR-feasibility answer (dashed box) is shown for comparison only and never raises an alert. The diagram source is docs/project_report/figure_scripts/system_architecture.dot.](figures/system_architecture.png){w=16}
 
 The physics engine and the ML model run inside the backend process; the deployed services are described in Sections 5.6 and 8.9.
 

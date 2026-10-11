@@ -4,9 +4,9 @@ The developed prototype, JalDrishti, is a web-based groundwater contamination sc
 
 ## 8.1 Overall System Architecture
 
-The main path of a request through the system is:
+The main path of a request through the system is shown below: an analyst picks a point, the location is resolved, the engine runs, the surrogate adds bands, and a published screening raises alerts that reach residents by email.
 
-FLOW: User selects a location or site in the portal >> API checks login and role >> Location details resolved (rock type, K, gradient, fractures, layers, ore zone, background) >> Physics engine runs (plume map, metrics, excursion test, vertical screening) >> ML surrogate adds P10–P90 bands and checks for extrapolation >> Result saved and shown on the map >> Screening published >> Alerts raised for affected blocks and emailed to residents
+![The path of one request, from a click in the console to a resident’s email. Each run is stored with the exact model version that produced it, so every published number can be re-derived.](figures/request_flow.png){w=16}
 
 The physics engine is loaded inside the backend process, not as a separate service. This keeps the system simple and fast. A single adapter file is the only point where the backend calls the engine, and it only passes allowed inputs, so that measured chemistry is never fed into a model that was not calibrated for it. Every saved run records the exact model version that produced it.
 
@@ -46,7 +46,7 @@ TABLE: Portal screens
 
 ### Console
 
-The console is the main working screen for analysts. The user clicks anywhere in Jharkhand, or chooses a registered hypothetical site. The system shows the local rock type, K, flow direction and ore zone, and the user sets the operating values: injection rate, bleed, wellfield width, years of operation, years of restoration and time since start. The engine then draws the plume on the map, shows the footprint, travel distance, ring concentration and excursion probability with their ML bands, and shows the 2-of-3 excursion panel and the shallow-aquifer screening. Below the result, a note states the measured permeability used and whether it is below the IAEA floor for in-situ leaching, and a table compares the measured-rock answer with the ISR-feasibility hypothetical, which is always labelled as hypothetical (Figure 7.3). The plume layer can be shown as a continuous concentration field, as the chance of exceeding the limit, or as contours. A timeline slider replays the plume over the years.
+The console is the main working screen for analysts. The user clicks anywhere in Jharkhand, or chooses a registered hypothetical site. The system shows the local rock type, K, flow direction and ore zone, and the user sets the operating values: injection rate, bleed, wellfield width, years of operation, years of restoration and time since start. The engine then draws the plume on the map, shows the footprint, travel distance, ring concentration and excursion probability with their ML bands, and shows the 2-of-3 excursion panel and the shallow-aquifer screening. Below the result, a note states the measured permeability used and whether it is below the IAEA floor for in-situ leaching, and a table compares the measured-rock answer with the ISR-feasibility hypothetical, which is always labelled as hypothetical (Section 7.5). The plume layer can be shown as a continuous concentration field, as the chance of exceeding the limit, or as contours. A timeline slider replays the plume over the years.
 
 ![The plume at the belt site near Narwapahar (TDS, 20 years; local build, September 2026, drawn without the background map tiles): (a) the concentration field and (b) the chance over the limit, fanned by the measured flow-direction uncertainty. The pink disc is the leach zone, the dotted circle is the monitoring ring and the thin outline is the ML P90 envelope.](figures/console_plume_views.png){w=14}
 
